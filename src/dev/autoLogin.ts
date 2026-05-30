@@ -13,6 +13,8 @@
 
 import { useAuth } from '@common/composables/useAuth';
 import { commonUtil, cookieHelper, logger } from '@common';
+import { accxuiConfig } from '@common/core/configRegistry';
+import { useUserStore } from '@/store/user';
 
 export async function tryDevAutoLogin(): Promise<void> {
   if (!import.meta.env.DEV) return;
@@ -25,11 +27,14 @@ export async function tryDevAutoLogin(): Promise<void> {
   if (!oms || !username || !password) return;
 
   const auth = useAuth();
+  const userStore = useUserStore();
   // If we already have a valid session for this OMS, skip — no need to re-login.
-  if (auth.isAuthenticated.value && cookieHelper().get('oms') === oms) return;
+  if (auth.isAuthenticated.value && cookieHelper().get('oms') === oms && commonUtil.getMaargURL()) return;
 
   try {
     // Seed the OMS cookie so commonUtil.getOmsURL() resolves correctly before login.
+    userStore.oms = oms;
+    accxuiConfig.value.oms = oms;
     auth.updateOMS(oms);
     cookieHelper().set('oms', oms);
 
@@ -37,6 +42,15 @@ export async function tryDevAutoLogin(): Promise<void> {
     await auth.fetchLoginOptions();
 
     await auth.login(username, password);
+    userStore.current = {
+      ...userStore.current,
+      userId: userStore.current.userId || cookieHelper().get('userId')
+    };
+    accxuiConfig.value.oms = oms;
+    accxuiConfig.value.current = userStore.current;
+    if (window.location.pathname === '/login') {
+      window.location.replace('/');
+    }
     logger.info('[dev] auto-login succeeded for', username, 'on', oms);
   } catch (err) {
     // Never log the password. The composable already shows a toast on failure.
