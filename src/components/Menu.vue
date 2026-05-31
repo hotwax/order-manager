@@ -9,54 +9,63 @@
     <ion-content>
       <ion-list>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item button router-link="/tasks" router-direction="root">
-            <ion-icon slot="start" :icon="checkboxOutline" />
-            <ion-label>{{ translate("Tasks") }}</ion-label>
+          <ion-item button router-link="/funnel" router-direction="root">
+            <ion-icon slot="start" :icon="funnelOutline" />
+            <ion-label>{{ translate("Funnel") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
           <ion-item button router-link="/orders" router-direction="root">
             <ion-icon slot="start" :icon="searchOutline" />
-            <ion-label>{{ translate("Find orders") }}</ion-label>
-          </ion-item>
-        </ion-menu-toggle>
-        <ion-menu-toggle :auto-hide="false">
-          <ion-item button router-link="/returns" router-direction="root">
-            <ion-icon slot="start" :icon="returnUpBackOutline" />
-            <ion-label>{{ translate("Find returns") }}</ion-label>
-          </ion-item>
-        </ion-menu-toggle>
-        <ion-menu-toggle :auto-hide="false">
-          <ion-item button router-link="/customers" router-direction="root">
-            <ion-icon slot="start" :icon="peopleOutline" />
-            <ion-label>{{ translate("Find customers") }}</ion-label>
-          </ion-item>
-        </ion-menu-toggle>
-        <ion-menu-toggle :auto-hide="false">
-          <ion-item button router-link="/shipments" router-direction="root">
-            <ion-icon slot="start" :icon="cubeOutline" />
-            <ion-label>{{ translate("Find shipments") }}</ion-label>
+            <ion-label>{{ translate("Find order") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-item-divider>
-          <ion-label>{{ translate("Customer service") }}</ion-label>
+          <ion-label>{{ translate("Blocked") }}</ion-label>
         </ion-item-divider>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item button router-link="/inflight-orders" router-direction="root">
+          <ion-item button router-link="/unfillable" router-direction="root">
+            <ion-icon slot="start" :icon="alertCircleOutline" />
+            <ion-label>{{ translate("Unfillable") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+        <ion-menu-toggle :auto-hide="false">
+          <ion-item button router-link="/bad-address" router-direction="root">
+            <ion-icon slot="start" :icon="locationOutline" />
+            <ion-label>{{ translate("Bad address") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+        <ion-menu-toggle :auto-hide="false">
+          <ion-item button router-link="/fraud" router-direction="root">
+            <ion-icon slot="start" :icon="shieldHalfOutline" />
+            <ion-label>{{ translate("Fraud") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+        <ion-menu-toggle :auto-hide="false">
+          <ion-item button router-link="/hold" router-direction="root">
+            <ion-icon slot="start" :icon="pauseCircleOutline" />
+            <ion-label>{{ translate("Hold") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+        <ion-item-divider>
+          <ion-label>{{ translate("In progress") }}</ion-label>
+        </ion-item-divider>
+        <ion-menu-toggle :auto-hide="false">
+          <ion-item button router-link="/open" router-direction="root">
+            <ion-icon slot="start" :icon="playCircleOutline" />
+            <ion-label>{{ translate("Open") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+        <ion-menu-toggle :auto-hide="false">
+          <ion-item button router-link="/inflight" router-direction="root">
             <ion-icon slot="start" :icon="airplaneOutline" />
-            <ion-label>{{ translate("Inflight orders") }}</ion-label>
+            <ion-label>{{ translate("Inflight") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item button router-link="/unallocated-orders" router-direction="root">
-            <ion-icon slot="start" :icon="locateOutline" />
-            <ion-label>{{ translate("Unallocated orders") }}</ion-label>
-          </ion-item>
-        </ion-menu-toggle>
-        <ion-menu-toggle :auto-hide="false">
-          <ion-item button router-link="/unwaved-orders" router-direction="root">
-            <ion-icon slot="start" :icon="layersOutline" />
-            <ion-label>{{ translate("Unwaved orders") }}</ion-label>
+          <ion-item button router-link="/packed" router-direction="root">
+            <ion-icon slot="start" :icon="cubeOutline" />
+            <ion-label>{{ translate("Packed") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
@@ -74,14 +83,15 @@
 import { IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonMenu, IonMenuToggle, IonTitle, IonToolbar } from '@ionic/vue';
 import {
   airplaneOutline,
-  checkboxOutline,
+  alertCircleOutline,
   cubeOutline,
-  layersOutline,
-  locateOutline,
-  peopleOutline,
-  returnUpBackOutline,
+  funnelOutline,
+  locationOutline,
+  pauseCircleOutline,
+  playCircleOutline,
   searchOutline,
-  settingsOutline
+  settingsOutline,
+  shieldHalfOutline
 } from 'ionicons/icons';
 import { translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';

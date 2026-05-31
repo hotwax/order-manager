@@ -165,21 +165,21 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrderStore } from '@/store/order';
 import { useUserStore } from '@/store/user';
-import { useUtilStore } from '@/store/util';
+import { useSeedStore } from '@/store/seed';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import SearchFilterCard from '@/components/SearchFilterCard.vue';
 
 const orderStore = useOrderStore();
 const userStore = useUserStore();
-const utilStore = useUtilStore();
+const seedStore = useSeedStore();
 const { searchQuery, searchFilters, searchSort, searchResults, searchTotal, loading, error, hasMore } = storeToRefs(orderStore);
 const debounceTimer = ref<ReturnType<typeof setTimeout>>();
 const selectMode = ref(false);
 const selectedOrderIds = ref<string[]>([]);
 
-const orderStatuses = computed(() => utilStore.getStatusItemsByType('ORDER_STATUS'));
-const salesChannels = computed(() => utilStore.getEnumsByType('ORDER_SALES_CHANNEL'));
+const orderStatuses = computed(() => seedStore.getStatusItemsByType('ORDER_STATUS'));
+const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
 const selectedProductStoreId = computed(() => userStore.currentProductStore?.productStoreId || 'All');
 const selectedStatusIds = computed(() => {
   const status = searchFilters.value.status as string[] | string;
@@ -203,10 +203,6 @@ const someCurrentPageSelected = computed(() => {
 
 onMounted(async () => {
   orderStore.searchFilters.productStoreId = selectedProductStoreId.value;
-  await Promise.allSettled([
-    utilStore.fetchStatusItemsByType('ORDER_STATUS'),
-    utilStore.fetchEnumsByType('ORDER_SALES_CHANNEL')
-  ]);
   await orderStore.runSearch();
 });
 
@@ -304,7 +300,7 @@ function setStatusFilter(statusId: string, checked: boolean) {
 }
 
 function statusDescription(statusId: string) {
-  return orderStatuses.value.find((status) => status.statusId === statusId)?.description || statusId;
+  return seedStore.statusDescription(statusId);
 }
 
 function createdDateLabel(value: string) {

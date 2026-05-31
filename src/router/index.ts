@@ -4,18 +4,15 @@ import { Login } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 import OrderSearch from '@/views/OrderSearch.vue';
 import OrderDetail from '@/views/OrderDetail.vue';
-import ShipmentSearch from '@/views/ShipmentSearch.vue';
-import ShipmentDetail from '@/views/ShipmentDetail.vue';
-import ReturnSearch from '@/views/ReturnSearch.vue';
-import ReturnDetail from '@/views/ReturnDetail.vue';
-import CustomerSearch from '@/views/CustomerSearch.vue';
-import CustomerDetail from '@/views/CustomerDetail.vue';
-import InflightOrders from '@/views/InflightOrders.vue';
-import UnallocatedOrders from '@/views/UnallocatedOrders.vue';
-import UnwavedOrders from '@/views/UnwavedOrders.vue';
 import Settings from '@/views/Settings.vue';
-import TaskQueue from '@/views/TaskQueue.vue';
-import TaskDetail from '@/views/TaskDetail.vue';
+import Funnel from '@/views/Funnel.vue';
+import UnfillableOrders from '@/views/UnfillableOrders.vue';
+import BadAddressOrders from '@/views/BadAddressOrders.vue';
+import FraudOrders from '@/views/FraudOrders.vue';
+import HoldOrders from '@/views/HoldOrders.vue';
+import OpenOrders from '@/views/OpenOrders.vue';
+import InflightOrders from '@/views/InflightOrders.vue';
+import PackedOrders from '@/views/PackedOrders.vue';
 
 const authGuard = async () => {
   if (!useAuth().isAuthenticated.value) {
@@ -26,12 +23,18 @@ const authGuard = async () => {
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/orders'
+    redirect: '/funnel'
   },
   {
     path: '/login',
     name: 'Login',
     component: Login
+  },
+  {
+    path: '/funnel',
+    name: 'Funnel',
+    component: Funnel,
+    beforeEnter: authGuard
   },
   {
     path: '/orders',
@@ -47,73 +50,45 @@ const routes: RouteRecordRaw[] = [
     beforeEnter: authGuard
   },
   {
-    path: '/tasks',
-    name: 'TaskQueue',
-    component: TaskQueue,
+    path: '/unfillable',
+    name: 'UnfillableOrders',
+    component: UnfillableOrders,
     beforeEnter: authGuard
   },
   {
-    path: '/tasks/:taskId',
-    name: 'TaskDetail',
-    component: TaskDetail,
-    props: true,
+    path: '/bad-address',
+    name: 'BadAddressOrders',
+    component: BadAddressOrders,
     beforeEnter: authGuard
   },
   {
-    path: '/shipments',
-    name: 'ShipmentSearch',
-    component: ShipmentSearch,
+    path: '/fraud',
+    name: 'FraudOrders',
+    component: FraudOrders,
     beforeEnter: authGuard
   },
   {
-    path: '/shipments/:shipmentId',
-    name: 'ShipmentDetail',
-    component: ShipmentDetail,
-    props: true,
+    path: '/hold',
+    name: 'HoldOrders',
+    component: HoldOrders,
     beforeEnter: authGuard
   },
   {
-    path: '/returns',
-    name: 'ReturnSearch',
-    component: ReturnSearch,
+    path: '/open',
+    name: 'OpenOrders',
+    component: OpenOrders,
     beforeEnter: authGuard
   },
   {
-    path: '/returns/:returnId',
-    name: 'ReturnDetail',
-    component: ReturnDetail,
-    props: true,
-    beforeEnter: authGuard
-  },
-  {
-    path: '/customers',
-    name: 'CustomerSearch',
-    component: CustomerSearch,
-    beforeEnter: authGuard
-  },
-  {
-    path: '/customers/:customerId',
-    name: 'CustomerDetail',
-    component: CustomerDetail,
-    props: true,
-    beforeEnter: authGuard
-  },
-  {
-    path: '/inflight-orders',
+    path: '/inflight',
     name: 'InflightOrders',
     component: InflightOrders,
     beforeEnter: authGuard
   },
   {
-    path: '/unallocated-orders',
-    name: 'UnallocatedOrders',
-    component: UnallocatedOrders,
-    beforeEnter: authGuard
-  },
-  {
-    path: '/unwaved-orders',
-    name: 'UnwavedOrders',
-    component: UnwavedOrders,
+    path: '/packed',
+    name: 'PackedOrders',
+    component: PackedOrders,
     beforeEnter: authGuard
   },
   {
@@ -124,7 +99,7 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/:pathMatch(.*)*',
-    redirect: '/orders'
+    redirect: '/funnel'
   }
 ];
 

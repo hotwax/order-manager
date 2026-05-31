@@ -16,6 +16,7 @@ import emitter from '@/event-bus';
 import Menu from '@/components/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';
+import { useSeedStore } from '@/store/seed';
 
 const loader = ref<HTMLIonLoadingElement | null>(null);
 const userStore = useUserStore();
@@ -53,6 +54,17 @@ onMounted(async () => {
 
   const timeZone = userProfile.value?.timeZone || userProfile.value?.userTimeZone;
   if (timeZone) Settings.defaultZone = timeZone;
+
+  // Ensure seed reference data is loaded on an authenticated boot. postLogin only fires on a
+  // login transition, so a page reload with a persisted session would otherwise skip it and
+  // leave label datasets (statuses, enums, geo, types) unresolved. loadInitialSeedData is
+  // idempotent — already-loaded datasets are skipped.
+  const productStoreIds = (userStore.current?.stores || [])
+    .map((store: any) => store.productStoreId)
+    .filter(Boolean);
+  if (productStoreIds.length) {
+    useSeedStore().loadInitialSeedData(productStoreIds).catch(() => undefined);
+  }
 });
 
 onUnmounted(() => {

@@ -1,4 +1,4 @@
-export type WorkflowBucket = 'inflight' | 'unallocated' | 'unwaved';
+export type WorkflowBucket = 'unfillable' | 'fraud' | 'open' | 'inflight' | 'packed';
 
 export interface WorkflowOrder {
   orderId: string;
@@ -25,6 +25,7 @@ export interface WorkflowOrder {
   pickedDate: string | null;
   receivedAtFacility: boolean;
   shipBeforeDate: string | null;
+  bucket: WorkflowBucket;
 }
 
 export interface WorkflowFilters {

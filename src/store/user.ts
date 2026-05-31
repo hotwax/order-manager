@@ -4,7 +4,9 @@ import { api, commonUtil, translate } from "@common";
 import { useAuth } from "@common/composables/useAuth";
 import logger from "@/logger";
 import { showToast } from "@/utils";
-import { useUtilStore } from "./util";
+import { useSeedStore } from "./seed";
+import { useOrderDetailStore } from "./orderDetail";
+import { useProductCacheStore } from "./productCache";
 
 export const useUserStore = defineStore("user", {
   state: () => ({
@@ -112,12 +114,13 @@ export const useUserStore = defineStore("user", {
         });
 
         this.current.stores = productStoresResp.data;
+        useSeedStore().setProductStores(productStoresResp.data || []);
         this.current.stores.push({
           productStoreId: "",
           storeName: "None",
         });
 
-        this.setCurrentProductStore(this.current.stores[0]);
+        await this.setCurrentProductStore(this.current.stores[0]);
       } catch (error: any) {
         logger.error("Failed to fetch product stores", error);
         return Promise.reject(error);
@@ -137,7 +140,7 @@ export const useUserStore = defineStore("user", {
         const preferredStoreId = preferredStoreResp.data;
         if (preferredStoreId) {
           const store = this.current.stores.find((store: any) => store.productStoreId === preferredStoreId);
-          store && this.setCurrentProductStore(store);
+          if (store) await this.setCurrentProductStore(store);
         }
       } catch (error) {
         logger.error("Favourite product store not found", error);
@@ -152,7 +155,7 @@ export const useUserStore = defineStore("user", {
         productStoreId: "",
         storeName: "None",
       };
-      await useUtilStore().fetchProductStoreShipmentMethods(this.currentProductStore.productStoreId);
+      await useSeedStore().loadProductStoreSeedData(this.currentProductStore.productStoreId);
     },
     async setUserTimeZone(tzId: string) {
       if (this.current.timeZone === tzId) return;
@@ -203,16 +206,16 @@ export const useUserStore = defineStore("user", {
         await this.fetchPermissions();
         await this.fetchProductStores();
         await this.fetchProductStorePreference();
-        await Promise.allSettled([
-          useUtilStore().fetchEntities(),
-          useUtilStore().fetchStatusFlowTransitions(),
-          useUtilStore().seedSelectableValues(this.currentProductStore.productStoreId)
-        ]);
+        const productStoreIds = (this.current.stores || []).map((store: any) => store.productStoreId).filter(Boolean);
+        await useSeedStore().loadInitialSeedData(productStoreIds);
       } catch (error: any) {
         return Promise.reject(error);
       }
     },
     async postLogout() {
+      useSeedStore().resetSeedData();
+      useOrderDetailStore().reset();
+      useProductCacheStore().reset();
       this.$reset();
     }
   },

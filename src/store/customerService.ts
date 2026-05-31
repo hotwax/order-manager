@@ -61,19 +61,26 @@ function generateOrders(): WorkflowOrder[] {
     let pickedDate: string | null = null;
     let receivedAtFacility = false;
     let statusId = 'ORDER_APPROVED';
+    let bucket: WorkflowBucket = 'open';
 
-    if (bucketRoll < 0.33) {
-      // Unallocated — approved, no facility
-      statusId = rng() > 0.5 ? 'ORDER_APPROVED' : 'ORDER_CREATED';
-    } else if (bucketRoll < 0.66) {
-      // Unwaved — brokered to facility, no picklist
+    if (bucketRoll < 0.15) {
+      bucket = 'unfillable';
+      statusId = 'ORDER_APPROVED';
+    } else if (bucketRoll < 0.45) {
+      bucket = 'fraud';
+      statusId = 'ORDER_HELD';
+    } else if (bucketRoll < 0.75) {
+      bucket = 'open';
+      statusId = 'ORDER_APPROVED';
+    } else if (bucketRoll < 0.9) {
+      bucket = 'inflight';
+      statusId = 'ORDER_APPROVED';
       facility = pick(rng, FACILITIES);
-      brokeringDate = now.minus({ hours: Math.floor(rng() * 48) }).toISO();
-      receivedAtFacility = rng() > 0.4;
+      receivedAtFacility = true;
     } else {
-      // Inflight — at the warehouse, no picklist
+      bucket = 'packed';
+      statusId = 'ORDER_APPROVED';
       facility = pick(rng, FACILITIES);
-      brokeringDate = now.minus({ hours: 24 + Math.floor(rng() * 72) }).toISO();
       receivedAtFacility = true;
     }
 
@@ -101,7 +108,8 @@ function generateOrders(): WorkflowOrder[] {
       picklistBinId,
       pickedDate,
       receivedAtFacility,
-      shipBeforeDate: now.plus({ days: 1 + Math.floor(rng() * 5) }).toISO()
+      shipBeforeDate: now.plus({ days: 1 + Math.floor(rng() * 5) }).toISO(),
+      bucket
     });
   }
 
@@ -142,28 +150,25 @@ function matchesFilters(order: WorkflowOrder, filters: WorkflowFilters): boolean
 }
 
 function inBucket(order: WorkflowOrder, bucket: WorkflowBucket): boolean {
-  switch (bucket) {
-    case 'unallocated':
-      return order.facilityId === null && order.picklistBinId === null;
-    case 'unwaved':
-      return order.facilityId !== null && order.picklistBinId === null && !order.receivedAtFacility;
-    case 'inflight':
-      return order.facilityId !== null && order.picklistBinId === null && order.receivedAtFacility;
-  }
+  return order.bucket === bucket;
 }
 
 export const useCustomerServiceStore = defineStore('customerService', {
   state: () => ({
     orders: generateOrders() as WorkflowOrder[],
     filters: {
+      unfillable: emptyFilters(),
+      fraud: emptyFilters(),
+      open: emptyFilters(),
       inflight: emptyFilters(),
-      unallocated: emptyFilters(),
-      unwaved: emptyFilters()
+      packed: emptyFilters()
     } as Record<WorkflowBucket, WorkflowFilters>,
     selection: {
+      unfillable: [] as string[],
+      fraud: [] as string[],
+      open: [] as string[],
       inflight: [] as string[],
-      unallocated: [] as string[],
-      unwaved: [] as string[]
+      packed: [] as string[]
     } as Record<WorkflowBucket, string[]>,
     lastAction: '' as string
   }),
@@ -181,9 +186,11 @@ export const useCustomerServiceStore = defineStore('customerService', {
       };
     },
     bucketCounts: (state) => ({
+      unfillable: state.orders.filter((order) => inBucket(order, 'unfillable')).length,
+      fraud: state.orders.filter((order) => inBucket(order, 'fraud')).length,
+      open: state.orders.filter((order) => inBucket(order, 'open')).length,
       inflight: state.orders.filter((order) => inBucket(order, 'inflight')).length,
-      unallocated: state.orders.filter((order) => inBucket(order, 'unallocated')).length,
-      unwaved: state.orders.filter((order) => inBucket(order, 'unwaved')).length
+      packed: state.orders.filter((order) => inBucket(order, 'packed')).length
     })
   },
   actions: {
@@ -206,54 +213,32 @@ export const useCustomerServiceStore = defineStore('customerService', {
       const selectedIds = new Set(this.selection[bucket]);
       if (selectedIds.size === 0) return;
 
-      const facilityCarousel = FACILITIES;
-      let carouselIndex = 0;
-
       this.orders = this.orders.map((order) => {
         if (!selectedIds.has(order.orderId)) return order;
 
-        if (bucket === 'unallocated' && actionId === 'broker') {
-          const facility = facilityCarousel[carouselIndex++ % facilityCarousel.length];
-          return {
-            ...order,
-            facilityId: facility.id,
-            facilityName: facility.name,
-            brokeringDate: DateTime.now().toISO(),
-            receivedAtFacility: false
-          };
+        if (actionId === 'cancel') {
+          return { ...order, statusId: 'ORDER_CANCELLED', bucket: 'open' };
         }
-        if (bucket === 'unallocated' && actionId === 'cancel') {
-          return { ...order, statusId: 'ORDER_CANCELLED' };
+        if (actionId === 'release') {
+          return { ...order, statusId: 'ORDER_APPROVED', bucket: 'open' };
         }
-        if (bucket === 'unwaved' && actionId === 'mark-received') {
-          return { ...order, receivedAtFacility: true };
+        if (actionId === 'rebroker') {
+          return { ...order, statusId: 'ORDER_APPROVED', bucket: 'open', facilityId: null, facilityName: null };
         }
-        if (bucket === 'unwaved' && actionId === 'rebroker') {
-          return {
-            ...order,
-            facilityId: null,
-            facilityName: null,
-            brokeringDate: null,
-            receivedAtFacility: false
-          };
-        }
-        if (bucket === 'inflight' && actionId === 'wave') {
+        if (actionId === 'wave') {
           return {
             ...order,
             picklistBinId: `BIN-${Math.floor(1000 + Math.random() * 9000)}`,
-            pickedDate: null
+            bucket: 'packed'
           };
         }
-        if (bucket === 'inflight' && actionId === 'hold') {
-          return { ...order, statusId: 'ORDER_HOLD' };
+        if (actionId === 'ship') {
+          return { ...order, statusId: 'ORDER_COMPLETED', bucket: 'open' };
         }
         return order;
       });
 
-      this.orders = this.orders.filter((order) => {
-        if (bucket === 'unallocated' && actionId === 'cancel') return order.statusId !== 'ORDER_CANCELLED';
-        return true;
-      });
+      this.orders = this.orders.filter((order) => order.statusId !== 'ORDER_CANCELLED' && order.statusId !== 'ORDER_COMPLETED');
 
       this.lastAction = `${actionId} · ${selectedIds.size} order${selectedIds.size === 1 ? '' : 's'}`;
       this.clearSelection(bucket);
@@ -262,16 +247,21 @@ export const useCustomerServiceStore = defineStore('customerService', {
 });
 
 export const BULK_ACTIONS: Record<WorkflowBucket, BulkActionDefinition[]> = {
-  unallocated: [
-    { id: 'broker', label: 'Broker to facility' },
+  unfillable: [
+    { id: 'rebroker', label: 'Rebroker order' },
     { id: 'cancel', label: 'Cancel', confirmText: 'Cancel selected orders?' }
   ],
-  unwaved: [
-    { id: 'mark-received', label: 'Mark received at facility' },
-    { id: 'rebroker', label: 'Send back to brokering' }
+  fraud: [
+    { id: 'release', label: 'Release order' },
+    { id: 'cancel', label: 'Cancel', confirmText: 'Cancel selected orders?' }
+  ],
+  open: [
+    { id: 'cancel', label: 'Cancel', confirmText: 'Cancel selected orders?' }
   ],
   inflight: [
-    { id: 'wave', label: 'Add to picklist' },
-    { id: 'hold', label: 'Place on hold' }
+    { id: 'wave', label: 'Add to picklist' }
+  ],
+  packed: [
+    { id: 'ship', label: 'Ship orders' }
   ]
 };
