@@ -1,6 +1,11 @@
 # Seed data
 
-The app should load these seed datasets at least once after login. Refresh behavior will be decided later.
+Status: **implemented** in `src/store/seed.ts`.
+
+The app loads stable reference datasets after login and reuses them across order screens.
+Refresh behavior is intentionally conservative: datasets that are already `loaded` are not
+refetched during the same persisted session, and transient `loading` states are reset on
+boot so a browser reload cannot leave labels stuck forever.
 
 Do not use generic entity access endpoints for this app. Seed data should come from explicit, bounded REST APIs.
 
@@ -31,8 +36,9 @@ Do not add a common aggregate seed-data endpoint for now. Keep each dataset mapp
 | Geos (address enrichment) | `GET admin/geos?geoTypeEnumId=GEOT_COUNTRY,GEOT_STATE,GEOT_PROVINCE&geoTypeEnumId_op=in` | Global | `geoId` |
 
 > `orderAdjustmentTypes` is currently nested under the `shippingGateways` resource (a
-> misplacement); used as-is. See `docs/MoquiChanges.md`. Geo sizing/analysis is in
-> `docs/GeoData.md` (1,388 rows total, ~232 KB; needed subset 963 rows, ~162 KB).
+> misplacement); used as-is. See [Moqui changes](../backend/MoquiChanges.md). Geo
+> sizing/analysis is in [Geo data](GeoData.md) (1,388 rows total, ~232 KB; needed subset
+> 963 rows, ~162 KB).
 
 ## Status types
 
@@ -48,6 +54,7 @@ Load these status types with `admin/status`:
 | `PAYMENT_PREF_STATUS` | Payment preference status labels |
 | `COM_EVENT_STATUS` | Communication event status labels |
 | `PARTY_STATUS` | Party/customer status labels |
+| `ORDER_HOLD_STATUS` | Order-hold WorkEffort lifecycle labels |
 
 ## Enum types
 
@@ -57,6 +64,7 @@ Load these enum types with `admin/enums`:
 | --- | --- |
 | `ORDER_SALES_CHANNEL` | Sales channel labels |
 | `ORDER_IDENTITY` | Order identification type labels (`OrderIdentification.orderIdentificationTypeId` is an `Enumeration`, so resolve via `enumDescription`). |
+| `ORDER_HOLD_PURPOSE` | Order-hold WorkEffort purpose labels. |
 
 ## Bounded reference endpoints
 
@@ -74,17 +82,16 @@ Use these explicit read-only endpoints for type datasets. Do not expose them thr
 
 ## Skipped for now
 
-Do not load work effort seed data yet. The local model will be revisited after migration work.
-
 Do not load product store payment settings. This dataset is not currently needed for the order detail rebuild.
 
 ## Pinia store contract
 
-Create one app-owned Pinia store for this data:
+One app-owned Pinia store owns this data:
 
 `src/store/seed.ts`
 
-This store owns stable lookup data that is reused across screens. It should not own order detail data, customer detail data, inventory, shipments, returns, or work items.
+This store owns stable lookup data that is reused across screens. It does not own order
+detail data, customer detail data, inventory, shipments, returns, or work items.
 
 ### State
 
@@ -102,7 +109,7 @@ type SeedDatasetState<T> = {
 };
 ```
 
-The store should have these top-level groups:
+The store has these top-level groups:
 
 ```ts
 {
@@ -141,21 +148,22 @@ The store should have these top-level groups:
 
 ### Actions
 
-The app should have one login-time entrypoint:
+The app has one login-time entrypoint:
 
 ```ts
 loadInitialSeedData(productStoreIds: string[]): Promise<void>
 ```
 
-This action should:
+This action:
 
-- fetch global datasets once
-- fetch product-store-scoped datasets for each available product store
-- use `Promise.allSettled` so one failed seed dataset does not block the app
-- set per-dataset loading state and errors
-- avoid refetching datasets already marked `loaded`
+- fetches global datasets once
+- fetches product-store-scoped datasets for each available product store
+- uses `Promise.allSettled` so one failed seed dataset does not block the app
+- sets per-dataset loading state and errors
+- avoids refetching datasets already marked `loaded`
+- demotes stale transient persisted states before loading
 
-The store should also expose focused loaders for later use:
+The store also exposes focused loaders:
 
 ```ts
 loadProductStoreSeedData(productStoreId: string): Promise<void>
@@ -164,7 +172,7 @@ loadEnumType(enumTypeId: string): Promise<void>
 resetSeedData(): void
 ```
 
-`resetSeedData` should be called on logout.
+`resetSeedData` is called on logout.
 
 ### Getters
 
@@ -251,6 +259,5 @@ Do not copy seed labels into the order detail store. That creates stale duplicat
 
 ### Existing util store
 
-The existing `util` store currently owns some of this behavior. As this plan is implemented, seed-data ownership should move out of `util` and into `seed`.
-
-Keep `util` only for generic UI/utilities that are not domain seed data.
+The former util-store seed responsibilities have moved into `seed`. Keep generic UI
+helpers outside this store; domain labels belong here.

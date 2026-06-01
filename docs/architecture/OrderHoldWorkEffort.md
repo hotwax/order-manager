@@ -169,7 +169,7 @@ always loaded; demo = dev only. `entity-facade-xml` upserts by PK, so it's re-ru
 ## 1.6 Restarts
 Two Moqui restarts: once after the entity port (1.1) so the table is created, once after the
 master changes (1.2). Validate XML with `xmllint`; restart by killing the full process tree
-(not just the screen) per `Compromises.md §2`.
+(not just the screen) per [Compromises](../history/Compromises.md).
 
 ---
 
@@ -180,7 +180,7 @@ Add two type ids so labels resolve (getters already exist — `enumDescription`,
 `statusDescription`):
 - `enumTypeIds` += `"ORDER_HOLD_PURPOSE"`
 - `statusTypeIds` += `"ORDER_HOLD_STATUS"`
-Update `docs/SeedData.md` accordingly. No new getters (the `ORDER_HOLD_STATUS_FLOW`
+Update [Seed data](SeedData.md) accordingly. No new getters (the `ORDER_HOLD_STATUS_FLOW`
 transitions load via the existing `loadStatusFlowTransitions`, so `allowedTransitions` works too).
 
 ## 2.2 Order detail store  (`src/store/orderDetail.ts`)
@@ -235,7 +235,7 @@ no extra fetches.
 - `ofbiz-oms-udm/entity/DatamodelWorkeffortEntitymodel.xml` — new `OrderHeaderWorkEffort`
 - `oms/entity/OrderExtendedEntities.xml` — masters (1.2)
 - `oms/data/OrderHoldTypeData.xml` (new), `oms/data/OrderHoldDemoData.xml` (new), `oms/component.xml`
-- `apps/order-manager/src/store/seed.ts`, `docs/SeedData.md`
+- `apps/order-manager/src/store/seed.ts`, [Seed data](SeedData.md)
 - `apps/order-manager/src/store/orderDetail.ts`
 - `apps/order-manager/src/views/OrderDetail.vue` (script + the one banner block; no CSS)
 

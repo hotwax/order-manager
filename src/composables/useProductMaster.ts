@@ -8,8 +8,8 @@ import { useProductCacheStore, type CachedProduct, type ProductIdentification } 
  * productId and NEVER refetched once cached. The order detail page is the first consumer.
  *
  * This mirrors inventory-count/src/composables/useProductMaster.ts. Same public API; the
- * storage backend is currently the in-memory productCache store (Dexie deferred — see
- * docs/ProductData.md and docs/Compromises.md). Consumers never touch the store directly.
+ * productCache store keeps a reactive in-memory mirror backed by Dexie persistence.
+ * Consumers never touch the store directly.
  */
 
 const PRODUCT_FIELDS = "productId productName parentProductName internalName goodIdentifications mainImageUrl";

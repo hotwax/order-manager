@@ -1,5 +1,7 @@
 # Geo data (address enrichment)
 
+Status: **implemented** as the `geos` dataset in `src/store/seed.ts`.
+
 Postal addresses in the order payload carry geo **IDs**, not display names:
 
 ```

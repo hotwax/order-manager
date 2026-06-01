@@ -1,5 +1,9 @@
 # Compromises log
 
+Status: **historical implementation log**. Use this for context on why decisions were made
+or how the local environment was verified; use the other docs for the current planned
+architecture.
+
 Running log of compromises made during the order-detail data-enrichment build
 (autonomous session, 2026-05-31). Read top to bottom.
 
@@ -56,7 +60,8 @@ cross-session persistence and multi-tenant on-disk storage are deferred.
    `"chart.js": "catalog:"` to a pinned version), so `pnpm install` works again.
 2. `pnpm --filter order-manager add dexie`.
 3. Swap the in-memory Map in `src/store/productCache.ts` for the `CommonDB` Dexie tables
-   (per `docs/ProductData.md`). **No consumer changes** — the composable API is unchanged.
+   (per [Product data](../architecture/ProductData.md)). **No consumer changes** — the
+   composable API is unchanged.
 
 ---
 
@@ -80,7 +85,7 @@ The original note is kept below for history.
 ### (history) Person-name master join requires a Moqui restart
 
 **What:** Customer name should come from `Person`/`PartyGroup` via an extended `OrderRole`
-master (see `docs/MoquiChanges.md` §1). I wrote the entity change in
+master (see [Moqui changes](../backend/MoquiChanges.md)). I wrote the entity change in
 `oms/entity/OrderExtendedEntities.xml` and validated the XML.
 
 **Why a compromise:** Moqui loads entity definitions/masters at **framework startup** — it
@@ -122,6 +127,10 @@ unrelated structure.
 
 ## 6. Template graph left intact — some nodes are still static placeholders
 
+Superseded for holds: the static hold banner was later removed and real holds now render in
+the Holds tab via `OrderHeaderWorkEffort` / `ORDER_HOLD` WorkEfforts. The note below is kept
+only as the earlier constraint that shaped the first binding pass.
+
 I was told not to change the template graph or CSS of `OrderDetail.vue`, only the Vue
 script and incorrect loops. Consequences:
 
@@ -161,4 +170,4 @@ Not fixed (out of scope; would be a global tsconfig/Pinia-version change).
 Geo is 963 needed rows (~162 KB) / 1,388 total (~232 KB) — small. Put it in the seed store
 (persisted to localStorage) like other reference data, rather than Dexie. This is a
 deliberate choice, not a forced compromise: Dexie is reserved for large per-product data.
-See `docs/GeoData.md` for the measured size/load analysis.
+See [Geo data](../architecture/GeoData.md) for the measured size/load analysis.

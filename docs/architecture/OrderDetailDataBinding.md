@@ -1,5 +1,7 @@
 # Order detail — data binding & label coverage
 
+Status: **implemented for the current read-only order detail surface**.
+
 The order detail page makes **one order API call** on load:
 
 ```
@@ -14,7 +16,7 @@ Everything on the page resolves from one of three sources, none of which is a se
 2. **The seed store** (stable reference data loaded once at login via `loadInitialSeedData`
    — status/enum/type labels and geo names)
 3. **The product cache** (rich product fields fetched once per `productId` and never
-   refetched — a shared lookup, not a per-order call; see `docs/ProductData.md`)
+   refetched — a shared lookup, not a per-order call; see [Product data](ProductData.md))
 
 This doc is the contract for what the page renders and where each label comes from.
 
@@ -42,15 +44,18 @@ This doc is the contract for what the page renders and where each label comes fr
 | Return type | `returnItems[].returnTypeId` | `seed.returnTypeDescription` | `returnTypes` ✓ |
 | Return item type | `returnItems[].returnItemTypeId` | `seed.returnItemTypeDescription` | `returnItemTypes` ✓ |
 | Role labels | `roles[].roleTypeId` | `seed.roleTypeDescription` | `roleTypes` ✓ |
+| Hold purpose | `workEfforts[].workEffort.workEffortPurposeTypeId` | `seed.enumDescription` | `ORDER_HOLD_PURPOSE` ✓ |
+| Hold status | `workEfforts[].workEffort.statusId` | `seed.statusDescription` | `ORDER_HOLD_STATUS` ✓ |
 
-**The seed store already covers every reference label the page needs except one** (see gaps below).
+The seed store covers the reference labels used by the current page. Any missing future
+labels should be added to `src/store/seed.ts` rather than copied into the order store.
 
 ## Three data sources, no extra order calls
 
 1. **The order payload** — one `GET oms/orders?...` per order (transactional data).
 2. **The seed store** — stable reference data loaded once at login (labels + geo).
 3. **The product cache** — rich product data fetched **once per productId, ever**, and
-   cached (see `docs/ProductData.md`). Not an order call; a shared lookup that never
+   cached (see [Product data](ProductData.md)). Not an order call; a shared lookup that never
    refetches the same product.
 
 | UI element | Source |
@@ -65,12 +70,13 @@ This doc is the contract for what the page renders and where each label comes fr
 | Identification type labels | seed `enumDescription(orderIdentificationTypeId)` (`ORDER_IDENTITY`) |
 | Adjustment type labels | seed `orderAdjustmentTypeDescription(orderAdjustmentTypeId)` |
 | Amounts / totals | payload `grandTotal`, `items[].unitPrice`, `adjustments[].amount` |
+| Open order holds | payload `workEfforts[].workEffort` filtered to `ORDER_HOLD` and `ORD_HOLD_OPEN` |
 
 ## Decisions
 
 ### Customer name comes from Person/PartyGroup, not ship-to name
 `roles[]` carries only `partyId`. We **extend the OrderRole entity master** to join
-`Person` + `PartyGroup` (see `docs/MoquiChanges.md` §1), so the order payload itself carries
+`Person` + `PartyGroup` (see [Moqui changes](../backend/MoquiChanges.md)), so the order payload itself carries
 `roles[PLACING_CUSTOMER].person.{firstName,lastName}` (B2C) or `.partyGroup.groupName` (B2B).
 No extra call — it's in the same master fetch.
 
@@ -80,13 +86,14 @@ falls back to `postalAddress.toName`. The `customer` store is **dropped** from t
 ### Product data is rich, via the shared product cache
 The payload has no product name/SKU/image — only `itemDescription`, `productId`,
 `externalId`. We adopt the inventory-count product-master pattern: fetch product display
-fields from Solr **on demand, cached per `productId`, never refetched** (`docs/ProductData.md`).
+fields from Solr **on demand, cached per `productId`, never refetched** ([Product data](ProductData.md)).
 After the order loads, `prefetch(itemProductIds)` runs once; item labels then resolve to
 `product.productName` with `itemDescription`/`productId` as graceful fallback.
 
 ### Geo names resolved from the seed store
 `postalAddress.stateProvinceGeoId` / `countryGeoId` resolve through `seed.geoName(...)`.
-Geo (1,388 rows, ~232 KB) loads at login like other reference data — see `docs/GeoData.md`.
+Geo (1,388 rows, ~232 KB) loads at login like other reference data; see
+[Geo data](GeoData.md).
 
 ### Identification + adjustment type labels resolved from seed
 - Identification types are **Enumerations** (`enumTypeId ORDER_IDENTITY`) → `enumDescription`.
@@ -97,8 +104,8 @@ Both added to `loadInitialSeedData`.
 ## Net result
 
 - **One** `GET oms/orders` per order. Customer name, addresses, items, statuses, payments,
-  comms, returns all come from that single payload.
+  comms, returns, and holds all come from that single payload.
 - All reference labels (statuses, enums, types, **geo**, **identification types**,
-  **adjustment types**) come from the seed store loaded at login.
+  **adjustment types**, **hold purpose/status**) come from the seed store loaded at login.
 - Product names/SKUs/images come from the shared product cache — fetched once per product,
-  never twice.
+  never twice, and persisted per OMS in Dexie.

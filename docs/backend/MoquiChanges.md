@@ -1,5 +1,8 @@
 # Moqui changes for order detail enrichment
 
+Status: **partly implemented in the local Moqui/OMS working trees**, with remaining API
+gaps tracked in [API requirements](API_REQUIREMENTS.md).
+
 Single fetch the order detail page uses:
 
 ```
@@ -46,7 +49,8 @@ And change the OrderHeader `default` master's roles line:
 **⚠ Requires a Moqui restart.** Entity-definition/master changes load at framework
 startup; they do not hot-reload. Until the server is restarted with this change, the order
 payload will not contain `roles[].person`. The PWA therefore falls back to
-`postalAddress.toName` and upgrades automatically once `person` appears. (See Compromises.md.)
+`postalAddress.toName` and upgrades automatically once `person` appears. See
+[Compromises](../history/Compromises.md).
 
 ## 2. Type/reference endpoints — already live, no Moqui change
 
