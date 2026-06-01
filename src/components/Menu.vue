@@ -20,6 +20,12 @@
             <ion-label>{{ translate("Find order") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
+        <ion-menu-toggle :auto-hide="false">
+          <ion-item button router-link="/customers" router-direction="root">
+            <ion-icon slot="start" :icon="peopleOutline" />
+            <ion-label>{{ translate("Find customers") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
         <ion-item-divider>
           <ion-label>{{ translate("Blocked") }}</ion-label>
         </ion-item-divider>
@@ -88,6 +94,7 @@ import {
   funnelOutline,
   locationOutline,
   pauseCircleOutline,
+  peopleOutline,
   playCircleOutline,
   searchOutline,
   settingsOutline,

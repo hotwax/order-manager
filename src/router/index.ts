@@ -4,6 +4,8 @@ import { Login } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 import OrderSearch from '@/views/OrderSearch.vue';
 import OrderDetail from '@/views/OrderDetail.vue';
+import CustomerFind from '@/views/CustomerFind.vue';
+import CustomerDetail from '@/views/CustomerDetail.vue';
 import Settings from '@/views/Settings.vue';
 import Funnel from '@/views/Funnel.vue';
 import UnfillableOrders from '@/views/UnfillableOrders.vue';
@@ -46,6 +48,19 @@ const routes: RouteRecordRaw[] = [
     path: '/orders/:orderId',
     name: 'OrderDetail',
     component: OrderDetail,
+    props: true,
+    beforeEnter: authGuard
+  },
+  {
+    path: '/customers',
+    name: 'CustomerFind',
+    component: CustomerFind,
+    beforeEnter: authGuard
+  },
+  {
+    path: '/customers/:customerId',
+    name: 'CustomerDetail',
+    component: CustomerDetail,
     props: true,
     beforeEnter: authGuard
   },
