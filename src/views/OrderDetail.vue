@@ -277,6 +277,10 @@
               <ion-label>Shipping</ion-label>
               <ion-note slot="end">{{ money(orderTotals.shipping, order.currency) }}</ion-note>
             </ion-item>
+            <ion-item v-if="orderTotals.other">
+              <ion-label>Discounts &amp; adjustments</ion-label>
+              <ion-note slot="end">{{ money(orderTotals.other, order.currency) }}</ion-note>
+            </ion-item>
             <ion-item class="total-item">
               <ion-label>Grand Total</ion-label>
               <ion-note slot="end" color="dark">{{ money(orderTotals.total, order.currency) }}</ion-note>
@@ -704,6 +708,29 @@ const openHolds = computed(() => orderDetailStore.openHolds.map((hold: any) => {
   };
 }));
 
+const ITEM_STATUS_PROGRESSION: Record<string, number> = {
+  ITEM_CREATED: 0,
+  ITEM_APPROVED: 1,
+  ITEM_COMPLETED: 2
+};
+const INACTIVE_ITEM_STATUSES = new Set(['ITEM_CANCELLED', 'ITEM_REJECTED']);
+
+/**
+ * Representative status for a grouped (split) line. A line spanning several units
+ * isn't "Completed" until every *active* unit is, so we surface the least-progressed
+ * active status. Cancelled/rejected units are ignored unless they're all that remain.
+ */
+function dominantItemStatusId(statusIds: string[]): string {
+  if (!statusIds.length) return '';
+  const active = statusIds.filter((statusId) => !INACTIVE_ITEM_STATUSES.has(statusId));
+  const pool = active.length ? active : statusIds;
+  return pool.reduce(
+    (lowest, statusId) =>
+      (ITEM_STATUS_PROGRESSION[statusId] ?? 99) < (ITEM_STATUS_PROGRESSION[lowest] ?? 99) ? statusId : lowest,
+    pool[0]
+  );
+}
+
 const groupedItems = computed(() => {
   if (!order.value) return [];
 
@@ -777,37 +804,42 @@ const groupedItems = computed(() => {
     });
   });
 
-  return Object.values(groups);
+  // The collapsed line shows one representative status across its splits (see
+  // dominantItemStatusId); per-split rows still carry their own exact status.
+  const result = Object.values(groups);
+  result.forEach((group) => {
+    group.status = seed.statusDescription(dominantItemStatusId(group.items.map((item) => item.statusId)));
+  });
+  return result;
 });
 
 const orderTotals = computed(() => {
   const raw = orderDetailStore.current;
-  if (!raw) return { subtotal: 0, taxes: 0, shipping: 0, total: 0 };
+  if (!raw) return { subtotal: 0, taxes: 0, shipping: 0, other: 0, total: 0 };
 
   let subtotal = 0;
-  let taxes = 0;
-  let shipping = 0;
-
   (raw.shipGroups || []).forEach((sg: any) => {
     (sg.items || []).forEach((item: any) => {
+      // Cancelled/rejected units aren't billed; excluding them keeps the breakdown
+      // reconciled to grandTotal (verified on M103061: 207.00 items + 47.65 shipping = 254.65).
+      if (INACTIVE_ITEM_STATUSES.has(item.statusId)) return;
       subtotal += Number(item.unitPrice || 0) * Number(item.quantity || 0);
     });
   });
 
+  let taxes = 0;
+  let shipping = 0;
+  let other = 0;
   (raw.adjustments || []).forEach((adj: any) => {
     const amount = Number(adj.amount || 0);
-    if (adj.orderAdjustmentTypeId === 'SHIPPING_CHARGES') {
-      shipping += amount;
-    } else if (adj.orderAdjustmentTypeId === 'SALES_TAX') {
-      taxes += amount;
-    } else {
-      taxes += amount;
-    }
+    if (adj.orderAdjustmentTypeId === 'SHIPPING_CHARGES') shipping += amount;
+    else if (adj.orderAdjustmentTypeId === 'SALES_TAX') taxes += amount;
+    else other += amount; // discounts, promotions, and any other adjustment type
   });
 
-  const total = raw.grandTotal || (subtotal + taxes + shipping);
+  const total = raw.grandTotal || (subtotal + taxes + shipping + other);
 
-  return { subtotal, taxes, shipping, total };
+  return { subtotal, taxes, shipping, other, total };
 });
 
 const selectedSegment = ref('items');
