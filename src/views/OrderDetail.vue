@@ -946,6 +946,7 @@ ion-card-header  ion-buttons {
 .order-item-rollup {
   --columns-desktop: 4;
   --columns-tablet: 4;
+  padding-inline-end: var(--spacer-base);
 }
 
 .order-item-row {
