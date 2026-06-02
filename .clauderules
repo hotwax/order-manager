@@ -1,0 +1,11 @@
+# Custom Rules & Style Guidelines
+
+## Badges & Status Colors
+- **Rule**: Never use hardcoded colors (like `color="primary"`) for status badges or status indicator components.
+- **Helper**: Always resolve the status color dynamically using the shared `commonUtil.getStatusColor(statusId)` helper from `@common`.
+- **Example**:
+  ```html
+  <ion-badge :color="commonUtil.getStatusColor(order.statusId)">
+    {{ order.status }}
+  </ion-badge>
+  ```
