@@ -179,10 +179,10 @@
           <ion-list-header>
             <ion-label>Items</ion-label>
           </ion-list-header>
-          <ion-item buttonDetail="false" button>
+          <ion-item lines="full" buttonDetail="false" button>
             <ion-checkbox :checked="areAllSelected" justify="start" label-placement="end" @ionChange="toggleSelectAll($event.detail.checked)">Select all</ion-checkbox>
-            <ion-button slot="end" fill="clear" @click.stop>
-              Add item
+            <ion-button slot="end" fill="outline" color="medium" @click.stop>
+              Add items
             </ion-button>
           </ion-item>
           <ion-accordion-group>
@@ -286,17 +286,17 @@
           <ion-list lines="none">
             <ion-item>
               <ion-label>Subtotal</ion-label>
-              <ion-note slot="end">{{ money(orderTotals.subtotal, order.currency) }}</ion-note>
+              <ion-label slot="end">{{ money(orderTotals.subtotal, order.currency) }}</ion-label>
             </ion-item>
             <ion-item v-for="(amount, typeId) in orderTotals.adjustments" :key="typeId">
               <ion-label>{{ seed.orderAdjustmentTypeDescription(typeId) }}</ion-label>
-              <ion-note slot="end">{{ money(amount, order.currency) }}</ion-note>
-            </ion-item>
-            <ion-item class="total-item">
-              <ion-label>Grand Total</ion-label>
-              <ion-note slot="end" color="dark">{{ money(orderTotals.total, order.currency) }}</ion-note>
+              <ion-label slot="end">{{ money(amount, order.currency) }}</ion-label>
             </ion-item>
           </ion-list>
+          <ion-item class="total-item">
+            <ion-label>Grand Total</ion-label>
+            <ion-label slot="end" color="dark">{{ money(orderTotals.total, order.currency) }}</ion-label>
+          </ion-item>
         </ion-card>
       </div>
       <div v-if="selectedSegment === 'ship-groups'">
