@@ -10,84 +10,58 @@
     </ion-header>
 
     <ion-content>
-      <ion-card>
-        <ion-card-header>
-          <ion-card-title>{{ translate("Overview") }}</ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-          <div class="ion-text-center">
-            <h2>{{ totalOrders }} {{ translate("Total Orders") }}</h2>
-            <p>{{ totalBlocked }} {{ translate("Blocked") }} · {{ totalInProgress }} {{ translate("In Progress") }}</p>
-          </div>
-        </ion-card-content>
-      </ion-card>
+      div class facets
+        ion item class facet item for each product store user is linked to
+        ion item h1 product store name globe icon
 
-      <ion-list>
-        <ion-item-divider>
-          <ion-label>{{ translate("Blocked") }}</ion-label>
-        </ion-item-divider>
+        ion card class global stat
+          div class total orders 
+            p class overline date today
+            p class big number order count where order date is today
+            p time since day start
 
-        <ion-item button router-link="/unfillable" router-direction="forward">
-          <ion-icon slot="start" :icon="alertCircleOutline" color="danger" />
-          <ion-label>
-            <h2>{{ translate("Unfillable") }}</h2>
-            <p>{{ translate("Orders that cannot be filled due to inventory shortage") }}</p>
-          </ion-label>
-          <ion-badge slot="end" color="danger">{{ counts['unfillable'] }}</ion-badge>
-        </ion-item>
+          div class metrics
+            div class metric
+              p brokering status
+              progress bar
+              p picked and packed
+              progress bar
 
-        <ion-item button router-link="/bad-address" router-direction="forward">
-          <ion-label>
-            <h2>{{ translate("Bad address") }}</h2>
-          </ion-label>
-        </ion-item>
+        section class drilldown
+          ion card
+            p class overline open orders
+            p class big number orders where status is approved
+            p order date from 1st result where status is approved sorted by order date ascending
 
-        <ion-item button router-link="/fraud" router-direction="forward">
-          <ion-icon slot="start" :icon="shieldHalfOutline" color="danger" />
-          <ion-label>
-            <h2>{{ translate("Fraud") }}</h2>
-            <p>{{ translate("Suspicious orders flagged for manual review") }}</p>
-          </ion-label>
-          <ion-badge slot="end" color="danger">{{ counts['fraud'] }}</ion-badge>
-        </ion-item>
+          ion card
+          p class overline unfillable
+          p class big number number of orders where facility id equals unfillable
+          animated spark line graph
 
-        <ion-item button router-link="/hold" router-direction="forward">
-          <ion-label>
-            <h2>{{ translate("Hold") }}</h2>
-          </ion-label>
-        </ion-item>
+          ion card
+          p class overline Order Hold tasks
+          p class big number number of orders with hold tasks
+          ion item substitute number of workefforts where purpose type is substitute
+          ion item bad address number of workefforts where purpose type is bad address
+          ion item fraud risk number of workefforts where purpose type is fraud
 
-        <ion-item-divider>
-          <ion-label>{{ translate("In Progress") }}</ion-label>
-        </ion-item-divider>
+        br divider
 
-        <ion-item button router-link="/open" router-direction="forward">
-          <ion-icon slot="start" :icon="playCircleOutline" color="primary" />
-          <ion-label>
-            <h2>{{ translate("Open") }}</h2>
-            <p>{{ translate("Newly created or approved orders awaiting fulfillment") }}</p>
-          </ion-label>
-          <ion-badge slot="end" color="primary">{{ counts['open'] }}</ion-badge>
-        </ion-item>
+        ion item h1 facility name business icon
+        div class dimension
+          ion search search facilities
+          ion segment
+            order volume
+            Fulfillment Velocity
+            Partial fulfillments
 
-        <ion-item button router-link="/inflight" router-direction="forward">
-          <ion-icon slot="start" :icon="airplaneOutline" color="secondary" />
-          <ion-label>
-            <h2>{{ translate("Inflight") }}</h2>
-            <p>{{ translate("Orders brokered and sent to fulfilment facility") }}</p>
-          </ion-label>
-          <ion-badge slot="end" color="secondary">{{ counts['inflight'] }}</ion-badge>
-        </ion-item>
-
-        <ion-item button router-link="/packed" router-direction="forward">
-          <ion-icon slot="start" :icon="cubeOutline" color="success" />
-          <ion-label>
-            <h2>{{ translate("Packed") }}</h2>
-            <p>{{ translate("Orders packed and ready for shipping pick up") }}</p>
-          </ion-label>
-          <ion-badge slot="end" color="success">{{ counts['packed'] }}</ion-badge>
-        </ion-item>
-      </ion-list>
+        ion list class facilities
+          ion list header Top 10 facilities by selected dimension or Search results
+          metric
+            ion radio for each facility in result facility name end slot order count
+            progress bar where 100% progress is metric count of highest randing facility in given metric
+        h1 Fill rate at Facility name
+          copy fulfillment dashboard from fulfillment app to here
     </ion-content>
   </ion-page>
 </template>
