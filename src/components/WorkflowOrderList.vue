@@ -143,6 +143,7 @@ import {
   alertController
 } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { DateTime } from 'luxon';
 import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import type { BulkActionDefinition, WorkflowBucket, WorkflowOrder } from '@/types/customerService';
@@ -163,6 +164,7 @@ const props = defineProps<{
 }>();
 
 const store = useCustomerServiceStore();
+const route = useRoute();
 const toastMessage = ref('');
 
 const filters = computed({
@@ -179,6 +181,25 @@ const allCurrentPageSelected = computed(() => {
   return currentPageOrderIds.value.length > 0 && currentPageOrderIds.value.every((orderId) => selectedIds.value.has(orderId));
 });
 const someCurrentPageSelected = computed(() => currentPageOrderIds.value.some((orderId) => selectedIds.value.has(orderId)));
+
+function queryValue(value: unknown) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function applyRouteFilters() {
+  const productStoreId = queryValue(route.query.productStoreId);
+  const facilityId = queryValue(route.query.facilityId);
+
+  if (typeof productStoreId === 'string') {
+    filters.value.productStoreId = productStoreId;
+  }
+
+  if (typeof facilityId === 'string') {
+    filters.value.facilityId = facilityId;
+  }
+}
+
+watch(() => route.query, applyRouteFilters, { immediate: true });
 
 watch(orders, () => {
   const currentOrderIds = new Set(currentPageOrderIds.value);

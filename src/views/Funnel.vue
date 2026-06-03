@@ -11,45 +11,23 @@
 
     <ion-content>
       <!-- Facets: Product Store selector -->
+      <!-- Loops over the product stores the user is linked to; selection binds to selectedStoreId -->
       <div class="facets ion-padding">
-        <!-- 
-          BUSINESS LOGIC COMMENT:
-          Bind the selected product store ID to a reactive variable.
-          Example: v-model="selectedStoreId"
-        -->
-        <ion-radio-group value="store-1">
-          <ion-list lines="none">
-            <!-- 
-              BUSINESS LOGIC COMMENT:
-              Loop over the product stores that the user is linked to.
-              Example: v-for="store in productStores" :key="store.productStoreId"
-            -->
-            <ion-item class="facet-item">
-              <ion-radio value="store-1" label-placement="end">Store Name 1</ion-radio>
-            </ion-item>
-            <ion-item class="facet-item">
-              <ion-radio value="store-2" label-placement="end">Store Name 2</ion-radio>
-            </ion-item>
-          </ion-list>
-        </ion-radio-group>
+        <RadioFacetGroup v-model="selectedStoreId" :options="storeOptions" />
       </div>
 
-      <!-- Page Heading: Shows based on selected product store -->
-      <!-- 
-        BUSINESS LOGIC COMMENT:
-        Display name of the selected product store dynamically based on active selection.
-      -->
+      <!-- Page Heading: Name of the selected product store -->
       <ion-item lines="none" class="selected-store-header">
         <ion-icon slot="start" :icon="globeOutline" />
         <ion-label>
-          <h1>Store Name 1</h1>
+          <h1>{{ selectedStoreName }}</h1>
         </ion-label>
       </ion-item>
 
       <!-- Global Stat Card -->
       <ion-card class="global-stat">
         <ion-card-content>
-          <div class="total-orders ion-text-center">
+          <div class="total-orders">
             <!-- Date Today -->
             <p class="overline">Today</p>
             <!-- Order Count today -->
@@ -59,94 +37,80 @@
           </div>
 
           <div class="metrics">
-            <div class="metric">
+            <ion-item button detail="true" lines="none" class="metric" router-link="/open">
               <!-- Brokering Status -->
               <div class="metric-label">
                 <p>Brokering status</p>
                 <p>85%</p>
               </div>
               <ion-progress-bar :value="0.85"></ion-progress-bar>
-            </div>
-            <div class="metric">
+            </ion-item>
+            <ion-item button detail="true" lines="none" class="metric" router-link="/packed">
               <!-- Picked and Packed -->
               <div class="metric-label">
                 <p>Picked and packed</p>
                 <p>62%</p>
               </div>
               <ion-progress-bar :value="0.62" color="success"></ion-progress-bar>
-            </div>
+            </ion-item>
           </div>
         </ion-card-content>
       </ion-card>
 
       <!-- Drilldown Section -->
       <section class="drilldown ion-padding">
-        <!-- Card 1: Open Orders -->
+        <!-- Card 1: Open Orders — subtitle follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Open Orders list on click -->
-        <ion-card button class="drilldown-card">
-          <ion-card-content>
-            <p class="overline">Open Orders</p>
-            <!-- orders where status is approved -->
-            <h1 class="big-number">345</h1>
-            <!-- order date from 1st result where status is approved sorted by order date ascending -->
-            <p class="card-detail">Oldest: May 30, 2026 10:15 AM</p>
-          </ion-card-content>
-        </ion-card>
+        <!-- stat: orders where status is approved -->
+        <!-- subtitle: order date from 1st result where status is approved sorted by order date ascending -->
+        <StatCard
+          button
+          router-link="/open"
+          title="Open Orders"
+          :stat="345"
+          subtitle="Oldest: May 30, 2026 10:15 AM"
+        />
 
-        <!-- Card 2: Unfillable -->
+        <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
-        <ion-card button class="drilldown-card">
-          <ion-card-content>
-            <p class="overline">Unfillable</p>
-            <!-- number of orders where facility id equals unfillable -->
-            <h1 class="big-number">42</h1>
-            <!-- animated spark line graph -->
-            <div class="sparkline-container">
-              <svg class="sparkline" viewBox="0 0 100 30" width="100%" height="30" stroke="var(--ion-color-danger)" stroke-width="2" fill="none">
-                <polyline points="0,25 10,22 20,28 30,15 40,20 50,5 60,18 70,12 80,22 90,8 100,10" />
-              </svg>
-            </div>
-          </ion-card-content>
-        </ion-card>
+        <!-- stat: number of orders where facility id equals unfillable -->
+        <StatCard button router-link="/unfillable" title="Unfillable" :stat="42">
+          <Sparkline :points="unfillableTrend" color="danger" />
+        </StatCard>
 
-        <!-- Card 3: Order Hold Tasks -->
+        <!-- Card 3: Order Hold Tasks — drilldown follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Display list of tasks requiring resolution -->
-        <ion-card class="drilldown-card">
-          <ion-card-content>
-            <p class="overline">Order Hold Tasks</p>
-            <!-- number of orders with hold tasks -->
-            <h1 class="big-number">32</h1>
-            
-            <ion-list lines="none" class="hold-tasks-list">
-              <!-- Substitute workefforts -->
-              <ion-item button detail="true">
-                <ion-label>
-                  <h2>Substitute</h2>
-                  <!-- number of workefforts where purpose type is substitute -->
-                  <p>12 tasks</p>
-                </ion-label>
-              </ion-item>
-              
-              <!-- Bad Address workefforts -->
-              <ion-item button detail="true">
-                <ion-label>
-                  <h2>Bad Address</h2>
-                  <!-- number of workefforts where purpose type is bad address -->
-                  <p>15 tasks</p>
-                </ion-label>
-              </ion-item>
-              
-              <!-- Fraud Risk workefforts -->
-              <ion-item button detail="true">
-                <ion-label>
-                  <h2>Fraud Risk</h2>
-                  <!-- number of workefforts where purpose type is fraud -->
-                  <p>5 tasks</p>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-          </ion-card-content>
-        </ion-card>
+        <!-- stat: number of orders with hold tasks -->
+        <StatCard title="Order Hold Tasks" :stat="32">
+          <ion-list lines="none" class="hold-tasks-list">
+            <!-- Substitute workefforts -->
+            <ion-item button detail="true" router-link="/unfillable">
+              <ion-label>
+                Substitute
+                <!-- number of workefforts where purpose type is substitute -->
+              </ion-label>
+              <p slot="end">12 tasks</p>
+            </ion-item>
+
+            <!-- Bad Address workefforts -->
+            <ion-item button detail="true" router-link="/bad-address">
+              <ion-label>
+                Bad Address
+                <!-- number of workefforts where purpose type is bad address -->
+              </ion-label>
+              <p slot="end">15 tasks</p>
+            </ion-item>
+
+            <!-- Fraud Risk workefforts -->
+            <ion-item button detail="true" router-link="/fraud">
+              <ion-label>
+                Fraud Risk
+                <!-- number of workefforts where purpose type is fraud -->
+              </ion-label>
+              <p slot="end">5 tasks</p>
+            </ion-item>
+          </ion-list>
+        </StatCard>
       </section>
 
       <!-- Divider -->
@@ -188,98 +152,118 @@
         </ion-list-header>
 
         <!-- BUSINESS LOGIC COMMENT: Bind selected facility ID to ref via ion-radio-group -->
-        <ion-radio-group value="facility-1">
+        <ion-radio-group v-model="selectedFacilityId">
           <!-- Facility 1 (highest ranking, 100% progress) -->
           <!-- BUSINESS LOGIC COMMENT: progress bar value is computed as: metric count / max count in result set -->
           <ion-item lines="none" class="facility-radio-item">
-            <ion-radio value="facility-1" justify="space-between" label-placement="start">
-              <div class="facility-radio-content">
-                <div class="facility-radio-header">
-                  <h2>Main Warehouse</h2>
-                  <ion-note>450 orders</ion-note>
-                </div>
-                <ion-progress-bar :value="1.0" color="primary"></ion-progress-bar>
+            <ion-radio slot="start" value="WH_RNO" />
+            <div class="facility-metric">
+              <div class="facility-metric-label">
+                <ion-label>Reno DC</ion-label>
+                <ion-note>450 orders</ion-note>
               </div>
-            </ion-radio>
+              <ion-progress-bar :value="1.0" color="primary" />
+            </div>
           </ion-item>
 
           <!-- Facility 2 (e.g., 300 orders -> 66% progress) -->
           <ion-item lines="none" class="facility-radio-item">
-            <ion-radio value="facility-2" justify="space-between" label-placement="start">
-              <div class="facility-radio-content">
-                <div class="facility-radio-header">
-                  <h2>Dallas Fulfillment</h2>
-                  <ion-note>300 orders</ion-note>
-                </div>
-                <ion-progress-bar :value="300 / 450" color="primary"></ion-progress-bar>
+            <ion-radio slot="start" value="WH_ATL" />
+            <div class="facility-metric">
+              <div class="facility-metric-label">
+                <ion-label>Atlanta DC</ion-label>
+                <ion-note>300 orders</ion-note>
               </div>
-            </ion-radio>
+              <ion-progress-bar :value="300 / 450" color="primary" />
+            </div>
           </ion-item>
 
           <!-- Facility 3 (e.g., 150 orders -> 33% progress) -->
           <ion-item lines="none" class="facility-radio-item">
-            <ion-radio value="facility-3" justify="space-between" label-placement="start">
-              <div class="facility-radio-content">
-                <div class="facility-radio-header">
-                  <h2>Seattle Store</h2>
-                  <ion-note>150 orders</ion-note>
-                </div>
-                <ion-progress-bar :value="150 / 450" color="primary"></ion-progress-bar>
+            <ion-radio slot="start" value="WH_LDN" />
+            <div class="facility-metric">
+              <div class="facility-metric-label">
+                <ion-label>London DC</ion-label>
+                <ion-note>150 orders</ion-note>
               </div>
-            </ion-radio>
+              <ion-progress-bar :value="150 / 450" color="primary" />
+            </div>
           </ion-item>
         </ion-radio-group>
       </ion-list>
 
-      <!-- Fill Rate and Fulfillment Dashboard at selected Facility -->
+      <!-- Online Order Fulfillment Dashboard at selected Facility -->
       <div class="fulfillment-dashboard-section ion-padding">
         <h1 class="section-title">Fill rate at Facility Name</h1>
 
-        <!-- 
-          BUSINESS LOGIC COMMENT:
-          Copy fulfillment dashboard from fulfillment app to here.
-          Displays key fulfillment KPIs, graphs, or detailed tables.
-        -->
-        <div class="fulfillment-dashboard-grid">
-          <!-- KPI 1: Fill Rate -->
-          <ion-card class="kpi-card">
-            <ion-card-content>
-              <p class="overline">Weekly Fill Rate</p>
-              <h2 class="kpi-value text-success">94.2%</h2>
-              <ion-progress-bar :value="0.942" color="success"></ion-progress-bar>
-              <p class="kpi-subtext">Target: 95.0%</p>
-            </ion-card-content>
+        <!-- Copied exactly from Dashboard.vue -->
+        <div class="fulfillment">
+          <!-- Fill Rate Card -->
+          <ion-card class="fill-rate">
+            <ion-item lines="none">
+              <p class="overline">Today's Fill Rate</p>
+              <ion-icon slot="end" :icon="informationCircleOutline" />
+            </ion-item>
+            <ion-list lines="none">
+              <h1>94%</h1>
+              <ion-item>
+                <ion-label>Order allocated</ion-label>
+                <ion-label slot="end">150/Unlimited</ion-label>
+              </ion-item>
+              <ion-item>
+                <ion-label>Orders packed</ion-label>
+                <ion-label slot="end" color="success">141</ion-label>
+              </ion-item>
+              <ion-item>
+                <ion-label>Orders rejected</ion-label>
+                <ion-label slot="end" color="danger">9</ion-label>
+              </ion-item>
+            </ion-list>
           </ion-card>
 
-          <!-- KPI 2: Fulfillment Cycle Time -->
-          <ion-card class="kpi-card">
-            <ion-card-content>
-              <p class="overline">Avg Cycle Time</p>
-              <h2 class="kpi-value">3.8 hrs</h2>
-              <ion-progress-bar :value="0.76" color="primary"></ion-progress-bar>
-              <p class="kpi-subtext">Order received to shipping label</p>
-            </ion-card-content>
+          <!-- Orders Pending Fulfillment Card -->
+          <ion-card class="orders">
+            <p class="overline title">Orders Pending Fulfillment</p>
+            <div class="pending">
+              <h1>24</h1>
+              <ion-item lines="none">
+                <ion-label>
+                  <p>Oldest order assigned</p>
+                  3 hours ago
+                </ion-label>
+              </ion-item>
+            </div>
+            <div class="fulfill">
+              <ion-item lines="full" :button="true" :detail="true" :router-link="workflowRoute('/open')">
+                <ion-icon :icon="mailUnreadOutline" slot="start" />
+                <ion-label>14 open</ion-label>
+              </ion-item>
+              <ion-item lines="none" :button="true" :detail="true" :router-link="workflowRoute('/inflight')">
+                <ion-icon :icon="mailOpenOutline" slot="start" />
+                <ion-label>10 in progress</ion-label>
+              </ion-item>
+            </div>
           </ion-card>
 
-          <!-- KPI 3: Rejection Rate -->
-          <ion-card class="kpi-card">
-            <ion-card-content>
-              <p class="overline">Rejection Rate</p>
-              <h2 class="kpi-value text-danger">1.8%</h2>
-              <ion-progress-bar :value="0.18" color="danger"></ion-progress-bar>
-              <p class="kpi-subtext">8 orders rejected today</p>
-            </ion-card-content>
-          </ion-card>
+          <ion-progress-bar class="fulfillment-progress-bar" :value="0.7" color="success" />
 
-          <!-- KPI 4: Pending Pick -->
-          <ion-card class="kpi-card">
-            <ion-card-content>
-              <p class="overline">Pending Pick</p>
-              <h2 class="kpi-value">45</h2>
-              <ion-progress-bar :value="0.45" color="warning"></ion-progress-bar>
-              <p class="kpi-subtext">Awaiting picking assignment</p>
-            </ion-card-content>
-          </ion-card>
+          <!-- Scheduling -->
+          <div class="scheduling">
+            <ion-item lines="none">
+              <ion-icon slot="start" :icon="sendOutline" color="warning" />
+              <ion-label>
+                Carrier pickup scheduled
+                <p>04:30pm</p>
+              </ion-label>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-icon slot="start" :icon="storefrontOutline" color="danger" />
+              <ion-label>
+                Store closes in 2 hours
+                <p>07:00pm</p>
+              </ion-label>
+            </ion-item>
+          </div>
         </div>
       </div>
     </ion-content>
@@ -311,6 +295,7 @@ import {
   IonRadio,
   IonNote
 } from '@ionic/vue';
+import { ref } from 'vue';
 import {
   airplaneOutline,
   alertCircleOutline,
@@ -318,14 +303,44 @@ import {
   playCircleOutline,
   shieldHalfOutline,
   globeOutline,
-  businessOutline
+  businessOutline,
+  informationCircleOutline,
+  mailUnreadOutline,
+  mailOpenOutline,
+  sendOutline,
+  storefrontOutline
 } from 'ionicons/icons';
 import { computed } from 'vue';
-import { translate } from '@common';
+import { translate, RadioFacetGroup, StatCard, Sparkline } from '@common';
 import { useCustomerServiceStore } from '@/store/customerService';
+
+// Recent unfillable-order trend (mock). Higher values plot higher.
+const unfillableTrend = [12, 18, 9, 24, 16, 30, 14, 22, 11, 26, 23];
 
 const store = useCustomerServiceStore();
 const counts = computed(() => store.bucketCounts);
+
+const storeOptions = store.productStores.map((productStore) => ({
+  value: productStore.id,
+  primary: productStore.name
+}));
+const selectedStoreId = ref(storeOptions[0]?.value ?? '');
+const selectedStoreName = computed(
+  () => storeOptions.find((s) => s.value === selectedStoreId.value)?.primary ?? ''
+);
+const selectedFacilityId = ref('WH_RNO');
+
+const workflowRouteQuery = computed(() => ({
+  productStoreId: selectedStoreId.value,
+  facilityId: selectedFacilityId.value
+}));
+
+function workflowRoute(path: string) {
+  return {
+    path,
+    query: workflowRouteQuery.value
+  };
+}
 
 const totalBlocked = computed(() => {
   return counts.value['unfillable'] + counts.value['fraud'];
@@ -339,168 +354,242 @@ const totalOrders = computed(() => totalBlocked.value + totalInProgress.value);
 </script>
 
 <style scoped>
-.facets {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.facets ion-list {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-  background: transparent;
-  padding: 0;
-}
-
-.facet-item {
-  --background: transparent;
-  --padding-start: 0;
-  --inner-padding-end: 0;
-  margin: 0;
-}
-
 .selected-store-header {
-  --background: transparent;
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-top: var(--spacer-xs);
+  margin-bottom: var(--spacer-xs);
 }
 
 .global-stat {
-  margin: 16px;
+  margin: var(--spacer-sm);
+}
+
+.global-stat ion-card-content {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--spacer-base);
+  padding: var(--spacer-sm);
+}
+
+@media (min-width: 768px) {
+  .global-stat ion-card-content {
+    grid-template-columns: minmax(128px, 160px) minmax(0, 1fr);
+    align-items: stretch;
+  }
 }
 
 .total-orders {
-  margin-bottom: 24px;
+  display: grid;
+  align-content: center;
+  margin: 0;
+  min-width: 0;
 }
 
 .big-number {
-  margin: 8px 0;
+  margin: var(--spacer-xs) 0;
 }
 
 .time-elapsed {
-  color: var(--ion-color-medium);
   margin: 0;
 }
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
+  gap: var(--spacer-xs);
+  min-width: 0;
 }
 
 .metric-label {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 4px;
+  gap: var(--spacer-sm);
+  margin-bottom: var(--spacer-2xs);
 }
 
 .metric-label p {
   margin: 0;
 }
 
+.metric ion-progress-bar {
+  height: var(--spacer-lg);
+  border-radius: var(--spacer-xs);
+  overflow: hidden;
+}
+
+@media (max-width: 767px) {
+  .global-stat ion-card-content {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics {
+    gap: var(--spacer-sm);
+  }
+}
+
 .drilldown {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 16px;
-}
-
-.drilldown-card {
-  margin: 0;
-}
-
-.card-detail {
-  color: var(--ion-color-medium);
-  margin-top: 8px;
-  margin-bottom: 0;
-}
-
-.sparkline-container {
-  margin-top: 12px;
-  display: flex;
-  align-items: center;
-  height: 30px;
+  gap: var(--spacer-sm);
 }
 
 .hold-tasks-list {
-  background: transparent;
   padding: 0;
 }
 
 .divider {
-  border: 0;
-  border-top: 1px solid var(--ion-color-step-150, #d7d8da);
-  margin: 24px 0;
-}
-
-.facility-header {
-  --background: transparent;
+  margin: var(--spacer-base) 0;
 }
 
 .dimension {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: var(--spacer-xs);
+  margin-bottom: var(--spacer-sm);
+}
+
+@media (min-width: 768px) {
+  .dimension {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .dimension ion-searchbar {
+    flex: 0 1 343px;
+  }
+
+  .dimension ion-segment {
+    flex: 1 1 auto;
+  }
 }
 
 .facility-radio-item {
-  --padding-start: 0;
-  --inner-padding-end: 0;
+  --padding-start: var(--spacer-sm);
+  --inner-padding-end: var(--spacer-sm);
 }
 
-.facility-radio-content {
+.facility-metric {
   width: 100%;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px 0;
+  align-items: center;
+  gap: var(--spacer-sm);
 }
 
-.facility-radio-header {
+.facility-metric-label {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  align-items: baseline;
-  width: 100%;
+  gap: var(--spacer-sm);
+  flex: 0 1 306px;
 }
 
-.facility-radio-header h2 {
-  margin: 0;
+.facility-metric ion-progress-bar {
+  flex: 1 1 auto;
+  height: var(--spacer-lg);
+  border-radius: var(--spacer-xs);
+}
+
+@media (max-width: 767px) {
+  .facility-metric {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--spacer-xs);
+  }
+
+  .facility-metric-label {
+    flex: initial;
+  }
 }
 
 .fulfillment-dashboard-section {
-  margin-top: 24px;
+  margin-top: var(--spacer-base);
 }
 
 .section-title {
-  margin-bottom: 16px;
+  margin-bottom: var(--spacer-sm);
 }
 
-.fulfillment-dashboard-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 16px;
+.fulfillment {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-base);
+  padding: var(--spacer-base);
 }
 
-.kpi-card {
+@media (min-width: 991px) {
+  .fulfillment {
+    display: grid;
+    grid-template-areas: "fill-rate orders"
+                        "fill-rate progress-bar"
+                        "fill-rate scheduling";
+    grid-template-columns: 350px 1fr;
+    grid-template-rows: auto auto auto;
+    align-items: start;
+  }
+}
+
+.fulfillment > * {
   margin: 0;
 }
 
-.kpi-value {
-  margin: 8px 0;
+.fill-rate {
+  grid-area: fill-rate;
 }
 
-.kpi-subtext {
-  color: var(--ion-color-medium);
-  margin-top: 8px;
-  margin-bottom: 0;
+.orders {
+  grid-area: orders;
+  display: flex;
+  flex-direction: column;
 }
 
-.text-success {
-  color: var(--ion-color-success);
+@media (min-width: 991px) {
+  .orders {
+    display: grid;
+    grid-template-areas: "title title"
+                         "pending fulfill";
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: min-content auto;
+    align-items: end;
+  }
 }
 
-.text-danger {
-  color: var(--ion-color-danger);
+.title {
+  grid-area: title;
+  margin-inline: var(--spacer-sm);
 }
+
+.pending {
+  grid-area: pending;
+  display: flex;
+  align-items: center;
+}
+
+.pending ion-item {
+  flex: 1;
+}
+
+.fulfill {
+  grid-area: fulfill;
+}
+
+.fulfillment-progress-bar {
+  grid-area: progress-bar;
+  min-width: 0;
+  height: var(--spacer-lg);
+  border-radius: var(--spacer-xs);
+}
+
+.scheduling {
+  display: flex;
+  gap: var(--spacer-base);
+}
+
+.scheduling ion-item {
+  flex: 1;
+  border: var(--border-medium);
+  border-radius: var(--spacer-xs);
+}
+
+.scheduling ion-item::part(native) {
+  --border-radius: var(--spacer-xs);
+}
+
 </style>
