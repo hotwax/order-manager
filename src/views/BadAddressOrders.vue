@@ -155,12 +155,22 @@
         />
       </ion-infinite-scroll>
     </ion-content>
+
+    <ion-footer>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks" @click="bulkSaveAndReleaseHold()">{{ translate('Save and Release Hold') }}</ion-button>
+          <ion-button fill="outline" color="danger" :disabled="!hasSelectedTasks" @click="bulkCancelOrder()">{{ translate('Cancel Order') }}</ion-button>
+          <ion-button fill="outline" color="medium" :disabled="!hasSelectedTasks" @click="bulkParkOrder()">{{ translate('Park') }}</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-footer>
   </ion-page>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { IonButton, IonButtons, IonCard, IonCardContent, IonCheckbox, IonChip, IonContent, IonHeader, IonIcon, IonInfiniteScroll, IonInfiniteScrollContent, IonInput, IonItem, IonLabel, IonList, IonMenuButton, IonNote, IonPage, IonRadio, IonRadioGroup, IonSelect, IonSelectOption, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
+import { IonButton, IonButtons, IonCard, IonCardContent, IonCheckbox, IonChip, IonContent, IonFooter, IonHeader, IonIcon, IonInfiniteScroll, IonInfiniteScrollContent, IonInput, IonItem, IonLabel, IonList, IonMenuButton, IonNote, IonPage, IonRadio, IonRadioGroup, IonSelect, IonSelectOption, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import {
   personOutline,
   callOutline,
@@ -219,6 +229,7 @@ const editableAddresses = ref<Record<string, EditableAddress>>({});
 
 const addressValidationTasks = computed(() => orderTaskStore.getAddressValidationTasks);
 const isScrollable = computed(() => orderTaskStore.isAddressValidationTasksScrollable);
+const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
 
 watch([dateAfter, dateBefore, orderChannel], () => {
   fetchAddressValidationTasks();
@@ -373,6 +384,103 @@ async function parkOrder(task: any) {
     await fetchAddressValidationTasks();
   } catch {
     await showToast(translate('Failed to park the order. Please try again.'));
+  }
+}
+
+function getSelectedTasks() {
+  return addressValidationTasks.value.filter((task: any) => selectedOrders.value[task.workEffortId]);
+}
+
+async function bulkSaveAndReleaseHold() {
+  const tasks = getSelectedTasks();
+  if (!tasks.length) return;
+
+  const invalidTask = tasks.find((task: any) => {
+    const type = selectedAddressType.value[task.workEffortId] as 'original' | 'suggested';
+    return !!validateAddress(editableAddresses.value[task.workEffortId]?.[type]);
+  });
+  if (invalidTask) {
+    const type = selectedAddressType.value[invalidTask.workEffortId] as 'original' | 'suggested';
+    await showToast(validateAddress(editableAddresses.value[invalidTask.workEffortId]?.[type])!);
+    return;
+  }
+
+  const alert = await alertController.create({
+    header: translate('Save and release hold'),
+    message: translate('Are you sure you want to save address and release hold for {count} selected order(s)?').replace('{count}', String(tasks.length)),
+    buttons: [
+      { text: translate('No'), role: 'cancel' },
+      {
+        text: translate('Yes'),
+        role: 'confirm',
+        handler: async () => {
+          await Promise.all(tasks.map(async (task: any) => {
+            const type = selectedAddressType.value[task.workEffortId] as 'original' | 'suggested';
+            const address = editableAddresses.value[task.workEffortId]?.[type];
+            await orderTaskStore.updateShippingInformation(task.orderId, task.shipGroupSeqId, address);
+            await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_COMPLETED');
+          }));
+          selectedOrders.value = {};
+          selectAll.value = false;
+          await fetchAddressValidationTasks();
+        }
+      }
+    ]
+  });
+  await alert.present();
+}
+
+async function bulkCancelOrder() {
+  const tasks = getSelectedTasks();
+  if (!tasks.length) return;
+
+  const alert = await alertController.create({
+    header: translate('Cancel orders'),
+    message: translate('Are you sure you want to cancel {count} selected order(s)? This action cannot be undone.').replace('{count}', String(tasks.length)),
+    buttons: [
+      { text: translate('No'), role: 'cancel' },
+      {
+        text: translate('Yes'),
+        role: 'confirm',
+        handler: async () => {
+          await Promise.all(tasks.map(async (task: any) => {
+            const items = (task.items ?? []).map((item: any) => ({
+              orderItemSeqId: item.orderItemSeqId,
+              shipGroupSeqId: task.shipGroupSeqId,
+            }));
+            await orderTaskStore.cancelOrder(task.orderId, items);
+            await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED');
+          }));
+          selectedOrders.value = {};
+          selectAll.value = false;
+          await fetchAddressValidationTasks();
+        }
+      }
+    ]
+  });
+  await alert.present();
+}
+
+async function bulkParkOrder() {
+  const tasks = getSelectedTasks();
+  if (!tasks.length) return;
+
+  const modal = await modalController.create({ component: FacilityModal });
+  await modal.present();
+  const { data: facilityId } = await modal.onWillDismiss();
+  if (!facilityId) return;
+
+  try {
+    await Promise.all(tasks.map(async (task: any) => {
+      await orderTaskStore.parkOrder(task.orderId, task.shipGroupSeqId, facilityId);
+      await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_PARKED');
+    }));
+    selectedOrders.value = {};
+    selectAll.value = false;
+    await showToast(translate('Orders successfully moved to parking.'));
+    await fetchAddressValidationTasks();
+  } catch {
+    await showToast(translate('Failed to park one or more orders. Please try again.'));
   }
 }
 
