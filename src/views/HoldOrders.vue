@@ -147,6 +147,14 @@
         />
       </ion-infinite-scroll>
     </ion-content>
+
+    <ion-footer>
+      <ion-toolbar>
+        <ion-buttons slot="start">
+          <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks" @click="resolveSelectedTasks()">{{ translate('Resolve') }}</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-footer>
   </ion-page>
 </template>
 
@@ -155,6 +163,7 @@ import { ref, computed, watch } from 'vue';
 import {
   IonButtons,
   IonContent,
+  IonFooter,
   IonHeader,
   IonMenuButton,
   IonPage,
@@ -207,6 +216,7 @@ const selectedOrders = ref<Record<string, boolean>>({});
 
 const heldTasks = computed(() => orderTaskStore.getHoldTasks);
 const isScrollable = computed(() => orderTaskStore.isHoldTasksScrollable);
+const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
 
 watch([dateAfter, dateBefore, orderChannel], () => {
   fetchHoldTasks();
@@ -238,6 +248,32 @@ async function resolveTask(workEffortId: string) {
         role: 'confirm',
         handler: async () => {
           await orderTaskStore.changeTaskStatus(workEffortId, 'TASK_COMPLETED');
+          await fetchHoldTasks();
+        }
+      }
+    ]
+  });
+  await alert.present();
+}
+
+async function resolveSelectedTasks() {
+  const selected = Object.entries(selectedOrders.value)
+    .filter(([, checked]) => checked)
+    .map(([id]) => id);
+  if (!selected.length) return;
+
+  const alert = await alertController.create({
+    header: translate('Resolve tasks'),
+    message: translate('Are you sure you want to resolve {count} selected task(s)?').replace('{count}', String(selected.length)),
+    buttons: [
+      { text: translate('No'), role: 'cancel' },
+      {
+        text: translate('Yes'),
+        role: 'confirm',
+        handler: async () => {
+          await Promise.all(selected.map(id => orderTaskStore.changeTaskStatus(id, 'TASK_COMPLETED')));
+          selectedOrders.value = {};
+          selectAll.value = false;
           await fetchHoldTasks();
         }
       }
