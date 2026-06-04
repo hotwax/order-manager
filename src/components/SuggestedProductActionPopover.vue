@@ -16,22 +16,21 @@
   </template>
   
   <script setup lang="ts">
-  import { IonContent, IonItem, IonList, IonListHeader, popoverController } from "@ionic/vue";
+  import { IonContent, IonItem, IonList, IonListHeader, modalController, popoverController } from "@ionic/vue";
   import { translate } from "@common";
-  import { useStockStore } from "@/store/stock";
+  import ProductInventoryModal from "@/components/ProductInventoryModal.vue";
 
   const props = defineProps(["item", "task"]);
-
-  const stockStore = useStockStore();
 
   const closePopover = () => popoverController.dismiss();
 
   const viewInventory = async () => {
-    const stock = stockStore.getProductStock(props.item.productId);
-    const atp = stock?.availableToPromiseTotal ?? 0;
-    const qoh = stock?.quantityOnHandTotal ?? 0;
-    await showToast(translate(`ATP: ${atp}, QOH: ${qoh}`));
     closePopover();
+    const modal = await modalController.create({
+      component: ProductInventoryModal,
+      componentProps: { productId: props.item.productId }
+    });
+    await modal.present();
   };
 
   const cancelItem = () => {

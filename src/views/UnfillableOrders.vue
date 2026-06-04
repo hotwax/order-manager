@@ -30,7 +30,7 @@
         <ion-card v-for="task in swapTasks" :key="task.workEffortId">
           <ion-card-header>
             <div class="shipgroup-header-row">
-              <ion-card-title>{{ task.facilityName || task.facilityId }}</ion-card-title>
+              <ion-card-title>{{ seedStore.facilityName(task.facilityId) }}</ion-card-title>
               <ion-chip outline color="medium">
                 {{ translate('Task') }}: {{ task.workEffortId }}
               </ion-chip>
