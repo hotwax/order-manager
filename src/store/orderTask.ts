@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { api } from '@common';
+import { useUserStore } from '@/store/user';
 
 export const useOrderTaskStore = defineStore('orderTask', {
   state: () => ({
@@ -33,7 +34,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
   actions: {
     async fetchHoldTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
-        const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED' } });
+        const productStoreId = useUserStore().getCurrentProductStore.productStoreId;
+        const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', productStoreId } });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(
           tasks.map(async (task: any) => {
@@ -48,7 +50,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
     },
     async fetchAddressValidationTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
-        const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED' } });
+        const productStoreId = useUserStore().getCurrentProductStore.productStoreId;
+        const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', productStoreId } });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(
           tasks.map(async (task: any) => {
@@ -63,7 +66,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
     },
     async fetchSwapTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
-        const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED' } });
+        const productStoreId = useUserStore().getCurrentProductStore.productStoreId;
+        const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', productStoreId } });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(
           tasks.map(async (task: any) => {
