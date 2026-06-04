@@ -163,6 +163,21 @@ export const useSeedStore = defineStore("seed", {
     orderAdjustmentTypeDescription: (state) => (orderAdjustmentTypeId: string) => itemDescription(state.orderAdjustmentTypes.byId[orderAdjustmentTypeId], orderAdjustmentTypeId),
     orderIdentificationTypeDescription: (state) => (orderIdentificationTypeId: string) => itemDescription(findEnum(state, orderIdentificationTypeId), orderIdentificationTypeId),
     geoName: (state) => (geoId: string) => itemDescription(state.geos.byId[geoId], geoId, ["geoName"]),
+    getGeoIdByCode: (state) => (code: string) => {
+      if (!code) return '';
+      const match = state.geos.ids
+        .map((id) => state.geos.byId[id])
+        .find((geo) => geo.geoCodeAlpha2 === code || geo.geoCode === code);
+      return match?.geoId ?? '';
+    },
+    getCountries: (state) => state.geos.ids
+      .map((id) => state.geos.byId[id])
+      .filter((geo) => geo.geoTypeEnumId === "GEOT_COUNTRY")
+      .sort((a, b) => (a.geoName || "").localeCompare(b.geoName || "")),
+    getStates: (state) => state.geos.ids
+      .map((id) => state.geos.byId[id])
+      .filter((geo) => geo.geoTypeEnumId === "GEOT_STATE" || geo.geoTypeEnumId === "GEOT_PROVINCE")
+      .sort((a, b) => (a.geoName || "").localeCompare(b.geoName || "")),
     getCarrierOptions: (state) => state.carriers.ids.map((partyId) => ({ id: partyId, label: carrierLabel(state.carriers.byId[partyId]) })),
     getShipmentMethodOptions: (state) => state.shipmentMethodTypes.ids.map((shipmentMethodTypeId) => ({
       id: shipmentMethodTypeId,

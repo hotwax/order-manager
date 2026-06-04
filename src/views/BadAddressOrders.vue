@@ -5,48 +5,44 @@
         <ion-buttons slot="start">
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>Bad address</ion-title>
+        <ion-title>{{ translate('Bad address') }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
     <ion-content>
       <SearchFilterCard
         v-model="searchQuery"
-        placeholder="Search unfillable orders..."
+        :placeholder="translate('Search unfillable orders...')"
         @clear="clearFilters"
       >
-        <ion-item lines="none">
-          <ion-checkbox v-model="swappable" justify="start" label-placement="end">
-            Swappable
-          </ion-checkbox>
-        </ion-item>
-        <ion-input v-model="dateAfter" label="Date after" label-placement="stacked" type="date" />
-        <ion-input v-model="dateBefore" label="Date before" label-placement="stacked" type="date" />
-        <ion-select v-model="orderChannel" label="Channel" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">All channels</ion-select-option>
-          <ion-select-option value="shopify">Shopify</ion-select-option>
-          <ion-select-option value="amazon">Amazon</ion-select-option>
-          <ion-select-option value="retail">Retail Store</ion-select-option>
+        
+        <ion-input v-model="dateAfter" :label="translate('Date after')" label-placement="stacked" type="date" />
+        <ion-input v-model="dateBefore" :label="translate('Date before')" label-placement="stacked" type="date" />
+        <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
+          <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
+          <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
+            {{ channel.description || channel.enumId }}
+          </ion-select-option>
         </ion-select>
       </SearchFilterCard>
 
       <ion-item lines="none" class="select-all-item">
         <ion-checkbox slot="start" v-model="selectAll" />
-        <ion-label>Select all</ion-label>
+        <ion-label>{{ translate('Select all') }}</ion-label>
       </ion-item>
 
       <div class="bad-address-list">
-        <ion-card v-for="order in badAddressOrders" :key="order.id">
+        <ion-card v-for="task in addressValidationTasks" :key="task.workEffortId">
           <ion-item lines="none">
-            <ion-checkbox slot="start" v-model="order.selected" />
+            <ion-checkbox slot="start" v-model="selectedOrders[task.workEffortId]" />
             <ion-label>
-              {{ order.orderName }}
-              <p>{{ order.orderDate }}</p>
+              {{ task.orderName }}
+              <p>{{ task.orderDate }}</p>
             </ion-label>
             <ion-chip slot="end" outline color="medium">
-              Task: {{ order.workEffortId }}
+              {{ translate('Task') }}: {{ task.workEffortId }}
             </ion-chip>
-            <ion-note slot="end" color="dark">{{ money(order.orderTotal) }}</ion-note>
+            <ion-note slot="end" color="dark">{{ money(task.grandTotal) }}</ion-note>
           </ion-item>
 
           <ion-card-content>
@@ -55,170 +51,357 @@
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="personOutline" />
                 <ion-label>
-                  {{ order.customerName }}
-                  <p>Customer</p>
+                  {{ getCustomerName(task.customer) }}
+                  <p>{{ translate('Customer') }}</p>
                 </ion-label>
                 <ion-buttons slot="end">
-                  <ion-button fill="clear" :href="'tel:' + order.phone">
+                  <ion-button fill="clear" :href="'tel:' + commonUtil.formatPhoneNumber(task.billingPhone?.countryCode, task.billingPhone?.areaCode, task.billingPhone?.contactNumber)">
                     <ion-icon slot="icon-only" :icon="callOutline" />
                   </ion-button>
-                  <ion-button fill="clear" :href="'mailto:' + order.email">
+                  <ion-button fill="clear" :href="'mailto:' + (task.billingEmail ?? task.shippingEmail)">
                     <ion-icon slot="icon-only" :icon="mailOutline" />
                   </ion-button>
                 </ion-buttons>
               </ion-item>
-              
-              <ion-item lines="none" v-if="order.phone">
-                <ion-label>
-                  <p>Telecom contact</p>
-                  {{ order.phone }}
-                </ion-label>
-              </ion-item>
-
-              <ion-item lines="none" v-if="order.email">
-                <ion-label>
-                  <p>Email contact</p>
-                  {{ order.email }}
-                </ion-label>
-              </ion-item>
             </div>
 
-            <!-- Task Details -->
+            <!-- Address Details -->
             <div class="task-details border-top ion-padding-top">
-              <ion-radio-group v-model="order.selectedAddressType">
-                <ion-list lines="none">
-                  <ion-list-header>
-                    <ion-label>Original Address</ion-label>
-                    <ion-radio slot="end" value="original" />
-                  </ion-list-header>
-                  <ion-item v-for="(val, key) in order.originalAddress" :key="key">
-                    <ion-label>
-                      <p class="ion-text-capitalize">{{ key }}</p>
-                      {{ val }}
-                    </ion-label>
-                  </ion-item>
-                </ion-list>
+              <ion-radio-group v-model="selectedAddressType[task.workEffortId]">
+                <div class="address-columns">
+                  <!-- Original Address -->
+                  <ion-list lines="none" v-if="editableAddresses[task.workEffortId]">
+                    <ion-item lines="none">
+                      <ion-label>{{ translate('Original Address') }}</ion-label>
+                      <ion-radio slot="end" value="original">{{ translate('Keep original') }}</ion-radio>
+                    </ion-item>
+                    <ion-item>
+                      <ion-input :label="translate('Address Line 1')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].original.address1" />
+                    </ion-item>
+                    <ion-item>
+                      <ion-input :label="translate('Address Line 2')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].original.address2" />
+                    </ion-item>
+                    <ion-item>
+                      <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].original.city" />
+                    </ion-item>
+                    <ion-item>
+                      <ion-input :label="translate('Postal Code')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].original.postalCode" />
+                    </ion-item>
+                    <ion-item>
+                      <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].original.countryGeoId" interface="popover" @ionChange="editableAddresses[task.workEffortId].original.stateProvinceGeoId = ''">
+                        <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
+                      </ion-select>
+                    </ion-item>
+                    <ion-item>
+                      <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].original.stateProvinceGeoId" interface="popover">
+                        <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
+                      </ion-select>
+                    </ion-item>
+                  </ion-list>
 
-                <ion-list lines="none" class="ion-margin-top">
-                  <ion-list-header>
-                    <ion-label>Suggested Address</ion-label>
-                    <ion-radio slot="end" value="suggested" />
-                  </ion-list-header>
-                  <ion-item v-for="(val, key) in order.suggestedAddress" :key="key">
-                    <ion-label>
-                      <p class="ion-text-capitalize">{{ key }}</p>
-                      {{ val }}
-                    </ion-label>
-                  </ion-item>
-                </ion-list>
+                  <!-- Suggested Address -->
+                  <ion-list lines="none" v-if="editableAddresses[task.workEffortId]">
+                    <ion-item lines="none">
+                      <ion-label>{{ translate('Suggested Address') }}</ion-label>
+                      <ion-radio slot="end" value="suggested">{{ translate('Use suggested') }}</ion-radio>
+                    </ion-item>
+                    <ion-item>
+                      <ion-input :label="translate('Address Line 1')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].suggested.address1" />
+                    </ion-item>
+                    <ion-item>
+                      <ion-input :label="translate('Address Line 2')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].suggested.address2" />
+                    </ion-item>
+                    <ion-item>
+                      <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].suggested.city" />
+                    </ion-item>
+                    <ion-item>
+                      <ion-input :label="translate('Postal Code')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].suggested.postalCode" />
+                    </ion-item>
+                    <ion-item>
+                      <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].suggested.countryGeoId" interface="popover" @ionChange="editableAddresses[task.workEffortId].suggested.stateProvinceGeoId = ''">
+                        <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
+                      </ion-select>
+                    </ion-item>
+                    <ion-item>
+                      <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses[task.workEffortId].suggested.stateProvinceGeoId" interface="popover">
+                        <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
+                      </ion-select>
+                    </ion-item>
+                  </ion-list>
+                </div>
               </ion-radio-group>
             </div>
 
             <!-- Actions -->
             <div class="actions border-top ion-margin-top ion-padding-top">
               <ion-buttons>
-                <ion-button fill="solid" color="primary">Save and release hold</ion-button>
-                <ion-button fill="outline" color="danger">Cancel order</ion-button>
-                <ion-button fill="outline" color="medium">Park</ion-button>
+                <ion-button fill="solid" color="primary" @click="saveAndReleaseHold(task)">{{ translate('Save and release hold') }}</ion-button>
+                <ion-button fill="outline" color="danger" @click="cancelOrder(task)">{{ translate('Cancel order') }}</ion-button>
+                <ion-button fill="outline" color="medium" @click="parkOrder(task)">{{ translate('Park') }}</ion-button>
               </ion-buttons>
             </div>
           </ion-card-content>
         </ion-card>
       </div>
 
+      <ion-infinite-scroll
+        @ionInfinite="loadMoreAddressValidationTasks($event)"
+        threshold="100px"
+        v-if="isScrollable"
+      >
+        <ion-infinite-scroll-content
+          loading-spinner="crescent"
+          :loading-text="translate('Loading')"
+        />
+      </ion-infinite-scroll>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import {
-  IonButtons,
-  IonContent,
-  IonHeader,
-  IonMenuButton,
-  IonPage,
-  IonTitle,
-  IonToolbar,
-  IonItem,
-  IonLabel,
-  IonList,
-  IonListHeader,
-  IonNote,
-  IonCard,
-  IonCardContent,
-  IonIcon,
-  IonButton,
-  IonCheckbox,
-  IonSelect,
-  IonSelectOption,
-  IonInput,
-  IonChip,
-  IonRadioGroup,
-  IonRadio
-} from '@ionic/vue';
+import { IonButton, IonButtons, IonCard, IonCardContent, IonCheckbox, IonChip, IonContent, IonHeader, IonIcon, IonInfiniteScroll, IonInfiniteScrollContent, IonInput, IonItem, IonLabel, IonList, IonMenuButton, IonNote, IonPage, IonRadio, IonRadioGroup, IonSelect, IonSelectOption, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import {
   personOutline,
   callOutline,
   mailOutline
 } from 'ionicons/icons';
+import { commonUtil, translate } from '@common';
+import { showToast } from '@/utils';
 import SearchFilterCard from '@/components/SearchFilterCard.vue';
+import FacilityModal from '@/components/FacilityModal.vue';
+import { useOrderTaskStore } from '@/store/orderTask';
+import { useSeedStore } from '@/store/seed';
+
+const orderTaskStore = useOrderTaskStore();
+const seedStore = useSeedStore();
+
+const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
+const countries = computed(() => seedStore.getCountries);
+const states = computed(() => seedStore.getStates);
+const getGeoIdByCode = (code: string) => seedStore.getGeoIdByCode(code);
+
+const addressFields = [
+  { key: 'address1',       label: translate('Address Line 1') },
+  { key: 'address2',       label: translate('Address Line 2') },
+  { key: 'city',           label: translate('City') },
+  { key: 'postalCode',     label: translate('Postal Code') },
+  { key: 'stateGeoName',   label: translate('State') },
+  { key: 'countryGeoName', label: translate('Country') },
+];
+
+interface AddressForm {
+  address1: string;
+  address2: string;
+  city: string;
+  postalCode: string;
+  stateProvinceGeoId: string;
+  countryGeoId: string;
+  contactMechId: string;
+  contactMechPurposeTypeId: string;
+  partyId: string;
+  isEdited: boolean;
+}
+
+interface EditableAddress {
+  original: AddressForm;
+  suggested: AddressForm;
+}
 
 const searchQuery = ref('');
-const swappable = ref(false);
 const dateAfter = ref('');
 const dateBefore = ref('');
-const orderChannel = ref('All');
+const orderChannel = ref('');
 const selectAll = ref(false);
+const selectedOrders = ref<Record<string, boolean>>({});
+const selectedAddressType = ref<Record<string, string>>({});
+const editableAddresses = ref<Record<string, EditableAddress>>({});
 
-const badAddressOrders = ref([
-  {
-    id: '10001',
-    orderName: 'Order #10001',
-    orderDate: '2026-05-30 14:22',
-    workEffortId: 'WE-9921',
-    orderTotal: 124.50,
-    customerName: 'Jane Doe',
-    phone: '+1 555-9876',
-    email: 'jane.doe@example.com',
-    selected: false,
-    selectedAddressType: 'suggested',
-    originalAddress: {
-      address1: '125 Makret St',
-      city: 'San Francisco',
-      state: 'CA',
-      zip: '9410'
-    },
-    suggestedAddress: {
-      address1: '125 Market St',
-      city: 'San Francisco',
-      state: 'CA',
-      zip: '94105'
-    }
-  }
-]);
+const addressValidationTasks = computed(() => orderTaskStore.getAddressValidationTasks);
+const isScrollable = computed(() => orderTaskStore.isAddressValidationTasksScrollable);
+
+watch([dateAfter, dateBefore, orderChannel], () => {
+  fetchAddressValidationTasks();
+});
 
 watch(selectAll, (val) => {
-  badAddressOrders.value.forEach(order => {
-    order.selected = val;
+  addressValidationTasks.value.forEach(task => {
+    selectedOrders.value[task.workEffortId] = val;
   });
 });
 
+watch(addressValidationTasks, (tasks) => {
+  tasks.forEach((task: any) => {
+    if (!selectedAddressType.value[task.workEffortId]) {
+      selectedAddressType.value[task.workEffortId] = 'original';
+    }
+    if (!editableAddresses.value[task.workEffortId]) {
+      editableAddresses.value[task.workEffortId] = {
+        original: addressFormFrom(task.shippingAddress, task),
+        suggested: suggestedAddressFormFrom(task),
+      };
+    }
+  });
+}, { immediate: true });
+
+function addressFormFrom(src: any, task: any): AddressForm {
+  return {
+    address1: src?.address1 ?? '',
+    address2: src?.address2 ?? '',
+    city: src?.city ?? '',
+    postalCode: src?.postalCode ?? '',
+    stateProvinceGeoId: src?.stateProvinceGeoId ?? '',
+    countryGeoId: src?.countryGeoId ?? '',
+    contactMechId: task?.shippingAddress?.contactMechId ?? '',
+    contactMechPurposeTypeId: task?.shippingAddress?.contactMechPurposeTypeId || 'SHIPPING_LOCATION',
+    partyId: task?.customer?.partyId ?? '',
+    isEdited: true,
+  };
+}
+
+function suggestedAddressFormFrom(task: any): AddressForm {
+  let parsed: any = {};
+  try {
+    parsed = task.locationDesc ? JSON.parse(task.locationDesc) : {};
+  } catch {
+    parsed = {};
+  }
+  return {
+    address1: parsed.address1 ?? '',
+    address2: parsed.address2 ?? '',
+    city: parsed.city ?? '',
+    postalCode: parsed.postalCode ?? '',
+    stateProvinceGeoId: getGeoIdByCode(parsed.state ?? ''),
+    countryGeoId: getGeoIdByCode(parsed.country ?? ''),
+    contactMechId: task?.shippingAddress?.contactMechId ?? '',
+    contactMechPurposeTypeId: task?.shippingAddress?.contactMechPurposeTypeId || 'SHIPPING_LOCATION',
+    partyId: task?.customer?.partyId ?? '',
+    isEdited: true,
+  };
+}
+
+function validateAddress(address: AddressForm): string | null {
+  if (!address.address1?.trim()) return translate('Address Line 1 is required');
+  if (!address.city?.trim()) return translate('City is required');
+  if (!address.postalCode?.trim()) return translate('Postal Code is required');
+  if (!address.countryGeoId) return translate('Country is required');
+  return null;
+}
+
+async function saveAndReleaseHold(task: any) {
+  const type = selectedAddressType.value[task.workEffortId] as 'original' | 'suggested';
+  const address = editableAddresses.value[task.workEffortId]?.[type];
+  const error = validateAddress(address);
+  if (error) {
+    await showToast(error);
+    return;
+  }
+  try {
+    await orderTaskStore.updateShippingInformation(task.orderId, task.shipGroupSeqId, address);
+    await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_COMPLETED');
+    await fetchAddressValidationTasks();
+  } catch {
+    await showToast(translate('Failed to update shipping information. Please try again.'));
+  }
+}
+
 function clearFilters() {
   searchQuery.value = '';
-  swappable.value = false;
   dateAfter.value = '';
   dateBefore.value = '';
-  orderChannel.value = 'All';
+  orderChannel.value = '';
+  fetchAddressValidationTasks();
+}
+
+function getCustomerName(customer: any): string {
+  return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');
 }
 
 function money(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
+
+const fetchAddressValidationTasks = async (vSize?: any, vIndex?: any) => {
+  const viewSize = vSize ? vSize : import.meta.env.VITE_VIEW_SIZE;
+  const viewIndex = vIndex ? vIndex : 0;
+  await orderTaskStore.fetchAddressValidationTasks({
+    viewSize,
+    viewIndex,
+    ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
+    ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
+    ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
+    ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
+  });
+};
+
+async function cancelOrder(task: any) {
+  const alert = await alertController.create({
+    header: translate('Cancel order'),
+    message: translate('Are you sure you want to cancel this order? This action cannot be undone.'),
+    buttons: [
+      { text: translate('No'), role: 'cancel' },
+      {
+        text: translate('Yes'),
+        role: 'confirm',
+        handler: async () => {
+          const items = (task.items ?? []).map((item: any) => ({
+            orderItemSeqId: item.orderItemSeqId,
+            shipGroupSeqId: task.shipGroupSeqId,
+          }));
+          await orderTaskStore.cancelOrder(task.orderId, items);
+          await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED');
+          await fetchAddressValidationTasks();
+        }
+      }
+    ]
+  });
+  await alert.present();
+}
+
+async function parkOrder(task: any) {
+  const modal = await modalController.create({
+    component: FacilityModal,
+  });
+  await modal.present();
+  const { data: facilityId } = await modal.onWillDismiss();
+  if (!facilityId) return;
+
+  try {
+    await orderTaskStore.parkOrder(task.orderId, task.shipGroupSeqId, facilityId);
+    await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_PARKED');
+    await showToast(translate('Order successfully moved to parking.'));
+    await fetchAddressValidationTasks();
+  } catch {
+    await showToast(translate('Failed to park the order. Please try again.'));
+  }
+}
+
+async function loadMoreAddressValidationTasks(event: any) {
+  await fetchAddressValidationTasks(
+    undefined,
+    Math.ceil(addressValidationTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
+  );
+  await event.target.complete();
+}
+
+onIonViewWillEnter(() => {
+  fetchAddressValidationTasks();
+});
 </script>
 
 <style scoped>
 .border-top {
   border-top: 1px solid var(--ion-color-light);
+}
+
+.address-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.address-columns ion-item {
+  --border-width: 0;
+  --inner-border-width: 0;
 }
 </style>

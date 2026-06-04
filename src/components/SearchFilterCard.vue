@@ -5,6 +5,7 @@
         :value="modelValue"
         :placeholder="placeholder"
         @ionInput="updateSearch"
+        @ionChange="$emit('search')"
       />
 
       <div class="search-filter-grid">
@@ -31,6 +32,7 @@ defineProps<{
 const emit = defineEmits<{
   (event: 'update:modelValue', value: string): void;
   (event: 'clear'): void;
+  (event: 'search'): void;
 }>();
 
 function updateSearch(event: CustomEvent) {
