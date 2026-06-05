@@ -5,6 +5,7 @@
     search-placeholder="Order, external ID, customer"
     empty-title="No packed orders"
     empty-message="Orders that are packed and awaiting pickup by carrier will appear here."
+    show-facility
   />
 </template>
 

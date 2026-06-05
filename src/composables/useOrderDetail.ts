@@ -23,5 +23,19 @@ export function useOrderDetail() {
     });
   }
 
-  return { getOrder };
+  async function getWorkEfforts(orderId: string): Promise<any> {
+    return api({
+      url: `oms/orders/${orderId}/workEfforts`,
+      method: "GET"
+    });
+  }
+
+  async function getCommunicationEvents(orderId: string): Promise<any> {
+    return api({
+      url: `oms/orders/${orderId}/communicationEvents`,
+      method: "GET"
+    });
+  }
+
+  return { getOrder, getWorkEfforts, getCommunicationEvents };
 }

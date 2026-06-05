@@ -404,8 +404,8 @@
             </ion-list>
 
             <div class="actions ion-padding-horizontal ion-padding-bottom">
-              <ion-button fill="outline" color="primary">Broker</ion-button>
-              <ion-button fill="outline" color="medium">Park</ion-button>
+              <ion-button fill="outline" color="primary" @click="brokerShipGroup(shipGroup.id)">Broker</ion-button>
+              <ion-button fill="outline" color="medium" :disabled="!['ORDER_CREATED', 'ORDER_APPROVED'].includes(order.statusId)" @click="parkShipGroup(shipGroup.id)">Park</ion-button>
             </div>
           </ion-card>
         </template>
@@ -419,19 +419,80 @@
       </div>
 
       <div v-if="selectedSegment === 'holds'">
-        <ion-card v-for="hold in openHolds" :key="hold.id">
-          <ion-item color="warning" lines="none">
-            <ion-label>
-              {{ hold.purpose }}
-              <p>{{ hold.name }}</p>
-              <p v-if="hold.assignee">Assigned to {{ hold.assignee }}</p>
-            </ion-label>
-            <ion-badge slot="end" color="dark">{{ hold.status }}</ion-badge>
-          </ion-item>
-        </ion-card>
+        <div v-if="openHolds.length">
+          <div class="list-item work-effort-row" v-for="hold in openHolds" :key="hold.id">
+            <ion-item lines="none">
+              <ion-label>
+                {{ hold.id }}
+                <p>{{ translate("ID") }}</p>
+              </ion-label>
+            </ion-item>
+            <div class="tablet">
+              <ion-label class="ion-text-center">
+                {{ hold.purposeTypeId || '-' }}
+                <p>{{ translate("purpose") }}</p>
+              </ion-label>
+            </div>
+            <div class="tablet">
+              <ion-label class="ion-text-center">
+                {{ hold.description || '-' }}
+                <p>{{ translate("description") }}</p>
+              </ion-label>
+            </div>
+            <div class="tablet">
+              <ion-label class="ion-text-center">
+                <ion-badge :color="commonUtil.getStatusColor(hold.statusId)">{{ seed.statusDescription(hold.statusId) }}</ion-badge>
+                <p>{{ translate("status") }}</p>
+              </ion-label>
+            </div>
+          </div>
+        </div>
         <ion-list v-if="!openHolds.length">
           <ion-item lines="none">
-            <ion-label>No open holds on this order</ion-label>
+            <ion-label>{{ translate("No holds on this order") }}</ion-label>
+          </ion-item>
+        </ion-list>
+      </div>
+
+      <div v-if="selectedSegment === 'comms'">
+        <div v-if="commEvents.length">
+          <div class="list-item comm-event-row" v-for="ev in commEvents" :key="ev.id">
+            <ion-item lines="none">
+              <ion-label>
+                {{ ev.id }}
+                <p>{{ translate("ID") }}</p>
+              </ion-label>
+            </ion-item>
+            <div class="tablet">
+              <ion-label class="ion-text-center">
+                {{ ev.partyIdFrom || '-' }}
+                <p>{{ translate("from") }}</p>
+              </ion-label>
+            </div>
+            <div class="tablet">
+              <ion-label class="ion-text-center">
+                {{ ev.partyIdTo || '-' }}
+                <p>{{ translate("to") }}</p>
+              </ion-label>
+            </div>
+            <div class="tablet">
+              <ion-label class="ion-text-center">
+                {{ ev.content || '-' }}
+                <p>{{ translate("content") }}</p>
+              </ion-label>
+            </div>
+            <div class="tablet">
+              <ion-label class="ion-text-center" v-if="ev.entryDate">
+                {{ formatDate(ev.entryDate) }}
+                <p>{{ translate("entry date") }}</p>
+              </ion-label>
+              <ion-label v-else>-</ion-label>
+            </div>
+          </div>
+        </div>
+        <ion-list v-if="!commEvents.length">
+          <ion-item lines="none">
+            <ion-label>{{ translate("No communication events for this order") }}</ion-label>
           </ion-item>
         </ion-list>
       </div>
@@ -463,8 +524,8 @@
     <ion-footer v-if="order">
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-button fill="outline" color="danger">Cancel</ion-button>
-          <ion-button fill="outline" color="medium">Park</ion-button>
+          <ion-button fill="outline" color="danger" :disabled="['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order.statusId)" @click="cancelOrder">Cancel</ion-button>
+          <ion-button fill="outline" color="medium" :disabled="!['ORDER_CREATED', 'ORDER_APPROVED'].includes(order.statusId)" @click="parkFullOrder">Park</ion-button>
         </ion-buttons>
         <ion-buttons slot="end">
           <ion-button fill="solid" color="warning">Return</ion-button>
@@ -477,39 +538,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import {
-  IonBackButton,
-  IonBadge,
-  IonButton,
-  IonButtons,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonChip,
-  IonContent,
-  IonHeader,
-  IonIcon,
-  IonItem,
-  IonLabel,
-  IonList,
-  IonListHeader,
-  IonMenuButton,
-  IonNote,
-  IonPage,
-  IonProgressBar,
-  IonSegment,
-  IonSegmentButton,
-  IonSelect,
-  IonSelectOption,
-  IonTitle,
-  IonToolbar,
-  IonAccordion,
-  IonAccordionGroup,
-  IonThumbnail,
-  IonCheckbox,
-  IonFooter,
-  IonPopover
-} from '@ionic/vue';
+import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFooter, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
 import { businessOutline, chevronDown, ellipsisVertical, gitBranchOutline } from 'ionicons/icons';
@@ -519,7 +548,12 @@ import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
-import { commonUtil } from '@common';
+import FacilityModal from '@/components/FacilityModal.vue';
+import RoutingGroupModal from '@/components/RoutingGroupModal.vue';
+import { commonUtil, translate } from '@common';
+import { showToast } from '@/utils';
+import { useOrderTaskStore } from '@/store/orderTask';
+import { useUserStore } from '@/store/user';
 
 const props = defineProps<{
   orderId: string;
@@ -615,18 +649,23 @@ const billingAddress = computed(() => {
   return lines.length ? { lines } : undefined;
 });
 
-// Open order holds (WorkEfforts), labeled via seed; assignee name from the nested person.
-const openHolds = computed(() => orderDetailStore.openHolds.map((hold: any) => {
-  const person = hold.partyAssignments?.[0]?.person;
+const openHolds = computed(() => orderDetailStore.orderHeaderWorkEfforts.map((link: any) => {
+  const we = link['org.apache.ofbiz.workeffort.workeffort.WorkEffort'] || link;
   return {
-    id: hold.workEffortId,
-    purpose: seed.enumDescription(hold.workEffortPurposeTypeId),
-    name: hold.workEffortName,
-    status: seed.statusDescription(hold.statusId),
-    assignee: person ? [person.firstName, person.lastName].filter(Boolean).join(' ') : '',
-    at: hold.createdDate
+    id: link.workEffortId,
+    purposeTypeId: we.workEffortPurposeTypeId || '',
+    statusId: we.statusId || '',
+    description: we.description || ''
   };
 }));
+
+const commEvents = computed(() => orderDetailStore.commEvents.map((ev: any) => ({
+  id: ev.communicationEventId,
+  partyIdFrom: ev.partyIdFrom,
+  partyIdTo: ev.partyIdTo,
+  content: ev.content,
+  entryDate: ev.entryDate
+})));
 
 const groupedItems = computed(() => {
   if (!order.value) return [];
@@ -710,6 +749,12 @@ const orderTotals = computed(() => orderDetailStore.totals);
 
 const selectedSegment = ref('items');
 
+watch(selectedSegment, (segment) => {
+  if (!props.orderId) return;
+  if (segment === 'holds') orderDetailStore.fetchOrderHeaderWorkEfforts(props.orderId);
+  if (segment === 'comms') orderDetailStore.fetchCommEvents(props.orderId);
+});
+
 const areAllSelected = computed(() => {
   if (!groupedItems.value.length) return false;
   return groupedItems.value.every(group => group.selected) && 
@@ -768,6 +813,87 @@ function getGroupAdjustments(group: any) {
   return Object.entries(adjs)
     .map(([comment, amount]) => ({ comment, amount }))
     .filter(adj => adj.amount !== 0);
+}
+
+const orderTaskStore = useOrderTaskStore();
+const userStore = useUserStore();
+
+async function openFacilityModal(): Promise<string | null> {
+  const modal = await modalController.create({ component: FacilityModal });
+  await modal.present();
+  const { data: facilityId } = await modal.onWillDismiss();
+  return facilityId ?? null;
+}
+
+async function brokerShipGroup(shipGroupSeqId: string) {
+  const productStoreId = userStore.getCurrentProductStore.productStoreId;
+  const modal = await modalController.create({ component: RoutingGroupModal, componentProps: { productStoreId } });
+  await modal.present();
+  const { data: routingGroupId } = await modal.onWillDismiss();
+  if (!routingGroupId) return;
+  try {
+    await orderTaskStore.brokerShipGroup({ routingGroupId, orderId: order.value!.id, shipGroupSeqId, productStoreId });
+    await showToast(translate('Ship group brokered successfully.'));
+    await loadOrder(order.value!.id);
+  } catch {
+    await showToast(translate('Failed to broker the ship group. Please try again.'));
+  }
+}
+
+async function parkShipGroup(shipGroupSeqId: string) {
+  const facilityId = await openFacilityModal();
+  if (!facilityId) return;
+  try {
+    await orderTaskStore.parkOrder(order.value!.id, shipGroupSeqId, facilityId);
+    await showToast(translate('Ship group successfully moved to parking.'));
+    await loadOrder(order.value!.id);
+  } catch {
+    await showToast(translate('Failed to park the ship group. Please try again.'));
+  }
+}
+
+async function cancelOrder() {
+  const raw = orderDetailStore.current;
+  if (!raw) return;
+  const alert = await alertController.create({
+    header: translate('Cancel order'),
+    message: translate('Are you sure you want to cancel this order? This action cannot be undone.'),
+    buttons: [
+      { text: translate('No'), role: 'cancel' },
+      {
+        text: translate('Yes'),
+        role: 'confirm',
+        handler: async () => {
+          const items = (raw.shipGroups || []).flatMap((sg: any) =>
+            (sg.items || []).map((item: any) => ({
+              orderItemSeqId: item.orderItemSeqId,
+              shipGroupSeqId: sg.shipGroupSeqId,
+            }))
+          );
+          try {
+            await orderTaskStore.cancelOrder(raw.orderId, items);
+            await showToast(translate('Order cancelled successfully.'));
+            await loadOrder(raw.orderId);
+          } catch {
+            await showToast(translate('Failed to cancel the order. Please try again.'));
+          }
+        }
+      }
+    ]
+  });
+  await alert.present();
+}
+
+async function parkFullOrder() {
+  const facilityId = await openFacilityModal();
+  if (!facilityId) return;
+  try {
+    await orderTaskStore.parkOrderFull(order.value!.id, facilityId);
+    await showToast(translate('Order successfully moved to parking.'));
+    await loadOrder(order.value!.id);
+  } catch {
+    await showToast(translate('Failed to park the order. Please try again.'));
+  }
 }
 </script>
 
@@ -844,5 +970,23 @@ ion-card-header  ion-buttons {
 .order-item-row {
   --columns-desktop: 5;
   --columns-tablet: 5;
+}
+
+.work-effort-row {
+  --columns-desktop: 4;
+  --columns-tablet: 4;
+}
+
+.work-effort-row > ion-item {
+  width: 100%;
+}
+
+.comm-event-row {
+  --columns-desktop: 5;
+  --columns-tablet: 5;
+}
+
+.comm-event-row > ion-item {
+  width: 100%;
 }
 </style>

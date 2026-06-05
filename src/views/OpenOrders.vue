@@ -5,6 +5,7 @@
     search-placeholder="Order, external ID, customer"
     empty-title="No open orders"
     empty-message="Approved or newly created orders awaiting routing will appear here."
+    show-facility
   />
 </template>
 

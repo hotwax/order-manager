@@ -20,7 +20,9 @@ const newEntry = (): OrderEntry => ({ payload: null, status: "idle", loadedAt: "
 export const useOrderDetailStore = defineStore("orderDetail", {
   state: () => ({
     byOrderId: {} as Record<string, OrderEntry>,
-    currentOrderId: ""
+    currentOrderId: "",
+    orderHeaderWorkEfforts: [] as any[],
+    commEvents: [] as any[]
   }),
   getters: {
     current: (state) => state.byOrderId[state.currentOrderId]?.payload || null,
@@ -232,20 +234,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       );
     },
 
-    /**
-     * Order holds: the WorkEfforts joined via OrderHeaderWorkEffort, filtered to type ORDER_HOLD.
-     * The nested workEffort omits its own id (parent key), so carry workEffortId from the link row.
-     */
-    holds(): any[] {
-      return (this.current?.workEfforts || [])
-        .filter((link: any) => link.workEffort && link.workEffort.workEffortTypeId === "ORDER_HOLD")
-        .map((link: any) => ({ ...link.workEffort, workEffortId: link.workEffortId }));
-    },
-
-    /** Holds still open (not released). */
-    openHolds(): any[] {
-      return this.holds.filter((hold: any) => hold.statusId === "ORD_HOLD_OPEN");
-    },
+    openHolds: (state) => state.orderHeaderWorkEfforts,
 
     hasOpenHolds(): boolean {
       return this.openHolds.length > 0;
@@ -281,6 +270,28 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         entry.error = error?.message || "Failed to load order";
       }
     },
+    async fetchOrderHeaderWorkEfforts(orderId: string) {
+      if (!orderId) return;
+      try {
+        const resp = await useOrderDetail().getWorkEfforts(orderId);
+        if (commonUtil.hasError(resp)) throw resp.data;
+        this.orderHeaderWorkEfforts = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
+      } catch (error: any) {
+        logger.error("Failed to load work efforts", error);
+      }
+    },
+
+    async fetchCommEvents(orderId: string) {
+      if (!orderId) return;
+      try {
+        const resp = await useOrderDetail().getCommunicationEvents(orderId);
+        if (commonUtil.hasError(resp)) throw resp.data;
+        this.commEvents = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
+      } catch (error: any) {
+        logger.error("Failed to load communication events", error);
+      }
+    },
+
     async setCurrentOrder(orderId: string) {
       this.currentOrderId = orderId;
       await this.fetchOrder(orderId);

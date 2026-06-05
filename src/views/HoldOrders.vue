@@ -129,7 +129,7 @@
             <div class="actions border-top ion-margin-top ion-padding-top">
               <ion-buttons>
                 <ion-button fill="solid" color="primary" @click="resolveTask(task.workEffortId)">{{ translate('Resolve task') }}</ion-button>
-                <ion-button fill="outline" color="secondary" :router-link="'/order/' + task.orderId">{{ translate('View order') }}</ion-button>
+                <ion-button fill="outline" color="secondary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
               </ion-buttons>
             </div>
           </ion-card-content>
