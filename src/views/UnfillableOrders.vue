@@ -27,7 +27,7 @@
       </SearchFilterCard>
 
       <div class="unfillable-parking-list">
-        <ion-card v-for="task in swapTasks" :key="task.workEffortId">
+        <ion-card v-if="swapTasks.length" v-for="task in swapTasks" :key="task.workEffortId">
           <ion-card-header>
             <div class="shipgroup-header-row">
               <ion-card-title>{{ seedStore.facilityName(task.facilityId) }}</ion-card-title>
@@ -163,6 +163,9 @@
             </div>
           </ion-card-content>
         </ion-card>
+        <div class="empty-state" v-if="!swapTasks.length">
+          <p v-html="getEmptyMessage()"></p>
+        </div>
       </div>
 
      <ion-infinite-scroll
@@ -207,6 +210,13 @@ const orderChannel = ref('');
 
 const swapTasks = computed(() => orderTaskStore.getSwapTasks);
 const isScrollable = computed(() => orderTaskStore.isSwapTasksScrollable);
+const hasFilters = computed(() => !!(searchQuery.value || dateAfter.value || dateBefore.value || orderChannel.value));
+
+function getEmptyMessage() {
+  return hasFilters.value
+    ? translate('No records found for the search criteria.')
+    : translate('No records found.');
+}
 
 watch([dateAfter, dateBefore, orderChannel], () => {
   fetchSwapTasks();

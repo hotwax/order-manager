@@ -35,13 +35,13 @@
         </ion-select>
       </SearchFilterCard>
 
-      <ion-item lines="none">
+      <ion-item lines="none" v-if="fraudTasks.length">
         <ion-checkbox slot="start" v-model="selectAll" />
         <ion-label>{{ translate('Select all') }}</ion-label>
       </ion-item>
 
       <div class="fraud-orders">
-        <ion-card v-for="task in fraudTasks" :key="task.workEffortId">
+        <ion-card v-if="fraudTasks.length" v-for="task in fraudTasks" :key="task.workEffortId">
           <ion-item lines="none">
             <ion-checkbox slot="start" v-model="selectedOrders[task.workEffortId]" />
             <ion-label>
@@ -132,6 +132,9 @@
             </ion-item>
           </div>
         </ion-card>
+        <div class="empty-state" v-if="!fraudTasks.length">
+          <p v-html="getEmptyMessage()"></p>
+        </div>
       </div>
 
       <ion-infinite-scroll
@@ -146,7 +149,7 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <ion-footer>
+    <ion-footer v-if="fraudTasks.length">
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button color="primary" :disabled="!selectedTaskCount" @click="bulkResolve">{{ translate('Resolve') }}</ion-button>
@@ -186,6 +189,13 @@ const selectedOrders = ref<Record<string, boolean>>({});
 const fraudTasks = computed(() => orderTaskStore.getFraudTasks);
 const isScrollable = computed(() => orderTaskStore.isFraudTasksScrollable);
 const selectedTaskCount = computed(() => Object.values(selectedOrders.value).filter(Boolean).length as number);
+const hasFilters = computed(() => !!(searchQuery.value || recommendation.value || orderChannel.value || severity.value));
+
+function getEmptyMessage() {
+  return hasFilters.value
+    ? translate('No records found for the search criteria.')
+    : translate('No records found.');
+}
 
 watch(selectAll, (val) => {
   fraudTasks.value.forEach((task: any) => {

@@ -27,13 +27,13 @@
         </ion-select>
       </SearchFilterCard>
 
-      <ion-item lines="none" class="select-all-item">
+      <ion-item lines="none" class="select-all-item" v-if="heldTasks.length">
         <ion-checkbox slot="start" v-model="selectAll" />
         <ion-label>{{ translate('Select all') }}</ion-label>
       </ion-item>
 
       <div class="hold-orders-list">
-        <ion-card v-for="task in heldTasks" :key="task.workEffortId">
+        <ion-card v-if="heldTasks.length" v-for="task in heldTasks" :key="task.workEffortId">
           <ion-item lines="none">
             <ion-checkbox slot="start" v-model="selectedOrders[task.workEffortId]" />
             <ion-label>
@@ -134,6 +134,9 @@
             </div>
           </ion-card-content>
         </ion-card>
+        <div class="empty-state" v-if="!heldTasks.length">
+          <p v-html="getEmptyMessage()"></p>
+        </div>
       </div>
 
       <ion-infinite-scroll
@@ -148,7 +151,7 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <ion-footer>
+    <ion-footer v-if="heldTasks.length">
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks" @click="resolveSelectedTasks()">{{ translate('Resolve') }}</ion-button>
@@ -217,6 +220,13 @@ const selectedOrders = ref<Record<string, boolean>>({});
 const heldTasks = computed(() => orderTaskStore.getHoldTasks);
 const isScrollable = computed(() => orderTaskStore.isHoldTasksScrollable);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
+const hasFilters = computed(() => !!(searchQuery.value || dateAfter.value || dateBefore.value || orderChannel.value));
+
+function getEmptyMessage() {
+  return hasFilters.value
+    ? translate('No records found for the search criteria.')
+    : translate('No records found.');
+}
 
 watch([dateAfter, dateBefore, orderChannel], () => {
   fetchHoldTasks();
