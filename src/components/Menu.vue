@@ -26,6 +26,12 @@
             <ion-label>{{ translate("Find customers") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
+        <ion-menu-toggle :auto-hide="false">
+          <ion-item button router-link="/create-order" router-direction="root">
+            <ion-icon slot="start" :icon="addCircleOutline" />
+            <ion-label>{{ translate("Create order") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
         <ion-item-divider>
           <ion-label>{{ translate("Blocked") }}</ion-label>
         </ion-item-divider>
@@ -88,6 +94,7 @@
 <script setup lang="ts">
 import { IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonMenu, IonMenuToggle, IonTitle, IonToolbar } from '@ionic/vue';
 import {
+  addCircleOutline,
   airplaneOutline,
   alertCircleOutline,
   cubeOutline,

@@ -15,6 +15,7 @@ import HoldOrders from '@/views/HoldOrders.vue';
 import OpenOrders from '@/views/OpenOrders.vue';
 import InflightOrders from '@/views/InflightOrders.vue';
 import PackedOrders from '@/views/PackedOrders.vue';
+import CreateOrder from '@/views/CreateOrder.vue';
 
 const authGuard = async () => {
   if (!useAuth().isAuthenticated.value) {
@@ -104,6 +105,12 @@ const routes: RouteRecordRaw[] = [
     path: '/packed',
     name: 'PackedOrders',
     component: PackedOrders,
+    beforeEnter: authGuard
+  },
+  {
+    path: '/create-order',
+    name: 'CreateOrder',
+    component: CreateOrder,
     beforeEnter: authGuard
   },
   {
