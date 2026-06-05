@@ -97,7 +97,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           tasks.map(async (task: any) => {
             const [orderResponse, risksResponse] = await Promise.all([
               api({ url: 'oms/orders', method: 'GET', params: { orderId: task.orderId } }),
-              api({ url: 'oms/orders/risks', method: 'GET', params: { orderId: task.orderId } }),
+              api({ url: `oms/orders/${task.orderId}/risks`, method: 'GET'}),
             ]);
             const order = (orderResponse.data ?? [])[0] ?? {};
             const risks = risksResponse.data ?? [];
