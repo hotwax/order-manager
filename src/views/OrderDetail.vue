@@ -404,7 +404,7 @@
             </ion-list>
 
             <div class="actions ion-padding-horizontal ion-padding-bottom">
-              <ion-button fill="outline" color="primary">Broker</ion-button>
+              <ion-button fill="outline" color="primary" @click="brokerShipGroup(shipGroup.id)">Broker</ion-button>
               <ion-button fill="outline" color="medium" :disabled="!['ORDER_CREATED', 'ORDER_APPROVED'].includes(order.statusId)" @click="parkShipGroup(shipGroup.id)">Park</ion-button>
             </div>
           </ion-card>
@@ -549,9 +549,11 @@ import { useProductMaster } from '@/composables/useProductMaster';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 import FacilityModal from '@/components/FacilityModal.vue';
+import RoutingGroupModal from '@/components/RoutingGroupModal.vue';
 import { commonUtil, translate } from '@common';
 import { showToast } from '@/utils';
 import { useOrderTaskStore } from '@/store/orderTask';
+import { useUserStore } from '@/store/user';
 
 const props = defineProps<{
   orderId: string;
@@ -814,12 +816,28 @@ function getGroupAdjustments(group: any) {
 }
 
 const orderTaskStore = useOrderTaskStore();
+const userStore = useUserStore();
 
 async function openFacilityModal(): Promise<string | null> {
   const modal = await modalController.create({ component: FacilityModal });
   await modal.present();
   const { data: facilityId } = await modal.onWillDismiss();
   return facilityId ?? null;
+}
+
+async function brokerShipGroup(shipGroupSeqId: string) {
+  const productStoreId = userStore.getCurrentProductStore.productStoreId;
+  const modal = await modalController.create({ component: RoutingGroupModal, componentProps: { productStoreId } });
+  await modal.present();
+  const { data: routingGroupId } = await modal.onWillDismiss();
+  if (!routingGroupId) return;
+  try {
+    await orderTaskStore.brokerShipGroup({ routingGroupId, orderId: order.value!.id, shipGroupSeqId, productStoreId });
+    await showToast(translate('Ship group brokered successfully.'));
+    await loadOrder(order.value!.id);
+  } catch {
+    await showToast(translate('Failed to broker the ship group. Please try again.'));
+  }
 }
 
 async function parkShipGroup(shipGroupSeqId: string) {

@@ -224,6 +224,23 @@ export const useOrderTaskStore = defineStore('orderTask', {
         throw err;
       }
     },
+    async brokerShipGroup(payload: { routingGroupId: string; orderId: string; shipGroupSeqId: string; productStoreId: string }) {
+      try {
+        await api({
+          url: `order-routing/groups/${payload.routingGroupId}/run`,
+          method: 'POST',
+          data: {
+            routingGroupId: payload.routingGroupId,
+            orderId: payload.orderId,
+            shipGroupSeqId: payload.shipGroupSeqId,
+            productStoreId: payload.productStoreId,
+          },
+        });
+      } catch (err) {
+        console.error('Failed to broker the ship group', err);
+        throw err;
+      }
+    },
     async swapOrder(orderId: string, shipGroupSeqId: string, itemSwapList: { orderItemSeqId: string; newProductId: string; reasonEnumId?: string }[], refundAmount?: number) {
       try {
         await api({
