@@ -10,21 +10,21 @@
     </ion-header>
 
     <ion-content class="ion-padding">
-      <!-- Step 1: Select Brand -->
+      <!-- Step 1: Select Shop -->
       <div v-if="!isBrandSelected" class="brand-select-container">
         <div class="brand-select-header ion-text-center ion-padding-bottom">
-          <h1>{{ translate("Select a Brand") }}</h1>
-          <p>{{ translate("Choose a brand/store to begin creating the sales order") }}</p>
+          <h1>{{ translate("Select a Shop") }}</h1>
+          <p>{{ translate("Choose a Shopify Shop to begin creating the sales order") }}</p>
         </div>
         <ion-grid>
           <ion-row class="ion-justify-content-center">
-            <ion-col size="12" size-md="6" size-lg="4" v-for="store in productStoresList" :key="store.productStoreId">
-              <ion-card button class="brand-card ion-activatable ripple-parent" @click="selectBrand(store.productStoreId)">
+            <ion-col size="12" size-md="6" size-lg="4" v-for="shop in shopsList" :key="shop.shopId">
+              <ion-card button class="brand-card ion-activatable ripple-parent" @click="selectShop(shop.shopId, shop.productStoreId)">
                 <ion-ripple-effect></ion-ripple-effect>
                 <ion-card-content class="ion-text-center ion-padding-vertical">
                   <ion-icon :icon="storefrontOutline" class="brand-card-icon" />
-                  <h2><strong>{{ store.storeName || store.productStoreId }}</strong></h2>
-                  <p class="overline">{{ store.productStoreId }}</p>
+                  <h2><strong>{{ shop.name || shop.shopId }}</strong></h2>
+                  <p class="overline">{{ shop.shopId }}</p>
                 </ion-card-content>
               </ion-card>
             </ion-col>
@@ -32,23 +32,23 @@
         </ion-grid>
       </div>
 
-      <!-- Step 2: Create Order Form (shown only after brand selection) -->
+      <!-- Step 2: Create Order Form (shown only after shop selection) -->
       <ion-grid v-else>
         <ion-row>
           <!-- Left Column: Form Inputs -->
           <ion-col size="12" size-lg="8">
-            <!-- Active Brand Header -->
+            <!-- Active Shop Header -->
             <ion-card class="active-brand-card">
               <ion-card-content class="active-brand-content">
                 <div class="brand-info-wrapper">
                   <ion-icon :icon="storefrontOutline" class="active-brand-icon" />
                   <div class="brand-text">
-                    <p class="overline ion-no-margin">{{ translate("Active Brand") }}</p>
-                    <h3><strong>{{ getActiveBrandName(orderForm.productStoreId) }}</strong></h3>
+                    <p class="overline ion-no-margin">{{ translate("Active Shop") }}</p>
+                    <h3><strong>{{ getActiveShopName(orderForm.shopId) }}</strong></h3>
                   </div>
                 </div>
                 <ion-button fill="outline" size="small" color="medium" @click="changeBrand">
-                  {{ translate("Change Brand") }}
+                  {{ translate("Change Shop") }}
                 </ion-button>
               </ion-card-content>
             </ion-card>
@@ -72,22 +72,51 @@
                 </ion-segment>
 
                 <div v-if="customerMode === 'existing'" class="ion-margin-bottom">
-                  <ion-item lines="none" class="input-item">
+                  <ion-item lines="none" class="input-item ion-margin-bottom">
+                    <ion-input
+                      label="Search Customer"
+                      label-placement="stacked"
+                      placeholder="Type email, phone, or name and press Enter"
+                      v-model="customerSearchQuery"
+                      @keyup.enter="searchCustomers"
+                    >
+                      <ion-button slot="end" fill="clear" @click="searchCustomers">
+                        <ion-icon :icon="searchOutline" />
+                      </ion-button>
+                    </ion-input>
+                  </ion-item>
+
+                  <div v-if="isSearching" class="ion-text-center ion-padding">
+                    <ion-spinner name="crescent" />
+                    <p>{{ translate("Searching Shopify customers...") }}</p>
+                  </div>
+
+                  <ion-item v-else lines="none" class="input-item">
                     <ion-select
                       label="Select Customer"
                       label-placement="stacked"
                       v-model="selectedCustomerId"
-                      placeholder="Choose an existing customer"
+                      :placeholder="customersList.length > 0 ? 'Choose from search results' : 'Search for a customer first'"
+                      :disabled="customersList.length === 0"
                       @ionChange="handleCustomerSelection"
                     >
-                      <ion-select-option v-for="cust in filteredCustomersList" :key="cust.id" :value="cust.id">
-                        {{ cust.firstName }} {{ cust.lastName }} ({{ cust.email }})
+                      <ion-select-option v-for="cust in customersList" :key="cust.id" :value="cust.id">
+                        {{ cust.firstName || '' }} {{ cust.lastName || '' }} ({{ cust.email || 'No email' }})
                       </ion-select-option>
                     </ion-select>
                   </ion-item>
+
+                  <!-- Selected Customer Details Summary -->
+                  <div v-if="selectedCustomerId" class="selected-customer-summary ion-padding-top ion-margin-top">
+                    <div class="summary-details">
+                      <p><strong>{{ translate("Name") }}:</strong> {{ orderForm.customer.firstName }} {{ orderForm.customer.lastName }}</p>
+                      <p><strong>{{ translate("Email") }}:</strong> {{ orderForm.customer.email }}</p>
+                      <p v-if="orderForm.customer.phone"><strong>{{ translate("Phone") }}:</strong> {{ orderForm.customer.phone }}</p>
+                    </div>
+                  </div>
                 </div>
 
-                <ion-row>
+                <ion-row v-if="customerMode === 'new'">
                   <ion-col size="12" size-md="6">
                     <ion-item lines="none" class="input-item">
                       <ion-input
@@ -95,7 +124,6 @@
                         label-placement="stacked"
                         v-model="orderForm.customer.firstName"
                         placeholder="First Name"
-                        :readonly="customerMode === 'existing'"
                         required
                       />
                     </ion-item>
@@ -107,7 +135,6 @@
                         label-placement="stacked"
                         v-model="orderForm.customer.lastName"
                         placeholder="Last Name"
-                        :readonly="customerMode === 'existing'"
                         required
                       />
                     </ion-item>
@@ -120,7 +147,6 @@
                         type="email"
                         v-model="orderForm.customer.email"
                         placeholder="customer@example.com"
-                        :readonly="customerMode === 'existing'"
                         required
                       />
                     </ion-item>
@@ -133,9 +159,14 @@
                         type="tel"
                         v-model="orderForm.customer.phone"
                         placeholder="Phone Number"
-                        :readonly="customerMode === 'existing'"
                       />
                     </ion-item>
+                  </ion-col>
+
+                  <ion-col size="12" class="ion-text-right ion-padding-top">
+                    <ion-button color="primary" @click="handleCreateCustomer">
+                      {{ translate("Create Customer") }}
+                    </ion-button>
                   </ion-col>
                 </ion-row>
               </ion-card-content>
@@ -158,7 +189,6 @@
                         label-placement="stacked"
                         v-model="orderForm.shippingAddress.address1"
                         placeholder="123 Main St"
-                        :readonly="customerMode === 'existing'"
                         required
                       />
                     </ion-item>
@@ -170,7 +200,6 @@
                         label-placement="stacked"
                         v-model="orderForm.shippingAddress.address2"
                         placeholder="Apartment, suite, unit, etc. (optional)"
-                        :readonly="customerMode === 'existing'"
                       />
                     </ion-item>
                   </ion-col>
@@ -181,7 +210,6 @@
                         label-placement="stacked"
                         v-model="orderForm.shippingAddress.city"
                         placeholder="City"
-                        :readonly="customerMode === 'existing'"
                         required
                       />
                     </ion-item>
@@ -193,7 +221,6 @@
                         label-placement="stacked"
                         v-model="orderForm.shippingAddress.province"
                         placeholder="State or Province"
-                        :readonly="customerMode === 'existing'"
                         required
                       />
                     </ion-item>
@@ -205,7 +232,6 @@
                         label-placement="stacked"
                         v-model="orderForm.shippingAddress.zip"
                         placeholder="Zip Code"
-                        :readonly="customerMode === 'existing'"
                         required
                       />
                     </ion-item>
@@ -217,13 +243,23 @@
                         label-placement="stacked"
                         v-model="orderForm.shippingAddress.country"
                         placeholder="Select Country"
-                        :disabled="customerMode === 'existing'"
                       >
                         <ion-select-option value="United States">United States</ion-select-option>
                         <ion-select-option value="Canada">Canada</ion-select-option>
                         <ion-select-option value="United Kingdom">United Kingdom</ion-select-option>
                         <ion-select-option value="Mexico">Mexico</ion-select-option>
                       </ion-select>
+                    </ion-item>
+                  </ion-col>
+                  <ion-col size="12" size-md="6">
+                    <ion-item lines="none" class="input-item">
+                      <ion-input
+                        label="Shipping Phone"
+                        label-placement="stacked"
+                        type="tel"
+                        v-model="orderForm.shippingAddress.phone"
+                        placeholder="Shipping Phone"
+                      />
                     </ion-item>
                   </ion-col>
                 </ion-row>
@@ -252,23 +288,39 @@
                 <div v-else>
                   <div v-for="(item, index) in orderForm.lineItems" :key="index" class="item-row ion-margin-bottom">
                     <ion-row class="align-items-center">
-                      <ion-col size="12" size-md="4">
+                      <ion-col size="12" size-md="3">
+                        <ion-item lines="none" class="input-item">
+                          <ion-input
+                            label="Search Product"
+                            label-placement="stacked"
+                            placeholder="SKU/Name & Enter"
+                            v-model="item.searchQuery"
+                            @keyup.enter="searchRowProducts(index)"
+                          >
+                            <ion-button slot="end" fill="clear" @click="searchRowProducts(index)">
+                              <ion-icon :icon="searchOutline" />
+                            </ion-button>
+                          </ion-input>
+                        </ion-item>
+                      </ion-col>
+                      <ion-col size="12" size-md="3">
                         <ion-item lines="none" class="input-item">
                           <ion-select
-                            label="Product SKU / Name"
+                            label="Select Product"
                             label-placement="stacked"
                             v-model="item.selectedProductIndex"
-                            placeholder="Choose product"
+                            :placeholder="item.isSearching ? 'Searching...' : (item.searchResults.length > 0 ? 'Choose product' : 'Search first')"
+                            :disabled="item.isSearching || (item.searchResults.length === 0 && item.selectedProductIndex !== 'custom')"
                             @ionChange="handleProductSelection(index, $event.detail.value)"
                           >
                             <ion-select-option value="custom">-- Custom Product --</ion-select-option>
-                            <ion-select-option v-for="(prod, pIdx) in filteredProductsList" :key="pIdx" :value="pIdx">
-                              {{ prod.title }} ({{ prod.sku }})
+                            <ion-select-option v-for="(prod, pIdx) in item.searchResults" :key="pIdx" :value="pIdx">
+                              {{ prod.productName }} ({{ prod.internalName || prod.productId }})
                             </ion-select-option>
                           </ion-select>
                         </ion-item>
                       </ion-col>
-                      <ion-col size="12" size-md="4" v-if="item.selectedProductIndex === 'custom'">
+                      <ion-col size="12" size-md="3" v-if="item.selectedProductIndex === 'custom'">
                         <ion-row>
                           <ion-col size="6">
                             <ion-item lines="none" class="input-item">
@@ -294,7 +346,7 @@
                           </ion-col>
                         </ion-row>
                       </ion-col>
-                      <ion-col size="4" size-md="2">
+                      <ion-col size="4" size-md="1">
                         <ion-item lines="none" class="input-item">
                           <ion-input
                             label="Qty"
@@ -319,7 +371,7 @@
                           />
                         </ion-item>
                       </ion-col>
-                      <ion-col size="3" size-md="2" class="ion-text-end action-col">
+                      <ion-col size="3" size-md="3" class="ion-text-end action-col">
                         <div class="item-subtotal-text">
                           {{ formatMoney(item.quantity * item.price) }}
                         </div>
@@ -447,7 +499,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted } from 'vue';
 import {
   IonButton,
   IonButtons,
@@ -478,6 +530,7 @@ import {
   IonTitle,
   IonToolbar,
   IonRippleEffect,
+  IonSpinner,
   toastController
 } from '@ionic/vue';
 import {
@@ -489,13 +542,18 @@ import {
   locationOutline,
   personOutline,
   storefrontOutline,
-  trashOutline
+  trashOutline,
+  searchOutline
 } from 'ionicons/icons';
-import { api, translate } from '@common';
+import { api, translate, useSolrSearch } from '@common';
 import { useUserStore } from '@/store/user';
 import emitter from '@/event-bus';
+import { searchShopifyCustomers, createShopifyCustomer, getShopifyShops } from '@/services/customer';
+
+const { searchProducts } = useSolrSearch();
 
 const userStore = useUserStore();
+
 
 // Navigation Wizard Flow state
 const isBrandSelected = ref(false);
@@ -579,28 +637,18 @@ const mockCustomers = [
   }
 ];
 
-// Mock Products list with brand specific store mapping
-const mockProducts = [
-  { sku: 'SM-TRP-01', title: 'Steve Madden Troopa Boot', price: 99.95, productStoreId: 'SM_STORE' },
-  { sku: 'SM-CLF-05', title: 'Steve Madden Cliff Sneaker', price: 89.95, productStoreId: 'SM_STORE' },
-  { sku: 'DV-H2O-03', title: 'Dolce Vita H2O Bootie', price: 120.00, productStoreId: 'DV_STORE' },
-  { sku: 'SP-2750-04', title: 'Superga 2750 Cotu Classic', price: 65.00, productStoreId: 'SP_STORE' }
-];
 
-// Computed Brand-specific products and customers
-const filteredCustomersList = computed(() => {
-  return mockCustomers.filter(c => c.productStoreId === orderForm.value.productStoreId);
-});
-
-const filteredProductsList = computed(() => {
-  return mockProducts.filter(p => p.productStoreId === orderForm.value.productStoreId);
-});
 
 // Form state
 const customerMode = ref('existing'); // 'existing' or 'new'
 const selectedCustomerId = ref('');
+const customerSearchQuery = ref('');
+const isSearching = ref(false);
+const customersList = ref<any[]>([]);
+const shopsList = ref<any[]>([]);
 
 const orderForm = ref({
+  shopId: '',
   productStoreId: '',
   customer: {
     firstName: '',
@@ -614,7 +662,8 @@ const orderForm = ref({
     city: '',
     province: '',
     zip: '',
-    country: 'United States'
+    country: 'United States',
+    phone: ''
   },
   lineItems: [] as Array<{
     selectedProductIndex: number | string;
@@ -622,8 +671,19 @@ const orderForm = ref({
     title: string;
     quantity: number;
     price: number;
+    searchQuery: string;
+    isSearching: boolean;
+    searchResults: any[];
   }>,
   note: ''
+});
+
+onMounted(async () => {
+  try {
+    shopsList.value = await getShopifyShops();
+  } catch (err: any) {
+    presentToast(translate("Failed to load Shopify shops: " + (err.message || err)));
+  }
 });
 
 // Modal state
@@ -634,7 +694,8 @@ const orderResponseData = ref({
 });
 
 // Wizard navigation methods
-function selectBrand(storeId: string) {
+function selectShop(shopId: string, storeId: string) {
+  orderForm.value.shopId = shopId;
   orderForm.value.productStoreId = storeId;
   isBrandSelected.value = true;
 }
@@ -644,14 +705,16 @@ function changeBrand() {
   resetForm();
 }
 
-function getActiveBrandName(storeId: string) {
-  const store = productStoresList.value.find(s => s.productStoreId === storeId);
-  return store ? (store.storeName || store.productStoreId) : storeId;
+function getActiveShopName(shopId: string) {
+  const shop = shopsList.value.find(s => s.shopId === shopId);
+  return shop ? (shop.name || shop.shopId) : shopId;
 }
 
 // Watchers / handlers
 function handleCustomerModeChange() {
   selectedCustomerId.value = '';
+  customerSearchQuery.value = '';
+  customersList.value = [];
   orderForm.value.customer = { firstName: '', lastName: '', email: '', phone: '' };
   orderForm.value.shippingAddress = {
     address1: '',
@@ -659,21 +722,120 @@ function handleCustomerModeChange() {
     city: '',
     province: '',
     zip: '',
-    country: 'United States'
+    country: 'United States',
+    phone: ''
   };
+}
+
+async function handleCreateCustomer() {
+  const form = orderForm.value;
+
+  if (!form.shopId) {
+    presentToast(translate("Please select a Shopify Shop first."));
+    return;
+  }
+  if (!form.customer.firstName || !form.customer.lastName || !form.customer.email) {
+    presentToast(translate("Please enter first name, last name, and email to create a customer."));
+    return;
+  }
+
+  emitter.emit('presentLoader', { message: 'Creating customer on Shopify...' });
+  try {
+    const res = await createShopifyCustomer(form.shopId, {
+      email: form.customer.email,
+      phoneNumber: form.customer.phone || undefined,
+      firstName: form.customer.firstName,
+      lastName: form.customer.lastName || undefined
+    });
+    emitter.emit('dismissLoader');
+
+    if (res.hasShopifyError === 'Y') {
+      presentToast(translate("Shopify Error: " + res.shopifyErrorMessage), "danger");
+      return;
+    }
+    if (!res.customerId) {
+      presentToast(translate("Failed to create customer on Shopify: no customerId returned."), "danger");
+      return;
+    }
+
+    const newCustomerId = res.customerId;
+    const newCust = {
+      id: newCustomerId,
+      firstName: form.customer.firstName,
+      lastName: form.customer.lastName,
+      email: form.customer.email,
+      phone: form.customer.phone || '',
+      address: { ...form.shippingAddress }
+    };
+
+    // Add to current customersList so selection works
+    customersList.value.push(newCust);
+    selectedCustomerId.value = newCustomerId;
+    
+    // Switch to existing mode to display summary details
+    customerMode.value = 'existing';
+    presentToast(translate("Customer created and selected successfully!"), "success");
+  } catch (err: any) {
+    emitter.emit('dismissLoader');
+    presentToast(translate("Failed to create customer on Shopify: " + (err.message || err)), "danger");
+  }
+}
+
+async function searchCustomers() {
+  const query = customerSearchQuery.value.trim();
+  if (!query) {
+    presentToast(translate("Please enter email, phone or name to search."));
+    return;
+  }
+  if (!orderForm.value.shopId) {
+    presentToast(translate("Please select a Shopify Shop first."));
+    return;
+  }
+
+  isSearching.value = true;
+  try {
+    customersList.value = await searchShopifyCustomers(orderForm.value.shopId, query);
+    if (customersList.value.length === 0) {
+      presentToast(translate("No customers found matching the criteria."), "warning");
+    }
+  } catch (err: any) {
+    presentToast(translate("Failed to search customers: " + (err.message || err)));
+  } finally {
+    isSearching.value = false;
+  }
 }
 
 function handleCustomerSelection(event: any) {
   const customerId = event.detail.value;
-  const customer = mockCustomers.find(c => c.id === customerId);
+  const customer = customersList.value.find(c => c.id === customerId);
   if (customer) {
     orderForm.value.customer = {
-      firstName: customer.firstName,
-      lastName: customer.lastName,
-      email: customer.email,
-      phone: customer.phone
+      firstName: customer.firstName || '',
+      lastName: customer.lastName || '',
+      email: customer.email || '',
+      phone: customer.phone || ''
     };
-    orderForm.value.shippingAddress = { ...customer.address };
+    if (customer.address) {
+      orderForm.value.shippingAddress = {
+        address1: customer.address.address1 || '',
+        address2: customer.address.address2 || '',
+        city: customer.address.city || '',
+        province: customer.address.province || '',
+        zip: customer.address.zip || '',
+        country: customer.address.country || 'United States',
+        phone: customer.address.phone || ''
+      };
+    } else {
+      orderForm.value.shippingAddress = {
+        address1: '',
+        address2: '',
+        city: '',
+        province: '',
+        zip: '',
+        country: 'United States',
+        phone: ''
+      };
+    }
   }
 }
 
@@ -684,12 +846,58 @@ function addLineItem() {
     sku: '',
     title: '',
     quantity: 1,
-    price: 0
+    price: 0,
+    searchQuery: '',
+    isSearching: false,
+    searchResults: []
   });
 }
 
 function removeLineItem(index: number) {
   orderForm.value.lineItems.splice(index, 1);
+}
+
+async function searchRowProducts(index: number) {
+  const item = orderForm.value.lineItems[index];
+  const query = item.searchQuery ? item.searchQuery.trim() : '';
+  if (!query) {
+    await presentToast(translate("Please enter a SKU or product name to search."));
+    return;
+  }
+  if (!orderForm.value.productStoreId) {
+    await presentToast(translate("Please select a Shopify Shop first."));
+    return;
+  }
+
+  item.isSearching = true;
+  try {
+    const res = await searchProducts({
+      keyword: query,
+      filters: {
+        productStoreIds_s: { value: orderForm.value.productStoreId }
+      }
+    });
+    item.searchResults = res.products || [];
+    if (item.searchResults.length === 0) {
+      await presentToast(translate("No products found matching the criteria for this shop."), "warning");
+    }
+  } catch (err: any) {
+    await presentToast(translate("Failed to search products: " + (err.message || err)));
+  } finally {
+    item.isSearching = false;
+  }
+}
+
+function getProductPrice(product: any): number {
+  if (product.price !== undefined) return product.price;
+  
+  // Look for any key containing '_price' in product doc
+  const priceKey = Object.keys(product).find(key => key.endsWith('_price') || key.toLowerCase().includes('price'));
+  if (priceKey && product[priceKey]) {
+    const val = parseFloat(product[priceKey]);
+    return isNaN(val) ? 0 : val;
+  }
+  return 0;
 }
 
 function handleProductSelection(index: number, selection: number | string) {
@@ -698,11 +906,11 @@ function handleProductSelection(index: number, selection: number | string) {
     item.sku = '';
     item.title = '';
     item.price = 0;
-  } else if (typeof selection === 'number' && filteredProductsList.value[selection]) {
-    const product = filteredProductsList.value[selection];
-    item.sku = product.sku;
-    item.title = product.title;
-    item.price = product.price;
+  } else if (typeof selection === 'number' && item.searchResults[selection]) {
+    const product = item.searchResults[selection];
+    item.sku = product.internalName || product.productId;
+    item.title = product.productName || product.productId;
+    item.price = getProductPrice(product);
   }
 }
 
@@ -743,6 +951,7 @@ function resetForm() {
   customerMode.value = 'existing';
   selectedCustomerId.value = '';
   orderForm.value = {
+    shopId: orderForm.value.shopId || '',
     productStoreId: orderForm.value.productStoreId || '',
     customer: {
       firstName: '',
@@ -756,7 +965,8 @@ function resetForm() {
       city: '',
       province: '',
       zip: '',
-      country: 'United States'
+      country: 'United States',
+      phone: ''
     },
     lineItems: [],
     note: ''
@@ -768,8 +978,8 @@ async function submitOrder() {
   const form = orderForm.value;
 
   // 1. Config Validation
-  if (!form.productStoreId) {
-    presentToast(translate("Please select a Product Store."));
+  if (!form.shopId) {
+    presentToast(translate("Please select a Shop."));
     return;
   }
 
@@ -808,11 +1018,41 @@ async function submitOrder() {
     }
   }
 
-  // 5. Build API Payload
+  // 5. Create Customer if Mode is "new"
+  let shopifyCustomerId = '';
+  if (customerMode.value === 'new') {
+    emitter.emit('presentLoader', { message: 'Creating customer on Shopify...' });
+    try {
+      const res = await createShopifyCustomer(form.shopId, {
+        email: form.customer.email,
+        phoneNumber: form.customer.phone || undefined,
+        firstName: form.customer.firstName,
+        lastName: form.customer.lastName || undefined
+      });
+      emitter.emit('dismissLoader');
+      
+      if (res.hasShopifyError === 'Y') {
+        presentToast(translate("Shopify Error: " + res.shopifyErrorMessage));
+        return;
+      }
+      if (!res.customerId) {
+        presentToast(translate("Failed to create customer on Shopify: no customerId returned."));
+        return;
+      }
+      shopifyCustomerId = res.customerId;
+    } catch (err: any) {
+      emitter.emit('dismissLoader');
+      presentToast(translate("Failed to create customer on Shopify: " + (err.message || err)));
+      return;
+    }
+  } else {
+    shopifyCustomerId = selectedCustomerId.value;
+  }
+
+  // 6. Build API Payload
   const payload = {
-    productStoreId: form.productStoreId,
-    // Provide a dummy customer GID for creation or match with selected ID
-    shopifyCustomerId: selectedCustomerId.value ? selectedCustomerId.value.replace('cust-', '') : '123456789',
+    shopId: form.shopId,
+    shopifyCustomerId: shopifyCustomerId,
     currencyCode: 'USD',
     customer: {
       firstName: form.customer.firstName,
@@ -826,7 +1066,8 @@ async function submitOrder() {
       city: form.shippingAddress.city,
       province: form.shippingAddress.province,
       zip: form.shippingAddress.zip,
-      country: form.shippingAddress.country
+      country: form.shippingAddress.country,
+      phone: form.shippingAddress.phone
     },
     items: form.lineItems.map(item => ({
       sku: item.sku,
@@ -1013,5 +1254,25 @@ async function submitOrder() {
 .ripple-parent {
   position: relative;
   overflow: hidden;
+}
+
+.selected-customer-summary {
+  border-top: 1px dashed var(--ion-color-light);
+  margin-top: 16px;
+}
+
+.summary-details p {
+  margin: 6px 0;
+  font-size: 14px;
+}
+
+.summary-details h4 {
+  font-size: 15px;
+  color: var(--ion-color-dark);
+}
+
+.address-text {
+  color: var(--ion-color-medium);
+  line-height: 1.5;
 }
 </style>

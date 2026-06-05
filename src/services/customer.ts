@@ -715,3 +715,37 @@ export async function expirePartyRelationship(key: RelationshipKey, thruDate: st
     data: { ...key, thruDate }
   });
 }
+
+export async function searchShopifyCustomers(shopId: string, searchText: string): Promise<Customer[]> {
+  const response = await api({
+    url: 'oms/shopify/customers',
+    method: 'get',
+    params: {
+      shopId,
+      searchText
+    }
+  });
+  return response.data?.customers || [];
+}
+
+export async function createShopifyCustomer(shopId: string, customerData: any): Promise<any> {
+  const response = await api({
+    url: 'oms/shopify/customers',
+    method: 'post',
+    data: {
+      shopId,
+      ...customerData
+    }
+  });
+  return response.data;
+}
+
+export async function getShopifyShops(): Promise<any[]> {
+  const response = await api({
+    url: 'oms/shopifyShops/shops',
+    method: 'get'
+  });
+  return response.data || [];
+}
+
+
