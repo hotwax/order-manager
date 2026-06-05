@@ -7,6 +7,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
     holdTasks: [] as any[],
     addressValidationTasks: [] as any[],
     swapTasks: [] as any[],
+    fraudTasks: [] as any[],
   }),
   getters: {
     getHoldTasks: (state) => state.holdTasks,
@@ -29,13 +30,20 @@ export const useOrderTaskStore = defineStore('orderTask', {
         state.swapTasks?.length > 0 &&
         (state.swapTasks?.length % Number(import.meta.env.VITE_VIEW_SIZE) === 0)
       );
+    },
+    getFraudTasks: (state) => state.fraudTasks,
+    isFraudTasksScrollable: (state): boolean => {
+      return (
+        state.fraudTasks?.length > 0 &&
+        (state.fraudTasks?.length % Number(import.meta.env.VITE_VIEW_SIZE) === 0)
+      );
     }
   },
   actions: {
     async fetchHoldTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
         const productStoreId = useUserStore().getCurrentProductStore.productStoreId;
-        const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', productStoreId } });
+        const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', productStoreId } });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(
           tasks.map(async (task: any) => {
@@ -51,7 +59,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
     async fetchAddressValidationTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
         const productStoreId = useUserStore().getCurrentProductStore.productStoreId;
-        const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', productStoreId } });
+        const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', productStoreId } });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(
           tasks.map(async (task: any) => {
@@ -67,7 +75,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
     async fetchSwapTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
         const productStoreId = useUserStore().getCurrentProductStore.productStoreId;
-        const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', productStoreId } });
+        const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', productStoreId } });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(
           tasks.map(async (task: any) => {
@@ -78,6 +86,77 @@ export const useOrderTaskStore = defineStore('orderTask', {
         this.swapTasks = payload.viewIndex > 0 ? [...this.swapTasks, ...detailedTasks] : detailedTasks;
       } catch (err) {
         console.error('Failed to fetch the swap tasks', err);
+      }
+    },
+    async fetchFraudTasks(payload: { viewSize?: any; viewIndex?: any; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string; riskRecommendationEnumId?: string; riskLevelEnumId?: string } = {}) {
+      try {
+        const productStoreId = useUserStore().getCurrentProductStore.productStoreId;
+        const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', workEffortTypeId: 'REVIEW_RISK_ORDER', productStoreId } });
+        const tasks = listResponse.data ?? [];
+        const detailedTasks = await Promise.all(
+          tasks.map(async (task: any) => {
+            const [orderResponse, risksResponse] = await Promise.all([
+              api({ url: 'oms/orders', method: 'GET', params: { orderId: task.orderId } }),
+              api({ url: 'oms/orders/risks', method: 'GET', params: { orderId: task.orderId } }),
+            ]);
+            const order = (orderResponse.data ?? [])[0] ?? {};
+            const risks = risksResponse.data ?? [];
+
+            // Customer — PLACING_CUSTOMER role
+            const placingCustomer = (order.roles || []).find((r: any) => r.roleTypeId === 'PLACING_CUSTOMER');
+            const person = placingCustomer?.person;
+            const customer = {
+              partyId: placingCustomer?.partyId,
+              firstName: person?.firstName,
+              lastName: person?.lastName,
+            };
+
+            // Contact mechs indexed by purpose
+            const mechsByPurpose: Record<string, any> = {};
+            (order.contactMechs || []).forEach((mech: any) => {
+              if (mech.contactMechPurposeTypeId) mechsByPurpose[mech.contactMechPurposeTypeId] = mech;
+            });
+
+            const email = mechsByPurpose['ORDER_EMAIL']?.contactMech?.infoString
+              || mechsByPurpose['SHIPPING_EMAIL']?.contactMech?.infoString;
+
+            const telecomMech = (order.contactMechs || []).find((mech: any) => mech.telecomNumber);
+            const telecom = telecomMech?.telecomNumber;
+
+            // Payments
+            const payments = (order.paymentPreferences || []).map((p: any) => ({
+              paymentMethodTypeId: p.paymentMethodTypeId,
+              paymentMethodDescription: p['org.apache.ofbiz.accounting.payment.PaymentMethodType']?.description,
+              statusId: p.statusId,
+              statusDescription: p['moqui.basic.StatusItem']?.description,
+              maxAmount: p.maxAmount ?? p.presentmentAmount,
+            }));
+
+            // Items — flatten across all shipGroups
+            const shipGroupSeqId = task.shipGroupSeqId || '00001';
+            const items = (order.shipGroups || []).flatMap((sg: any) =>
+              (sg.items || []).map((item: any) => ({ ...item, shipGroupSeqId: sg.shipGroupSeqId }))
+            );
+
+            return {
+              ...task,
+              shipGroupSeqId,
+              order,
+              customer,
+              billingEmail: email,
+              billingPhone: telecom,
+              payments,
+              items,
+              risks,
+              grandTotal: order.grandTotal,
+              orderName: order.orderName,
+              orderDate: order.orderDate,
+            };
+          })
+        );
+        this.fraudTasks = payload.viewIndex > 0 ? [...this.fraudTasks, ...detailedTasks] : detailedTasks;
+      } catch (err) {
+        console.error('Failed to fetch the fraud tasks', err);
       }
     },
     async updateShippingInformation(orderId: string, shipGroupSeqId: string, address: {
@@ -124,7 +203,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
     async parkOrder(orderId: string, shipGroupSeqId: string, facilityId: string) {
       try {
         await api({
-          url: `oms/orders/${orderId}/shipGroups/${shipGroupSeqId}`,
+          url: `oms/orders/${orderId}/shipGroups/${shipGroupSeqId}/park`,
           method: 'PUT',
           data: { facilityId },
         });
