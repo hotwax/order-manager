@@ -31,27 +31,32 @@
             <!-- Date Today -->
             <p class="overline">Today</p>
             <!-- Order Count today -->
-            <h1 class="big-number">1,248</h1>
+            <h1 class="big-number">{{ (store.fulfillmentProgress.totalOrdersCount || 0).toLocaleString() }}</h1>
             <!-- Time since day start -->
-            <p class="time-elapsed">12 hours since day start</p>
+            <p class="time-elapsed">{{ new Date().getHours() }} hours since day start</p>
           </div>
 
           <div class="metrics">
             <ion-item button detail="true" lines="none" class="metric" router-link="/open">
-              <!-- Brokering Status -->
-              <div class="metric-label">
-                <p>Brokering status</p>
-                <p>85%</p>
+              <div style="width: 100%;">
+                <div class="metric-label">
+                  <p>Brokering status</p>
+                  <p>{{ fulfillmentStats.brokeringPercentage }}%</p>
+                </div>
+                <ion-progress-bar :value="fulfillmentStats.brokeringPercentage / 100"></ion-progress-bar>
               </div>
-              <ion-progress-bar :value="0.85"></ion-progress-bar>
             </ion-item>
-            <ion-item button detail="true" lines="none" class="metric" router-link="/packed">
-              <!-- Picked and Packed -->
-              <div class="metric-label">
-                <p>Picked and packed</p>
-                <p>62%</p>
+            <ion-item button detail lines="none" class="metric" router-link="/packed">
+              <div style="width: 100%;">
+                <div class="metric-label">
+                  <p>Picked and packed</p>
+                  <p>{{ fulfillmentStats.pickedAndPackedText }}%</p>
+                </div>
+                <div class="custom-progress-track">
+                  <div class="custom-progress-packed" :style="{ width: fulfillmentStats.packedPercentage + '%' }"></div>
+                  <div class="custom-progress-picked" :style="{ width: fulfillmentStats.pickedPercentage + '%' }"></div>
+                </div>
               </div>
-              <ion-progress-bar :value="0.62" color="success"></ion-progress-bar>
             </ion-item>
           </div>
         </ion-card-content>
@@ -67,15 +72,15 @@
           button
           router-link="/open"
           title="Open Orders"
-          :stat="345"
-          subtitle="Oldest: May 30, 2026 10:15 AM"
+          :stat="store.openOrders.openOrdersCount || 0"
+          :subtitle="oldestOpenOrderDateStr"
         />
 
         <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard button router-link="/unfillable" title="Unfillable" :stat="42">
-          <Sparkline :points="unfillableTrend" color="danger" />
+        <StatCard button router-link="/unfillable" title="Unfillable" :stat="totalUnfillable">
+          <Sparkline :points="store.unfillableTrend" color="danger" />
         </StatCard>
 
         <!-- Card 3: Order Hold Tasks — drilldown follow-up -->
@@ -120,18 +125,16 @@
       <ion-item lines="none" class="facility-header">
         <ion-icon slot="start" :icon="businessOutline" />
         <ion-label>
-          <h1>Facility Name</h1>
+          <h1>{{ selectedFacilityName }}</h1>
         </ion-label>
       </ion-item>
 
       <div class="dimension ion-padding-horizontal">
         <!-- Search facilities -->
-        <!-- BUSINESS LOGIC COMMENT: Bind value to searchQuery ref to filter facility list -->
-        <ion-searchbar placeholder="Search facilities"></ion-searchbar>
+        <ion-searchbar v-model="searchQuery" placeholder="Search facilities"></ion-searchbar>
         
         <!-- Segment selection -->
-        <!-- BUSINESS LOGIC COMMENT: Bind segment value to dimension ref (e.g. order volume, velocity, partials) -->
-        <ion-segment value="volume">
+        <ion-segment v-model="selectedDimension">
           <ion-segment-button value="volume">
             <ion-label>Order Volume</ion-label>
           </ion-segment-button>
@@ -145,56 +148,31 @@
       </div>
 
       <!-- Facilities List -->
-      <!-- BUSINESS LOGIC COMMENT: Display top 10 facilities by selected dimension or filtered search results -->
       <ion-list class="facilities ion-padding-top">
         <ion-list-header>
           <ion-label>Top 10 facilities by selected dimension or Search results</ion-label>
         </ion-list-header>
 
-        <!-- BUSINESS LOGIC COMMENT: Bind selected facility ID to ref via ion-radio-group -->
         <ion-radio-group v-model="selectedFacilityId">
-          <!-- Facility 1 (highest ranking, 100% progress) -->
-          <!-- BUSINESS LOGIC COMMENT: progress bar value is computed as: metric count / max count in result set -->
-          <ion-item lines="none" class="facility-radio-item">
-            <ion-radio slot="start" value="WH_RNO" />
+          <ion-item v-for="item in filteredFacilities" :key="item.facilityId" lines="none" class="facility-radio-item">
+            <ion-radio slot="start" :value="item.facilityId" />
             <div class="facility-metric">
               <div class="facility-metric-label">
-                <ion-label>Reno DC</ion-label>
-                <ion-note>450 orders</ion-note>
+                <ion-label>{{ item.name }}</ion-label>
+                <ion-note>{{ item.label }}</ion-note>
               </div>
-              <ion-progress-bar :value="1.0" color="primary" />
+              <ion-progress-bar :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0" color="primary" />
             </div>
           </ion-item>
-
-          <!-- Facility 2 (e.g., 300 orders -> 66% progress) -->
-          <ion-item lines="none" class="facility-radio-item">
-            <ion-radio slot="start" value="WH_ATL" />
-            <div class="facility-metric">
-              <div class="facility-metric-label">
-                <ion-label>Atlanta DC</ion-label>
-                <ion-note>300 orders</ion-note>
-              </div>
-              <ion-progress-bar :value="300 / 450" color="primary" />
-            </div>
-          </ion-item>
-
-          <!-- Facility 3 (e.g., 150 orders -> 33% progress) -->
-          <ion-item lines="none" class="facility-radio-item">
-            <ion-radio slot="start" value="WH_LDN" />
-            <div class="facility-metric">
-              <div class="facility-metric-label">
-                <ion-label>London DC</ion-label>
-                <ion-note>150 orders</ion-note>
-              </div>
-              <ion-progress-bar :value="150 / 450" color="primary" />
-            </div>
+          <ion-item v-if="filteredFacilities.length === 0" lines="none">
+            <ion-label>No facilities found</ion-label>
           </ion-item>
         </ion-radio-group>
       </ion-list>
 
       <!-- Online Order Fulfillment Dashboard at selected Facility -->
       <div class="fulfillment-dashboard-section ion-padding">
-        <h1 class="section-title">Fill rate at Facility Name</h1>
+        <h1 class="section-title">Fill rate at {{ selectedFacilityName }}</h1>
 
         <!-- Copied exactly from Dashboard.vue -->
         <div class="fulfillment">
@@ -310,25 +288,130 @@ import {
   sendOutline,
   storefrontOutline
 } from 'ionicons/icons';
-import { computed } from 'vue';
+import { computed, onMounted, watch } from 'vue';
 import { translate, RadioFacetGroup, StatCard, Sparkline } from '@common';
 import { useCustomerServiceStore } from '@/store/customerService';
-
-// Recent unfillable-order trend (mock). Higher values plot higher.
-const unfillableTrend = [12, 18, 9, 24, 16, 30, 14, 22, 11, 26, 23];
+import { DateTime } from 'luxon';
 
 const store = useCustomerServiceStore();
+
+const oldestOpenOrderDateStr = computed(() => {
+  const timestamp = store.openOrders.oldestOpenOrderDate;
+  return timestamp ? 'Oldest: ' + DateTime.fromMillis(timestamp).toFormat('LLL d, yyyy h:mm a') : 'No open orders';
+});
+
+const totalUnfillable = computed(() => store.unfillableTrend.reduce((sum, val) => sum + val, 0));
+
+onMounted(() => {
+  store.fetchProductStores();
+});
+
 const counts = computed(() => store.bucketCounts);
 
-const storeOptions = store.productStores.map((productStore) => ({
-  value: productStore.id,
-  primary: productStore.name
-}));
-const selectedStoreId = ref(storeOptions[0]?.value ?? '');
+const storeOptions = computed(() => {
+  return store.productStores.map((productStore) => ({
+    value: productStore.productStoreId,
+    primary: productStore.storeName
+  }));
+});
+
+const selectedStoreId = ref('');
+
+watch(storeOptions, (newOptions) => {
+  if (newOptions.length > 0 && !selectedStoreId.value) {
+    selectedStoreId.value = newOptions[0].value;
+  }
+}, { immediate: true });
+
+watch(selectedStoreId, (newStoreId) => {
+  if (newStoreId) {
+    store.fetchFulfillmentProgress(newStoreId);
+    store.fetchOpenOrders(newStoreId);
+    store.fetchUnfillable(newStoreId);
+    store.fetchFacilityOrderVolume(newStoreId);
+    store.fetchFacilityFulfillmentVelocity(newStoreId);
+    store.fetchFacilityPartialFulfillments(newStoreId);
+  }
+}, { immediate: true });
+
+const fulfillmentStats = computed(() => {
+  const fp = store.fulfillmentProgress || {};
+  const total = fp.totalShipGroupsCount || 0;
+  const brokered = fp.brokeredShipGroupsCount || 0;
+  const picked = fp.pickedShipGroupsCount || 0;
+  const packedTotal = (fp.packedShipGroupsCount || 0) + (fp.shippedShipGroupsCount || 0);
+
+  return {
+    brokeringPercentage: total ? Math.round((brokered / total) * 100) : 0,
+    pickedPercentage: brokered ? (picked / brokered) * 100 : 0,
+    packedPercentage: brokered ? (packedTotal / brokered) * 100 : 0,
+    pickedAndPackedText: brokered ? Math.round(((picked + packedTotal) / brokered) * 100) : 0,
+  };
+});
+
 const selectedStoreName = computed(
-  () => storeOptions.find((s) => s.value === selectedStoreId.value)?.primary ?? ''
+  () => storeOptions.value.find((s) => s.value === selectedStoreId.value)?.primary ?? ''
 );
 const selectedFacilityId = ref('WH_RNO');
+const searchQuery = ref('');
+const selectedDimension = ref('volume');
+
+function getFacilityName(facilityId: string) {
+  const fac = store.facilities.find(f => f.id === facilityId);
+  return fac ? fac.name : facilityId;
+}
+
+const selectedFacilityName = computed(() => {
+  const selected = filteredFacilities.value.find(item => item.facilityId === selectedFacilityId.value);
+  return selected ? selected.name : getFacilityName(selectedFacilityId.value);
+});
+
+const filteredFacilities = computed(() => {
+  let list: any[] = [];
+  if (selectedDimension.value === 'volume') {
+    list = store.facilityOrderVolume.map(item => ({
+      facilityId: item.facilityId,
+      name: item.facilityName || getFacilityName(item.facilityId),
+      value: item.lastOrderCount,
+      label: `${item.lastOrderCount} orders`
+    }));
+  } else if (selectedDimension.value === 'velocity') {
+    list = store.facilityFulfillmentVelocity.map(item => ({
+      facilityId: item.facilityId,
+      name: item.facilityName || getFacilityName(item.facilityId),
+      value: item.fulfillmentVelocity || 0,
+      label: `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
+    }));
+  } else if (selectedDimension.value === 'partial') {
+    list = store.facilityPartialFulfillments.map(item => ({
+      facilityId: item.facilityId,
+      name: item.facilityName || getFacilityName(item.facilityId),
+      value: item.partialFulfillmentRatio || 0,
+      label: `${Math.round((item.partialFulfillmentRatio || 0) * 100)}% partial (${item.partialFulfilledOrders || 0}/${item.totalFulfilledOrders || 0} orders)`
+    }));
+  }
+
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase();
+    list = list.filter(item => item.name.toLowerCase().includes(query));
+  }
+
+  return list.slice(0, 10);
+});
+
+const maxMetricValue = computed(() => {
+  if (filteredFacilities.value.length === 0) return 1;
+  return filteredFacilities.value[0].value || 1;
+});
+
+watch(filteredFacilities, (newList) => {
+  if (newList.length > 0) {
+    const exists = newList.some(item => item.facilityId === selectedFacilityId.value);
+    if (!exists) {
+      selectedFacilityId.value = newList[0].facilityId;
+    }
+  }
+});
 
 const workflowRouteQuery = computed(() => ({
   productStoreId: selectedStoreId.value,
@@ -413,6 +496,26 @@ const totalOrders = computed(() => totalBlocked.value + totalInProgress.value);
   height: var(--spacer-lg);
   border-radius: var(--spacer-xs);
   overflow: hidden;
+}
+
+/* Custom 3-tier progress bar */
+.custom-progress-track {
+  width: 100%;
+  height: var(--spacer-lg);
+  background: #d4f2da; /* Light pale green for background */
+  border-radius: var(--spacer-xs);
+  display: flex;
+  overflow: hidden;
+}
+
+.custom-progress-packed {
+  background: #1e8f42; /* Dark distinct green for packed */
+  height: 100%;
+}
+
+.custom-progress-picked {
+  background: var(--ion-color-success, #2dd36f); /* Vibrant base green for picked */
+  height: 100%;
 }
 
 @media (max-width: 767px) {

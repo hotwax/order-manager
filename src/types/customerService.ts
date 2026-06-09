@@ -43,3 +43,17 @@ export interface BulkActionDefinition {
   label: string;
   confirmText?: string;
 }
+
+export interface ProductStore {
+  productStoreId: string;
+  storeName: string;
+}
+
+export interface FulfillmentProgress {
+  totalOrdersCount: number;
+  totalShipGroupsCount: number;
+  brokeredShipGroupsCount: number;
+  pickedShipGroupsCount: number;
+  packedShipGroupsCount: number;
+  shippedShipGroupsCount: number;
+}

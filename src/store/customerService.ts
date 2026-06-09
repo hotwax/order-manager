@@ -1,17 +1,14 @@
 import { defineStore } from 'pinia';
 import { DateTime } from 'luxon';
+import { api } from '@common';
 import type {
   BulkActionDefinition,
+  ProductStore,
   WorkflowBucket,
   WorkflowFilters,
-  WorkflowOrder
+  WorkflowOrder,
+  FulfillmentProgress
 } from '@/types/customerService';
-
-const PRODUCT_STORES = [
-  { id: 'STORE_US', name: 'HotWax US' },
-  { id: 'STORE_EU', name: 'HotWax EU' },
-  { id: 'STORE_CA', name: 'HotWax CA' }
-];
 
 const FACILITIES = [
   { id: 'WH_RNO', name: 'Reno DC' },
@@ -48,7 +45,7 @@ function generateOrders(): WorkflowOrder[] {
   const now = DateTime.now();
 
   for (let i = 0; i < 60; i++) {
-    const store = pick(rng, PRODUCT_STORES);
+    const store = { id: 'STORE_US', name: 'HotWax US' }; // Hardcoded for mock orders
     const channel = pick(rng, CHANNELS);
     const shipMethod = pick(rng, SHIP_METHODS);
     const bucketRoll = rng();
@@ -155,6 +152,26 @@ function inBucket(order: WorkflowOrder, bucket: WorkflowBucket): boolean {
 
 export const useCustomerServiceStore = defineStore('customerService', {
   state: () => ({
+    productStores: [] as ProductStore[],
+    isFetchingProductStores: false,
+    fulfillmentProgress: {
+      totalOrdersCount: 0,
+      totalShipGroupsCount: 0,
+      brokeredShipGroupsCount: 0,
+      pickedShipGroupsCount: 0,
+      packedShipGroupsCount: 0,
+      shippedShipGroupsCount: 0
+    } as FulfillmentProgress,
+    openOrders: {
+      openOrdersCount: 0,
+      oldestOpenOrderDate: null as number | null
+    },
+    unfillable: {
+      unfillableDailyCounts: [] as { orderDate: number; shipGroupCount: number }[]
+    },
+    facilityOrderVolume: [] as any[],
+    facilityFulfillmentVelocity: [] as any[],
+    facilityPartialFulfillments: [] as any[],
     orders: generateOrders() as WorkflowOrder[],
     filters: {
       unfillable: emptyFilters(),
@@ -173,7 +190,6 @@ export const useCustomerServiceStore = defineStore('customerService', {
     lastAction: '' as string
   }),
   getters: {
-    productStores: () => PRODUCT_STORES,
     facilities: () => FACILITIES,
     channels: () => CHANNELS,
     priorities: () => ['HIGH', 'NORMAL', 'LOW'],
@@ -191,9 +207,131 @@ export const useCustomerServiceStore = defineStore('customerService', {
       open: state.orders.filter((order) => inBucket(order, 'open')).length,
       inflight: state.orders.filter((order) => inBucket(order, 'inflight')).length,
       packed: state.orders.filter((order) => inBucket(order, 'packed')).length
-    })
+    }),
+    unfillableTrend(state): number[] {
+      const today = DateTime.now();
+      return Array.from({ length: 14 }, (_, i) => {
+        const dateStr = today.minus({ days: 13 - i }).toFormat('yyyy-MM-dd');
+        const match = state.unfillable.unfillableDailyCounts?.find((d) => 
+          DateTime.fromMillis(d.orderDate).toFormat('yyyy-MM-dd') === dateStr
+        );
+        return match ? match.shipGroupCount : 0;
+      });
+    }
   },
   actions: {
+    async fetchProductStores() {
+      if (this.isFetchingProductStores) return;
+      
+      this.isFetchingProductStores = true;
+      try {
+        const resp = await api({
+          url: 'admin/productStores',
+          method: 'GET'
+        });
+        this.productStores = resp.data || [];
+      } catch (error) {
+        console.error('Failed to fetch product stores', error);
+      } finally {
+        this.isFetchingProductStores = false;
+      }
+    },
+    async fetchFulfillmentProgress(productStoreId?: string) {
+      try {
+        const resp = await api({
+          url: 'oms/orders/funnelDashboard/fulfillmentProgress',
+          method: 'GET',
+          params: {
+            productStoreId: productStoreId,
+            dateFilter: "2025-10-01"
+          }
+        });
+        if (resp.data) {
+          this.fulfillmentProgress = resp.data;
+        }
+      } catch (error) {
+        console.error('Failed to fetch fulfillment progress', error);
+      }
+    },
+    async fetchOpenOrders(productStoreId?: string) {
+      try {
+        const params: any = {};
+        if (productStoreId) params.productStoreId = productStoreId;
+        const resp = await api({
+          url: 'oms/orders/funnelDashboard/openOrders',
+          method: 'GET',
+          params
+        });
+        if (resp.data) this.openOrders = resp.data;
+      } catch (error) {
+        console.error('Failed to fetch open orders', error);
+      }
+    },
+    async fetchUnfillable(productStoreId?: string) {
+      try {
+        const params: any = { pageSize: 14 };
+        if (productStoreId) params.productStoreId = productStoreId;
+        const resp = await api({
+          url: 'oms/orders/funnelDashboard/unfillable',
+          method: 'GET',
+          params
+        });
+        if (resp.data) this.unfillable = resp.data;
+      } catch (error) {
+        console.error('Failed to fetch unfillable stats', error);
+      }
+    },
+    async fetchFacilityOrderVolume(productStoreId?: string) {
+      try {
+        const params: any = { dateFilter: '2025-11-17' };
+        if (productStoreId) params.productStoreId = productStoreId;
+        const resp = await api({
+          url: 'oms/orders/funnelDashboard/facilityOrderVolume',
+          method: 'GET',
+          params
+        });
+        if (resp.data) {
+          this.facilityOrderVolume = resp.data.facilities || [];
+          console.log('facilityOrderVolume:', this.facilityOrderVolume);
+        }
+      } catch (error) {
+        console.error('Failed to fetch facility order volume', error);
+      }
+    },
+    async fetchFacilityFulfillmentVelocity(productStoreId?: string) {
+      try {
+        const params: any = { dateFilter: '2025-01-01' };
+        if (productStoreId) params.productStoreId = productStoreId;
+        const resp = await api({
+          url: 'oms/orders/funnelDashboard/facilityFulfillmentVelocity',
+          method: 'GET',
+          params
+        });
+        if (resp.data) {
+          this.facilityFulfillmentVelocity = resp.data.facilities || [];
+          console.log('facilityFulfillmentVelocity:', this.facilityFulfillmentVelocity);
+        }
+      } catch (error) {
+        console.error('Failed to fetch facility fulfillment velocity', error);
+      }
+    },
+    async fetchFacilityPartialFulfillments(productStoreId?: string) {
+      try {
+        const params: any = { dateFilter: '2025-01-01' };
+        if (productStoreId) params.productStoreId = productStoreId;
+        const resp = await api({
+          url: 'oms/orders/funnelDashboard/facilityPartialFulfillments',
+          method: 'GET',
+          params
+        });
+        if (resp.data) {
+          this.facilityPartialFulfillments = resp.data.facilities || [];
+          console.log('facilityPartialFulfillments:', this.facilityPartialFulfillments);
+        }
+      } catch (error) {
+        console.error('Failed to fetch facility partial fulfillments', error);
+      }
+    },
     clearFilters(bucket: WorkflowBucket) {
       this.filters[bucket] = emptyFilters();
     },
