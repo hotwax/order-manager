@@ -8,7 +8,7 @@ import CustomerFind from '@/views/CustomerFind.vue';
 import CustomerDetail from '@/views/CustomerDetail.vue';
 import Settings from '@/views/Settings.vue';
 import Funnel from '@/views/Funnel.vue';
-import UnfillableOrders from '@/views/UnfillableOrders.vue';
+import SwapOrders from '@/views/SwapOrders.vue';
 import BadAddressOrders from '@/views/BadAddressOrders.vue';
 import FraudOrders from '@/views/FraudOrders.vue';
 import HoldOrders from '@/views/HoldOrders.vue';
@@ -66,9 +66,9 @@ const routes: RouteRecordRaw[] = [
     beforeEnter: authGuard
   },
   {
-    path: '/unfillable',
-    name: 'UnfillableOrders',
-    component: UnfillableOrders,
+    path: '/swap',
+    name: 'SwapOrders',
+    component: SwapOrders,
     beforeEnter: authGuard
   },
   {

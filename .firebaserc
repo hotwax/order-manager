@@ -1,0 +1,18 @@
+{
+  "projects": {
+    "default": "hotwax-digital-commerce-uat",
+    "uat": "hotwax-digital-commerce-uat"
+  },
+  "targets": {
+    "hotwax-digital-commerce-uat": {
+      "hosting": {
+        "dev": [
+          "hotwax-order-manager-dev"
+        ],
+        "uat": [
+          "hotwax-order-manager-uat"
+        ]
+      }
+    }
+  }
+}

@@ -667,6 +667,7 @@ const orderForm = ref({
   },
   lineItems: [] as Array<{
     selectedProductIndex: number | string;
+    productId?: string;
     sku: string;
     title: string;
     quantity: number;
@@ -843,6 +844,7 @@ function handleCustomerSelection(event: any) {
 function addLineItem() {
   orderForm.value.lineItems.push({
     selectedProductIndex: '',
+    productId: '',
     sku: '',
     title: '',
     quantity: 1,
@@ -903,11 +905,13 @@ function getProductPrice(product: any): number {
 function handleProductSelection(index: number, selection: number | string) {
   const item = orderForm.value.lineItems[index];
   if (selection === 'custom') {
+    item.productId = '';
     item.sku = '';
     item.title = '';
     item.price = 0;
   } else if (typeof selection === 'number' && item.searchResults[selection]) {
     const product = item.searchResults[selection];
+    item.productId = product.productId;
     item.sku = product.internalName || product.productId;
     item.title = product.productName || product.productId;
     item.price = getProductPrice(product);
@@ -1070,6 +1074,7 @@ async function submitOrder() {
       phone: form.shippingAddress.phone
     },
     items: form.lineItems.map(item => ({
+      productId: item.productId,
       sku: item.sku,
       title: item.title,
       quantity: item.quantity,

@@ -10,19 +10,15 @@
 
       <div class="search-filter-grid">
         <slot />
-        <ion-button fill="clear" @click="$emit('clear')">Clear</ion-button>
+        <ion-button fill="clear" @click="$emit('clear')">{{ translate('Clear') }}</ion-button>
       </div>
     </ion-card-content>
   </ion-card>
 </template>
 
 <script setup lang="ts">
-import {
-  IonButton,
-  IonCard,
-  IonCardContent,
-  IonSearchbar
-} from '@ionic/vue';
+import { IonButton, IonCard, IonCardContent, IonSearchbar } from '@ionic/vue';
+import { translate } from '@common';
 
 defineProps<{
   modelValue: string;

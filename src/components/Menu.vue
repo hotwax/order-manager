@@ -36,9 +36,9 @@
           <ion-label>{{ translate("Blocked") }}</ion-label>
         </ion-item-divider>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item button router-link="/unfillable" router-direction="root">
+          <ion-item button router-link="/swap" router-direction="root">
             <ion-icon slot="start" :icon="alertCircleOutline" />
-            <ion-label>{{ translate("Unfillable") }}</ion-label>
+            <ion-label>{{ translate("Swap") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">

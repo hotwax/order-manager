@@ -6,30 +6,30 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>Assign task</ion-title>
+      <ion-title>{{ translate('Assign task') }}</ion-title>
     </ion-toolbar>
     <ion-toolbar>
-      <ion-searchbar v-model="queryString" placeholder="Search staff" @keyup.enter="findAssignees" />
+      <ion-searchbar v-model="queryString" :placeholder="translate('Search staff')" @keyup.enter="findAssignees" />
     </ion-toolbar>
   </ion-header>
 
   <ion-content>
     <ion-list>
-      <ion-list-header>Staff</ion-list-header>
+      <ion-list-header>{{ translate('Staff') }}</ion-list-header>
       <ion-radio-group v-model="selectedAssigneeId">
         <ion-item button @click="selectedAssigneeId = meAssignee.id">
           <ion-radio slot="start" :value="meAssignee.id" />
           <ion-label>
-            Me
+            {{ translate('Me') }}
             <p>{{ meAssignee.externalId || meAssignee.id }}</p>
           </ion-label>
         </ion-item>
         <ion-item v-if="isLoading">
           <ion-spinner name="crescent" slot="start" />
-          <ion-label>Fetching staff</ion-label>
+          <ion-label>{{ translate('Fetching staff') }}</ion-label>
         </ion-item>
         <ion-item v-else-if="!assignees.length">
-          <ion-label>No staff found</ion-label>
+          <ion-label>{{ translate('No staff found') }}</ion-label>
         </ion-item>
         <template v-else>
           <ion-item v-for="assignee in assignees" :key="assignee.id" button @click="selectedAssigneeId = assignee.id">
@@ -73,7 +73,7 @@ import {
   modalController
 } from '@ionic/vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
-import { commonUtil, logger, useSolrSearch } from '@common';
+import { commonUtil, logger, translate, useSolrSearch } from '@common';
 import { computed, onMounted, ref } from 'vue';
 import { useUserStore } from '@/store/user';
 

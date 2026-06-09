@@ -6,7 +6,7 @@
           {{ translate("Cancel item") }}
         </ion-item>
           <ion-item button @click="customerSwap()">
-            {{ translate("Customer swap") }}
+            {{ translate("Custom swap") }}
           </ion-item>
           <ion-item button @click="viewInventory()">
             {{ translate("View inventory") }}
@@ -19,6 +19,7 @@
   import { IonContent, IonItem, IonList, IonListHeader, modalController, popoverController } from "@ionic/vue";
   import { translate } from "@common";
   import ProductInventoryModal from "@/components/ProductInventoryModal.vue";
+  import CustomSwapModal from "@/components/CustomSwapModal.vue";
 
   const props = defineProps(["item", "task"]);
 
@@ -39,8 +40,22 @@
     closePopover();
   };
 
-  const customerSwap = () => {
-    // TODO: implement customer swap
+  const customerSwap = async () => {
     closePopover();
+    // Find the original order item to get its substituteProducts list
+    const originalItem = (props.task.items ?? []).find((i: any) => i.orderItemSeqId === props.item._sourceOrderItemSeqId);
+    const modal = await modalController.create({
+      component: CustomSwapModal,
+      componentProps: {
+        substituteProducts: originalItem?.substituteProducts ?? [],
+        facilityId: props.task.facilityId,
+      },
+    });
+    await modal.present();
+    const { data: selectedProduct } = await modal.onWillDismiss();
+    if (!selectedProduct || !originalItem) return;
+    // Apply selected product as custom substitute on the original item
+    originalItem._customSubstitute = selectedProduct;
+    originalItem._cancel = false;
   };
   </script>

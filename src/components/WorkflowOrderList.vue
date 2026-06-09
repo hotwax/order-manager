@@ -39,8 +39,8 @@
             {{ method.label }}
           </ion-select-option>
         </ion-select>
-        <ion-input v-model="filters.dateFrom" label="Order date from" label-placement="stacked" type="date" />
-        <ion-input v-model="filters.dateThru" label="Order date thru" label-placement="stacked" type="date" />
+        <ion-input v-model="filters.dateFrom" :label="translate('Order date from')" label-placement="stacked" type="date" />
+        <ion-input v-model="filters.dateThru" :label="translate('Order date thru')" label-placement="stacked" type="date" />
       </SearchFilterCard>
 
       <ion-list>
@@ -51,9 +51,9 @@
             :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
             @ion-change="toggleCurrentPageSelection($event.detail.checked)"
           />
-          <ion-label>{{ orderTotal }} {{ orderTotal === 1 ? 'order' : 'orders' }}</ion-label>
+          <ion-label>{{ orderTotal }} {{ orderTotal === 1 ? translate('order') : translate('orders') }}</ion-label>
           <ion-button fill="clear" size="small" @click="toggleSelectMode">
-            {{ selectMode ? 'Done' : 'Select' }}
+            {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
         <ion-item
@@ -106,7 +106,7 @@
 
     <ion-footer v-if="selectMode">
       <ion-toolbar>
-        <ion-title size="small">{{ selectedIds.size }} selected</ion-title>
+        <ion-title size="small">{{ selectedIds.size }} {{ translate('selected') }}</ion-title>
         <ion-buttons slot="end">
           <ion-button
             v-for="action in actions"
@@ -165,7 +165,7 @@ import { useSeedStore } from '@/store/seed';
 import type { BulkActionDefinition, WorkflowBucket, WorkflowOrder } from '@/types/customerService';
 import EmptyState from '@/components/EmptyState.vue';
 import SearchFilterCard from '@/components/SearchFilterCard.vue';
-import { commonUtil } from '@common';
+import { commonUtil, translate } from '@common';
 
 const actualOrderIds = ['M100051'];
 const fallbackActualOrderId = actualOrderIds[Math.floor(Math.random() * actualOrderIds.length)];
@@ -345,8 +345,8 @@ async function runAction(action: BulkActionDefinition) {
       header: action.label,
       message: action.confirmText,
       buttons: [
-        { text: 'Cancel', role: 'cancel' },
-        { text: 'Confirm', role: 'confirm' }
+        { text: translate('Cancel'), role: 'cancel' },
+        { text: translate('Confirm'), role: 'confirm' }
       ]
     });
     await alert.present();
@@ -356,7 +356,7 @@ async function runAction(action: BulkActionDefinition) {
 
   const count = selectedIds.value.size;
   store.runBulkAction(props.bucket, action.id);
-  toastMessage.value = `${action.label} · ${count} order${count === 1 ? '' : 's'}`;
+  toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
 }
 
 function formatChannel(channel: string) {

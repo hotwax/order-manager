@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { commonUtil } from "@common";
+import { api, commonUtil } from "@common";
 import logger from "@/logger";
 import { useOrderDetail } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
@@ -22,7 +22,10 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     byOrderId: {} as Record<string, OrderEntry>,
     currentOrderId: "",
     orderHeaderWorkEfforts: [] as any[],
-    commEvents: [] as any[]
+    commEvents: [] as any[],
+    shippingMethods: [] as any[],
+    carrierParties: [] as any[],
+    fulfillmentTimeline: [] as any[],
   }),
   getters: {
     current: (state) => state.byOrderId[state.currentOrderId]?.payload || null,
@@ -234,11 +237,24 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       );
     },
 
+    /** Fulfillment timeline indexed by shipGroupSeqId for O(1) lookup in the template. */
+    timelineByShipGroup: (state): Record<string, any> => {
+      const index: Record<string, any> = {};
+      state.fulfillmentTimeline.forEach((entry: any) => {
+        if (entry.shipGroupSeqId) index[entry.shipGroupSeqId] = entry;
+      });
+      return index;
+    },
+
     openHolds: (state) => state.orderHeaderWorkEfforts,
 
     hasOpenHolds(): boolean {
       return this.openHolds.length > 0;
-    }
+    },
+
+    /** Shipping methods for a given carrier partyId, derived from the fetched carrierShipmentMethods list. */
+    shippingMethodsByCarrier: (state) => (carrierPartyId: string) =>
+      state.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId),
   },
   actions: {
     async fetchOrder(orderId: string, force = false) {
@@ -281,6 +297,17 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       }
     },
 
+    async fetchFulfillmentTimeline(orderId: string) {
+      if (!orderId) return;
+      try {
+        const resp = await api({ url: `oms/orders/${orderId}/fulfillmentTimeline`, method: 'GET' });
+        if (commonUtil.hasError(resp)) throw resp.data;
+        this.fulfillmentTimeline = Array.isArray(resp.data) ? resp.data : (resp.data?.timeline ?? resp.data?.docs ?? []);
+      } catch (error: any) {
+        logger.error('Failed to load fulfillment timeline', error);
+      }
+    },
+
     async fetchCommEvents(orderId: string) {
       if (!orderId) return;
       try {
@@ -292,9 +319,66 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       }
     },
 
+    async fetchShippingMethods() {
+      try {
+        const resp = await api({ url: 'oms/shippingGateways/carrierShipmentMethods', method: 'GET' });
+        this.shippingMethods = Array.isArray(resp.data) ? resp.data : [];
+      } catch (error: any) {
+        logger.error('Failed to load shipping methods', error);
+      }
+    },
+    async fetchCarrierParties() {
+      try {
+        const resp = await api({ url: 'oms/shippingGateways/carrierParties', method: 'GET', params: { roleTypeId: 'CARRIER' } });
+        this.carrierParties = Array.isArray(resp.data) ? resp.data : [];
+      } catch (error: any) {
+        logger.error('Failed to load carrier parties', error);
+      }
+    },
+    async updateShipmentCarrierAndMethod(orderId: string, shipGroupSeqId: string, shipmentMethodTypeId: string, carrierPartyId: string) {
+      try {
+        await api({
+          url: `oms/orders/${orderId}/shipGroups/${shipGroupSeqId}`,
+          method: 'PUT',
+          data: { shipmentMethodTypeId, carrierPartyId },
+        });
+      } catch (error: any) {
+        logger.error('Failed to update carrier/method', error);
+        throw error;
+      }
+    },
+    async bulkCreateOrderTasks(orderIds: string[], taskData: { workEffortTypeId: string; workEffortPurposeTypeId: string; workEffortName: string; description: string }) {
+      const shipGroupsByOrder = await Promise.all(
+        orderIds.map(async (orderId) => {
+          const resp = await api({ url: `oms/orders/${orderId}/shipGroups`, method: 'GET' });
+          const shipGroups: any[] = Array.isArray(resp.data) ? resp.data : (resp.data?.docs ?? []);
+          return { orderId, shipGroupSeqId: shipGroups[0]?.shipGroupSeqId };
+        })
+      );
+      const payload = shipGroupsByOrder
+        .filter((item) => item.shipGroupSeqId)
+        .map((item) => ({ ...item, ...taskData, statusId: 'TASK_CREATED' }));
+      return api({ url: 'oms/orders/tasks', method: 'POST', data: payload });
+    },
+    async bulkCancelOrders(orderIds: string[]) {
+      const payload = orderIds.map((orderId) => ({ orderId }));
+      return api({ url: 'oms/orders/cancel', method: 'POST', data: payload });
+    },
+    async bulkUpdateShippingMethods(orderIds: string[], carrierPartyId: string, shipmentMethodTypeId: string) {
+      await Promise.allSettled(
+        orderIds.map((orderId) =>
+          api({
+            url: `oms/orders/updateShippingMethod`,
+            method: 'POST',
+            data: { orderId, carrierPartyId, shipmentMethodTypeId },
+          })
+        )
+      );
+    },
     async setCurrentOrder(orderId: string) {
       this.currentOrderId = orderId;
       await this.fetchOrder(orderId);
+      this.fetchFulfillmentTimeline(orderId);
     },
     reset() {
       this.$reset();

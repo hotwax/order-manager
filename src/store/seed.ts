@@ -91,6 +91,7 @@ export const useSeedStore = defineStore("seed", {
 
     statusesByType: {} as Record<string, SeedDatasetState>,
     enumsByType: {} as Record<string, SeedDatasetState>,
+    enumChildTypesByParent: {} as Record<string, string[]>,
     statusFlowTransitions: dataset(),
 
     facilities: dataset(),
@@ -121,6 +122,14 @@ export const useSeedStore = defineStore("seed", {
     getEnumsByType: (state) => (typeId: string) => {
       const enumDataset = state.enumsByType[typeId];
       return enumDataset ? enumDataset.ids.map((id) => enumDataset.byId[id]) : [];
+    },
+    /** Returns all Enumeration records belonging to child types of the given parentTypeId. */
+    getEnumsByParentType: (state) => (parentTypeId: string) => {
+      const childTypeIds = state.enumChildTypesByParent[parentTypeId] ?? [];
+      return childTypeIds.flatMap((childTypeId) => {
+        const dataset = state.enumsByType[childTypeId];
+        return dataset ? dataset.ids.map((id) => dataset.byId[id]) : [];
+      });
     },
     productStore: (state) => (productStoreId: string) => state.productStores.byId[productStoreId],
     productStoreName: (state) => (productStoreId: string) => itemDescription(state.productStores.byId[productStoreId], productStoreId, ["storeName", "companyName"]),
@@ -353,6 +362,13 @@ export const useSeedStore = defineStore("seed", {
         method: "GET",
         params: { enumTypeId, pageSize: 500, orderByField: "sequenceNum" }
       }, (enumeration) => enumeration.enumId);
+    },
+    async loadEnumsByParentType(parentTypeId: string) {
+      const resp = await api({ url: 'admin/enumTypes', method: 'GET', params: { parentTypeId, pageSize: 200 } });
+      const childTypes: any[] = Array.isArray(resp.data) ? resp.data : (resp.data?.enumTypeList ?? resp.data?.docs ?? []);
+      const childTypeIds = childTypes.map((t: any) => t.enumTypeId).filter(Boolean);
+      this.enumChildTypesByParent[parentTypeId] = childTypeIds;
+      await Promise.all(childTypeIds.map((typeId: string) => this.loadEnumType(typeId)));
     },
     async loadStatusFlowTransitions() {
       await this.loadDataset(this.statusFlowTransitions, {
