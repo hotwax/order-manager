@@ -545,12 +545,11 @@ import {
   trashOutline,
   searchOutline
 } from 'ionicons/icons';
-import { api, translate, useSolrSearch } from '@common';
+import { api, translate } from '@common';
 import { useUserStore } from '@/store/user';
 import emitter from '@/event-bus';
 import { searchShopifyCustomers, createShopifyCustomer, getShopifyShops } from '@/services/customer';
-
-const { searchProducts } = useSolrSearch();
+import { searchProducts } from '@/services/solr';
 
 const userStore = useUserStore();
 

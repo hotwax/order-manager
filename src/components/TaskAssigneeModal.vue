@@ -73,9 +73,10 @@ import {
   modalController
 } from '@ionic/vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
-import { commonUtil, logger, translate, useSolrSearch } from '@common';
+import { commonUtil, logger, translate } from '@common';
 import { computed, onMounted, ref } from 'vue';
 import { useUserStore } from '@/store/user';
+import { executeSolrQuery } from '@/services/solr';
 
 type Assignee = {
   id: string;
@@ -123,19 +124,16 @@ async function findAssignees() {
   const query = assigneeQuery(queryString.value);
   const payload = {
     json: {
+      query,
       params: {
-        rows: '50',
-        q: query,
-        defType: 'edismax',
-        qf: 'firstName lastName groupName partyId externalId',
-        sort: 'firstName asc'
+        rows: '50'
       },
       filter: ['docType:EMPLOYEE', 'statusId:PARTY_ENABLED']
     }
   };
 
   try {
-    const resp = await useSolrSearch().runSolrQuery(payload);
+    const resp = await executeSolrQuery(payload);
     if (resp.status === 200 && !commonUtil.hasError(resp)) {
       assignees.value = (resp.data.response?.docs || [])
         .map(normalizeAssignee)
@@ -154,8 +152,13 @@ function assigneeQuery(value: string) {
   const trimmedValue = value.trim();
   if (!trimmedValue) return '*:*';
 
-  const tokens = trimmedValue.split(/\s+/).map((token) => `*${token}*`);
-  return `(${tokens.join(' OR ')}) OR "${trimmedValue}"^100`;
+  const tokens = trimmedValue.split(/\s+/).map(escapeAssigneeQueryToken).filter(Boolean);
+  const fields = ['keywordSearchText', 'spellchecker', 'identifier', 'externalId', 'partyId'];
+  return `(${tokens.flatMap((token) => fields.map((field) => `${field}:*${token}*`)).join(' OR ')})`;
+}
+
+function escapeAssigneeQueryToken(value: string) {
+  return value.replace(/([\\+\-!(){}[\]^"~*?:]|&&|\|\|)/g, '\\$1');
 }
 
 function normalizeAssignee(doc: any): Assignee {

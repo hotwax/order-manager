@@ -1,9 +1,10 @@
-import { commonUtil, useSolrSearch } from '@common';
+import { commonUtil } from '@common';
 import {
   allDocs,
   normalizeOrderDoc,
   type OrderSearchResult
 } from './OrderService';
+import { executeSolrQuery } from './solr';
 
 export interface OrderSearchParams {
   queryString?: string;
@@ -114,7 +115,7 @@ export function buildOrderLookupPayload(params: OrderSearchParams = {}) {
 }
 
 export async function searchOrders(params: OrderSearchParams = {}): Promise<OrderSearchResult> {
-  const response = await useSolrSearch().runSolrQuery(buildOrderLookupPayload(params));
+  const response = await executeSolrQuery(buildOrderLookupPayload(params));
 
   if (commonUtil.hasError(response)) return Promise.reject(response.data);
 

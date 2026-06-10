@@ -10,6 +10,7 @@ import {
   toStringValue,
   uniqueStrings
 } from './OrderService';
+import { executeSolrQuery } from './solr';
 import type { ContactMech, Customer, Order } from '@/types/order';
 import type { CustomerContactMech, CustomerOrderSummary, CustomerProfile, CustomerRelationship, CustomerTaskSummary } from '@/types/customer';
 
@@ -504,8 +505,8 @@ function mapOrderGroup(group: any): CustomerOrderSummary {
 }
 
 /**
- * Customer orders + lifetime aggregates from Solr (enterpriseSearch core,
- * docType:ORDER, customerPartyId). The app calls runSolrQuery directly. Order docs
+ * Customer orders + lifetime aggregates from Solr (enterpriseSearch collection,
+ * docType:ORDER, customerPartyId). The app calls execute#SolrQuery directly. Order docs
  * are per-item, so we group by orderId. We PAGE THROUGH every group so the lifetime
  * value/count are accurate regardless of order volume (ngroups = order count; one
  * grandTotal per group summed = lifetime value). A Solr stats/facet sum can replace
@@ -521,23 +522,19 @@ export async function getCustomerOrdersFromSolr(partyId: string, params: { pageS
   let currencyUom = 'USD';
 
   for (let page = 0; page < maxPages; page++) {
-    const response = await api({
-      url: 'admin/runSolrQuery',
-      method: 'post',
-      data: {
-        coreName: 'enterpriseSearch',
-        json: {
-          query: '*:*',
-          filter: ['docType:ORDER', `customerPartyId:"${partyId}"`],
-          params: {
-            group: true,
-            'group.field': 'orderId',
-            'group.limit': 10,
-            'group.ngroups': true,
-            sort: 'orderDate desc',
-            rows: pageSize,
-            start: page * pageSize
-          }
+    const response = await executeSolrQuery({
+      collection: 'enterpriseSearch',
+      json: {
+        query: '*:*',
+        filter: ['docType:ORDER', `customerPartyId:"${partyId}"`],
+        params: {
+          group: true,
+          'group.field': 'orderId',
+          'group.limit': 10,
+          'group.ngroups': true,
+          sort: 'orderDate desc',
+          rows: pageSize,
+          start: page * pageSize
         }
       }
     });
@@ -747,5 +744,4 @@ export async function getShopifyShops(): Promise<any[]> {
   });
   return response.data || [];
 }
-
 

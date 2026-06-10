@@ -64,7 +64,7 @@ import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabe
 import { checkmarkCircle, closeOutline, imageOutline } from 'ionicons/icons';
 import { ref } from 'vue';
 import { api, translate } from '@common';
-import { useSolrSearch } from '@common/composables/useSolrSearch';
+import { searchProducts } from '@/services/solr';
 import { showToast } from '@/utils';
 
 const props = defineProps<{
@@ -72,8 +72,6 @@ const props = defineProps<{
   shipGroupSeqId: string;
   onItemAdded?: () => void;
 }>();
-
-const { searchProducts } = useSolrSearch();
 
 const queryString = ref('');
 const products = ref<any[]>([]);

@@ -1,7 +1,8 @@
 import { ref } from "vue";
-import { useSolrSearch, commonUtil } from "@common";
+import { commonUtil } from "@common";
 import logger from "@/logger";
 import { useProductCacheStore, type CachedProduct, type ProductIdentification } from "@/store/productCache";
+import { executeSolrQuery } from "@/services/solr";
 
 /**
  * Product master — fetch rich product data (name, SKU, image) from Solr, cached per
@@ -79,7 +80,7 @@ async function getByIds(productIds: string[]): Promise<CachedProduct[]> {
   for (let index = 0; index < ids.length; index += BATCH_SIZE) {
     const batch = ids.slice(index, index + BATCH_SIZE);
     try {
-      const resp = await useSolrSearch().runSolrQuery(buildProductQuery(batch));
+      const resp = await executeSolrQuery(buildProductQuery(batch));
       if (commonUtil.hasError(resp)) {
         logger.error("Product Solr query returned an error", resp.data);
         continue;
