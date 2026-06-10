@@ -15,28 +15,28 @@
         :placeholder="searchPlaceholder"
         @clear="clearFilters"
       >
-        <ion-select v-model="filters.productStoreId" :label="translate('Product store')" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">{{ translate('All stores') }}</ion-select-option>
-          <ion-select-option v-for="store in store.productStores" :key="store.id" :value="store.id">
-            {{ store.name }}
-          </ion-select-option>
+        <ion-input v-model="filters.customerName" label="Customer name" label-placement="stacked" :clear-input="true" />
+        <ion-select v-model="filters.priority" label="Priority" label-placement="stacked" interface="popover">
+          <ion-select-option :value="null">All</ion-select-option>
+          <ion-select-option :value="true">High priority</ion-select-option>
+          <ion-select-option :value="false">Normal / no priority</ion-select-option>
         </ion-select>
-        <ion-select v-model="filters.salesChannelEnumId" :label="translate('Channel')" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">{{ translate('All channels') }}</ion-select-option>
-          <ion-select-option v-for="channel in store.channels" :key="channel" :value="channel">
+        <ion-select v-model="filters.salesChannelEnumId" label="Channel" label-placement="stacked" interface="popover">
+          <ion-select-option value="All">All channels</ion-select-option>
+          <ion-select-option v-for="channel in channelOptions" :key="channel" :value="channel">
             {{ formatChannel(channel) }}
           </ion-select-option>
         </ion-select>
-        <ion-select v-if="showFacility" v-model="filters.facilityId" :label="translate('Facility')" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">{{ translate('All facilities') }}</ion-select-option>
-          <ion-select-option v-for="facility in store.facilities" :key="facility.id" :value="facility.id">
+        <ion-select v-if="showFacility" v-model="filters.facilityId" label="Facility" label-placement="stacked" interface="popover">
+          <ion-select-option value="All">All facilities</ion-select-option>
+          <ion-select-option v-for="facility in facilityOptions" :key="facility.id" :value="facility.id">
             {{ facility.name }}
           </ion-select-option>
         </ion-select>
-        <ion-select v-model="filters.priority" :label="translate('Priority')" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">{{ translate('All priorities') }}</ion-select-option>
-          <ion-select-option v-for="priority in store.priorities" :key="priority" :value="priority">
-            {{ priority }}
+        <ion-select v-model="filters.shipmentMethodTypeId" label="Shipment method" label-placement="stacked" interface="popover">
+          <ion-select-option value="All">All methods</ion-select-option>
+          <ion-select-option v-for="method in shipmentMethodOptions" :key="method.id" :value="method.id">
+            {{ method.label }}
           </ion-select-option>
         </ion-select>
         <ion-input v-model="filters.dateFrom" :label="translate('Order date from')" label-placement="stacked" type="date" />
@@ -51,7 +51,7 @@
             :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
             @ion-change="toggleCurrentPageSelection($event.detail.checked)"
           />
-          <ion-label>{{ orders.length }} {{ orders.length === 1 ? translate('order') : translate('orders') }}</ion-label>
+          <ion-label>{{ orderTotal }} {{ orderTotal === 1 ? translate('order') : translate('orders') }}</ion-label>
           <ion-button fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
@@ -86,11 +86,22 @@
         </ion-item>
       </ion-list>
 
+      <div v-if="isLoading && !orders.length" class="ion-text-center ion-padding">
+        <ion-spinner name="crescent" />
+      </div>
       <EmptyState
-        v-if="!orders.length"
+        v-else-if="!isLoading && !orders.length"
         :title="emptyTitle"
         :message="emptyMessage"
       />
+
+      <ion-infinite-scroll
+        threshold="100px"
+        v-show="hasMore"
+        @ionInfinite="loadMore($event)"
+      >
+        <ion-infinite-scroll-content loading-spinner="crescent" />
+      </ion-infinite-scroll>
     </ion-content>
 
     <ion-footer v-if="selectMode">
@@ -127,6 +138,8 @@ import {
   IonContent,
   IonFooter,
   IonHeader,
+  IonInfiniteScroll,
+  IonInfiniteScrollContent,
   IonInput,
   IonItem,
   IonLabel,
@@ -137,15 +150,18 @@ import {
   IonPage,
   IonSelect,
   IonSelectOption,
+  IonSpinner,
   IonTitle,
   IonToast,
   IonToolbar,
   alertController
 } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { DateTime } from 'luxon';
 import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
+import { useOrderStore } from '@/store/order';
+import { useSeedStore } from '@/store/seed';
 import type { BulkActionDefinition, WorkflowBucket, WorkflowOrder } from '@/types/customerService';
 import EmptyState from '@/components/EmptyState.vue';
 import SearchFilterCard from '@/components/SearchFilterCard.vue';
@@ -164,6 +180,8 @@ const props = defineProps<{
 }>();
 
 const store = useCustomerServiceStore();
+const orderStore = useOrderStore();
+const seedStore = useSeedStore();
 const route = useRoute();
 const toastMessage = ref('');
 
@@ -171,6 +189,27 @@ const filters = computed({
   get: () => store.filters[props.bucket],
   set: (value) => (store.filters[props.bucket] = value)
 });
+
+const channelOptions = computed(() =>
+  (seedStore.enumsByType['ORDER_SALES_CHANNEL']?.ids || []).map((enumId) => {
+    const enumeration: any = seedStore.enumsByType['ORDER_SALES_CHANNEL'].byId[enumId];
+    return enumeration?.enumId || enumId;
+  })
+);
+
+const facilityOptions = computed(() =>
+  seedStore.facilities.ids.map((id) => {
+    const facility: any = seedStore.facilities.byId[id];
+    return { id, name: facility?.facilityName || id };
+  })
+);
+
+const shipmentMethodOptions = computed(() =>
+  seedStore.shipmentMethodTypes.ids.map((id) => {
+    const method: any = seedStore.shipmentMethodTypes.byId[id];
+    return { id, label: method?.description || id };
+  })
+);
 
 const orders = computed(() => store.filteredOrders(props.bucket));
 const selectedIds = computed(() => new Set(store.selection[props.bucket]));
@@ -182,17 +221,25 @@ const allCurrentPageSelected = computed(() => {
 });
 const someCurrentPageSelected = computed(() => currentPageOrderIds.value.some((orderId) => selectedIds.value.has(orderId)));
 
+const isApiBucket = props.bucket === 'open' || props.bucket === 'inflight' || props.bucket === 'packed';
+const apiBucket = props.bucket as 'open' | 'inflight' | 'packed';
+
+const isLoading = computed(() => isApiBucket && orderStore.workflowOrdersLoading[apiBucket]);
+
+const orderTotal = computed(() =>
+  isApiBucket ? orderStore.workflowOrdersTotal[apiBucket] : orders.value.length
+);
+
+const hasMore = computed(() =>
+  isApiBucket && orderStore.workflowOrders[apiBucket].length < orderStore.workflowOrdersTotal[apiBucket]
+);
+
 function queryValue(value: unknown) {
   return Array.isArray(value) ? value[0] : value;
 }
 
 function applyRouteFilters() {
-  const productStoreId = queryValue(route.query.productStoreId);
   const facilityId = queryValue(route.query.facilityId);
-
-  if (typeof productStoreId === 'string') {
-    filters.value.productStoreId = productStoreId;
-  }
 
   if (typeof facilityId === 'string') {
     filters.value.facilityId = facilityId;
@@ -200,6 +247,40 @@ function applyRouteFilters() {
 }
 
 watch(() => route.query, applyRouteFilters, { immediate: true });
+
+function loadWorkflowOrders() {
+  orderStore.fetchWorkflowOrders(props.bucket as 'open' | 'inflight' | 'packed', filters.value);
+}
+
+async function loadMore(event: any) {
+  await orderStore.loadMoreWorkflowOrders(props.bucket as 'open' | 'inflight' | 'packed', filters.value);
+  event.target.complete();
+}
+
+onMounted(loadWorkflowOrders);
+
+const debounceTimer = ref<ReturnType<typeof setTimeout>>();
+
+watch(
+  () => [filters.value.query, filters.value.customerName],
+  () => {
+    if (debounceTimer.value) clearTimeout(debounceTimer.value);
+    debounceTimer.value = setTimeout(loadWorkflowOrders, 300);
+  }
+);
+
+watch(
+  () => [
+    filters.value.priority,
+    filters.value.productStoreId,
+    filters.value.salesChannelEnumId,
+    filters.value.facilityId,
+    filters.value.shipmentMethodTypeId,
+    filters.value.dateFrom,
+    filters.value.dateThru
+  ],
+  loadWorkflowOrders
+);
 
 watch(orders, () => {
   const currentOrderIds = new Set(currentPageOrderIds.value);
@@ -289,7 +370,7 @@ function formatChannel(channel: string) {
 
 function formatDate(iso: string) {
   if (!iso) return '';
-  return DateTime.fromISO(iso).toFormat('LLL d, h:mma');
+  return DateTime.fromMillis(Number(iso)).toFormat('LLL d, h:mma');
 }
 
 function formatCurrency(amount: number, currency: string) {

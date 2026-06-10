@@ -411,7 +411,7 @@ export function firstDoc(data: any) {
 }
 
 export function allDocs(data: any) {
-  const docs = data?.entityValueList ?? data?.rows ?? data?.docs ?? data?.response?.docs ?? [];
+  const docs = data?.entityValueList ?? data?.rows ?? data?.docs ?? data?.response?.docs ?? data ?? [];
   return Array.isArray(docs) ? docs : [];
 }
 

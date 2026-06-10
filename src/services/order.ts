@@ -1,7 +1,9 @@
-import { commonUtil, useSolrSearch } from '@common';
+import { api, commonUtil, useSolrSearch } from '@common';
 import {
   allDocs,
   normalizeOrderDoc,
+  toStringValue,
+  toNumberValue,
   type OrderSearchResult
 } from './OrderService';
 
