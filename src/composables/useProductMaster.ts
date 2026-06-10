@@ -1,8 +1,7 @@
 import { ref } from "vue";
-import { commonUtil } from "@common";
+import { executeSolrQuery, solrDocs, escapeSolrValue, type SolrQuery } from "@common";
 import logger from "@/logger";
 import { useProductCacheStore, type CachedProduct, type ProductIdentification } from "@/store/productCache";
-import { executeSolrQuery } from "@/services/solr";
 
 /**
  * Product master — fetch rich product data (name, SKU, image) from Solr, cached per
@@ -22,10 +21,6 @@ const staleMs = ref(24 * 60 * 60 * 1000);
 function init(opts?: { staleMs?: number }) {
   if (opts?.staleMs !== undefined) staleMs.value = opts.staleMs;
   cacheReady.value = true;
-}
-
-function escapeSolrValue(value: string) {
-  return String(value).replace(/([\\+\-!(){}[\]^"~*?:]|&&|\|\|)/g, "\\$1");
 }
 
 function parseGoodIdentifications(raw: any): ProductIdentification[] {
@@ -56,18 +51,13 @@ function mapDocToProduct(doc: any): CachedProduct {
   };
 }
 
-function buildProductQuery(productIds: string[]) {
+function buildProductQuery(productIds: string[]): SolrQuery {
   return {
-    json: {
-      params: {
-        rows: productIds.length,
-        start: 0,
-        "q.op": "AND",
-        fl: PRODUCT_FIELDS
-      } as Record<string, any>,
-      query: "*:*",
-      filter: ["docType:PRODUCT", `productId:(${productIds.map(escapeSolrValue).join(" OR ")})`]
-    }
+    query: "*:*",
+    filter: ["docType:PRODUCT", `productId:(${productIds.map(escapeSolrValue).join(" OR ")})`],
+    fields: PRODUCT_FIELDS,
+    limit: productIds.length,
+    params: { "q.op": "AND" }
   };
 }
 
@@ -80,13 +70,8 @@ async function getByIds(productIds: string[]): Promise<CachedProduct[]> {
   for (let index = 0; index < ids.length; index += BATCH_SIZE) {
     const batch = ids.slice(index, index + BATCH_SIZE);
     try {
-      const resp = await executeSolrQuery(buildProductQuery(batch));
-      if (commonUtil.hasError(resp)) {
-        logger.error("Product Solr query returned an error", resp.data);
-        continue;
-      }
-      const docs = resp.data?.response?.docs || [];
-      products.push(...docs.map(mapDocToProduct));
+      const response = await executeSolrQuery(buildProductQuery(batch));
+      products.push(...solrDocs(response).map(mapDocToProduct));
     } catch (error) {
       logger.error("Product Solr query failed", error);
     }

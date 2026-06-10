@@ -73,10 +73,9 @@ import {
   modalController
 } from '@ionic/vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
-import { commonUtil, logger, translate } from '@common';
+import { logger, translate, executeSolrQuery, solrDocs } from '@common';
 import { computed, onMounted, ref } from 'vue';
 import { useUserStore } from '@/store/user';
-import { executeSolrQuery } from '@/services/solr';
 
 type Assignee = {
   id: string;
@@ -122,25 +121,16 @@ async function findAssignees() {
   assignees.value = [];
 
   const query = assigneeQuery(queryString.value);
-  const payload = {
-    json: {
-      query,
-      params: {
-        rows: '50'
-      },
-      filter: ['docType:EMPLOYEE', 'statusId:PARTY_ENABLED']
-    }
-  };
 
   try {
-    const resp = await executeSolrQuery(payload);
-    if (resp.status === 200 && !commonUtil.hasError(resp)) {
-      assignees.value = (resp.data.response?.docs || [])
-        .map(normalizeAssignee)
-        .filter((assignee: Assignee) => assignee.id && assignee.id !== meAssignee.value.id);
-    } else {
-      throw resp.data;
-    }
+    const response = await executeSolrQuery({
+      query,
+      filter: ['docType:EMPLOYEE', 'statusId:PARTY_ENABLED'],
+      limit: 50
+    });
+    assignees.value = solrDocs(response)
+      .map(normalizeAssignee)
+      .filter((assignee: Assignee) => assignee.id && assignee.id !== meAssignee.value.id);
   } catch (error) {
     logger.error('Failed to fetch task assignees', error);
   } finally {

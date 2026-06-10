@@ -10,7 +10,7 @@ import {
   toStringValue,
   uniqueStrings
 } from './OrderService';
-import { executeSolrQuery } from './solr';
+import { executeSolrQuery, solrGroups } from '@common';
 import type { ContactMech, Customer, Order } from '@/types/order';
 import type { CustomerContactMech, CustomerOrderSummary, CustomerProfile, CustomerRelationship, CustomerTaskSummary } from '@/types/customer';
 
@@ -524,24 +524,21 @@ export async function getCustomerOrdersFromSolr(partyId: string, params: { pageS
   for (let page = 0; page < maxPages; page++) {
     const response = await executeSolrQuery({
       collection: 'enterpriseSearch',
-      json: {
-        query: '*:*',
-        filter: ['docType:ORDER', `customerPartyId:"${partyId}"`],
-        params: {
-          group: true,
-          'group.field': 'orderId',
-          'group.limit': 10,
-          'group.ngroups': true,
-          sort: 'orderDate desc',
-          rows: pageSize,
-          start: page * pageSize
-        }
+      query: '*:*',
+      filter: ['docType:ORDER', `customerPartyId:"${partyId}"`],
+      sort: 'orderDate desc',
+      limit: pageSize,
+      offset: page * pageSize,
+      params: {
+        group: true,
+        'group.field': 'orderId',
+        'group.limit': 10,
+        'group.ngroups': true
       }
     });
 
-    const grouped = response.data?.grouped?.orderId;
-    const groups: any[] = grouped?.groups || [];
-    lifetimeOrders = Number(grouped?.ngroups ?? (page * pageSize + groups.length));
+    const { groups, ngroups } = solrGroups(response, 'orderId');
+    lifetimeOrders = ngroups || (page * pageSize + groups.length);
     if (!groups.length) break;
 
     groups.forEach((group) => {

@@ -1,10 +1,8 @@
-import { commonUtil } from '@common';
 import {
-  allDocs,
   normalizeOrderDoc,
   type OrderSearchResult
 } from './OrderService';
-import { executeSolrQuery } from './solr';
+import { executeSolrQuery, solrDocs, solrTotal, solrGroups, type SolrQuery, type SolrResponse } from '@common';
 
 export interface OrderSearchParams {
   queryString?: string;
@@ -72,7 +70,7 @@ const orderSearchQueryFields = [
   'returnId'
 ];
 
-export function buildOrderLookupPayload(params: OrderSearchParams = {}) {
+export function buildOrderLookupPayload(params: OrderSearchParams = {}): SolrQuery {
   const viewSize = Number(params.pageSize ?? 50);
   const viewIndex = Number(params.pageIndex ?? 0);
   const searchTerm = params.queryString?.trim() ?? '';
@@ -87,58 +85,53 @@ export function buildOrderLookupPayload(params: OrderSearchParams = {}) {
   const dateFilter = buildOrderDateSolrFilter(params.dateFrom, params.dateThru);
   if (dateFilter) filters.push(dateFilter);
 
-  const payload = {
-    json: {
-      params: {
-        sort: params.sort ?? 'orderDate desc',
-        rows: viewSize,
-        start: viewSize * viewIndex,
-        group: true,
-        'group.field': 'orderId',
-        'group.limit': 10000,
-        'group.ngroups': true,
-        'q.op': 'AND',
-        fl: orderSolrFields.join(' ')
-      } as Record<string, any>,
-      query: '*:*',
-      filter: filters
+  const query: SolrQuery = {
+    query: '*:*',
+    filter: filters,
+    sort: params.sort ?? 'orderDate desc',
+    limit: viewSize,
+    offset: viewSize * viewIndex,
+    fields: orderSolrFields.join(' '),
+    params: {
+      group: true,
+      'group.field': 'orderId',
+      'group.limit': 10000,
+      'group.ngroups': true,
+      'q.op': 'AND'
     }
   };
 
   if (searchTerm) {
-    payload.json.params.defType = 'edismax';
-    payload.json.params.qf = orderSearchQueryFields.join(' ');
-    payload.json.query = buildOrderSearchQuery(searchTerm);
+    query.params!.defType = 'edismax';
+    query.params!.qf = orderSearchQueryFields.join(' ');
+    query.query = buildOrderSearchQuery(searchTerm);
   }
 
-  return payload;
+  return query;
 }
 
 export async function searchOrders(params: OrderSearchParams = {}): Promise<OrderSearchResult> {
   const response = await executeSolrQuery(buildOrderLookupPayload(params));
-
-  if (commonUtil.hasError(response)) return Promise.reject(response.data);
-
-  return normalizeOrderSolrResponse(response.data);
+  return normalizeOrderSolrResponse(response);
 }
 
-function normalizeOrderSolrResponse(data: any): OrderSearchResult {
-  const groupedOrders = data?.grouped?.orderId;
+function normalizeOrderSolrResponse(response: SolrResponse): OrderSearchResult {
+  const { groups, ngroups } = solrGroups(response, 'orderId');
 
-  if (groupedOrders?.groups?.length) {
+  if (groups.length) {
     return {
-      orders: groupedOrders.groups
+      orders: groups
         .map((group: any) => group?.doclist?.docs?.[0])
         .filter(Boolean)
         .map(normalizeOrderDoc),
-      total: Number(groupedOrders.ngroups ?? groupedOrders.matches ?? groupedOrders.groups.length)
+      total: ngroups
     };
   }
 
-  const docs = allDocs(data);
+  const docs = solrDocs(response);
   return {
     orders: docs.map(normalizeOrderDoc),
-    total: Number(data?.response?.numFound ?? docs.length)
+    total: solrTotal(response) || docs.length
   };
 }
 
