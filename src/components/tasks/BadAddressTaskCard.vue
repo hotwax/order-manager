@@ -1,9 +1,7 @@
 <template>
   <TaskCardShell
     :title="task.orderName"
-    :subtitle="task.orderDate"
-    :amount="money(task.grandTotal)"
-    :chip-label="task.workEffortId"
+    :subtitle="taskItemSummary(task)"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
     :contact-phone-href="getPhoneHref(task)"
@@ -20,11 +18,12 @@
     </template>
 
     <ion-radio-group v-if="editableAddresses" v-model="selectedAddressType" class="address-task-addresses">
-      <ion-list lines="none">
-        <ion-item lines="none">
+      <ion-list lines="full">
+        <ion-list-header>
           <ion-label>{{ translate('Original Address') }}</ion-label>
-          <ion-radio slot="end" value="original">{{ translate('Keep original') }}</ion-radio>
-        </ion-item>
+          <ion-note slot="end">{{ translate('Keep original') }}</ion-note>
+          <ion-radio slot="end" value="original" :aria-label="translate('Keep original')" />
+        </ion-list-header>
         <ion-item>
           <ion-input :label="translate('Address Line 1')" label-placement="stacked" v-model="editableAddresses.original.address1" />
         </ion-item>
@@ -38,22 +37,23 @@
           <ion-input :label="translate('Postal Code')" label-placement="stacked" v-model="editableAddresses.original.postalCode" />
         </ion-item>
         <ion-item>
-          <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.original.countryGeoId" interface="popover" @ionChange="editableAddresses.original.stateProvinceGeoId = ''">
-            <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
-          </ion-select>
-        </ion-item>
-        <ion-item>
           <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.original.stateProvinceGeoId" interface="popover">
             <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
           </ion-select>
         </ion-item>
+        <ion-item>
+          <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.original.countryGeoId" interface="popover" @ionChange="editableAddresses.original.stateProvinceGeoId = ''">
+            <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
+          </ion-select>
+        </ion-item>
       </ion-list>
 
-      <ion-list lines="none">
-        <ion-item lines="none">
+      <ion-list lines="full">
+        <ion-list-header>
           <ion-label>{{ translate('Suggested Address') }}</ion-label>
-          <ion-radio slot="end" value="suggested">{{ translate('Use suggested') }}</ion-radio>
-        </ion-item>
+          <ion-note slot="end">{{ translate('Use suggested') }}</ion-note>
+          <ion-radio slot="end" value="suggested" :aria-label="translate('Use suggested')" />
+        </ion-list-header>
         <ion-item>
           <ion-input :label="translate('Address Line 1')" label-placement="stacked" v-model="editableAddresses.suggested.address1" />
         </ion-item>
@@ -67,13 +67,13 @@
           <ion-input :label="translate('Postal Code')" label-placement="stacked" v-model="editableAddresses.suggested.postalCode" />
         </ion-item>
         <ion-item>
-          <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.suggested.countryGeoId" interface="popover" @ionChange="editableAddresses.suggested.stateProvinceGeoId = ''">
-            <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
+          <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.suggested.stateProvinceGeoId" interface="popover">
+            <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
           </ion-select>
         </ion-item>
         <ion-item>
-          <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.suggested.stateProvinceGeoId" interface="popover">
-            <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
+          <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.suggested.countryGeoId" interface="popover" @ionChange="editableAddresses.suggested.stateProvinceGeoId = ''">
+            <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
           </ion-select>
         </ion-item>
       </ion-list>
@@ -95,6 +95,8 @@ import {
   IonItem,
   IonLabel,
   IonList,
+  IonListHeader,
+  IonNote,
   IonRadio,
   IonRadioGroup,
   IonSelect,
@@ -149,10 +151,11 @@ const editableAddresses = ref<EditableAddress | null>(null);
 
 watch(() => props.task, (task) => {
   if (!task) return;
-  selectedAddressType.value = 'original';
+  const suggested = suggestedAddressFormFrom(task);
+  selectedAddressType.value = hasAddressValue(suggested) ? 'suggested' : 'original';
   editableAddresses.value = {
     original: addressFormFrom(task.shippingAddress, task),
-    suggested: suggestedAddressFormFrom(task),
+    suggested,
   };
 }, { immediate: true });
 
@@ -192,6 +195,10 @@ function suggestedAddressFormFrom(task: any): AddressForm {
   };
 }
 
+function hasAddressValue(address: AddressForm): boolean {
+  return [address.address1, address.address2, address.city, address.postalCode, address.stateProvinceGeoId, address.countryGeoId].some(Boolean);
+}
+
 function validateAddress(address: AddressForm): string | null {
   if (!address.address1?.trim()) return translate('Address Line 1 is required');
   if (!address.city?.trim()) return translate('City is required');
@@ -222,8 +229,12 @@ function getEmailHref(task: any): string {
   return email ? `mailto:${email}` : '';
 }
 
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+function taskItemSummary(task: any): string {
+  const items = task.items ?? [];
+  const itemCount = items.length;
+  const unitCount = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+
+  return `${itemCount} ${itemCount === 1 ? translate('item') : translate('items')} ${unitCount} ${unitCount === 1 ? translate('unit') : translate('units')}`;
 }
 
 // Returns the validation error for the currently selected address, or null if valid.
@@ -328,11 +339,6 @@ defineExpose({
 
 .address-task-addresses>ion-list:not(:first-child) {
   border-inline-start: var(--border-medium);
-}
-
-.address-task-addresses ion-item {
-  --border-width: 0;
-  --inner-border-width: 0;
 }
 
 @media (max-width: 640px) {
