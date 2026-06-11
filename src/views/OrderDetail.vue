@@ -316,7 +316,7 @@
               :color="shipGroupProgress(shipGroup) === 1 ? 'success' : 'primary'" />
             <div class="ship-group-options-wrapper">
               <!-- shows when expanded -->
-              <div class="ship-group-expanded-options"
+              <div v-collapsible class="ship-group-expanded-options"
                 :class="{ 'ship-group-expanded-options-open': hasSelectableShipGroupOptions(shipGroup) && isShipGroupExpanded(shipGroup.id) }"
                 :aria-hidden="!(hasSelectableShipGroupOptions(shipGroup) && isShipGroupExpanded(shipGroup.id))"
                 :inert="hasSelectableShipGroupOptions(shipGroup) && isShipGroupExpanded(shipGroup.id) ? undefined : ''">
@@ -343,7 +343,7 @@
               </div>
               <!-- shows all the time -->
               <div v-if="hasSelectedShipGroupOptions(shipGroup)"
-                class="ship-group-selected-options ion-padding-horizontal ion-padding-top">
+                class="ship-group-selected-options">
                 <ion-item v-if="shipGroup.giftMessage" button detail="false" lines="none"
                   @click="openGiftModal(shipGroup)">
                   <ion-label>
@@ -432,7 +432,7 @@
             </div>
 
             <!-- shows when collapsed -->
-            <div class="ship-group-summary-container"
+            <div v-collapsible class="ship-group-summary-container"
               :class="{ 'ship-group-summary-collapsed': isShipGroupExpanded(shipGroup.id) }"
               :aria-hidden="isShipGroupExpanded(shipGroup.id)"
               :inert="isShipGroupExpanded(shipGroup.id) ? '' : undefined">
@@ -476,7 +476,7 @@
             </div>
 
             <!-- shows when expanded -->
-            <div class="ship-group-card-details"
+            <div v-collapsible class="ship-group-card-details"
               :class="{ 'ship-group-card-details-expanded': isShipGroupExpanded(shipGroup.id) }"
               :aria-hidden="!isShipGroupExpanded(shipGroup.id)"
               :inert="isShipGroupExpanded(shipGroup.id) ? undefined : ''">
@@ -1044,6 +1044,42 @@ const billingAddress = computed(() => {
 
 const timelineByShipGroup = computed(() => orderDetailStore.timelineByShipGroup);
 const expandedShipGroupIds = ref<Set<string>>(new Set());
+const collapsibleObservers = new WeakMap<HTMLElement, ResizeObserver>();
+
+function updateCollapsibleHeight(el: HTMLElement) {
+  const update = () => {
+    el.style.setProperty('--ship-group-collapsible-height', `${el.scrollHeight}px`);
+  };
+
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(update);
+    return;
+  }
+
+  update();
+}
+
+const vCollapsible = {
+  mounted(el: HTMLElement) {
+    updateCollapsibleHeight(el);
+
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => updateCollapsibleHeight(el));
+    observer.observe(el);
+    Array.from(el.children).forEach((child) => observer.observe(child));
+    collapsibleObservers.set(el, observer);
+  },
+  updated(el: HTMLElement) {
+    updateCollapsibleHeight(el);
+  },
+  unmounted(el: HTMLElement) {
+    collapsibleObservers.get(el)?.disconnect();
+    collapsibleObservers.delete(el);
+  }
+};
 
 function isVirtualFacility(shipGroup: any): boolean {
   if (!shipGroup.facilityId) return true;
@@ -2380,32 +2416,44 @@ ion-card-header ion-buttons {
 .ship-group-expanded-options,
 .ship-group-summary-container,
 .ship-group-card-details {
-  display: grid;
-  transition: grid-template-rows 180ms ease;
+  max-height: 0;
+  opacity: 0;
+  overflow: hidden;
+  transition: max-height 180ms ease, opacity 160ms ease, padding-block 180ms ease;
 }
 
-.ship-group-expanded-options,
-.ship-group-card-details {
-  grid-template-rows: 0fr;
+.ship-group-expanded-options {
+  padding-inline: var(--spacer-base);
+  padding-block: 0;
 }
 
-.ship-group-expanded-options-open,
+.ship-group-expanded-options-open {
+  max-height: var(--ship-group-collapsible-height);
+  opacity: 1;
+  padding-block: var(--spacer-base);
+}
+
 .ship-group-card-details-expanded {
-  grid-template-rows: 1fr;
+  max-height: var(--ship-group-collapsible-height);
+  opacity: 1;
 }
 
 .ship-group-summary-container {
-  grid-template-rows: 1fr;
+  max-height: var(--ship-group-collapsible-height);
+  opacity: 1;
 }
 
 .ship-group-summary-collapsed {
-  grid-template-rows: 0fr;
+  max-height: 0;
+  opacity: 0;
 }
 
 .ship-group-selected-options {
   display: grid;
   gap: var(--spacer-base);
   grid-template-columns: repeat(auto-fit, minmax(260px, 400px));
+  padding-inline: var(--spacer-base);
+  padding-block-start: var(--spacer-base);
 }
 
 .ship-group-options,
@@ -2446,13 +2494,6 @@ ion-card-header ion-buttons {
   flex-wrap: wrap;
   gap: var(--spacer-xs);
   align-items: center;
-  padding-inline: var(--spacer-base);
-  padding-block: 0;
-  transition: padding-block 180ms ease;
-}
-
-.ship-group-expanded-options-open .ship-group-options {
-  padding-block: var(--spacer-base);
 }
 
 .ship-group-timeline {
@@ -2466,6 +2507,14 @@ ion-card-header ion-buttons {
   gap: var(--spacer-xs);
   justify-content: flex-start;
   border-block-start: var(--border-medium);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ship-group-expanded-options,
+  .ship-group-summary-container,
+  .ship-group-card-details {
+    transition: none;
+  }
 }
 
 .order-summary {
