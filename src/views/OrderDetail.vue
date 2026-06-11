@@ -318,7 +318,7 @@
                 :class="{ 'ship-group-expanded-options-open': hasSelectableShipGroupOptions(shipGroup) && isShipGroupExpanded(shipGroup.id) }"
                 :aria-hidden="!(hasSelectableShipGroupOptions(shipGroup) && isShipGroupExpanded(shipGroup.id))"
                 :inert="hasSelectableShipGroupOptions(shipGroup) && isShipGroupExpanded(shipGroup.id) ? undefined : ''">
-                <div class="ship-group-options ion-padding-horizontal">
+                <div class="ship-group-options">
                   <ion-chip v-if="!shipGroup.giftMessage" outline @click="openGiftModal(shipGroup)">
                     <ion-icon :icon="giftOutline" />
                     <ion-label>{{ translate('Gift options') }}</ion-label>
@@ -2242,6 +2242,7 @@ ion-card-header ion-buttons {
   flex-wrap: wrap;
   gap: var(--spacer-xs);
   align-items: center;
+  padding-inline: var(--spacer-base);
   padding-block: 0;
   transition: padding-block 180ms ease;
 }
