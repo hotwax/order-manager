@@ -23,10 +23,10 @@
           <DxpShopifyImg :src="getProduct(item.productId).mainImageUrl" :key="getProduct(item.productId).mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
-          {{ getProduct(item.productId)?.productName || item.productName || item.itemDescription }}
-          <p>{{ translate('SKU') }}: {{ getProduct(item.productId)?.internalName || item.internalName }}</p>
+          {{ orderedItemPrimary(item) }}
+          <p>{{ orderedItemSecondary(item) }}</p>
         </ion-label>
-        <ion-note slot="end">{{ money(item.unitPrice) }}</ion-note>
+        <ion-note slot="end">{{ item.quantity }} {{ translate('Qty') }}</ion-note>
       </ion-item>
     </ion-list>
 
@@ -36,9 +36,9 @@
       </ion-list-header>
       <ion-item v-for="payment in task.payments" :key="payment.paymentMethodTypeId">
         <ion-label>
-          {{ payment.paymentMethodDescription || payment.paymentMethodTypeId }}
           <p>{{ payment.paymentMethodTypeId }}</p>
-          <ion-badge color="warning">{{ payment.statusId }}</ion-badge>
+          {{ paymentMethodLabel(payment) }}
+          <p>{{ paymentStatusLabel(payment) }}</p>
         </ion-label>
         <ion-note slot="end">{{ money(payment.maxAmount) }}</ion-note>
       </ion-item>
@@ -76,13 +76,15 @@
 </template>
 
 <script setup lang="ts">
-import { IonBadge, IonButton, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonThumbnail, alertController } from '@ionic/vue';
+import { computed } from 'vue';
+import { IonButton, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonThumbnail, alertController } from '@ionic/vue';
 import { hardwareChipOutline, informationCircleOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { showToast } from '@/utils';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
+import { useProductStore } from '@/store/productStore';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean }>(), {
@@ -97,6 +99,7 @@ const emit = defineEmits<{
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
+const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 
 function money(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
@@ -104,6 +107,30 @@ function money(value: number) {
 
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);
+}
+
+function orderedItemPrimary(item: any): string {
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, getProduct(item.productId))
+    || item.productId;
+}
+
+function orderedItemSecondary(item: any): string {
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.secondaryId, getProduct(item.productId))
+    || item.internalName
+    || item.itemDescription
+    || '';
+}
+
+function paymentMethodLabel(payment: any): string {
+  return payment.paymentMethodDescription
+    || seedStore.paymentMethodDescription(payment.paymentMethodTypeId)
+    || payment.paymentMethodTypeId;
+}
+
+function paymentStatusLabel(payment: any): string {
+  return payment.statusDescription
+    || seedStore.statusDescription(payment.statusId)
+    || payment.statusId;
 }
 
 function riskLevelColor(riskLevelEnumId: string): string {

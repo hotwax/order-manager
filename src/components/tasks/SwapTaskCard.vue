@@ -1,9 +1,7 @@
 <template>
   <TaskCardShell
     :title="getCardTitle(task)"
-    :subtitle="task.orderName || task.orderDate"
-    :amount="money(task.grandTotal)"
-    :chip-label="task.workEffortId"
+    :subtitle="taskItemSummary(task)"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
     :contact-phone-href="getPhoneHref(task)"
@@ -14,6 +12,10 @@
     :selected="selected"
     @update:selected="emit('update:selected', $event)"
   >
+    <template #heading-end>
+      <ion-note slot="end">{{ brokerageLabel(task) }}</ion-note>
+    </template>
+
     <template #content-start>
       <ion-list lines="none" v-if="task.routingFacilityName || task.routingDescription">
         <ion-item v-if="task.routingFacilityName">
@@ -33,27 +35,26 @@
 
     <ion-list lines="none">
       <ion-list-header>
-        <ion-label>{{ translate('Ordered Items') }}</ion-label>
+        <ion-label>{{ translate('Ordered items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="item in task.items" :key="item.orderItemSeqId">
         <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="getProduct(item.productId)?.mainImageUrl">
           <DxpShopifyImg :src="getProduct(item.productId).mainImageUrl" :key="getProduct(item.productId).mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
-          <p class="overline">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(item.productId)) }}</p>
-          {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(item.productId)) ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(item.productId)) : item.productId }}
+          {{ productPrimary(item) }}
+          <p>{{ productSecondary(item) }}</p>
         </ion-label>
-        <ion-note slot="end">{{ money(item.unitPrice) }}</ion-note>
       </ion-item>
       <ion-item>
-        <ion-label>{{ translate('Original order total') }}</ion-label>
+        <ion-label>{{ translate('Original total') }}</ion-label>
         <ion-note slot="end" color="dark">{{ money(task.grandTotal) }}</ion-note>
       </ion-item>
     </ion-list>
 
     <ion-list lines="none" v-if="task.items?.length">
       <ion-list-header>
-        <ion-label>{{ translate('Suggested Items') }}</ion-label>
+        <ion-label>{{ translate('Suggested items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="(suggested, index) in getSuggestedItems(task).list" :key="`suggested-${index}`">
         <ion-thumbnail slot="start" :key="getProduct(suggested.productId)?.mainImageUrl">
@@ -62,8 +63,8 @@
         <ion-label>
           <p class="overline" v-if="suggested._isSubstitute">{{ translate('Approved swap') }}</p>
           <p class="overline" v-else-if="suggested._noReplacement">{{ translate('No replacement in stock') }}</p>
-          {{ getProduct(suggested.productId)?.productName || suggested.productName }}
-          <p>{{ translate('SKU') }}: {{ getProduct(suggested.productId)?.internalName || suggested.internalName }}</p>
+          {{ productPrimary(suggested) }}
+          <p>{{ productSecondary(suggested) }}</p>
         </ion-label>
 
         <template v-if="suggested._cancel">
@@ -81,13 +82,12 @@
         <ion-badge v-else-if="!suggested._noReplacement" slot="end" color="success">{{ translate('Available') }}</ion-badge>
         <ion-badge v-else slot="end" color="danger">{{ translate('Cancel') }}</ion-badge>
 
-        <ion-note slot="end">{{ money(suggested._isSubstitute ? suggested.price : suggested.unitPrice) }}</ion-note>
         <ion-button slot="end" fill="clear" color="medium" @click="openSuggestedProductActionsPopover($event, suggested, task)">
           <ion-icon slot="icon-only" :icon="ellipsisVerticalOutline" />
         </ion-button>
       </ion-item>
       <ion-item>
-        <ion-label>{{ translate('New order total') }}</ion-label>
+        <ion-label>{{ translate('New total') }}</ion-label>
         <ion-note slot="end" color="dark">{{ money(getSuggestedItems(task).newTotal) }}</ion-note>
       </ion-item>
       <ion-item>
@@ -96,7 +96,7 @@
           label-placement="start"
           type="number"
           :value="getSuggestedItems(task).suggestedRefund"
-          :helper-text="translate('Total available funds for refund')"
+          :helper-text="`${money(task.grandTotal)} ${translate('available to refund')}`"
           :clear-input="true"
           @ionInput="task._refundAmount = $event.detail.value != null ? Number($event.detail.value) : undefined"
           @ionClear="task._refundAmount = undefined"
@@ -149,6 +149,24 @@ function getCardTitle(task: any): string {
   return seedStore.facilityName(task.facilityId) || task.orderName;
 }
 
+function taskItemSummary(task: any): string {
+  const items = task.items ?? [];
+  const itemCount = items.length;
+  const unitCount = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+
+  return `${itemCount} ${itemCount === 1 ? translate('item') : translate('items')} ${unitCount} ${unitCount === 1 ? translate('unit') : translate('units')}`;
+}
+
+function isVirtualFacility(task: any): boolean {
+  return !task.facilityId
+    || task.facilityParentTypeId === 'VIRTUAL_FACILITY'
+    || task.facilityTypeId === 'VIRTUAL_FACILITY';
+}
+
+function brokerageLabel(task: any): string {
+  return isVirtualFacility(task) ? translate('Not Brokered') : translate('Brokered');
+}
+
 function getPhoneNumber(task: any): string {
   return commonUtil.formatPhoneNumber(task.billingPhone?.countryCode, task.billingPhone?.areaCode, task.billingPhone?.contactNumber);
 }
@@ -169,6 +187,18 @@ function getEmailHref(task: any): string {
 
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);
+}
+
+function productPrimary(item: any): string {
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, getProduct(item.productId))
+    || item.productId;
+}
+
+function productSecondary(item: any): string {
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.secondaryId, getProduct(item.productId))
+    || item.internalName
+    || item.itemDescription
+    || '';
 }
 
 function getSubstitute(item: any) {
