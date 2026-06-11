@@ -81,7 +81,7 @@
 
     <template #actions>
       <ion-button fill="clear" color="primary" @click="saveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
-      <ion-button fill="clear" color="danger" @click="cancelOrder()">{{ translate('Cancel order') }}</ion-button>
+      <ion-button fill="clear" color="primary" @click="cancelOrder()">{{ translate('Cancel order') }}</ion-button>
       <ion-button fill="clear" color="primary" @click="parkOrder()">{{ translate('Park') }}</ion-button>
     </template>
   </TaskCardShell>
@@ -323,8 +323,18 @@ defineExpose({
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
+.address-task-addresses>ion-list:not(:first-child) {
+  border-inline-start: var(--border-medium);
+}
+
 .address-task-addresses ion-item {
   --border-width: 0;
   --inner-border-width: 0;
+}
+
+@media (max-width: 640px) {
+  .address-task-addresses>ion-list:not(:first-child) {
+    border-inline-start: 0;
+  }
 }
 </style>

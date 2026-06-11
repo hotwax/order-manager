@@ -137,6 +137,11 @@ async function copyContact(value: string) {
   border-block-start: var(--border-medium);
 }
 
+.task-card-contact-details>ion-item:not(:first-child),
+.task-card-content-grid>*:not(:first-child) {
+  border-inline-start: var(--border-medium);
+}
+
 .task-card-content {
   padding: 0;
 }
@@ -172,6 +177,11 @@ async function copyContact(value: string) {
 }
 
 @media (max-width: 640px) {
+  .task-card-contact-details>ion-item:not(:first-child),
+  .task-card-content-grid>*:not(:first-child) {
+    border-inline-start: 0;
+  }
+
   .task-card-actions {
     align-items: stretch;
   }
