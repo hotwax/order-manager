@@ -86,7 +86,7 @@
         <!-- Card 3: Order Hold Tasks — drilldown follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Display list of tasks requiring resolution -->
         <!-- stat: number of orders with hold tasks -->
-        <StatCard title="Order Hold Tasks" :stat="32">
+        <StatCard title="Order Hold Tasks" :stat="store.holdTasks.holdTasksTotalCount || 0">
           <ion-list lines="none" class="hold-tasks-list">
             <!-- Substitute workefforts -->
             <ion-item button :detail="true" router-link="/unfillable">
@@ -94,7 +94,7 @@
                 Substitute
                 <!-- number of workefforts where purpose type is substitute -->
               </ion-label>
-              <p slot="end">12 tasks</p>
+              <p slot="end">{{ store.holdTasks.holdSubstituteCount || 0 }} tasks</p>
             </ion-item>
 
             <!-- Bad Address workefforts -->
@@ -103,7 +103,7 @@
                 Bad Address
                 <!-- number of workefforts where purpose type is bad address -->
               </ion-label>
-              <p slot="end">15 tasks</p>
+              <p slot="end">{{ store.holdTasks.holdBadAddressCount || 0 }} tasks</p>
             </ion-item>
 
             <!-- Fraud Risk workefforts -->
@@ -112,7 +112,7 @@
                 Fraud Risk
                 <!-- number of workefforts where purpose type is fraud -->
               </ion-label>
-              <p slot="end">5 tasks</p>
+              <p slot="end">{{ store.holdTasks.holdFraudRiskCount || 0 }} tasks</p>
             </ion-item>
           </ion-list>
         </StatCard>
@@ -318,6 +318,7 @@ watch(selectedStoreId, (newStoreId) => {
     store.fetchFacilityOrderVolume(newStoreId);
     store.fetchFacilityFulfillmentVelocity(newStoreId);
     store.fetchFacilityPartialFulfillments(newStoreId);
+    store.fetchHoldTasks(newStoreId);
     if (selectedFacilityId.value) {
       store.fetchFacilityFulfillmentProgress(selectedFacilityId.value, newStoreId);
     }

@@ -170,6 +170,12 @@ export const useCustomerServiceStore = defineStore('customerService', {
     unfillable: {
       unfillableHourlyCounts: [] as { shipGroupDateHour: string; shipGroupCount: number }[]
     },
+    holdTasks: {
+      holdTasksTotalCount: 0,
+      holdSubstituteCount: 0,
+      holdBadAddressCount: 0,
+      holdFraudRiskCount: 0
+    },
     facilityOrderVolume: [] as any[],
     facilityFulfillmentVelocity: [] as any[],
     facilityPartialFulfillments: [] as any[],
@@ -283,6 +289,20 @@ export const useCustomerServiceStore = defineStore('customerService', {
         if (resp.data) this.unfillable = resp.data;
       } catch (error) {
         console.error('Failed to fetch unfillable stats', error);
+      }
+    },
+    async fetchHoldTasks(productStoreId?: string) {
+      try {
+        const params: any = {};
+        if (productStoreId) params.productStoreId = productStoreId;
+        const resp = await api({
+          url: 'oms/orders/funnelDashboard/holdTasks',
+          method: 'GET',
+          params
+        });
+        if (resp.data) this.holdTasks = resp.data;
+      } catch (error) {
+        console.error('Failed to fetch hold task counts', error);
       }
     },
     async fetchFacilityOrderVolume(productStoreId?: string) {
