@@ -127,7 +127,7 @@ async function copyContact(value: string) {
 
 <style scoped>
 .task-card-shell {
-  border-radius: 16px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
