@@ -3,7 +3,7 @@
     <ion-toolbar>
       <ion-buttons slot="start">
         <ion-button @click="dismiss()">
-          <ion-icon :icon="closeOutline" />
+          <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
       <ion-title>{{ translate('Edit Shipping Method') }}</ion-title>
@@ -44,18 +44,13 @@
         </ion-select>
       </ion-item>
     </ion-list>
-  </ion-content>
 
-  <ion-footer>
-    <ion-toolbar>
-      <ion-buttons slot="end">
-        <ion-button @click="dismiss()">{{ translate('Cancel') }}</ion-button>
-        <ion-button :disabled="!selectedCarrierId || !selectedMethodId" color="primary" @click="confirm()">
-          {{ translate('Apply') }}
-        </ion-button>
-      </ion-buttons>
-    </ion-toolbar>
-  </ion-footer>
+    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+      <ion-fab-button :disabled="!selectedCarrierId || !selectedMethodId" @click="confirm()">
+        <ion-icon :icon="saveOutline" />
+      </ion-fab-button>
+    </ion-fab>
+  </ion-content>
 </template>
 
 <script setup lang="ts">
@@ -63,7 +58,8 @@ import {
   IonButton,
   IonButtons,
   IonContent,
-  IonFooter,
+  IonFab,
+  IonFabButton,
   IonHeader,
   IonIcon,
   IonItem,
@@ -74,7 +70,7 @@ import {
   IonToolbar,
   modalController,
 } from '@ionic/vue';
-import { closeOutline } from 'ionicons/icons';
+import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, ref } from 'vue';
 import { translate } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
