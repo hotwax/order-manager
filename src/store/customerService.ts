@@ -4,7 +4,6 @@ import { useOrderStore } from '@/store/order';
 import { api } from '@common';
 import type {
   BulkActionDefinition,
-  ProductStore,
   WorkflowBucket,
   WorkflowFilters,
   WorkflowOrder,
@@ -159,8 +158,6 @@ function inBucket(order: WorkflowOrder, bucket: WorkflowBucket): boolean {
 
 export const useCustomerServiceStore = defineStore('customerService', {
   state: () => ({
-    productStores: [] as ProductStore[],
-    isFetchingProductStores: false,
     fulfillmentProgress: {
       totalOrdersCount: 0,
       totalShipGroupsCount: 0,
@@ -243,22 +240,6 @@ export const useCustomerServiceStore = defineStore('customerService', {
     }
   },
   actions: {
-    async fetchProductStores() {
-      if (this.isFetchingProductStores) return;
-      
-      this.isFetchingProductStores = true;
-      try {
-        const resp = await api({
-          url: 'admin/productStores',
-          method: 'GET'
-        });
-        this.productStores = resp.data || [];
-      } catch (error) {
-        console.error('Failed to fetch product stores', error);
-      } finally {
-        this.isFetchingProductStores = false;
-      }
-    },
     async fetchFulfillmentProgress(productStoreId?: string) {
       try {
         const resp = await api({

@@ -275,9 +275,11 @@ import {
 import { computed, onMounted, watch } from 'vue';
 import { translate, RadioFacetGroup, StatCard, Sparkline } from '@common';
 import { useCustomerServiceStore } from '@/store/customerService';
+import { useProductStore } from '@/store/productStore';
 import { DateTime } from 'luxon';
 
 const store = useCustomerServiceStore();
+const productStore = useProductStore() as any;
 
 const selectedStoreId = ref('');
 const selectedFacilityId = ref('WH_RNO');
@@ -291,16 +293,10 @@ const oldestOpenOrderDateStr = computed(() => {
 
 const totalUnfillable = computed(() => store.unfillableTrend.reduce((sum, val) => sum + val, 0));
 
-onMounted(() => {
-  store.fetchProductStores();
-});
-
-const counts = computed(() => store.bucketCounts);
-
 const storeOptions = computed(() => {
-  return store.productStores.map((productStore) => ({
-    value: productStore.productStoreId,
-    primary: productStore.storeName
+  return productStore.getProductStores.map((pStore: any) => ({
+    value: pStore.productStoreId,
+    primary: pStore.storeName
   }));
 });
 
@@ -347,7 +343,7 @@ const fulfillmentStats = computed(() => {
 });
 
 const selectedStoreName = computed(
-  () => storeOptions.value.find((s) => s.value === selectedStoreId.value)?.primary ?? ''
+  () => storeOptions.value.find((s: any) => s.value === selectedStoreId.value)?.primary ?? ''
 );
 
 function getFacilityName(facilityId: string) {
