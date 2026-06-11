@@ -186,8 +186,8 @@ import {
 } from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
 import { showToast } from '@/utils';
-import SearchFilterCard from '@/components/SearchFilterCard.vue';
-import FacilityModal from '@/components/FacilityModal.vue';
+import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 

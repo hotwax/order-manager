@@ -166,7 +166,7 @@ import { IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCheckbox, 
 import { callOutline, checkmarkCircleOutline, cubeOutline, hardwareChipOutline, informationCircleOutline, mailOutline, personOutline, pricetagOutline, removeCircleOutline, warningOutline } from 'ionicons/icons';
 import { DxpShopifyImg, translate } from '@common';
 import { showToast } from '@/utils';
-import SearchFilterCard from '@/components/SearchFilterCard.vue';
+import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useProductMaster } from '@/composables/useProductMaster';

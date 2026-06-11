@@ -169,11 +169,11 @@ import { useOrderStore } from '@/store/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
 import { useSeedStore } from '@/store/seed';
-import AddOrderTaskModal from '@/components/AddOrderTaskModal.vue';
-import EditShippingMethodModal from '@/components/EditShippingMethodModal.vue';
-import EmptyState from '@/components/EmptyState.vue';
-import ErrorState from '@/components/ErrorState.vue';
-import SearchFilterCard from '@/components/SearchFilterCard.vue';
+import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
+import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
+import EmptyState from '@/components/common/EmptyState.vue';
+import ErrorState from '@/components/common/ErrorState.vue';
+import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import { showToast } from '@/utils';
 import {
   ORDER_CANCEL_PERMISSION,

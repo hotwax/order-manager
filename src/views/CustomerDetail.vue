@@ -613,8 +613,8 @@ import type { CustomerOrderSummary } from '@/types/customer';
 import AddContactModal from '@/components/AddContactModal.vue';
 // import AddRelationshipModal from '@/components/AddRelationshipModal.vue';
 import RelationshipHistoryModal from '@/components/RelationshipHistoryModal.vue';
-import EmptyState from '@/components/EmptyState.vue';
-import ErrorState from '@/components/ErrorState.vue';
+import EmptyState from '@/components/common/EmptyState.vue';
+import ErrorState from '@/components/common/ErrorState.vue';
 
 const props = defineProps<{
   customerId: string;

@@ -188,15 +188,15 @@ import { IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader
 import { arrowUndoOutline, ellipsisVerticalOutline, callOutline, closeCircleOutline, mailOutline, personOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { showToast } from '@/utils';
-import SearchFilterCard from '@/components/SearchFilterCard.vue';
-import FacilityModal from '@/components/FacilityModal.vue';
+import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
-import SuggestedProductActionPopover from '@/components/SuggestedProductActionPopover.vue';
+import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductActionPopover.vue';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();

@@ -13,7 +13,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Settings } from 'luxon';
 import { translate } from '@common';
 import emitter from '@/event-bus';
-import Menu from '@/components/Menu.vue';
+import Menu from '@/components/layout/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';
 import { useSeedStore } from '@/store/seed';

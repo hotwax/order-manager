@@ -80,7 +80,7 @@ import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonInput, IonIte
 import { closeOutline, trashOutline } from 'ionicons/icons';
 import { reactive, ref } from 'vue';
 import { api, translate } from '@common';
-import EmptyState from '@/components/EmptyState.vue';
+import EmptyState from '@/components/common/EmptyState.vue';
 import { showToast } from '@/utils';
 
 type Attribute = { attrName: string; attrValue?: string; attrDescription?: string };

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('task assignee modal', () => {
   it('uses a radio list with a pinned Me option and searchable staff results', () => {
-    const source = readFileSync(resolve(process.cwd(), 'src/components/TaskAssigneeModal.vue'), 'utf8');
+    const source = readFileSync(resolve(process.cwd(), 'src/components/tasks/TaskAssigneeModal.vue'), 'utf8');
 
     expect(source).toContain('<ion-radio-group v-model="selectedAssigneeId">');
     expect(source).toContain('Me');

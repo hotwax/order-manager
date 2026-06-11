@@ -64,9 +64,9 @@ import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScroll
 import { computed, onMounted, ref, watch } from 'vue';
 import { partyTypes, searchCustomers } from '@/services/customer';
 import type { Customer } from '@/types/order';
-import EmptyState from '@/components/EmptyState.vue';
-import ErrorState from '@/components/ErrorState.vue';
-import SearchFilterCard from '@/components/SearchFilterCard.vue';
+import EmptyState from '@/components/common/EmptyState.vue';
+import ErrorState from '@/components/common/ErrorState.vue';
+import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import { translate } from '@common'
 
 const searchQuery = ref('');

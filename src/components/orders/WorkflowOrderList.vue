@@ -163,8 +163,8 @@ import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useSeedStore } from '@/store/seed';
 import type { BulkActionDefinition, WorkflowBucket, WorkflowOrder } from '@/types/customerService';
-import EmptyState from '@/components/EmptyState.vue';
-import SearchFilterCard from '@/components/SearchFilterCard.vue';
+import EmptyState from '@/components/common/EmptyState.vue';
+import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import { commonUtil, translate } from '@common';
 
 const actualOrderIds = ['M100051'];

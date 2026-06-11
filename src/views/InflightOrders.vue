@@ -10,5 +10,5 @@
 </template>
 
 <script setup lang="ts">
-import WorkflowOrderList from '@/components/WorkflowOrderList.vue';
+import WorkflowOrderList from '@/components/orders/WorkflowOrderList.vue';
 </script>

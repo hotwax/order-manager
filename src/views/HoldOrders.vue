@@ -197,7 +197,7 @@ import {
   mailOutline
 } from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
-import SearchFilterCard from '@/components/SearchFilterCard.vue';
+import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import { useUserStore } from '@/store/user';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';

@@ -18,8 +18,8 @@
   <script setup lang="ts">
   import { IonContent, IonItem, IonList, IonListHeader, modalController, popoverController } from "@ionic/vue";
   import { translate } from "@common";
-  import ProductInventoryModal from "@/components/ProductInventoryModal.vue";
-  import CustomSwapModal from "@/components/CustomSwapModal.vue";
+  import ProductInventoryModal from "@/components/inventory/ProductInventoryModal.vue";
+  import CustomSwapModal from "@/components/swaps/CustomSwapModal.vue";
 
   const props = defineProps(["item", "task"]);
 
