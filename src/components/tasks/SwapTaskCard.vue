@@ -17,17 +17,19 @@
     </template>
 
     <template #content-start>
-      <ion-list lines="none" v-if="task.routingFacilityName || task.routingDescription">
-        <ion-item v-if="task.routingFacilityName">
+      <ion-list lines="full" v-if="hasRoutingDetails(task)">
+        <ion-item>
+          <ion-icon slot="start" :icon="gitBranchOutline" />
           <ion-label>
-            <p>{{ translate('Order facility change routing') }}</p>
-            {{ task.routingFacilityName }}
+            <p class="overline">{{ routingMovementLabel(task) }}</p>
+            {{ routingPath(task) || translate('Routing details') }}
           </ion-label>
+          <ion-note slot="end" v-if="routingTimestamp(task)">{{ formatRoutingTimestamp(task) }}</ion-note>
         </ion-item>
-        <ion-item v-if="task.routingDescription">
+        <ion-item>
           <ion-label>
-            <p>{{ translate('Routing facility change description') }}</p>
-            {{ task.routingDescription }}
+            {{ translate('Routing justification') }}
+            <p v-if="routingJustification(task)">{{ routingJustification(task) }}</p>
           </ion-label>
         </ion-item>
       </ion-list>
@@ -117,8 +119,9 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
-import { arrowUndoOutline, closeCircleOutline, ellipsisVerticalOutline } from 'ionicons/icons';
+import { arrowUndoOutline, closeCircleOutline, ellipsisVerticalOutline, gitBranchOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
+import { DateTime } from 'luxon';
 import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductActionPopover.vue';
@@ -148,6 +151,74 @@ function getCustomerName(customer: any): string {
 
 function getCardTitle(task: any): string {
   return seedStore.facilityName(task.facilityId) || task.orderName;
+}
+
+function routingFacilityName(task: any): string {
+  return seedStore.facilityName(task.facilityId)
+    || task.routingFacilityName
+    || task.facilityName
+    || task.facilityId
+    || '';
+}
+
+function routingMovementLabel(task: any): string {
+  const facilityName = routingFacilityName(task);
+  return facilityName ? `${translate('Moved to')} ${facilityName}` : translate('Moved to parking');
+}
+
+function routingPath(task: any): string {
+  const routingParts = [
+    task.routingGroupName || task.routingGroupId,
+    task.orderRoutingName || task.orderRoutingId,
+    task.routingRuleName || task.routingRuleId,
+  ].filter(Boolean);
+
+  if (routingParts.length) return routingParts.join(' > ');
+
+  return task.routingFacilityName || task.routingDescription || '';
+}
+
+function routingJustification(task: any): string {
+  return task.routingJustification
+    || task.routingJustificationDescription
+    || task.changeReasonDescription
+    || task.changeReasonEnumId
+    || '';
+}
+
+function routingTimestamp(task: any): string | number {
+  return task.facilityChangeDateTime
+    || task.facilityChangeDate
+    || task.routingDate
+    || task.lastUpdatedStamp
+    || '';
+}
+
+function formatRoutingTimestamp(task: any): string {
+  const value = routingTimestamp(task);
+  if (!value) return '';
+
+  const num = Number(value);
+  const dt = Number.isFinite(num) && String(value).length >= 10
+    ? DateTime.fromMillis(num)
+    : DateTime.fromISO(String(value));
+
+  return dt.isValid ? dt.toFormat('yyyy-LL-dd HH:mm') : String(value);
+}
+
+function hasRoutingDetails(task: any): boolean {
+  return !!(
+    task.routingFacilityName
+    || task.routingDescription
+    || task.routingGroupName
+    || task.routingGroupId
+    || task.orderRoutingName
+    || task.orderRoutingId
+    || task.routingRuleName
+    || task.routingRuleId
+    || routingJustification(task)
+    || routingTimestamp(task)
+  );
 }
 
 function taskItemSummary(task: any): string {
