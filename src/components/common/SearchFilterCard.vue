@@ -43,7 +43,7 @@ function updateSearch(event: CustomEvent) {
 .search-filter-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 12px;
+  gap: var(--spacer-base);
   align-items: end;
 }
 
