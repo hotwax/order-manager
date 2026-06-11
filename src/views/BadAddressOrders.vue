@@ -236,18 +236,13 @@ onIonViewWillEnter(() => {
 </script>
 
 <style scoped>
-.border-top {
-  border-top: 1px solid var(--ion-color-light);
+.bad-address-list {
+  padding: 0 var(--spacer-sm) var(--spacer-sm);
 }
 
-.address-columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
-}
-
-.address-columns ion-item {
-  --border-width: 0;
-  --inner-border-width: 0;
+@media (max-width: 640px) {
+  .bad-address-list {
+    padding-inline: 0;
+  }
 }
 </style>

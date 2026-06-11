@@ -213,7 +213,13 @@ onIonViewWillEnter(() => {
 </script>
 
 <style scoped>
-.border-top {
-  border-top: 1px solid var(--ion-color-light);
+.hold-orders-list {
+  padding: 0 var(--spacer-sm) var(--spacer-sm);
+}
+
+@media (max-width: 640px) {
+  .hold-orders-list {
+    padding-inline: 0;
+  }
 }
 </style>

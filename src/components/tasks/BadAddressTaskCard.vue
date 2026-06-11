@@ -1,141 +1,100 @@
 <template>
-  <ion-card>
-    <ion-item lines="none">
-      <ion-checkbox
-        v-if="selectable"
-        slot="start"
-        :checked="selected"
-        @ionChange="emit('update:selected', $event.detail.checked)"
-      />
-      <ion-label>
-        {{ task.orderName }}
-        <p>{{ task.orderDate }}</p>
-      </ion-label>
-      <ion-chip slot="end" outline color="medium">
-        {{ translate('Task') }}: {{ task.workEffortId }}
-      </ion-chip>
-      <ion-note slot="end" color="dark">{{ money(task.grandTotal) }}</ion-note>
-    </ion-item>
+  <TaskCardShell
+    :title="task.orderName"
+    :subtitle="task.orderDate"
+    :amount="money(task.grandTotal)"
+    :chip-label="task.workEffortId"
+    :contact-name="getCustomerName(task.customer)"
+    :contact-phone="getPhoneNumber(task)"
+    :contact-phone-href="getPhoneHref(task)"
+    :contact-email="getEmailAddress(task)"
+    :contact-email-href="getEmailHref(task)"
+    :selectable="selectable"
+    :selected="selected"
+    @update:selected="emit('update:selected', $event)"
+  >
+    <template #content-start>
+      <ion-item v-if="task.description">
+        <ion-label>{{ task.description }}</ion-label>
+      </ion-item>
+    </template>
 
-    <ion-card-content>
-      <!-- Contact Details -->
-      <div class="contact-details border-top ion-padding-top">
+    <ion-radio-group v-if="editableAddresses" v-model="selectedAddressType" class="address-task-addresses">
+      <ion-list lines="none">
         <ion-item lines="none">
-          <ion-icon slot="start" :icon="personOutline" />
-          <ion-label>
-            {{ getCustomerName(task.customer) }}
-            <p>{{ translate('Customer') }}</p>
-          </ion-label>
-          <ion-buttons slot="end">
-            <ion-button fill="clear" :href="'tel:' + commonUtil.formatPhoneNumber(task.billingPhone?.countryCode, task.billingPhone?.areaCode, task.billingPhone?.contactNumber)">
-              <ion-icon slot="icon-only" :icon="callOutline" />
-            </ion-button>
-            <ion-button fill="clear" :href="'mailto:' + (task.billingEmail ?? task.shippingEmail)">
-              <ion-icon slot="icon-only" :icon="mailOutline" />
-            </ion-button>
-          </ion-buttons>
+          <ion-label>{{ translate('Original Address') }}</ion-label>
+          <ion-radio slot="end" value="original">{{ translate('Keep original') }}</ion-radio>
         </ion-item>
-      </div>
-
-      <!-- Address Details -->
-      <div class="task-details border-top ion-padding-top">
         <ion-item>
-          <ion-label>
-            {{ task.description }}
-          </ion-label>
+          <ion-input :label="translate('Address Line 1')" label-placement="stacked" v-model="editableAddresses.original.address1" />
         </ion-item>
-        <ion-radio-group v-model="selectedAddressType">
-          <div class="address-columns">
-            <!-- Original Address -->
-            <ion-list lines="none" v-if="editableAddresses">
-              <ion-item lines="none">
-                <ion-label>{{ translate('Original Address') }}</ion-label>
-                <ion-radio slot="end" value="original">{{ translate('Keep original') }}</ion-radio>
-              </ion-item>
-              <ion-item>
-                <ion-input :label="translate('Address Line 1')" label-placement="stacked" v-model="editableAddresses.original.address1" />
-              </ion-item>
-              <ion-item>
-                <ion-input :label="translate('Address Line 2')" label-placement="stacked" v-model="editableAddresses.original.address2" />
-              </ion-item>
-              <ion-item>
-                <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses.original.city" />
-              </ion-item>
-              <ion-item>
-                <ion-input :label="translate('Postal Code')" label-placement="stacked" v-model="editableAddresses.original.postalCode" />
-              </ion-item>
-              <ion-item>
-                <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.original.countryGeoId" interface="popover" @ionChange="editableAddresses.original.stateProvinceGeoId = ''">
-                  <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
-                </ion-select>
-              </ion-item>
-              <ion-item>
-                <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.original.stateProvinceGeoId" interface="popover">
-                  <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
-                </ion-select>
-              </ion-item>
-            </ion-list>
+        <ion-item>
+          <ion-input :label="translate('Address Line 2')" label-placement="stacked" v-model="editableAddresses.original.address2" />
+        </ion-item>
+        <ion-item>
+          <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses.original.city" />
+        </ion-item>
+        <ion-item>
+          <ion-input :label="translate('Postal Code')" label-placement="stacked" v-model="editableAddresses.original.postalCode" />
+        </ion-item>
+        <ion-item>
+          <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.original.countryGeoId" interface="popover" @ionChange="editableAddresses.original.stateProvinceGeoId = ''">
+            <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
+          </ion-select>
+        </ion-item>
+        <ion-item>
+          <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.original.stateProvinceGeoId" interface="popover">
+            <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
+          </ion-select>
+        </ion-item>
+      </ion-list>
 
-            <!-- Suggested Address -->
-            <ion-list lines="none" v-if="editableAddresses">
-              <ion-item lines="none">
-                <ion-label>{{ translate('Suggested Address') }}</ion-label>
-                <ion-radio slot="end" value="suggested">{{ translate('Use suggested') }}</ion-radio>
-              </ion-item>
-              <ion-item>
-                <ion-input :label="translate('Address Line 1')" label-placement="stacked" v-model="editableAddresses.suggested.address1" />
-              </ion-item>
-              <ion-item>
-                <ion-input :label="translate('Address Line 2')" label-placement="stacked" v-model="editableAddresses.suggested.address2" />
-              </ion-item>
-              <ion-item>
-                <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses.suggested.city" />
-              </ion-item>
-              <ion-item>
-                <ion-input :label="translate('Postal Code')" label-placement="stacked" v-model="editableAddresses.suggested.postalCode" />
-              </ion-item>
-              <ion-item>
-                <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.suggested.countryGeoId" interface="popover" @ionChange="editableAddresses.suggested.stateProvinceGeoId = ''">
-                  <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
-                </ion-select>
-              </ion-item>
-              <ion-item>
-                <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.suggested.stateProvinceGeoId" interface="popover">
-                  <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
-                </ion-select>
-              </ion-item>
-            </ion-list>
-          </div>
-        </ion-radio-group>
-      </div>
+      <ion-list lines="none">
+        <ion-item lines="none">
+          <ion-label>{{ translate('Suggested Address') }}</ion-label>
+          <ion-radio slot="end" value="suggested">{{ translate('Use suggested') }}</ion-radio>
+        </ion-item>
+        <ion-item>
+          <ion-input :label="translate('Address Line 1')" label-placement="stacked" v-model="editableAddresses.suggested.address1" />
+        </ion-item>
+        <ion-item>
+          <ion-input :label="translate('Address Line 2')" label-placement="stacked" v-model="editableAddresses.suggested.address2" />
+        </ion-item>
+        <ion-item>
+          <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses.suggested.city" />
+        </ion-item>
+        <ion-item>
+          <ion-input :label="translate('Postal Code')" label-placement="stacked" v-model="editableAddresses.suggested.postalCode" />
+        </ion-item>
+        <ion-item>
+          <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.suggested.countryGeoId" interface="popover" @ionChange="editableAddresses.suggested.stateProvinceGeoId = ''">
+            <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
+          </ion-select>
+        </ion-item>
+        <ion-item>
+          <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.suggested.stateProvinceGeoId" interface="popover">
+            <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
+          </ion-select>
+        </ion-item>
+      </ion-list>
+    </ion-radio-group>
 
-      <!-- Actions -->
-      <div class="actions border-top ion-margin-top ion-padding-top">
-        <ion-buttons>
-          <ion-button fill="solid" color="primary" @click="saveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
-          <ion-button fill="outline" color="danger" @click="cancelOrder()">{{ translate('Cancel order') }}</ion-button>
-          <ion-button fill="outline" color="medium" @click="parkOrder()">{{ translate('Park') }}</ion-button>
-        </ion-buttons>
-      </div>
-    </ion-card-content>
-  </ion-card>
+    <template #actions>
+      <ion-button fill="solid" color="primary" @click="saveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
+      <ion-button fill="outline" color="danger" @click="cancelOrder()">{{ translate('Cancel order') }}</ion-button>
+      <ion-button fill="outline" color="medium" @click="parkOrder()">{{ translate('Park') }}</ion-button>
+    </template>
+  </TaskCardShell>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import {
   IonButton,
-  IonButtons,
-  IonCard,
-  IonCardContent,
-  IonCheckbox,
-  IonChip,
-  IonIcon,
   IonInput,
   IonItem,
   IonLabel,
   IonList,
-  IonNote,
   IonRadio,
   IonRadioGroup,
   IonSelect,
@@ -143,14 +102,10 @@ import {
   alertController,
   modalController,
 } from '@ionic/vue';
-import {
-  personOutline,
-  callOutline,
-  mailOutline,
-} from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
 import { showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
+import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 
@@ -249,6 +204,24 @@ function getCustomerName(customer: any): string {
   return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');
 }
 
+function getPhoneNumber(task: any): string {
+  return commonUtil.formatPhoneNumber(task.billingPhone?.countryCode, task.billingPhone?.areaCode, task.billingPhone?.contactNumber);
+}
+
+function getPhoneHref(task: any): string {
+  const phone = getPhoneNumber(task);
+  return phone ? `tel:${phone}` : '';
+}
+
+function getEmailAddress(task: any): string {
+  return task.billingEmail ?? task.shippingEmail ?? '';
+}
+
+function getEmailHref(task: any): string {
+  const email = getEmailAddress(task);
+  return email ? `mailto:${email}` : '';
+}
+
 function money(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
@@ -345,17 +318,12 @@ defineExpose({
 </script>
 
 <style scoped>
-.border-top {
-  border-top: 1px solid var(--ion-color-light);
-}
-
-.address-columns {
+.address-task-addresses {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
 }
 
-.address-columns ion-item {
+.address-task-addresses ion-item {
   --border-width: 0;
   --inner-border-width: 0;
 }
