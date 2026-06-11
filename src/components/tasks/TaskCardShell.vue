@@ -1,19 +1,19 @@
 <template>
   <ion-card class="task-card-shell">
-    <ion-item lines="none">
+    <ion-item lines="none" class="task-card-heading" :class="{ 'task-card-heading-has-chip': chipLabel }">
       <ion-checkbox
         v-if="selectable"
         slot="start"
         :checked="selected"
         @ionChange="emit('update:selected', $event.detail.checked)"
       />
-      <ion-label>
+      <ion-label class="task-card-heading-title">
         <slot name="title">
           {{ title }}
           <p v-if="subtitle">{{ subtitle }}</p>
         </slot>
       </ion-label>
-      <ion-chip v-if="chipLabel" slot="end" outline color="medium">
+      <ion-chip v-if="chipLabel" class="task-card-heading-chip" outline color="medium">
         <ion-icon :icon="ticketOutline" />
         <ion-label>{{ chipLabel }}</ion-label>
       </ion-chip>
@@ -131,6 +131,22 @@ async function copyContact(value: string) {
   overflow: hidden;
 }
 
+.task-card-heading {
+  position: relative;
+}
+
+.task-card-heading-has-chip .task-card-heading-title {
+  flex: 0 1 auto;
+  max-width: min(45%, 420px);
+}
+
+.task-card-heading-chip {
+  position: absolute;
+  inset-inline-start: 50%;
+  margin: 0;
+  transform: translateX(-50%);
+}
+
 .task-card-contact-details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -177,6 +193,15 @@ async function copyContact(value: string) {
 }
 
 @media (max-width: 640px) {
+  .task-card-heading-chip {
+    position: static;
+    transform: none;
+  }
+
+  .task-card-heading-has-chip .task-card-heading-title {
+    max-width: none;
+  }
+
   .task-card-contact-details>ion-item:not(:first-child),
   .task-card-content-grid>*:not(:first-child) {
     border-inline-start: 0;
