@@ -2,8 +2,7 @@
  * Pure payload builder for the clone-order flow (no store/`@common` imports — unit
  * testable without mocks). Maps the raw order master-detail payload
  * (orderDetailStore.current, the verbatim API response) onto the POST
- * `oms/orders/shopify` body shape established by CreateOrder.vue, plus the
- * clone-only `externalId` idempotency marker.
+ * `oms/orders/shopify` body shape established by CreateOrder.vue.
  *
  * Product decisions (2026-06-11):
  * - ALWAYS clone ALL items with ORIGINAL ordered quantities, all ship groups
@@ -11,8 +10,10 @@
  *   in created status.
  * - Price modes: CARRY (price = source unitPrice), CURRENT (omit price so
  *   Shopify prices at the current catalog), FREE (price = 0).
- * - externalId = (source externalId || source orderId) + "-1" — the backend
- *   rejects a duplicate, making a second clone attempt fail automatically.
+ * - NO externalId is sent: cloning posts to Shopify synchronously and the new
+ *   order takes its externalId from the Shopify order id on sync. Shopify
+ *   legitimately posts multiple orders with the same externalId (exchanges),
+ *   so externalId is NOT a dedup/idempotency key.
  */
 
 export type ClonePriceMode = 'CARRY' | 'CURRENT' | 'FREE';
@@ -30,7 +31,6 @@ export interface CloneOrderPayload {
   shopId: string;
   shopifyCustomerId: string;
   currencyCode: string;
-  externalId: string;
   customer: { firstName: string; lastName: string; email: string; phone: string };
   shippingAddress: { address1: string; address2: string; city: string; province: string; zip: string; country: string; phone: string };
   items: CloneOrderItem[];
@@ -46,11 +46,6 @@ export interface BuildClonePayloadOptions {
   geoName: (geoId: string) => string;
   /** Optional product-cache lookup for richer sku/title — inject productCache.getProduct. */
   getProduct?: (productId: string) => any;
-}
-
-/** Idempotency marker for the clone: (source externalId || source orderId) + "-1". */
-export function cloneExternalId(raw: any): string {
-  return `${raw?.externalId || raw?.orderId || ''}-1`;
 }
 
 /** Default (editable) note prefill: "Cloned from <orderName or orderId> (<orderId>)". */
@@ -118,7 +113,6 @@ export function buildClonePayload(raw: any, opts: BuildClonePayloadOptions): Clo
     shopId: opts.shopId,
     shopifyCustomerId: opts.shopifyCustomerId,
     currencyCode: raw?.currencyUom || 'USD',
-    externalId: cloneExternalId(raw),
     customer: { firstName, lastName, email, phone },
     shippingAddress: {
       address1: address.address1 || '',

@@ -27,10 +27,6 @@
         <ion-label>{{ translate('Ship to') }}</ion-label>
         <ion-note slot="end">{{ shipToCity || '-' }}</ion-note>
       </ion-item>
-      <ion-item>
-        <ion-label>{{ translate('New external ID') }}</ion-label>
-        <ion-note slot="end">{{ newExternalId }}</ion-note>
-      </ion-item>
     </ion-list>
 
     <ion-list>
@@ -154,7 +150,7 @@ import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
 import { createShopifyCustomer, searchShopifyCustomers } from '@/services/customer';
 import { showToast } from '@/utils';
-import { buildClonePayload, cloneCustomerName, cloneEmail, cloneExternalId, clonePhone, defaultCloneNote, type ClonePriceMode } from '@/utils/cloneOrder';
+import { buildClonePayload, cloneCustomerName, cloneEmail, clonePhone, defaultCloneNote, type ClonePriceMode } from '@/utils/cloneOrder';
 
 /** PartyIdentification type carrying the numeric Shopify customer id (ShopifySeedData.xml). */
 const SHOPIFY_CUSTOMER_ID_TYPE = 'SHOPIFY_CUST_ID';
@@ -168,7 +164,6 @@ const raw = computed(() => orderDetailStore.current);
 const priceMode = ref<ClonePriceMode>('CARRY');
 const note = ref(defaultCloneNote(raw.value));
 
-const newExternalId = computed(() => cloneExternalId(raw.value));
 const currency = computed(() => raw.value?.currencyUom || 'USD');
 const itemCount = computed(() =>
   (raw.value?.shipGroups || []).reduce((count: number, shipGroup: any) => count + (shipGroup.items || []).length, 0)
@@ -301,11 +296,6 @@ function extractErrorMessage(err: any): string {
   return Array.isArray(message) ? message.join(' ') : String(message);
 }
 
-/** The backend rejects a duplicate clone externalId with an error naming that externalId. */
-function isAlreadyClonedError(message: string): boolean {
-  return message.includes(newExternalId.value) || /already.*(cloned|exist)/i.test(message);
-}
-
 async function confirm() {
   if (!isValid.value || !raw.value) return;
   submitError.value = '';
@@ -363,13 +353,10 @@ async function confirm() {
     modalController.dismiss({
       shopifyOrderId: response.data.shopifyOrderId || 'Unknown ID',
       shopifyOrderName: response.data.shopifyOrderName,
-      externalId: payload.externalId,
     }, 'confirm');
   } catch (err: any) {
     const message = extractErrorMessage(err);
-    submitError.value = isAlreadyClonedError(message)
-      ? translate('This order appears to have already been cloned — an order with external ID {externalId} already exists.', { externalId: newExternalId.value })
-      : (message || translate('Failed to clone the order. Please try again.'));
+    submitError.value = message || translate('Failed to clone the order. Please try again.');
     await showToast(submitError.value);
   } finally {
     isSubmitting.value = false;

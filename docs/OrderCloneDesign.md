@@ -41,41 +41,36 @@ fields for them — so the "as if newly created externally" rule is enforced by 
 price is provided; a custom line (no resolved variant) keeps the `0.00` fallback because Shopify cannot
 price it.
 
-## Idempotency — the `-1` externalId rule
+## externalId & duplicate clones
 
-Every clone sends `externalId = (source externalId || source orderId) + "-1"`. The backend rejects the
-request when that externalId is already taken, so attempting the same clone twice **fails automatically**.
+The clone sends **no** externalId. Cloning posts to Shopify **synchronously**
+(`draftOrderCreate` + `draftOrderComplete`) and the new order takes its externalId from the returned
+Shopify order id when the bridge syncs it back — exactly like any other externally-placed order.
 
-Mechanics (important):
-
-- The service stamps the externalId as an **order-level draft-order customAttribute** plus a `Cloned` tag.
-- On bridge re-ingest, Shopify customAttributes persist as **`OrderAttribute`** rows
-  (`attrName = "externalId"`); `OrderHeader.externalId` itself is set to the *new Shopify order's* id by
-  the bridge — so the duplicate gate checks **OrderAttribute first**, then OrderHeader as belt-and-braces.
-- **Pre-sync window:** a second clone fired before the first has synced back from Shopify is not caught.
-  Accepted limitation; the window is the Shopify→OMS sync lag.
-- Clone of a clone yields `...-1-1`.
+Duplicate-clone prevention is **explicitly out of scope** (product decision 2026-06-11): Shopify
+legitimately posts multiple orders sharing the same externalId — exchanges create new orders against the
+same source — so externalId is **not** a uniqueness/idempotency key, and a gate on it would reject
+legitimate orders. If a clone is fired twice, two Shopify orders are created; that is accepted for now.
 
 ## Endpoints
 
 | Endpoint | Status | Purpose |
 |---|---|---|
-| `POST oms/orders/shopify` | extended | optional `externalId` → duplicate gate + customAttribute/tag stamp; null `price` → omit `originalUnitPrice` |
+| `POST oms/orders/shopify` | extended | null `price` → omit `originalUnitPrice` (current-catalog pricing for CURRENT mode) |
 | `GET oms/orders/{orderId}/shopifyShopOrder` | new | shop resolution: `{shopId, orderId, shopifyOrderId}` rows |
 | `GET oms/parties/{partyId}/identifications` | new | customer Shopify id: rows matched on `partyIdentificationTypeId = "SHOPIFY_CUST_ID"` |
 | `GET/POST oms/shopify/customers` | existing | fallback customer search-by-email / create |
 
 ## Frontend pieces (order-manager)
 
-- `src/utils/cloneOrder.ts` — pure, import-free payload builder (`buildClonePayload`, `cloneExternalId`,
-  …). Geo transforms (`stateProvinceGeoId → province`, `countryGeoId → country` via injected `geoName`,
-  `postalCode → zip`) and product enrichment (`getProduct` injection) are dependency-injected for
-  testability. 18 unit tests in `cloneOrder.spec.ts`.
+- `src/utils/cloneOrder.ts` — pure, import-free payload builder (`buildClonePayload`, …). Geo transforms
+  (`stateProvinceGeoId → province`, `countryGeoId → country` via injected `geoName`, `postalCode → zip`)
+  and product enrichment (`getProduct` injection) are dependency-injected for testability.
 - `src/components/orders/CloneOrderModal.vue` — explainer, read-only summary (item count, currency, ship-to,
-  new external ID), 3-way price radio, editable prefilled note (`Cloned from <orderName> (<orderId>)`),
-  shop auto-resolution with manual `ion-select` fallback over seed `shopifyShops`, customer resolution
+  3-way price radio, editable prefilled note (`Cloned from <orderName> (<orderId>)`), shop
+  auto-resolution with manual `ion-select` fallback over seed `shopifyShops`, and customer resolution
   chain (PartyIdentification → email search → **deferred** create-at-submit, so cancelling the modal never
-  leaves an orphan Shopify customer), distinct already-cloned error rendering.
+  leaves an orphan Shopify customer).
 - `src/views/OrderDetail.vue` — footer **Clone** button, gated through
   `OrderActionValidator.validateFooterAction(order, 'CLONE', …)`.
 

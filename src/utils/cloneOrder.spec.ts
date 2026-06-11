@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildClonePayload, cloneCustomerName, cloneExternalId, defaultCloneNote, type BuildClonePayloadOptions } from './cloneOrder';
+import { buildClonePayload, cloneCustomerName, defaultCloneNote, type BuildClonePayloadOptions } from './cloneOrder';
 
 const geoName = (geoId: string) => ({ NY: 'New York', USA: 'United States' } as Record<string, string>)[geoId] || geoId;
 
@@ -54,17 +54,6 @@ const baseOpts: BuildClonePayloadOptions = {
   geoName
 };
 
-describe('cloneExternalId', () => {
-  it('appends -1 to the source externalId when present', () => {
-    expect(cloneExternalId(sourceOrder())).toBe('5551112223-1');
-  });
-
-  it('falls back to the orderId when the source has no externalId', () => {
-    expect(cloneExternalId(sourceOrder({ externalId: undefined }))).toBe('ORD10001-1');
-    expect(cloneExternalId(sourceOrder({ externalId: '' }))).toBe('ORD10001-1');
-  });
-});
-
 describe('defaultCloneNote', () => {
   it('uses the orderName when present', () => {
     expect(defaultCloneNote(sourceOrder())).toBe('Cloned from #1001 (ORD10001)');
@@ -115,12 +104,11 @@ describe('buildClonePayload structure', () => {
     });
   });
 
-  it('carries shop, customer id, currency, externalId, and note', () => {
+  it('carries shop, customer id, currency, and note', () => {
     const payload = buildClonePayload(sourceOrder(), baseOpts);
     expect(payload.shopId).toBe('SHOP1');
     expect(payload.shopifyCustomerId).toBe('777');
     expect(payload.currencyCode).toBe('EUR');
-    expect(payload.externalId).toBe('5551112223-1');
     expect(payload.note).toBe('a note');
   });
 

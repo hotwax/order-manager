@@ -117,6 +117,41 @@ export type OrderFooterAction = OrderAction<OrderFooterActionId>;
 export type ShipGroupAction = OrderAction<ShipGroupActionId>;
 export type OrderItemAction = OrderAction<OrderItemActionId>;
 
+/**
+ * An order-level STATUS-CHANGE action, derived from the seed transition table —
+ * NOT a fixed union. Its id IS the destination statusId (e.g. 'ORDER_APPROVED'),
+ * because which statuses can follow the current one is owned by the table, not
+ * this file. These are the "next logical transition" buttons (Approve, etc.).
+ */
+export interface OrderStatusAction {
+  /** Destination statusId — doubles as the action id. */
+  id: string;
+  toStatusId: string;
+  label: string;
+  color?: string;
+  /** The seed row's transitionName, kept for traceability / tooltips. */
+  transitionName?: string;
+  validation: ActionValidationResult;
+}
+
+/**
+ * A single footer button as the view renders it — the UNIFIED shape across
+ * table-driven status transitions (`kind: 'status'`) and the lifecycle/bulk
+ * footer actions (`kind: 'footer'`). The footer is built from one list of these
+ * (see getOrderFooterActions); only VALID actions are included, so a button
+ * that shouldn't apply to the order simply isn't present.
+ */
+export interface FooterActionView {
+  /** Dispatch key: a destination statusId for `status`, else the footer action id. */
+  id: string;
+  kind: 'status' | 'footer';
+  label: string;
+  color?: string;
+  fill: 'solid' | 'outline';
+  /** Present for `kind: 'status'` — the target status to transition to. */
+  toStatusId?: string;
+}
+
 /* ── Fulfillment phase model ──────────────────────────────────────────────── */
 
 /**
@@ -219,6 +254,18 @@ const TERMINAL_ITEM_STATUSES = ['ITEM_CANCELLED', 'ITEM_COMPLETED'];
 // Product decision 2026-06-11: ORDER_REJECTED / ORDER_EXPIRED have no known
 // use case today and are intentionally NOT treated as terminal.
 const TERMINAL_ORDER_STATUSES = ['ORDER_CANCELLED', 'ORDER_COMPLETED'];
+/**
+ * Display metadata for known order status-change destinations. Anything not
+ * listed falls back to the seed row's transitionName / toStatusDescription, so
+ * a newly-seeded transition still renders a (less-polished) button rather than
+ * disappearing.
+ */
+const ORDER_STATUS_ACTION_META: Record<string, { label: string; color?: string }> = {
+  ORDER_APPROVED: { label: 'Approve order' },
+  ORDER_HOLD: { label: 'Hold order', color: 'warning' },
+  ORDER_CANCELLED: { label: 'Cancel order', color: 'danger' },
+  ORDER_COMPLETED: { label: 'Complete order' }
+};
 /** Item statuses from which the item is still in-flight enough to broker/park/release. */
 const PRE_FULFILL_ITEM_STATUSES = ['ITEM_CREATED', 'ITEM_APPROVED', 'ITEM_HOLD', 'ITEM_REJECTED'];
 
@@ -345,6 +392,117 @@ export const OrderActionValidator = {
   canTransitionTo(toStatusId: string, allowedToStatusIds?: Set<string>): boolean | undefined {
     if (!allowedToStatusIds) return undefined;
     return allowedToStatusIds.has(toStatusId);
+  },
+
+  /* ════════════════════════════════════════════════════════════════════════
+   * ORDER STATUS TRANSITIONS — table-driven "next logical transition" buttons.
+   * ════════════════════════════════════════════════════════════════════════ */
+
+  /**
+   * Whether a seed transition row is available to a USER-INITIATED (direct)
+   * status change. The Default flow marks system-only edges with
+   * `conditionExpression="directStatusChange == false"` (e.g. CREATED → HOLD /
+   * REJECTED / AUTHORIZED) — those are driven by the OMS, not by an operator
+   * clicking a button. A user click IS a direct status change, so:
+   *   - no conditionExpression           → user-driven (e.g. CREATED → APPROVED)
+   *   - "directStatusChange == false"    → NOT user-driven
+   *   - any other/unrecognized condition → conservatively NOT user-driven (we
+   *     never surface a button we can't prove is honorable; extend this as the
+   *     engine learns to evaluate more conditions).
+   * This is the "conditioned on the overall lifecycle, not just one status
+   * field" gate — expressed by the transition table itself.
+   */
+  isUserDrivenTransition(transition: any): boolean {
+    const expr = String(transition?.conditionExpression || '').trim();
+    if (!expr) return true;
+    if (/directStatusChange\s*==\s*false/.test(expr)) return false;
+    return false;
+  },
+
+  /**
+   * DISCOVERY — the order-level status-change actions for the order's CURRENT
+   * status, derived entirely from the seed transition table. Pass the enriched
+   * rows from `seed.allowedTransitions(order.statusId)`. A button exists for a
+   * destination iff the table has that (user-drivable) transition — there is NO
+   * app-side hardcoding of which status may follow which. A created order shows
+   * "Approve order" purely because the Default flow seeds CREATED → APPROVED.
+   * Terminal orders yield none.
+   */
+  getOrderStatusActions(order: any, allowedTransitions: any[]): OrderStatusAction[] {
+    if (this.isOrderTerminal(order)) return [];
+    return (allowedTransitions || [])
+      .filter((transition: any) => this.isUserDrivenTransition(transition))
+      .map((transition: any) => {
+        const meta = ORDER_STATUS_ACTION_META[transition.toStatusId];
+        return {
+          id: transition.toStatusId,
+          toStatusId: transition.toStatusId,
+          label: meta?.label || transition.transitionName || transition.toStatusDescription || transition.toStatusId,
+          color: meta?.color,
+          transitionName: transition.transitionName,
+          validation: { allowed: true }
+        };
+      });
+  },
+
+  /**
+   * DISCOVERY — the COMPLETE, valid-only footer action set for an order, in one
+   * flat list the view can render directly. It unifies:
+   *   - table-driven status transitions (Approve, Cancel order, …), and
+   *   - the lifecycle/bulk footer actions (Return, Clone, Cancel items,
+   *     Appeasement, Reship).
+   * INVALID actions are omitted entirely — the footer shows only what is
+   * currently doable (no disabled-but-visible buttons). The engine reports
+   * validity; the VIEW still decides which ids it has a handler wired for and
+   * skips the rest (e.g. Appeasement/Reship until their backend lands).
+   */
+  getOrderFooterActions(order: any, allowedTransitions: any[], selectedItems: any[], ctx?: OrderLifecycleContext): FooterActionView[] {
+    const actions: FooterActionView[] = [];
+    const statusActions = this.getOrderStatusActions(order, allowedTransitions);
+    const footer = this.getFooterActions(order, selectedItems, ctx);
+
+    // Status transitions on the start — EXCEPT order-cancel, which is folded
+    // into the single morphing cancel button below.
+    for (const transition of statusActions) {
+      if (transition.id === 'ORDER_CANCELLED') continue;
+      actions.push({
+        id: transition.id,
+        kind: 'status',
+        toStatusId: transition.toStatusId,
+        label: transition.label,
+        color: transition.color,
+        fill: transition.id === 'ORDER_APPROVED' ? 'solid' : 'outline'
+      });
+    }
+
+    // ONE cancel button that morphs with the item selection (kept on the start
+    // so it converts in place): with cancellable items selected it is the bulk
+    // "Cancel N items" (the view supplies the count); otherwise, if the order
+    // itself can be cancelled, it is the whole-order "Cancel order". The two
+    // never coexist.
+    const bulkCancelValid = footer.some((action) => action.id === 'CANCEL_ITEMS' && action.validation.allowed);
+    const orderCancelValid = statusActions.some((transition) => transition.id === 'ORDER_CANCELLED');
+    if (bulkCancelValid) {
+      actions.push({ id: 'CANCEL_ITEMS', kind: 'status', label: 'Cancel items', color: 'danger', fill: 'outline' });
+    } else if (orderCancelValid) {
+      const orderCancel = statusActions.find((transition) => transition.id === 'ORDER_CANCELLED')!;
+      actions.push({ id: 'ORDER_CANCELLED', kind: 'status', toStatusId: 'ORDER_CANCELLED', label: orderCancel.label, color: 'danger', fill: 'outline' });
+    }
+
+    // Remaining lifecycle actions on the end (cancel handled above).
+    for (const action of footer) {
+      if (action.id === 'CANCEL_ITEMS') continue;
+      if (!action.validation.allowed) continue;
+      actions.push({
+        id: action.id,
+        kind: 'footer',
+        label: action.label,
+        color: action.color,
+        fill: 'outline'
+      });
+    }
+
+    return actions;
   },
 
   /* ════════════════════════════════════════════════════════════════════════
@@ -642,7 +800,7 @@ export const OrderActionValidator = {
     return [
       {
         id: 'CANCEL_ITEMS',
-        label: 'Cancel',
+        label: 'Cancel items',
         color: 'danger',
         validation: this.validateFooterAction(order, 'CANCEL_ITEMS', selectedItems, ctx)
       },
