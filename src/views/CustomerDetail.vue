@@ -6,7 +6,7 @@
           <ion-back-button default-href="/customers" />
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>Customer detail</ion-title>
+        <ion-title>Customer Detail</ion-title>
       </ion-toolbar>
       <ion-progress-bar v-if="loading" type="indeterminate" />
     </ion-header>
@@ -22,6 +22,9 @@
                 <h1>{{ customer.name || 'First Last' }}</h1>
                 <p>Customer since {{ customerSince || '—' }}</p>
               </ion-label>
+              <!-- TODO: deduct return-related OrderPaymentPreference refund amounts
+                   (returnPaymentPrefs where statusId is PAYMENT_REFUNDED or similar)
+                   from lifetimeValue so the displayed figure reflects net spend. -->
               <div slot="end" class="lifetime-value ion-text-right">
                 <p class="overline">Lifetime value</p>
                 <h2>{{ lifetimeValue }}</h2>
@@ -39,9 +42,13 @@
                 <template v-for="section in contactSections" :key="section.key">
                   <ion-item class="contact-section" lines="none">
                     <ion-label color="medium">{{ section.label }}</ion-label>
-                    <ion-button slot="end" fill="clear" size="small">
+                    <ion-button v-if="!section.values.length" slot="end" fill="clear" size="small" @click="onAddContact(section.contactMechTypeId)">
                       Add
                       <ion-icon slot="end" :icon="addCircleOutline" />
+                    </ion-button>
+                    <ion-button v-else slot="end" fill="clear" size="small" @click="onEditContact(section)">
+                      Edit
+                      <ion-icon slot="end" :icon="pencilOutline" />
                     </ion-button>
                   </ion-item>
                   <ion-item v-for="value in section.values" :key="value.contactMechId">
@@ -64,7 +71,7 @@
                 <ion-list lines="none">
                   <ion-item v-for="relationship in personalRelationships" :key="relationship.key">
                     <ion-label>
-                      <p class="overline">{{ relationship.relationshipName }}</p>
+                      <p class="overline">{{ seed.describe(relationship.partyRelationshipTypeId) }}</p>
                       <h3>{{ relationship.relatedPartyName }}</h3>
                       <p>{{ relationship.relatedPartyId }}</p>
                     </ion-label>
@@ -77,8 +84,10 @@
                   </ion-item>
                 </ion-list>
                 <div class="card-actions">
-                  <ion-button fill="clear" size="small">View history</ion-button>
-                  <ion-button fill="clear" size="small">Add new</ion-button>
+                  <ion-button fill="clear" size="small" @click="onViewRelationshipHistory()">View history</ion-button>
+                  <!-- TODO: need to identify roleTypeIdFrom and roleTypeIdTo for the relationship,
+                       and ensure PartyRole records exist for both parties before creating.
+                  <ion-button fill="clear" size="small" @click="onAddRelationship()">Add new</ion-button> -->
                 </div>
               </ion-card>
 
@@ -218,7 +227,7 @@
         </div>
 
         <div class="ion-padding-horizontal">
-          <ion-searchbar placeholder="Search" />
+          <ion-searchbar placeholder="Search" :value="recentOrdersQuery" @ion-input="recentOrdersQuery = ($event.target as any).value ?? ''" />
         </div>
 
         <div v-if="recentOrders.length" class="recent-orders-grid">
@@ -247,7 +256,7 @@
               </ion-list-header>
               <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
                 <ion-thumbnail slot="start">
-                  <img v-if="item.imageUrl" :src="item.imageUrl" alt="Product image" />
+                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
                 </ion-thumbnail>
                 <ion-label>
                   {{ item.name }}
@@ -273,6 +282,253 @@
           title="No recent orders"
           message="This customer has no orders on file."
         />
+      </div>
+
+      <!-- ===== Orders segment ===== -->
+      <div v-else-if="selectedSegment === 'orders'">
+        <div class="section-header">
+          <h2>All orders</h2>
+        </div>
+        <div class="ion-padding-horizontal">
+          <ion-searchbar placeholder="Search" :value="allOrdersQuery" @ion-input="allOrdersQuery = ($event.target as any).value ?? ''" />
+        </div>
+        <div v-if="allOrders.length" class="recent-orders-grid">
+          <ion-card v-for="order in allOrders" :key="order.id">
+            <ion-item lines="full">
+              <ion-label>
+                <h2>{{ order.name }}</h2>
+                <p>{{ order.subtitle }}</p>
+              </ion-label>
+              <ion-note slot="end">{{ order.progressLabel }}</ion-note>
+              <ion-icon slot="end" :icon="chevronUp" color="medium" />
+            </ion-item>
+            <ion-progress-bar :value="order.progressValue" :color="order.progressColor" />
+            <ion-item lines="full">
+              <ion-label>
+                <p class="overline">Order date</p>
+                {{ order.orderDate }}
+              </ion-label>
+            </ion-item>
+            <ion-list lines="none">
+              <ion-list-header>
+                <ion-label>Items</ion-label>
+              </ion-list-header>
+              <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
+                <ion-thumbnail slot="start">
+                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
+                </ion-thumbnail>
+                <ion-label>
+                  {{ item.name }}
+                  <p>{{ item.secondary }}</p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+            <div class="card-actions">
+              <ion-button
+                fill="clear"
+                size="small"
+                :router-link="order.id ? `/orders/${order.id}` : undefined"
+                :disabled="!order.id"
+              >
+                View details
+              </ion-button>
+            </div>
+          </ion-card>
+        </div>
+        <EmptyState
+          v-else-if="ordersStatus === 'loaded'"
+          title="No orders"
+          message="This customer has no orders on file."
+        />
+      </div>
+
+      <!-- ===== Unfillable segment ===== -->
+      <div v-else-if="selectedSegment === 'unfillable'">
+        <div class="section-header">
+          <h2>Unfillable orders</h2>
+        </div>
+        <div v-if="unfillableOrders.length" class="recent-orders-grid">
+          <ion-card v-for="order in unfillableOrders" :key="order.id">
+            <ion-item lines="full">
+              <ion-label>
+                <h2>{{ order.name }}</h2>
+                <p>{{ order.subtitle }}</p>
+              </ion-label>
+              <ion-note slot="end">{{ order.progressLabel }}</ion-note>
+              <ion-icon slot="end" :icon="chevronUp" color="medium" />
+            </ion-item>
+            <ion-progress-bar :value="order.progressValue" color="warning" />
+            <ion-item lines="full">
+              <ion-label>
+                <p class="overline">Order date</p>
+                {{ order.orderDate }}
+              </ion-label>
+            </ion-item>
+            <ion-list lines="none">
+              <ion-list-header>
+                <ion-label>Items</ion-label>
+              </ion-list-header>
+              <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
+                <ion-thumbnail slot="start">
+                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
+                </ion-thumbnail>
+                <ion-label>
+                  {{ item.name }}
+                  <p>{{ item.secondary }}</p>
+                </ion-label>
+              </ion-item>
+            </ion-list>
+            <div class="card-actions">
+              <ion-button
+                fill="clear"
+                size="small"
+                :router-link="order.id ? `/orders/${order.id}` : undefined"
+                :disabled="!order.id"
+              >
+                View details
+              </ion-button>
+            </div>
+          </ion-card>
+        </div>
+        <EmptyState
+          v-else-if="ordersStatus === 'loaded'"
+          title="No unfillable orders"
+          message="No orders are currently parked at the unfillable facility."
+        />
+      </div>
+
+      <!-- ===== Returns segment ===== -->
+      <div v-else-if="selectedSegment === 'returns'">
+        <div class="section-header">
+          <h2>Returns</h2>
+        </div>
+        <div v-if="customerReturns.length" class="recent-orders-grid">
+          <ion-card v-for="ret in customerReturns" :key="ret.returnId">
+            <ion-item lines="full">
+              <ion-label>
+                <h2>{{ ret.externalId || ret.returnId }}</h2>
+                <p>{{ ret.itemCount }} {{ ret.itemCount === 1 ? 'item' : 'items' }} · {{ money(ret.returnTotal, ret.currencyUomId) }}</p>
+              </ion-label>
+              <ion-chip slot="end" :color="returnStatusColor(ret.statusId)" outline>
+                {{ seed.describe(ret.statusId) || ret.statusId }}
+              </ion-chip>
+            </ion-item>
+
+            <ion-progress-bar :value="returnProgressValue(ret.statusId)" :color="returnStatusColor(ret.statusId)" />
+
+            <ion-item lines="full">
+              <ion-label>
+                <p class="overline">Return date</p>
+                {{ formatLongDate(ret.entryDate) }}
+              </ion-label>
+              <ion-label v-if="ret.destinationFacilityId" slot="end">
+                <p class="overline">Facility</p>
+                {{ ret.destinationFacilityId }}
+              </ion-label>
+            </ion-item>
+
+            <ion-list lines="none">
+              <ion-list-header>
+                <ion-label>Items</ion-label>
+              </ion-list-header>
+              <ion-item v-for="item in ret.items" :key="item.returnItemSeqId">
+                <ion-thumbnail slot="start">
+                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId || '')?.mainImageUrl" size="small" />
+                </ion-thumbnail>
+                <ion-label>
+                  <h3>{{ item.productId || '—' }}</h3>
+                  <p>Qty {{ item.returnQuantity }}{{ item.receivedQuantity != null ? ` · Received ${item.receivedQuantity}` : '' }}</p>
+                  <ion-button v-if="item.returnReasonId" fill="clear" size="small" @click="showReturnReason(item.returnReasonId)">
+                    <ion-icon slot="icon-only" :icon="informationCircleOutline" />
+                  </ion-button>
+                </ion-label>
+                <ion-note slot="end">{{ money(item.returnPrice * item.returnQuantity, ret.currencyUomId) }}</ion-note>
+              </ion-item>
+            </ion-list>
+
+            <div class="card-actions">
+              <ion-button
+                v-if="ret.items[0]?.orderId"
+                fill="clear"
+                size="small"
+                :router-link="`/orders/${ret.items[0].orderId}`"
+              >
+                View order
+              </ion-button>
+            </div>
+          </ion-card>
+        </div>
+        <EmptyState
+          v-else-if="returnsStatus === 'loaded'"
+          title="No returns"
+          message="This customer has no returns on file."
+        />
+        <div v-else-if="returnsStatus === 'idle'" class="ion-padding ion-text-center">
+          <ion-button fill="outline" @click="loadReturns()">Load returns</ion-button>
+        </div>
+        <div v-else-if="returnsStatus === 'loading'" class="ion-padding ion-text-center">
+          <ion-spinner name="crescent" />
+        </div>
+      </div>
+
+      <!-- ===== Comms segment ===== -->
+      <div v-else-if="selectedSegment === 'comms'">
+        <div class="section-header">
+          <h2>Communications</h2>
+        </div>
+        <div v-if="customerCommunications.length" class="recent-orders-grid">
+          <ion-card v-for="comm in customerCommunications" :key="comm.communicationEventId">
+            <ion-item lines="full">
+              <ion-label>
+                <h2>{{ comm.subject || '(No subject)' }}</h2>
+                <p>{{ (seed as any).describe(comm.communicationEventTypeId) || comm.communicationEventTypeId }}</p>
+              </ion-label>
+              <ion-chip slot="end" :color="commStatusColor(comm.statusId)" outline>
+                {{ (seed as any).describe(comm.statusId) || comm.statusId }}
+              </ion-chip>
+            </ion-item>
+
+            <ion-item lines="full">
+              <ion-label>
+                <p class="overline">Date</p>
+                {{ formatLongDate(comm.datetimeStarted || comm.entryDate) }}
+              </ion-label>
+              <ion-label slot="end" v-if="comm.datetimeEnded">
+                <p class="overline">Ended</p>
+                {{ formatLongDate(comm.datetimeEnded) }}
+              </ion-label>
+            </ion-item>
+
+            <ion-item lines="full">
+              <ion-label>
+                <p class="overline">From</p>
+                {{ comm.partyIdFrom || '—' }}
+              </ion-label>
+              <ion-label slot="end">
+                <p class="overline">To</p>
+                {{ comm.partyIdTo || '—' }}
+              </ion-label>
+            </ion-item>
+
+            <ion-item v-if="comm.content || comm.note" lines="none">
+              <ion-label class="ion-text-wrap">
+                <p class="overline">Message</p>
+                <p>{{ comm.content || comm.note }}</p>
+              </ion-label>
+            </ion-item>
+          </ion-card>
+        </div>
+        <EmptyState
+          v-else-if="commsStatus === 'loaded'"
+          title="No communications"
+          message="No communication events found for this customer."
+        />
+        <div v-else-if="commsStatus === 'idle'" class="ion-padding ion-text-center">
+          <ion-button fill="outline" @click="loadCommunications()">Load communications</ion-button>
+        </div>
+        <div v-else-if="commsStatus === 'loading'" class="ion-padding ion-text-center">
+          <ion-spinner name="crescent" />
+        </div>
       </div>
 
       <!-- ===== Other segments (placeholder) ===== -->
@@ -335,19 +591,28 @@ import {
   IonSearchbar,
   IonSegment,
   IonSegmentButton,
+  IonSpinner,
   IonThumbnail,
   IonTitle,
-  IonToolbar
+  IonToolbar,
+  modalController
 } from '@ionic/vue';
 import { DateTime } from 'luxon';
 import {
   addCircleOutline,
   chevronUp,
   informationCircleOutline,
+  pencilOutline,
   pricetagOutline
 } from 'ionicons/icons';
+import { commonUtil, DxpShopifyImg } from '@common';
 import { useCustomerDetail } from '@/composables/useCustomerDetail';
+import { useProductCacheStore } from '@/store/productCache';
 import { useSeedStore } from '@/store/seed';
+import type { CustomerOrderSummary } from '@/types/customer';
+import AddContactModal from '@/components/AddContactModal.vue';
+// import AddRelationshipModal from '@/components/AddRelationshipModal.vue';
+import RelationshipHistoryModal from '@/components/RelationshipHistoryModal.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import ErrorState from '@/components/ErrorState.vue';
 
@@ -357,6 +622,9 @@ const props = defineProps<{
 
 const selectedSegment = ref('dashboard');
 const seed = useSeedStore();
+const productCache = useProductCacheStore();
+const recentOrdersQuery = ref('');
+const allOrdersQuery = ref('');
 
 const {
   customer,
@@ -368,14 +636,27 @@ const {
   timeline,
   recentOrders: recentOrdersSource,
   openTasks,
+  customerReturns: customerReturnsSource,
+  customerCommunications: customerCommunicationsSource,
   ordersStatus,
   tasksStatus,
+  returnsStatus,
+  commsStatus,
   lifetimeValue: lifetimeValueRaw,
   lifetimeCurrency,
   customerSince: customerSinceRaw,
   load,
-  expireRelationship
+  loadReturns,
+  loadCommunications,
+  expireRelationship,
+  // createRelationship, // TODO: re-enable when roleTypeId handling is ready
+  addContact,
+  updateContact,
+  expireContact
 } = useCustomerDetail(() => props.customerId);
+
+const customerReturns = computed(() => customerReturnsSource.value as import('@/types/customer').CustomerReturnSummary[]);
+const customerCommunications = computed(() => customerCommunicationsSource.value as import('@/types/customer').CustomerCommunicationSummary[]);
 
 const customerSince = computed(() => formatMonthYear(customerSinceRaw.value));
 const createdAtLabel = computed(() => (timeline.value[0]?.at ? formatTimestamp(timeline.value[0].at) : ''));
@@ -385,9 +666,8 @@ const mergedSelectedKey = computed(() => {
   return canonical?.key || duplicateRelationships.value[0]?.key || '';
 });
 
-// Recent orders: live customer orders from Solr (docType:ORDER, customerPartyId).
-const recentOrders = computed(() =>
-  recentOrdersSource.value.slice(0, 12).map((order) => ({
+function mapOrder(order: CustomerOrderSummary) {
+  return {
     id: order.orderId,
     name: order.orderName || order.orderId,
     subtitle: `${order.itemCount} ${order.itemCount === 1 ? 'item' : 'items'} · ${order.unitCount} ${order.unitCount === 1 ? 'unit' : 'units'}`,
@@ -395,13 +675,35 @@ const recentOrders = computed(() =>
     progressValue: order.progressValue ?? 0.5,
     progressColor: order.progressColor || 'primary',
     orderDate: formatLongDate(order.orderDate),
+    isUnfillable: order.isUnfillable,
     items: (order.items || []).map((item) => ({
+      productId: item.productId || '',
       name: item.name || item.sku || 'Item',
       secondary: item.sku || '',
       imageUrl: item.imageUrl || ''
     }))
-  }))
-);
+  };
+}
+
+function matchesOrderQuery(order: ReturnType<typeof mapOrder>, q: string): boolean {
+  const lower = q.toLowerCase();
+  return order.name.toLowerCase().includes(lower) || order.id.toLowerCase().includes(lower);
+}
+
+type MappedOrder = ReturnType<typeof mapOrder>;
+
+// Recent orders: live customer orders from Solr (docType:ORDER, customerPartyId).
+const recentOrders = computed(() => {
+  const mapped: MappedOrder[] = recentOrdersSource.value.slice(0, 12).map(mapOrder);
+  const q = recentOrdersQuery.value.trim();
+  return q ? mapped.filter((o) => matchesOrderQuery(o, q)) : mapped;
+});
+const allOrders = computed(() => {
+  const mapped: MappedOrder[] = recentOrdersSource.value.map(mapOrder);
+  const q = allOrdersQuery.value.trim();
+  return q ? mapped.filter((o) => matchesOrderQuery(o, q)) : mapped;
+});
+const unfillableOrders = computed(() => recentOrdersSource.value.filter((o: CustomerOrderSummary) => o.isUnfillable).map(mapOrder));
 
 const segmentLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -414,8 +716,69 @@ const segmentLabel = computed(() => {
   return labels[selectedSegment.value] || 'Dashboard';
 });
 
+// TODO: need to identify roleTypeIdFrom and roleTypeIdTo for the relationship,
+// and ensure PartyRole records exist for both parties before creating.
+// async function onAddRelationship() {
+//   const modal = await modalController.create({
+//     component: AddRelationshipModal,
+//     componentProps: { currentPartyId: props.customerId }
+//   });
+//   await modal.present();
+//   const { data, role } = await modal.onWillDismiss();
+//   if (role === 'confirm' && data) {
+//     await createRelationship({
+//       partyIdFrom: props.customerId,
+//       partyIdTo: data.partyId,
+//       partyRelationshipTypeId: data.partyRelationshipTypeId,
+//       fromDate: new Date().toISOString(),
+//       comments: data.comments
+//     });
+//   }
+// }
+
+async function onViewRelationshipHistory() {
+  const modal = await modalController.create({
+    component: RelationshipHistoryModal,
+    componentProps: { currentPartyId: props.customerId }
+  });
+  await modal.present();
+}
+
+async function onAddContact(contactMechTypeId: string) {
+  const modal = await modalController.create({
+    component: AddContactModal,
+    componentProps: { contactMechTypeId }
+  });
+  await modal.present();
+  const { data, role } = await modal.onWillDismiss();
+  if (role === 'confirm' && data) {
+    await addContact(contactMechTypeId, data);
+  }
+}
+
+async function onEditContact(section: import('@/types/customer').ContactSection) {
+  const existingContact = customer.value?.contactMechs.find(
+    (cm: import('@/types/customer').CustomerContactMech) => cm.contactMechId === section.values[0]?.contactMechId
+  );
+  const modal = await modalController.create({
+    component: AddContactModal,
+    componentProps: { contactMechTypeId: section.contactMechTypeId, existingContact }
+  });
+  await modal.present();
+  const { data, role } = await modal.onWillDismiss();
+  if (role === 'confirm' && data && section.values[0]) {
+    await updateContact(section.contactMechTypeId, section.values[0].contactMechId, data);
+  } else if (role === 'expire' && section.values[0]) {
+    await expireContact(section.values[0].contactMechId);
+  }
+}
+
 async function onExpireRelationship(relationship: { keyFields: { partyIdFrom: string; partyIdTo: string; roleTypeIdFrom: string; roleTypeIdTo: string; fromDate: string } }) {
   await expireRelationship(relationship.keyFields, DateTime.now().toFormat('yyyy-LL-dd HH:mm:ss.SSS'));
+}
+
+async function showReturnReason(returnReasonId: string) {
+  await commonUtil.showToast((seed as any).describe(returnReasonId));
 }
 
 onMounted(() => load());
@@ -423,6 +786,32 @@ watch(() => props.customerId, () => load());
 
 function money(value: number, currency = 'USD') {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(Number(value || 0));
+}
+
+const RETURN_PROGRESS: Record<string, number> = {
+  RETURN_REQUESTED: 0.2,
+  RETURN_ACCEPTED: 0.5,
+  RETURN_RECEIVED: 0.8,
+  RETURN_COMPLETED: 1,
+  RETURN_CANCELLED: 0
+};
+
+function returnProgressValue(statusId: string): number {
+  return RETURN_PROGRESS[statusId] ?? 0.4;
+}
+
+function returnStatusColor(statusId: string): string {
+  if (statusId === 'RETURN_COMPLETED') return 'success';
+  if (statusId === 'RETURN_CANCELLED') return 'danger';
+  if (statusId === 'RETURN_RECEIVED') return 'primary';
+  return 'warning';
+}
+
+function commStatusColor(statusId: string): string {
+  if (statusId === 'COM_COMPLETE') return 'success';
+  if (statusId === 'COM_CANCELLED') return 'danger';
+  if (statusId === 'COM_IN_PROGRESS') return 'primary';
+  return 'medium';
 }
 
 function parseDate(value?: string | number) {

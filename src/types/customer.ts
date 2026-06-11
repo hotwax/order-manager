@@ -83,6 +83,7 @@ export interface CustomerOrderSummary {
   progressLabel: string;
   progressValue: number;
   progressColor?: string;
+  isUnfillable: boolean;
   items: Array<{
     orderItemSeqId: string;
     productId: string;
@@ -112,11 +113,27 @@ export interface CustomerTaskSummary {
 
 export interface CustomerReturnSummary {
   returnId: string;
-  orderId: string;
+  externalId?: string;
   statusId: string;
   entryDate: string;
   returnTotal: number;
   currencyUomId: string;
+  destinationFacilityId?: string;
+  returnChannelEnumId?: string;
+  itemCount: number;
+  items: Array<{
+    returnItemSeqId: string;
+    productId?: string;
+    orderId?: string;
+    orderItemSeqId?: string;
+    statusId: string;
+    returnReasonId?: string;
+    returnTypeId?: string;
+    returnQuantity: number;
+    receivedQuantity?: number;
+    returnPrice: number;
+    description?: string;
+  }>;
 }
 
 export interface CustomerCommunicationSummary {
@@ -125,9 +142,15 @@ export interface CustomerCommunicationSummary {
   statusId: string;
   subject?: string;
   entryDate?: string;
+  datetimeStarted?: string;
+  datetimeEnded?: string;
   partyIdFrom?: string;
   partyIdTo?: string;
+  roleTypeIdFrom?: string;
+  roleTypeIdTo?: string;
+  contactMechTypeId?: string;
   content?: string;
+  note?: string;
 }
 
 export interface CustomerTimelineEvent {

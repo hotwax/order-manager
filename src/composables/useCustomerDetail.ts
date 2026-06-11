@@ -22,8 +22,12 @@ export function useCustomerDetail(getPartyId: () => string) {
   const timeline = computed(() => store.customerTimeline(partyId.value));
   const recentOrders = computed(() => store.recentOrders(partyId.value));
   const openTasks = computed(() => store.openTasks(partyId.value));
-  const ordersStatus = computed(() => store.sectionStatus(partyId.value, 'recentOrders'));
-  const tasksStatus = computed(() => store.sectionStatus(partyId.value, 'tasks'));
+  const customerReturns = computed(() => (store as any).returns(partyId.value));
+  const customerCommunications = computed(() => (store as any).communications(partyId.value));
+  const ordersStatus = computed(() => (store as any).sectionStatus(partyId.value, 'recentOrders'));
+  const tasksStatus = computed(() => (store as any).sectionStatus(partyId.value, 'tasks'));
+  const returnsStatus = computed(() => (store as any).sectionStatus(partyId.value, 'returns'));
+  const commsStatus = computed(() => (store as any).sectionStatus(partyId.value, 'communications'));
   const lifetimeValue = computed(() => store.lifetimeValue(partyId.value));
   const lifetimeOrders = computed(() => store.lifetimeOrders(partyId.value));
   const lifetimeCurrency = computed(() => store.lifetimeCurrency(partyId.value));
@@ -45,6 +49,26 @@ export function useCustomerDetail(getPartyId: () => string) {
     return store.createRelationship(input);
   }
 
+  function addContact(contactMechTypeId: string, data: Record<string, string>) {
+    return (store as any).addContact(partyId.value, contactMechTypeId, data);
+  }
+
+  function updateContact(contactMechTypeId: string, contactMechId: string, data: Record<string, string>) {
+    return (store as any).updateContact(partyId.value, contactMechTypeId, contactMechId, data);
+  }
+
+  function expireContact(contactMechId: string) {
+    return (store as any).expireContact(partyId.value, contactMechId);
+  }
+
+  function loadReturns() {
+    return (store as any).loadCustomerReturns(partyId.value);
+  }
+
+  function loadCommunications() {
+    return (store as any).loadCustomerCommunications(partyId.value);
+  }
+
   return {
     store,
     customer,
@@ -56,8 +80,12 @@ export function useCustomerDetail(getPartyId: () => string) {
     timeline,
     recentOrders,
     openTasks,
+    customerReturns,
+    customerCommunications,
     ordersStatus,
     tasksStatus,
+    returnsStatus,
+    commsStatus,
     lifetimeValue,
     lifetimeOrders,
     lifetimeCurrency,
@@ -65,6 +93,11 @@ export function useCustomerDetail(getPartyId: () => string) {
     load,
     refresh,
     expireRelationship,
-    createRelationship
+    createRelationship,
+    addContact,
+    updateContact,
+    expireContact,
+    loadReturns,
+    loadCommunications
   };
 }
