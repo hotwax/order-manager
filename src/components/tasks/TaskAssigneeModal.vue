@@ -42,13 +42,13 @@
         </template>
       </ion-radio-group>
     </ion-list>
-  </ion-content>
 
-  <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-    <ion-fab-button :disabled="!selectedAssigneeId" @click="saveAssignee">
-      <ion-icon :icon="saveOutline" />
-    </ion-fab-button>
-  </ion-fab>
+    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+      <ion-fab-button :disabled="!selectedAssigneeId" @click="saveAssignee">
+        <ion-icon :icon="saveOutline" />
+      </ion-fab-button>
+    </ion-fab>
+  </ion-content>
 </template>
 
 <script setup lang="ts">
