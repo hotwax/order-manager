@@ -128,6 +128,7 @@ import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
+import { isSwapItemUnavailable } from '@/utils/swapItems';
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean }>(), {
   selectable: false,
@@ -205,11 +206,6 @@ function getSubstitute(item: any) {
   return item.substituteProducts?.[0];
 }
 
-function isUnavailable(item: any): boolean {
-  //return item.quantityNotAvailable !== null && item.quantityNotAvailable < 0;
-  return true
-}
-
 function hasSubstituteStock(productId: string, facilityId: string): boolean {
   const stock = useStockStore().getProductStock(productId, facilityId);
   return (stock?.computedAtp ?? 0) > 0;
@@ -236,13 +232,13 @@ function getSuggestedItems(task: any): { list: any[]; newTotal: number; suggeste
     }
 
     // Unavailable item with a substitute that has stock — show substitute
-    if (isUnavailable(item) && substituteAvailable) {
+    if (isSwapItemUnavailable(item) && substituteAvailable) {
       newTotal += (substitute.price ?? 0) * (item.quantity ?? 1);
       return { ...substitute, quantity: item.quantity, _isSubstitute: true, _cancel: false, _noReplacement: false, _sourceOrderItemSeqId: item.orderItemSeqId };
     }
 
     // Unavailable item but no substitute or substitute out of stock — show original with no replacement
-    if (isUnavailable(item)) {
+    if (isSwapItemUnavailable(item)) {
       newTotal += (item.unitPrice ?? 0) * (item.quantity ?? 1);
       return { ...item, _isSubstitute: false, _cancel: false, _noReplacement: true, _sourceOrderItemSeqId: item.orderItemSeqId };
     }
