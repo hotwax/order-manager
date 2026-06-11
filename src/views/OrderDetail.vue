@@ -177,90 +177,66 @@
         </ion-segment-button>
       </ion-segment>
 
-      <div v-if="selectedSegment === 'items'">
+      <div v-if="selectedSegment === 'items'" class="order-items">
 
-        <ion-list>
-          <ion-list-header>
-            <ion-label>{{ translate('Items') }}</ion-label>
-          </ion-list-header>
-          <ion-item lines="full" buttonDetail="false" button>
+        <ion-list lines="none" class="order-items-list">
+          <ion-item lines="full" class="order-items-toolbar">
             <ion-checkbox :checked="areAllSelected" justify="start" label-placement="end"
               @ionChange="toggleSelectAll($event.detail.checked)">{{ translate('Select all') }}</ion-checkbox>
+            <ion-button slot="end" fill="outline" @click="openAddItemFromItemsSegment">
+              {{ translate('Add Items') }}
+            </ion-button>
           </ion-item>
           <ion-accordion-group>
             <ion-accordion v-for="group in groupedItems" :key="group.externalId" :value="group.externalId">
-              <div slot="header" class="list-item order-item-rollup">
-                <ion-item class="item-key-header" lines="none">
-                  <ion-checkbox slot="start" v-model="group.selected" @click.stop />
-                  <ion-thumbnail slot="start" v-image-preview="getProduct(group.productId)"
-                    :key="getProduct(group.productId)?.mainImageUrl">
-                    <DxpShopifyImg :src="getProduct(group.productId)?.mainImageUrl"
-                      :key="getProduct(group.productId)?.mainImageUrl" size="small" />
-                  </ion-thumbnail>
-                  <ion-label>
-                    <p class="overline">{{
-                      commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId,
-                      getProduct(group.productId) || {}) }}</p>
-                    <div>
-                      {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId,
-                        getProduct(group.productId) || {}) || group.name }}
-                      <ion-badge class="kit-badge" color="dark" v-if="isKit(group)">{{ translate("Kit") }}</ion-badge>
-                    </div>
-                    <p>{{ group.externalId }}</p>
-                  </ion-label>
-                </ion-item>
-
-                <ion-label class="tablet">
-                  {{ group.totalQty }} {{ translate('units') }}
-                  <p>{{ translate('Qty') }}</p>
-                </ion-label>
-
-                <!--<ion-label class="tablet">
-                  <ion-badge :color="commonUtil.getStatusColor(group.statusId)">{{ group.status }}</ion-badge>
-                  <p>{{ translate('Status') }}</p>
-                </ion-label>-->
-
-                <ion-label class="ion-text-end ion-padding-vertical">
-                  {{ money(group.totalPrice, order.currency) }}
-                  <p v-for="adj in getGroupAdjustments(group)" :key="adj.comment">
-                    {{ adj.comment }}: {{ money(adj.amount, order.currency) }}
-                  </p>
-                </ion-label>
-              </div>
+              <OrderItemListRow
+                slot="header"
+                class="order-item-rollup-entry"
+                :primary="groupPrimaryIdentifier(group)"
+                :secondary="groupSecondaryIdentifier(group)"
+                :badge-label="isKit(group) ? translate('Kit') : ''"
+                :image-url="getProduct(group.productId)?.mainImageUrl"
+                :preview-product="getProduct(group.productId)"
+                :selected="group.selected"
+                :quantity="group.totalQty"
+                :quantity-label="translate('qty')"
+                :status-label="group.status"
+                :status-color="commonUtil.getStatusColor(group.statusId)"
+                :amount="money(group.totalPrice, order.currency)"
+                :adjustments="getGroupAdjustmentRows(group)"
+                @update:selected="group.selected = $event"
+              />
               <div slot="content">
                 <ion-list lines="none">
-                  <div v-for="item in group.items" :key="item.orderItemSeqId" class="list-item order-item-row">
-                    <ion-item class="item-key-content" lines="none">
-                      <ion-checkbox slot="start" v-model="item.selected" />
-                      <ion-label>
-                        {{ item.orderItemSeqId }}
-                        <p>{{ translate('#') }}{{ item.shipGroupSeqId }}</p>
-                      </ion-label>
-                    </ion-item>
-
-                    <ion-chip class="tablet" outline
-                      :disabled="['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)"
-                      @click.stop="rejectAndReleaseItem(item, group.productId)">
-                      <ion-icon :icon="businessOutline"></ion-icon>
-                      <ion-label>{{ item.facilityName }}</ion-label>
-                    </ion-chip>
-
-                    <ion-chip class="tablet" outline :disabled="!item.attributeCount"
-                      @click.stop="openItemAttributesModal(item)">
-                      <ion-icon :icon="gitBranchOutline"></ion-icon>
-                      <ion-label>{{ item.attributeCount || 0 }}</ion-label>
-                    </ion-chip>
-
-                    <ion-badge class="tablet" :color="commonUtil.getStatusColor(item.statusId)">{{ item.status
-                      }}</ion-badge>
-
-                    <ion-buttons>
+                  <OrderItemListRow
+                    v-for="item in group.items"
+                    :key="item.orderItemSeqId"
+                    class="order-item-detail-entry"
+                    :primary="item.orderItemSeqId"
+                    :secondary="item.externalId || `${translate('#')}${item.shipGroupSeqId}`"
+                    :selected="item.selected"
+                    :quantity="item.quantity"
+                    :quantity-label="translate('qty')"
+                    :facility-label="item.facilityName"
+                    :facility-disabled="['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)"
+                    :attributes-label="attributeChipLabel(item.attributeCount)"
+                    :attributes-disabled="!item.attributeCount"
+                    :status-label="item.status"
+                    :status-color="commonUtil.getStatusColor(item.statusId)"
+                    :status-detail="itemStatusDetail(item)"
+                    :amount="money(itemLineTotal(item), order.currency)"
+                    :adjustments="getItemAdjustmentRows(item)"
+                    @update:selected="item.selected = $event"
+                    @facility-click="rejectAndReleaseItem(item, group.productId)"
+                    @attributes-click="openItemAttributesModal(item)"
+                  >
+                    <template #actions>
                       <ion-button v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)" fill="clear"
                         size="small" color="danger" @click.stop="cancelSingleItem(item)">
                         {{ translate('Cancel') }}
                       </ion-button>
-                    </ion-buttons>
-                  </div>
+                    </template>
+                  </OrderItemListRow>
                 </ion-list>
               </div>
             </ion-accordion>
@@ -272,15 +248,16 @@
         <div class="order-summary">
           <ion-card>
             <ion-card-header>
-              <ion-card-title>{{ translate('Order payment preference') }}</ion-card-title>
+              <ion-card-title>{{ translate('Payment') }}</ion-card-title>
             </ion-card-header>
             <ion-list lines="none">
               <ion-item v-for="payment in order.payments" :key="payment.id">
                 <ion-label>
-                  <p>{{ payment.paymentMethodTypeDesc || payment.method }}</p>
-                  {{ money(payment.amount, order.currency) }}
+                  <p class="overline">{{ payment.paymentMethodTypeId || payment.method }}</p>
+                  {{ payment.paymentMethodTypeDesc || payment.method }}
+                  <p>{{ payment.statusDesc || payment.status }}</p>
                 </ion-label>
-                <ion-note slot="end">{{ payment.statusDesc || payment.status }}</ion-note>
+                <ion-note slot="end">{{ money(payment.amount, order.currency) }}</ion-note>
               </ion-item>
               <ion-item v-if="!order.payments?.length">
                 <ion-label>{{ translate('No payment preference records') }}</ion-label>
@@ -288,23 +265,27 @@
             </ion-list>
           </ion-card>
           <ion-card class="totals">
-            <ion-card-header>
-              <ion-card-title>{{ translate('Totals') }}</ion-card-title>
-            </ion-card-header>
-            <ion-list lines="none">
+            <ion-list lines="full">
               <ion-item>
                 <ion-label>{{ translate('Subtotal') }}</ion-label>
                 <ion-label slot="end">{{ money(orderTotals.subtotal, order.currency) }}</ion-label>
               </ion-item>
-              <ion-item v-for="(amount, typeId) in orderTotals.adjustments" :key="typeId">
-                <ion-label>{{ seed.orderAdjustmentTypeDescription(typeId) }}</ion-label>
-                <ion-label slot="end">{{ money(amount, order.currency) }}</ion-label>
+              <ion-item v-for="adjustment in orderAdjustmentRows" :key="adjustment.label">
+                <ion-label>
+                  {{ adjustment.label }}
+                  <p v-if="adjustment.detail">{{ adjustment.detail }}</p>
+                </ion-label>
+                <ion-label slot="end">{{ money(adjustment.amount, order.currency) }}</ion-label>
+              </ion-item>
+              <ion-item>
+                <ion-label>{{ translate('Grand total') }}</ion-label>
+                <ion-label slot="end" color="dark">{{ money(orderTotals.total, order.currency) }}</ion-label>
+              </ion-item>
+              <ion-item>
+                <ion-label>{{ translate('Payment received') }}</ion-label>
+                <ion-label slot="end">{{ money(paymentReceivedTotal, order.currency) }}</ion-label>
               </ion-item>
             </ion-list>
-            <ion-item class="total-item">
-              <ion-label>{{ translate('Grand Total') }}</ion-label>
-              <ion-label slot="end" color="dark">{{ money(orderTotals.total, order.currency) }}</ion-label>
-            </ion-item>
           </ion-card>
         </div>
       </div>
@@ -926,7 +907,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { businessOutline, calendarOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, ellipsisVertical, giftOutline, gitBranchOutline, informationCircleOutline, mailOutline, saveOutline, sendOutline, shieldOutline, ticketOutline } from 'ionicons/icons';
+import { calendarOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, saveOutline, sendOutline, shieldOutline, ticketOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
@@ -934,6 +915,7 @@ import { useProductMaster } from '@/composables/useProductMaster';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import AddItemToOrderModal from '@/components/orders/AddItemToOrderModal.vue';
+import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
 import RejectItemsModal from '@/components/orders/RejectItemsModal.vue';
 import ProductInventoryModal from '@/components/inventory/ProductInventoryModal.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
@@ -1000,8 +982,10 @@ const order = computed(() => {
     })),
     payments: (raw.paymentPreferences || []).map((payment: any) => ({
       id: payment.orderPaymentPreferenceId,
+      paymentMethodTypeId: payment.paymentMethodTypeId,
       paymentMethodTypeDesc: seed.paymentMethodDescription(payment.paymentMethodTypeId),
       amount: payment.maxAmount ?? payment.presentmentAmount,
+      statusId: payment.statusId,
       statusDesc: seed.statusDescription(payment.statusId)
     })),
     shipGroups: (raw.shipGroups || []).map((shipGroup: any) => ({
@@ -1175,6 +1159,7 @@ const groupedItems = computed(() => {
     selected: boolean;
     items: Array<{
       orderItemSeqId: string;
+      externalId: string;
       shipGroupSeqId: string;
       facilityId: string;
       facilityName: string;
@@ -1185,6 +1170,9 @@ const groupedItems = computed(() => {
       unitPrice: number;
       returnedQty: number;
       returnableQty: number;
+      attributes: any[];
+      attributeCount: number;
+      adjustments: Array<{ comment: string; amount: number }>;
     }>;
   }> = {};
 
@@ -1219,6 +1207,7 @@ const groupedItems = computed(() => {
       }
       groups[externalId].items.push({
         orderItemSeqId: item.id,
+        externalId,
         shipGroupSeqId: sg.id,
         facilityId: sg.facilityId || '',
         facilityName: sg.facilityName || 'Facility',
@@ -1231,7 +1220,8 @@ const groupedItems = computed(() => {
         returnedQty,
         returnableQty,
         attributes: rawItem?.orderItemAttributes || rawItem?.attributes || rawItem?.orderItemAttributeList || [],
-        attributeCount: rawItem?.orderItemAttributes?.length || rawItem?.attributes?.length || rawItem?.orderItemAttributeList?.length || 0
+        attributeCount: rawItem?.orderItemAttributes?.length || rawItem?.attributes?.length || rawItem?.orderItemAttributeList?.length || 0,
+        adjustments: itemAdjustmentSummaries(rawItem, item.id)
       });
     });
   });
@@ -1255,6 +1245,20 @@ const riskSummary = computed(() => {
     level: levelEnumId ? seed.enumDescription(levelEnumId) : translate('No risk level')
   };
 });
+
+const paymentReceivedTotal = computed(() =>
+  (order.value?.payments || []).reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0)
+);
+
+const orderAdjustmentRows = computed(() =>
+  Object.entries(orderTotals.value.adjustments)
+    .map(([typeId, amount]) => ({
+      label: seed.orderAdjustmentTypeDescription(typeId) || typeId,
+      detail: shippingAdjustmentDetail(typeId),
+      amount: Number(amount)
+    }))
+    .filter((row) => row.amount !== 0)
+);
 
 const selectedSegment = ref('items');
 
@@ -1750,8 +1754,90 @@ function formatTime(value: string | number | undefined) {
 function getGroupAdjustments(group: any) {
   const adjs = orderDetailStore.adjustmentsByExternalId[group.externalId] || {};
   return Object.entries(adjs)
-    .map(([comment, amount]) => ({ comment, amount }))
+    .map(([comment, amount]) => ({ comment, amount: Number(amount) }))
     .filter(adj => adj.amount !== 0);
+}
+
+function groupPrimaryIdentifier(group: any): string {
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, getProduct(group.productId) || {})
+    || group.name
+    || group.externalId;
+}
+
+function groupSecondaryIdentifier(group: any): string {
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.secondaryId, getProduct(group.productId) || {})
+    || group.externalId;
+}
+
+function getGroupAdjustmentRows(group: any): Array<{ label: string; amount: string }> {
+  return getGroupAdjustments(group).map((adjustment) => ({
+    label: adjustment.comment,
+    amount: money(adjustment.amount, order.value?.currency || 'USD')
+  }));
+}
+
+function getItemAdjustmentRows(item: any): Array<{ label: string; amount: string }> {
+  return (item.adjustments || []).map((adjustment: any) => ({
+    label: adjustment.comment,
+    amount: money(adjustment.amount, order.value?.currency || 'USD')
+  }));
+}
+
+function itemStatusDetail(item: any): string {
+  return item.shipGroupSeqId ? `${translate('#')}${item.shipGroupSeqId}` : '';
+}
+
+function itemLineTotal(item: any): number {
+  return Number(item.unitPrice || 0) * Number(item.quantity || 0);
+}
+
+function attributeChipLabel(count: number): string {
+  return `${count || 0} ${Number(count) === 1 ? translate('attribute') : translate('attributes')}`;
+}
+
+function itemAdjustmentLabel(adj: any): string {
+  return adj.comments || adj.comment || adj.description || adj.orderAdjustmentTypeId || translate('Adjustment');
+}
+
+function itemAdjustmentKey(adj: any, fallbackSeqId = ""): string {
+  return adj.orderAdjustmentId || [
+    fallbackSeqId || adj.orderItemSeqId || "",
+    adj.shipGroupSeqId || "",
+    adj.orderAdjustmentTypeId || "",
+    itemAdjustmentLabel(adj),
+    Number(adj.amount || 0)
+  ].join("|");
+}
+
+function itemAdjustmentSummaries(rawItem: any, orderItemSeqId: string): Array<{ comment: string; amount: number }> {
+  const totals: Record<string, number> = {};
+  const seen = new Set<string>();
+  const adjustments = [
+    ...(orderDetailStore.current?.adjustments || []).filter((adj: any) => adj.orderItemSeqId === orderItemSeqId),
+    ...(rawItem?.adjustments || [])
+  ];
+
+  adjustments.forEach((adj: any) => {
+    const key = itemAdjustmentKey(adj, orderItemSeqId);
+    if (seen.has(key)) return;
+    seen.add(key);
+    const comment = itemAdjustmentLabel(adj);
+    totals[comment] = (totals[comment] || 0) + Number(adj.amount || 0);
+  });
+
+  return Object.entries(totals)
+    .filter(([, amount]) => Number(amount) !== 0)
+    .map(([comment, amount]) => ({ comment, amount: Number(amount) }));
+}
+
+function shippingAdjustmentDetail(typeId: string): string {
+  if (!typeId || !/shipping/i.test(typeId)) return '';
+  const methods = new Set(
+    (order.value?.shipGroups || [])
+      .map((shipGroup: any) => shippingMethodLabel(shipGroup.shipmentMethodTypeId))
+      .filter(Boolean)
+  );
+  return Array.from(methods).join(', ');
 }
 
 const orderTaskStore = useOrderTaskStore();
@@ -1762,6 +1848,38 @@ async function openFacilityModal(): Promise<string | null> {
   await modal.present();
   const { data: facilityId } = await modal.onWillDismiss();
   return facilityId ?? null;
+}
+
+async function openAddItemFromItemsSegment() {
+  const shipGroups = order.value?.shipGroups || [];
+  if (!shipGroups.length) {
+    await showToast(translate('No ship groups are available for this order.'));
+    return;
+  }
+
+  if (shipGroups.length === 1) {
+    await openAddItemModal(shipGroups[0]);
+    return;
+  }
+
+  let selectedShipGroup: any = null;
+  const alert = await alertController.create({
+    header: translate('Select ship group'),
+    buttons: [
+      ...shipGroups.map((shipGroup: any) => ({
+        text: shipGroupHeaderTitle(shipGroup),
+        handler: () => {
+          selectedShipGroup = shipGroup;
+        }
+      })),
+      { text: translate('Cancel'), role: 'cancel' }
+    ]
+  });
+
+  await alert.present();
+  await alert.onDidDismiss();
+
+  if (selectedShipGroup) await openAddItemModal(selectedShipGroup);
 }
 
 async function openItemAttributesModal(item: any) {
@@ -2215,17 +2333,6 @@ ion-card-header ion-buttons {
   }
 }
 
-.order-item-rollup {
-  --columns-desktop: 4;
-  --columns-tablet: 4;
-  padding-inline-end: var(--spacer-base);
-}
-
-.order-item-row {
-  --columns-desktop: 5;
-  --columns-tablet: 5;
-}
-
 .comm-event-row {
   --columns-desktop: 5;
   --columns-tablet: 5;
@@ -2233,6 +2340,19 @@ ion-card-header ion-buttons {
 
 .comm-event-row>ion-item {
   width: 100%;
+}
+
+.order-items-list {
+  padding-block-start: var(--spacer-sm);
+}
+
+.order-items-toolbar {
+  --min-height: 5rem;
+}
+
+.order-items .order-summary {
+  gap: var(--spacer-sm);
+  padding: var(--spacer-sm);
 }
 
 .ship-group-card {
@@ -2365,9 +2485,9 @@ ion-card-header ion-buttons {
   pointer-events: auto;
 }
 
-.list-item.order-item-row:hover {
-  --list-item-bg-hover: transparent;
-  background: transparent;
-  cursor: default;
+@media (max-width: 699px) {
+  .order-items .order-summary {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
