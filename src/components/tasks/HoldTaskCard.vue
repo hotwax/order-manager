@@ -24,7 +24,7 @@
       </ion-item>
       <ion-item v-if="task.notes">
         <ion-label>
-          <p>{{ translate('Notes') }}</p>
+          <p class="overline">{{ translate('Notes') }}</p>
           {{ task.notes }}
         </ion-label>
       </ion-item>
@@ -38,7 +38,7 @@
       </ion-item>
       <ion-item>
         <ion-label>
-          <p>{{ translate('Reporter') }}</p>
+          <p class="overline">{{ translate('Reporter') }}</p>
           {{ getAssignedParty(task, 'TASK_REPORTER') }}
         </ion-label>
       </ion-item>
@@ -49,7 +49,7 @@
         <ion-textarea
           :label="translate('Resolution comment')"
           label-placement="stacked"
-          :placeholder="translate('Enter resolution comment...')"
+          :placeholder="translate('Response')"
           v-model="resolutionComment"
         />
       </ion-item>

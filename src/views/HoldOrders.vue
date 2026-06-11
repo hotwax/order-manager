@@ -21,8 +21,8 @@
           <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
           <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
         </ion-select>
-        <ion-input v-model="dateAfter" :label="translate('Date after')" label-placement="stacked" type="date" />
-        <ion-input v-model="dateBefore" :label="translate('Date before')" label-placement="stacked" type="date" />
+        <ion-input v-model="dateAfter" :label="translate('Order date after')" label-placement="stacked" type="date" />
+        <ion-input v-model="dateBefore" :label="translate('Order date before')" label-placement="stacked" type="date" />
         <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
           <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
           <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
