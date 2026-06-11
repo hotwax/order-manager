@@ -157,17 +157,13 @@ onIonViewWillEnter(() => {
 </script>
 
 <style scoped>
-.shipgroup-header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.swap-order-list {
+  padding: 0 var(--spacer-sm) var(--spacer-sm);
 }
 
-.border-top {
-  border-top: 1px solid var(--ion-color-light);
-}
-
-.expand-btn {
-  margin: 0;
+@media (max-width: 640px) {
+  .swap-order-list {
+    padding-inline: 0;
+  }
 }
 </style>

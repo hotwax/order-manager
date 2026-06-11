@@ -1,150 +1,128 @@
 <template>
-  <ion-card>
-    <ion-card-header>
-      <div class="shipgroup-header-row">
-        <ion-card-title>{{ seedStore.facilityName(task.facilityId) }}</ion-card-title>
-        <ion-chip outline color="medium">
-          {{ translate('Task') }}: {{ task.workEffortId }}
-        </ion-chip>
-      </div>
-    </ion-card-header>
-
-    <ion-card-content>
-      <!-- Contact Details -->
-      <div class="contact-details border-top ion-padding-top">
-        <ion-item lines="none">
-          <ion-icon slot="start" :icon="personOutline" />
-          <ion-label>
-            {{ getCustomerName(task.customer) }}
-            <p>{{ translate('Customer') }}</p>
-          </ion-label>
-          <ion-buttons slot="end">
-            <ion-button fill="clear" :href="'tel:' + commonUtil.formatPhoneNumber(task.billingPhone?.countryCode, task.billingPhone?.areaCode, task.billingPhone?.contactNumber)">
-              <ion-icon slot="icon-only" :icon="callOutline" />
-            </ion-button>
-            <ion-button fill="clear" :href="'mailto:' + (task.billingEmail ?? task.shippingEmail)">
-              <ion-icon slot="icon-only" :icon="mailOutline" />
-            </ion-button>
-          </ion-buttons>
-        </ion-item>
-
-        <ion-item lines="none" v-if="task.routingFacilityName">
+  <TaskCardShell
+    :title="getCardTitle(task)"
+    :subtitle="task.orderName || task.orderDate"
+    :amount="money(task.grandTotal)"
+    :chip-label="task.workEffortId"
+    :contact-name="getCustomerName(task.customer)"
+    :contact-phone="getPhoneNumber(task)"
+    :contact-phone-href="getPhoneHref(task)"
+    :contact-email="getEmailAddress(task)"
+    :contact-email-href="getEmailHref(task)"
+    content-layout="grid"
+    :selectable="selectable"
+    :selected="selected"
+    @update:selected="emit('update:selected', $event)"
+  >
+    <template #content-start>
+      <ion-list lines="none" v-if="task.routingFacilityName || task.routingDescription">
+        <ion-item v-if="task.routingFacilityName">
           <ion-label>
             <p>{{ translate('Order facility change routing') }}</p>
             {{ task.routingFacilityName }}
           </ion-label>
         </ion-item>
-
-        <ion-item lines="none" v-if="task.routingDescription">
+        <ion-item v-if="task.routingDescription">
           <ion-label>
             <p>{{ translate('Routing facility change description') }}</p>
             {{ task.routingDescription }}
           </ion-label>
         </ion-item>
-      </div>
+      </ion-list>
+    </template>
 
-      <!-- Resolution -->
-      <div class="resolution ion-margin-top ion-padding-top border-top" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-        <ion-list lines="none">
-          <ion-list-header>
-            <ion-label>{{ translate('Ordered Items') }}</ion-label>
-          </ion-list-header>
-          <ion-item v-for="item in task.items" :key="item.orderItemSeqId">
-            <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="getProduct(item.productId)?.mainImageUrl">
-              <DxpShopifyImg :src="getProduct(item.productId).mainImageUrl" :key="getProduct(item.productId).mainImageUrl" size="small" />
-            </ion-thumbnail>
-            <ion-label>
-              <p class="overline">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(item.productId)) }}</p>
-              {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(item.productId)) ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(item.productId)) : item.productId }}
-            </ion-label>
-            <ion-note slot="end">{{ money(item.unitPrice) }}</ion-note>
-          </ion-item>
-          <ion-item>
-            <ion-label>{{ translate('Original order total') }}</ion-label>
-            <ion-note slot="end" color="dark">{{ money(task.grandTotal) }}</ion-note>
-          </ion-item>
-        </ion-list>
+    <ion-list lines="none">
+      <ion-list-header>
+        <ion-label>{{ translate('Ordered Items') }}</ion-label>
+      </ion-list-header>
+      <ion-item v-for="item in task.items" :key="item.orderItemSeqId">
+        <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="getProduct(item.productId)?.mainImageUrl">
+          <DxpShopifyImg :src="getProduct(item.productId).mainImageUrl" :key="getProduct(item.productId).mainImageUrl" size="small" />
+        </ion-thumbnail>
+        <ion-label>
+          <p class="overline">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(item.productId)) }}</p>
+          {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(item.productId)) ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(item.productId)) : item.productId }}
+        </ion-label>
+        <ion-note slot="end">{{ money(item.unitPrice) }}</ion-note>
+      </ion-item>
+      <ion-item>
+        <ion-label>{{ translate('Original order total') }}</ion-label>
+        <ion-note slot="end" color="dark">{{ money(task.grandTotal) }}</ion-note>
+      </ion-item>
+    </ion-list>
 
-        <ion-list lines="none" class="ion-margin-top" v-if="task.items?.length">
-          <ion-list-header>
-            <ion-label>{{ translate('Suggested Items') }}</ion-label>
-          </ion-list-header>
-          <ion-item v-for="(suggested, index) in getSuggestedItems(task).list" :key="`suggested-${index}`">
-            <ion-thumbnail slot="start" :key="getProduct(suggested.productId)?.mainImageUrl">
-              <DxpShopifyImg :src="getProduct(suggested.productId)?.mainImageUrl" size="small" />
-            </ion-thumbnail>
-            <ion-label>
-              <p class="overline" v-if="suggested._isSubstitute">{{ translate('Approved swap') }}</p>
-              <p class="overline" v-else-if="suggested._noReplacement">{{ translate('No replacement in stock') }}</p>
-              {{ getProduct(suggested.productId)?.productName || suggested.productName }}
-              <p>{{ translate('SKU') }}: {{ getProduct(suggested.productId)?.internalName || suggested.internalName }}</p>
-            </ion-label>
+    <ion-list lines="none" v-if="task.items?.length">
+      <ion-list-header>
+        <ion-label>{{ translate('Suggested Items') }}</ion-label>
+      </ion-list-header>
+      <ion-item v-for="(suggested, index) in getSuggestedItems(task).list" :key="`suggested-${index}`">
+        <ion-thumbnail slot="start" :key="getProduct(suggested.productId)?.mainImageUrl">
+          <DxpShopifyImg :src="getProduct(suggested.productId)?.mainImageUrl" size="small" />
+        </ion-thumbnail>
+        <ion-label>
+          <p class="overline" v-if="suggested._isSubstitute">{{ translate('Approved swap') }}</p>
+          <p class="overline" v-else-if="suggested._noReplacement">{{ translate('No replacement in stock') }}</p>
+          {{ getProduct(suggested.productId)?.productName || suggested.productName }}
+          <p>{{ translate('SKU') }}: {{ getProduct(suggested.productId)?.internalName || suggested.internalName }}</p>
+        </ion-label>
 
-            <!-- Cancelled: danger badge + revert button -->
-            <template v-if="suggested._cancel">
-              <ion-badge slot="end" color="danger">{{ translate('Cancel') }}</ion-badge>
-              <ion-button slot="end" fill="clear" color="medium" @click="revertCancel(task, suggested)">
-                <ion-icon slot="icon-only" :icon="arrowUndoOutline" />
-              </ion-button>
-            </template>
-            <!-- Substitute with stock: Available badge + close circle button -->
-            <template v-else-if="suggested._isSubstitute">
-              <ion-badge slot="end" color="success">{{ translate('Available') }}</ion-badge>
-              <ion-button slot="end" fill="clear" color="danger" @click="removeSuggestedSubstitute(task, suggested)">
-                <ion-icon slot="icon-only" :icon="closeCircleOutline" />
-              </ion-button>
-            </template>
-            <!-- Available original item: Available badge only -->
-            <ion-badge v-else-if="!suggested._noReplacement" slot="end" color="success">{{ translate('Available') }}</ion-badge>
-            <!-- No replacement: Cancel badge only -->
-            <ion-badge v-else slot="end" color="danger">{{ translate('Cancel') }}</ion-badge>
+        <template v-if="suggested._cancel">
+          <ion-badge slot="end" color="danger">{{ translate('Cancel') }}</ion-badge>
+          <ion-button slot="end" fill="clear" color="medium" @click="revertCancel(task, suggested)">
+            <ion-icon slot="icon-only" :icon="arrowUndoOutline" />
+          </ion-button>
+        </template>
+        <template v-else-if="suggested._isSubstitute">
+          <ion-badge slot="end" color="success">{{ translate('Available') }}</ion-badge>
+          <ion-button slot="end" fill="clear" color="danger" @click="removeSuggestedSubstitute(task, suggested)">
+            <ion-icon slot="icon-only" :icon="closeCircleOutline" />
+          </ion-button>
+        </template>
+        <ion-badge v-else-if="!suggested._noReplacement" slot="end" color="success">{{ translate('Available') }}</ion-badge>
+        <ion-badge v-else slot="end" color="danger">{{ translate('Cancel') }}</ion-badge>
 
-            <ion-note slot="end">{{ money(suggested._isSubstitute ? suggested.price : suggested.unitPrice) }}</ion-note>
-            <ion-button slot="end" fill="clear" color="medium" @click="openSuggestedProductActionsPopover($event, suggested, task)">
-              <ion-icon slot="icon-only" :icon="ellipsisVerticalOutline" />
-            </ion-button>
-          </ion-item>
-          <ion-item>
-            <ion-label>{{ translate('New order total') }}</ion-label>
-            <ion-note slot="end" color="dark">{{ money(getSuggestedItems(task).newTotal) }}</ion-note>
-          </ion-item>
-          <ion-item>
-            <ion-input
-              :label="translate('Suggested refund')"
-              label-placement="start"
-              type="number"
-              :value="getSuggestedItems(task).suggestedRefund"
-              :helper-text="translate('Total available funds for refund')"
-              :clear-input="true"
-              @ionInput="task._refundAmount = $event.detail.value != null ? Number($event.detail.value) : undefined"
-              @ionClear="task._refundAmount = undefined"
-            >
-              <span slot="start">$</span>
-            </ion-input>
-          </ion-item>
-        </ion-list>
-      </div>
+        <ion-note slot="end">{{ money(suggested._isSubstitute ? suggested.price : suggested.unitPrice) }}</ion-note>
+        <ion-button slot="end" fill="clear" color="medium" @click="openSuggestedProductActionsPopover($event, suggested, task)">
+          <ion-icon slot="icon-only" :icon="ellipsisVerticalOutline" />
+        </ion-button>
+      </ion-item>
+      <ion-item>
+        <ion-label>{{ translate('New order total') }}</ion-label>
+        <ion-note slot="end" color="dark">{{ money(getSuggestedItems(task).newTotal) }}</ion-note>
+      </ion-item>
+      <ion-item>
+        <ion-input
+          :label="translate('Suggested refund')"
+          label-placement="start"
+          type="number"
+          :value="getSuggestedItems(task).suggestedRefund"
+          :helper-text="translate('Total available funds for refund')"
+          :clear-input="true"
+          @ionInput="task._refundAmount = $event.detail.value != null ? Number($event.detail.value) : undefined"
+          @ionClear="task._refundAmount = undefined"
+        >
+          <span slot="start">$</span>
+        </ion-input>
+      </ion-item>
+    </ion-list>
 
-      <!-- Actions -->
-      <div class="actions ion-margin-top ion-padding-top border-top">
-        <ion-buttons>
-          <ion-button fill="solid" color="primary" @click="releaseUpdatedOrder(task)">{{ translate('Release updated order') }}</ion-button>
-          <ion-button fill="outline" color="danger" @click="cancelOrder(task)">{{ translate('Cancel order') }}</ion-button>
-          <ion-button fill="outline" color="medium" @click="parkOrder(task)">{{ translate('Park') }}</ion-button>
-        </ion-buttons>
-      </div>
-    </ion-card-content>
-  </ion-card>
+    <template #actions>
+      <ion-button fill="solid" color="primary" @click="releaseUpdatedOrder(task)">{{ translate('Release updated order') }}</ion-button>
+      <ion-button fill="outline" color="danger" @click="cancelOrder(task)">{{ translate('Cancel order') }}</ion-button>
+      <ion-button fill="outline" color="medium" @click="parkOrder(task)">{{ translate('Park') }}</ion-button>
+    </template>
+  </TaskCardShell>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonChip, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
-import { arrowUndoOutline, ellipsisVerticalOutline, callOutline, closeCircleOutline, mailOutline, personOutline } from 'ionicons/icons';
+import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
+import { arrowUndoOutline, closeCircleOutline, ellipsisVerticalOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductActionPopover.vue';
+import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
@@ -165,6 +143,28 @@ const productIdentificationPref = computed(() => useProductStore().getProductIde
 
 function getCustomerName(customer: any): string {
   return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');
+}
+
+function getCardTitle(task: any): string {
+  return seedStore.facilityName(task.facilityId) || task.orderName;
+}
+
+function getPhoneNumber(task: any): string {
+  return commonUtil.formatPhoneNumber(task.billingPhone?.countryCode, task.billingPhone?.areaCode, task.billingPhone?.contactNumber);
+}
+
+function getPhoneHref(task: any): string {
+  const phone = getPhoneNumber(task);
+  return phone ? `tel:${phone}` : '';
+}
+
+function getEmailAddress(task: any): string {
+  return task.billingEmail ?? task.shippingEmail ?? '';
+}
+
+function getEmailHref(task: any): string {
+  const email = getEmailAddress(task);
+  return email ? `mailto:${email}` : '';
 }
 
 function getProduct(productId: string) {
@@ -334,15 +334,3 @@ async function parkOrder(task: any) {
 
 defineExpose({ task: props.task });
 </script>
-
-<style scoped>
-.shipgroup-header-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.border-top {
-  border-top: 1px solid var(--ion-color-light);
-}
-</style>

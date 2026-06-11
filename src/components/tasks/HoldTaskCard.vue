@@ -1,135 +1,91 @@
 <template>
-  <ion-card>
-    <ion-item lines="none">
-      <ion-checkbox
-        v-if="selectable"
-        slot="start"
-        :checked="selected"
-        @ion-change="emit('update:selected', $event.detail.checked)"
-      />
-      <ion-label>
-        {{ task.orderName }}
-        <p>{{ task.orderDate }}</p>
-      </ion-label>
-      <ion-chip slot="end" outline color="medium">
-        {{ translate('Task') }}: {{ task.workEffortId }}
-      </ion-chip>
-      <ion-note slot="end" color="dark">{{ money(task.grandTotal) }}</ion-note>
-    </ion-item>
+  <TaskCardShell
+    :title="task.orderName"
+    :subtitle="task.orderDate"
+    :amount="money(task.grandTotal)"
+    :chip-label="task.workEffortId"
+    :contact-name="getCustomerName(task.customer)"
+    :contact-phone="getPhoneNumber(task)"
+    :contact-phone-href="getPhoneHref(task)"
+    :contact-email="getEmailAddress(task)"
+    :contact-email-href="getEmailHref(task)"
+    content-layout="grid"
+    :selectable="selectable"
+    :selected="selected"
+    @update:selected="emit('update:selected', $event)"
+  >
+    <ion-list lines="none">
+      <ion-list-header>
+        <ion-label>{{ translate('Task details') }}</ion-label>
+      </ion-list-header>
+      <ion-item>
+        <ion-label>
+          {{ task.workEffortName }}
+          <p>{{ task.purposeDescription }}</p>
+        </ion-label>
+        <ion-note slot="end" v-if="task.estimatedCompletionDate">{{ translate('Due') }}: {{ task.estimatedCompletionDate }}</ion-note>
+      </ion-item>
+      <ion-item v-if="task.notes">
+        <ion-label>
+          <p>{{ translate('Notes') }}</p>
+          {{ task.notes }}
+        </ion-label>
+      </ion-item>
+    </ion-list>
 
-    <ion-card-content>
-      <!-- Contact Details -->
-      <div class="contact-details border-top ion-padding-top">
-        <ion-item lines="none">
-          <ion-icon slot="start" :icon="personOutline" />
-          <ion-label>
-            {{ getCustomerName(task.customer) }}
-            <p>{{ translate('Customer') }}</p>
-          </ion-label>
-          <ion-buttons slot="end">
-            <ion-button fill="clear" :href="'tel:' + commonUtil.formatPhoneNumber(task.billingPhone?.countryCode, task.billingPhone?.areaCode, task.billingPhone?.contactNumber)">
-              <ion-icon slot="icon-only" :icon="callOutline" />
-            </ion-button>
-            <ion-button fill="clear" :href="'mailto:' + (task.billingEmail ?? task.shippingEmail)">
-              <ion-icon slot="icon-only" :icon="mailOutline" />
-            </ion-button>
-          </ion-buttons>
-        </ion-item>
+    <ion-list lines="none">
+      <ion-list-header>
+        <ion-label>{{ translate('Assignment') }}</ion-label>
+      </ion-list-header>
+      <ion-item>
+        <ion-label>
+          {{ getAssignedParty(task, 'TASK_ASSIGNEE') }}
+          <p>{{ translate('Assignee') }}</p>
+        </ion-label>
+      </ion-item>
+      <ion-item>
+        <ion-label>
+          {{ getAssignedParty(task, 'TASK_REPORTER') }}
+          <p>{{ translate('Reporter') }}</p>
+        </ion-label>
+      </ion-item>
+    </ion-list>
 
-        <ion-item lines="none" v-if="task.customerPhone">
-          <ion-label>
-            <p>{{ translate('Telecom contact') }}</p>
-            {{ task.customerPhone }}
-          </ion-label>
-        </ion-item>
+    <ion-list lines="none">
+      <ion-list-header>
+        <ion-label>{{ translate('Resolution') }}</ion-label>
+      </ion-list-header>
+      <ion-item>
+        <ion-textarea
+          :label="translate('Resolution comment')"
+          label-placement="stacked"
+          :placeholder="translate('Enter resolution comment...')"
+          v-model="resolutionComment"
+        />
+      </ion-item>
+    </ion-list>
 
-        <ion-item lines="none" v-if="task.customerEmail">
-          <ion-label>
-            <p>{{ translate('Email contact') }}</p>
-            {{ task.customerEmail }}
-          </ion-label>
-        </ion-item>
-      </div>
-
-      <!-- Task Details -->
-      <div class="task-details border-top ion-padding-top">
-        <ion-list lines="none">
-          <ion-item>
-            <ion-label>
-              {{ task.workEffortName }}
-              <p>{{ task.purposeDescription }}</p>
-            </ion-label>
-            <ion-note slot="end" v-if="task.estimatedCompletionDate">{{ translate('Due') }}: {{ task.estimatedCompletionDate }}</ion-note>
-          </ion-item>
-          <ion-item v-if="task.notes">
-            <ion-label>
-              <p>{{ translate('Notes') }}</p>
-              {{ task.notes }}
-            </ion-label>
-          </ion-item>
-        </ion-list>
-
-        <ion-list lines="none" class="ion-margin-top">
-          <ion-item>
-            <ion-label>
-              {{ getAssignedParty(task, 'TASK_ASSIGNEE') }}
-              <p>{{ translate('Assignee') }}</p>
-            </ion-label>
-          </ion-item>
-          <ion-item>
-            <ion-label>
-              {{ getAssignedParty(task, 'TASK_REPORTER') }}
-              <p>{{ translate('Reporter') }}</p>
-            </ion-label>
-          </ion-item>
-        </ion-list>
-
-        <ion-list lines="none" class="ion-margin-top">
-          <ion-item>
-            <ion-textarea
-              :label="translate('Resolution comment')"
-              label-placement="stacked"
-              :placeholder="translate('Enter resolution comment...')"
-              v-model="resolutionComment"
-            />
-          </ion-item>
-        </ion-list>
-      </div>
-
-      <!-- Actions -->
-      <div class="actions border-top ion-margin-top ion-padding-top">
-        <ion-buttons>
-          <ion-button fill="solid" color="primary" @click="resolveTask()">{{ translate('Resolve task') }}</ion-button>
-          <ion-button fill="outline" color="secondary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
-        </ion-buttons>
-      </div>
-    </ion-card-content>
-  </ion-card>
+    <template #actions>
+      <ion-button fill="solid" color="primary" @click="resolveTask()">{{ translate('Resolve task') }}</ion-button>
+      <ion-button fill="outline" color="secondary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
+    </template>
+  </TaskCardShell>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import {
   IonButton,
-  IonButtons,
-  IonCard,
-  IonCardContent,
-  IonCheckbox,
-  IonChip,
-  IonIcon,
   IonItem,
   IonLabel,
   IonList,
+  IonListHeader,
   IonNote,
   IonTextarea,
   alertController,
 } from '@ionic/vue';
-import {
-  personOutline,
-  callOutline,
-  mailOutline,
-} from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
+import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean }>(), {
@@ -177,6 +133,24 @@ function getCustomerName(customer: any): string {
   return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');
 }
 
+function getPhoneNumber(task: any): string {
+  return task.customerPhone || commonUtil.formatPhoneNumber(task.billingPhone?.countryCode, task.billingPhone?.areaCode, task.billingPhone?.contactNumber);
+}
+
+function getPhoneHref(task: any): string {
+  const phone = getPhoneNumber(task);
+  return phone ? `tel:${phone}` : '';
+}
+
+function getEmailAddress(task: any): string {
+  return task.customerEmail || task.billingEmail || task.shippingEmail || '';
+}
+
+function getEmailHref(task: any): string {
+  const email = getEmailAddress(task);
+  return email ? `mailto:${email}` : '';
+}
+
 function getAssignedParty(task: any, roleTypeId: string): string {
   const party = task.assignedParties?.find((p: any) => p.roleTypeId === roleTypeId);
   if (!party) return roleTypeId === 'TASK_ASSIGNEE' ? translate('Unassigned') : translate('System');
@@ -192,9 +166,3 @@ defineExpose({
   submitResolve,
 });
 </script>
-
-<style scoped>
-.border-top {
-  border-top: 1px solid var(--ion-color-light);
-}
-</style>
