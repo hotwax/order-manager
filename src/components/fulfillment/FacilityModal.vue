@@ -10,34 +10,15 @@
     </ion-toolbar>
   </ion-header>
 
-  <ion-content>
-    <ion-searchbar
-      @ionFocus="selectSearchBarText($event)"
-      :placeholder="translate('Search facilities')"
-      v-model="queryString"
-      @keyup.enter="queryString = $event.target.value; findFacility()"
-      @keydown="preventSpecialCharacters($event)"
-    />
+  <ion-content class="ion-padding-top">
     <ion-radio-group v-model="selectedFacilityId">
       <ion-list>
-        <div class="empty-state" v-if="isLoading">
-          <ion-item lines="none">
-            <ion-spinner color="secondary" name="crescent" slot="start" />
-            {{ translate('Fetching facilities') }}
-          </ion-item>
-        </div>
-        <div class="empty-state" v-else-if="!filteredFacilities.length">
-          <p>{{ translate('No facilities found') }}</p>
-        </div>
-        <div v-else>
-          <ion-item v-for="facility in filteredFacilities" :key="facility.facilityId">
-            <ion-radio slot="start" :value="facility.facilityId" />
-            <ion-label>
-              {{ facility.facilityName }}
-              <p>{{ facility.facilityId }}</p>
-            </ion-label>
-          </ion-item>
-        </div>
+        <ion-item v-for="option in parkingOptions" :key="option.facilityId">
+          <ion-radio slot="start" :value="option.facilityId" />
+          <ion-label>
+            {{ translate(option.label) }}
+          </ion-label>
+        </ion-item>
       </ion-list>
     </ion-radio-group>
 
@@ -50,22 +31,24 @@
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSearchbar, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
+import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
-import { onMounted, ref } from 'vue';
-import { api, logger, translate } from '@common';
+import { ref } from 'vue';
+import { translate } from '@common';
 
-type Facility = {
+type ParkingOption = {
   facilityId: string;
-  facilityName: string;
-  description?: string;
+  label: string;
 };
 
-const facilities = ref<Facility[]>([]);
-const filteredFacilities = ref<Facility[]>([]);
-const isLoading = ref(false);
-const selectedFacilityId = ref('');
-const queryString = ref('');
+const parkingOptions: ParkingOption[] = [
+  { facilityId: 'REJECTED_ITM_PARKING', label: 'Rejected' },
+  { facilityId: 'UNFILLABLE_PARKING', label: 'Unfillable' },
+  { facilityId: 'BACKORDER_PARKING', label: 'Backorder' },
+  { facilityId: 'PRE_ORDER_PARKING', label: 'Pre-order' },
+];
+
+const selectedFacilityId = ref(parkingOptions[0].facilityId);
 
 function closeModal(facilityId?: string) {
   modalController.dismiss(facilityId);
@@ -76,48 +59,6 @@ function save() {
     closeModal(selectedFacilityId.value);
   }
 }
-
-function findFacility() {
-  const search = queryString.value.trim().toLowerCase();
-  if (search) {
-    filteredFacilities.value = facilities.value.filter((facility) =>
-      facility.facilityName?.toLowerCase().includes(search) ||
-      facility.facilityId?.toLowerCase().includes(search)
-    );
-  } else {
-    filteredFacilities.value = facilities.value;
-  }
-}
-
-async function selectSearchBarText(event: any) {
-  const element = await event.target.getInputElement();
-  element.select();
-}
-
-function preventSpecialCharacters(event: any) {
-  if (/[`!@#$%^&*()_+\-=\\|,.<>?~]/.test(event.key)) event.preventDefault();
-}
-
-async function fetchVirtualFacilities() {
-  isLoading.value = true;
-  try {
-    const resp = await api({
-      url: 'admin/facilities',
-      method: 'GET',
-      params: { parentTypeId: 'VIRTUAL_FACILITY' }
-    });
-    facilities.value = resp.data || [];
-    filteredFacilities.value = facilities.value;
-  } catch (error) {
-    logger.error('Failed to fetch virtual facilities', error);
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-onMounted(() => {
-  fetchVirtualFacilities();
-});
 </script>
 
 <style scoped>
