@@ -12,6 +12,7 @@ export interface OrderSearchParams {
   status?: string | string[];
   channel?: string;
   productStoreId?: string;
+  facilityIds?: string[];
   dateFrom?: string;
   dateThru?: string;
   sort?: string;
@@ -84,6 +85,10 @@ export function buildOrderLookupPayload(params: OrderSearchParams = {}) {
   if (statusIds.length > 1) filters.push(`orderStatusId:(${statusIds.map(escapeSolrValue).join(' OR ')})`);
   if (params.channel && params.channel !== 'All') filters.push(`salesChannelEnumId: ${escapeSolrValue(params.channel)}`);
   if (params.productStoreId && params.productStoreId !== 'All') filters.push(`productStoreId: ${escapeSolrValue(params.productStoreId)}`);
+
+  const facilityIds = (params.facilityIds ?? []).filter((facilityId) => facilityId && facilityId !== 'All');
+  if (facilityIds.length === 1) filters.push(`facilityId: ${escapeSolrValue(facilityIds[0])}`);
+  if (facilityIds.length > 1) filters.push(`facilityId: (${facilityIds.map(escapeSolrValue).join(' OR ')})`);
 
   const dateFilter = buildOrderDateSolrFilter(params.dateFrom, params.dateThru);
   if (dateFilter) filters.push(dateFilter);

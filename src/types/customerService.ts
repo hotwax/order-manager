@@ -1,4 +1,4 @@
-export type WorkflowBucket = 'unfillable' | 'fraud' | 'brokering' | 'open' | 'inflight' | 'packed';
+export type WorkflowBucket = 'unfillable' | 'fraud' | 'open' | 'inflight' | 'packed';
 
 export interface WorkflowOrder {
   orderId: string;
