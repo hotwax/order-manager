@@ -26,7 +26,6 @@
         <ion-icon slot="start" :icon="personOutline" />
         <ion-label>
           {{ contactName || translate('Unknown') }}
-          <p>{{ translate('Full name') }}</p>
         </ion-label>
         <ion-button v-if="contactName" slot="end" fill="outline" size="small" :aria-label="translate('Copy full name')" @click="copyContact(contactName)">
           {{ translate('Copy') }}
@@ -36,7 +35,6 @@
         <ion-icon slot="start" :icon="callOutline" />
         <ion-label>
           {{ contactPhone || '-' }}
-          <p>{{ translate('Phone') }}</p>
         </ion-label>
         <ion-button v-if="contactPhone" slot="end" fill="outline" size="small" :aria-label="translate('Copy phone')" @click="copyContact(contactPhone)">
           {{ translate('Copy') }}
@@ -46,7 +44,6 @@
         <ion-icon slot="start" :icon="mailOutline" />
         <ion-label>
           {{ contactEmail || '-' }}
-          <p>{{ translate('Email') }}</p>
         </ion-label>
         <ion-button v-if="contactEmail" slot="end" fill="outline" size="small" :aria-label="translate('Copy email')" @click="copyContact(contactEmail)">
           {{ translate('Copy') }}
