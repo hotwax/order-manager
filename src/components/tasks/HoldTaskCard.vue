@@ -15,15 +15,12 @@
     @update:selected="emit('update:selected', $event)"
   >
     <ion-list lines="none">
-      <ion-list-header>
-        <ion-label>{{ translate('Task details') }}</ion-label>
-      </ion-list-header>
       <ion-item>
         <ion-label>
           {{ task.workEffortName }}
           <p>{{ task.purposeDescription }}</p>
         </ion-label>
-        <ion-note slot="end" v-if="task.estimatedCompletionDate">{{ translate('Due') }}: {{ task.estimatedCompletionDate }}</ion-note>
+        <ion-note slot="end" v-if="task.estimatedCompletionDate">{{ task.estimatedCompletionDate }}</ion-note>
       </ion-item>
       <ion-item v-if="task.notes">
         <ion-label>
@@ -34,27 +31,20 @@
     </ion-list>
 
     <ion-list lines="none">
-      <ion-list-header>
-        <ion-label>{{ translate('Assignment') }}</ion-label>
-      </ion-list-header>
       <ion-item>
         <ion-label>
           {{ getAssignedParty(task, 'TASK_ASSIGNEE') }}
-          <p>{{ translate('Assignee') }}</p>
         </ion-label>
       </ion-item>
       <ion-item>
         <ion-label>
-          {{ getAssignedParty(task, 'TASK_REPORTER') }}
           <p>{{ translate('Reporter') }}</p>
+          {{ getAssignedParty(task, 'TASK_REPORTER') }}
         </ion-label>
       </ion-item>
     </ion-list>
 
     <ion-list lines="none">
-      <ion-list-header>
-        <ion-label>{{ translate('Resolution') }}</ion-label>
-      </ion-list-header>
       <ion-item>
         <ion-textarea
           :label="translate('Resolution comment')"
@@ -79,7 +69,6 @@ import {
   IonItem,
   IonLabel,
   IonList,
-  IonListHeader,
   IonNote,
   IonTextarea,
   alertController,
