@@ -2356,7 +2356,7 @@ ion-card-header ion-buttons {
 }
 
 .ship-group-card {
-  border-radius: 16px;
+  border-radius: 8px;
 }
 
 .ship-group-header-wrapper {
