@@ -30,10 +30,12 @@ export interface WorkflowOrder {
 
 export interface WorkflowFilters {
   query: string;
+  customerName: string;
   productStoreId: string;
   salesChannelEnumId: string;
   facilityId: string;
-  priority: string;
+  shipmentMethodTypeId: string;
+  priority: boolean | null;
   dateFrom: string;
   dateThru: string;
 }

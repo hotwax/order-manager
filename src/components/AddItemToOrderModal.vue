@@ -34,13 +34,12 @@
 
     <ion-list v-else lines="none">
       <ion-item v-for="product in products" :key="product.productId">
-        <ion-thumbnail slot="start">
-          <img v-if="product.mainImageUrl" :src="product.mainImageUrl" :alt="product.productName" />
-          <ion-icon v-else :icon="imageOutline" style="font-size: 32px; color: var(--ion-color-medium)" />
+        <ion-thumbnail slot="start" v-image-preview="product" :key="product?.mainImageUrl">
+          <DxpShopifyImg :src="product.mainImageUrl" :key="product.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
-          {{ product.parentProductName || product.productName || product.internalName }}
-          <p>{{ translate('SKU') }}: {{ product.sku || product.productId }}</p>
+          <p class="overline">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) }}</p>
+          {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, product) ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, product) : product.productId }}
         </ion-label>
         <!-- Show success check if already added, spinner while adding, Add button otherwise -->
         <ion-icon v-if="addedProductIds.has(product.productId)" slot="end" color="success" :icon="checkmarkCircle" />
@@ -61,17 +60,22 @@
 
 <script setup lang="ts">
 import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonSearchbar, IonSpinner, IonThumbnail, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { checkmarkCircle, closeOutline, imageOutline } from 'ionicons/icons';
-import { ref } from 'vue';
-import { api, translate } from '@common';
-import { searchProducts } from '@/services/solr';
+import { checkmarkCircle, closeOutline } from 'ionicons/icons';
+import { ref, computed } from 'vue';
+import { api, commonUtil, DxpShopifyImg, translate } from '@common';
+import { useSolrSearch } from '@common/composables/useSolrSearch';
 import { showToast } from '@/utils';
+import { useProductStore } from '@/store/productStore';
+
+const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 
 const props = defineProps<{
   orderId: string;
   shipGroupSeqId: string;
   onItemAdded?: () => void;
 }>();
+
+const { searchProducts } = useSolrSearch();
 
 const queryString = ref('');
 const products = ref<any[]>([]);

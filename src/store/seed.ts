@@ -21,7 +21,8 @@ const statusTypeIds = [
   "PAYMENT_PREF_STATUS",
   "COM_EVENT_STATUS",
   "PARTY_STATUS",
-  "ORDER_HOLD_STATUS"
+  "ORDER_HOLD_STATUS",
+  "WORK_EFFORT_STATUS"
 ];
 
 const enumTypeIds = [

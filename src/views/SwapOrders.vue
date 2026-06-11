@@ -82,8 +82,8 @@
                     <DxpShopifyImg :src="getProduct(item.productId).mainImageUrl" :key="getProduct(item.productId).mainImageUrl" size="small" />
                   </ion-thumbnail>
                   <ion-label>
-                    {{ getProduct(item.productId)?.productName || item.productName || item.itemDescription }}
-                    <p>{{ translate('SKU') }}: {{ getProduct(item.productId)?.internalName || item.internalName }}</p>
+                    <p class="overline">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(item.productId)) }}</p>
+                    {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(item.productId)) ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(item.productId)) : item.productId }}
                   </ion-label>
                   <ion-note slot="end">{{ money(item.unitPrice) }}</ion-note>
                 </ion-item>
@@ -194,6 +194,7 @@ import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useProductCacheStore } from '@/store/productCache';
+import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
 import SuggestedProductActionPopover from '@/components/SuggestedProductActionPopover.vue';
 
@@ -208,6 +209,7 @@ const dateAfter = ref('');
 const dateBefore = ref('');
 const orderChannel = ref('');
 
+const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 const swapTasks = computed(() => orderTaskStore.getSwapTasks);
 const isScrollable = computed(() => orderTaskStore.isSwapTasksScrollable);
 const hasFilters = computed(() => !!(searchQuery.value || dateAfter.value || dateBefore.value || orderChannel.value));

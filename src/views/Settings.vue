@@ -62,15 +62,11 @@
           </ion-item>
         </ion-card>
       </section>
-
-      <div class="section-header">
-        <div>
-          <h1>{{ translate('App') }}</h1>
-          <p class="overline">{{ translate("Version") }}: {{ appVersion }}</p>
-        </div>
-        <p v-if="builtDateTime" class="overline">{{ translate("Built") }}: {{ builtDateTime }}</p>
-      </div>
+      <hr />
+      <DxpAppVersionInfo />
       <section>
+        <DxpProductIdentifier />
+
         <ion-card>
           <ion-card-header>
             <ion-card-title>{{ translate("Timezone") }}</ion-card-title>
@@ -180,11 +176,14 @@ import { computed, onBeforeMount, ref } from 'vue';
 import { commonUtil, cookieHelper, i18n, translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';
+import { useProductStore } from '@/store/productStore'
+import DxpProductIdentifier from "@/components/DxpProductIdentifier.vue";
+import DxpAppVersionInfo from "@/components/DxpAppVersionInfo.vue";
 
 const userStore = useUserStore();
 const userProfile = computed(() => userStore.getUserProfile);
-const currentProductStore = computed(() => userStore.getCurrentProductStore);
-const productStores = computed(() => userProfile.value?.stores || []);
+const currentProductStore = computed(() => useProductStore().getCurrentProductStore);
+const productStores = computed(() => useProductStore().getProductStores || []);
 const timeZones = computed(() => userStore.getAvailableTimeZones);
 const currentTimeZone = computed(() => userStore.getUserTimeZone || userProfile.value?.userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone);
 const omsInstance = computed(() => cookieHelper().get('oms') || userStore.oms);
@@ -246,7 +245,8 @@ onBeforeMount(async () => {
 
 function setCurrentProductStore(event: CustomEvent) {
   if (currentProductStore.value.productStoreId !== event.detail.value) {
-    userStore.setCurrentProductStore({ productStoreId: event.detail.value });
+    const selectedProductStore = productStores.value.find((store: any) => store.productStoreId == event.detail.value)
+    useProductStore().setProductStorePreference(selectedProductStore)
   }
 }
 

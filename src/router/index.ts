@@ -4,7 +4,7 @@ import { Login } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 import OrderSearch from '@/views/OrderSearch.vue';
 import OrderDetail from '@/views/OrderDetail.vue';
-import CustomerFind from '@/views/CustomerFind.vue';
+import Customers from '@/views/Customers.vue';
 import CustomerDetail from '@/views/CustomerDetail.vue';
 import Settings from '@/views/Settings.vue';
 import Funnel from '@/views/Funnel.vue';
@@ -55,7 +55,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/customers',
     name: 'CustomerFind',
-    component: CustomerFind,
+    component: Customers,
     beforeEnter: authGuard
   },
   {

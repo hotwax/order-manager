@@ -175,7 +175,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         throw err;
       }
     },
-    async cancelOrder(orderId: string, items: { orderItemSeqId: string; shipGroupSeqId: string }[]) {
+    async cancelOrder(orderId: string, items: { orderItemSeqId: string; shipGroupSeqId: string, reason:string, comment: string }[]) {
       try {
         await api({
           url: `oms/orders/${orderId}/items/cancel`,
@@ -184,8 +184,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
             items: items.map((item) => ({
               orderItemSeqId: item.orderItemSeqId,
               shipGroupSeqId: item.shipGroupSeqId,
-              reason: '',
-              comment: '',
+              reason: item.reason,
+              comment: item.comment,
             })),
           },
         });

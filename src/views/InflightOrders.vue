@@ -2,7 +2,7 @@
   <WorkflowOrderList
     bucket="inflight"
     title="Inflight orders"
-    search-placeholder="Order, external ID, customer"
+    search-placeholder="Order name, order ID, external ID"
     empty-title="No inflight orders"
     empty-message="Orders that have arrived at a warehouse but aren't on a picklist yet will appear here."
     show-facility

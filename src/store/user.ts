@@ -7,15 +7,12 @@ import { showToast } from "@/utils";
 import { useSeedStore } from "./seed";
 import { useOrderDetailStore } from "./orderDetail";
 import { useProductCacheStore } from "./productCache";
+import { useProductStore } from "@/store/productStore";
 
 export const useUserStore = defineStore("user", {
   state: () => ({
     current: {} as any,
     permissions: [] as string[],
-    currentProductStore: {
-      productStoreId: "",
-      storeName: "None",
-    } as any,
     pwaState: {
       updateExists: false,
       registration: null as any,
@@ -31,7 +28,6 @@ export const useUserStore = defineStore("user", {
     getPermissions: (state) => state.permissions,
     getUserProfile: (state) => state.current,
     getPwaState: (state) => state.pwaState,
-    getCurrentProductStore: (state) => state.currentProductStore,
     getUserTimeZone: (state) => state.current.timeZone,
     getAvailableTimeZones: (state) => state.timeZones,
     getFetchStatus: (state) => state.fetchStatus,
@@ -105,58 +101,7 @@ export const useUserStore = defineStore("user", {
         return Promise.reject(error);
       }
     },
-    async fetchProductStores() {
-      try {
-        const productStoresResp = await api({
-          url: "admin/productStores",
-          method: "get",
-          baseURL: commonUtil.getMaargURL()
-        });
-
-        this.current.stores = productStoresResp.data;
-        useSeedStore().setProductStores(productStoresResp.data || []);
-        this.current.stores.push({
-          productStoreId: "",
-          storeName: "None",
-        });
-
-        await this.setCurrentProductStore(this.current.stores[0]);
-      } catch (error: any) {
-        logger.error("Failed to fetch product stores", error);
-        return Promise.reject(error);
-      }
-    },
-    async fetchProductStorePreference() {
-      try {
-        const preferredStoreResp = await api({
-          url: "admin/user/preferences",
-          method: "GET",
-          params: {
-            pageSize: 1,
-            userId: this.current.userId,
-            preferenceKey: "FAVORITE_PRODUCT_STORE"
-          },
-        });
-        const preferredStoreId = preferredStoreResp.data;
-        if (preferredStoreId) {
-          const store = this.current.stores.find((store: any) => store.productStoreId === preferredStoreId);
-          if (store) await this.setCurrentProductStore(store);
-        }
-      } catch (error) {
-        logger.error("Favourite product store not found", error);
-      }
-    },
-    async setCurrentProductStore(productStoreInfo: any) {
-      let productStore = productStoreInfo;
-      if (!productStoreInfo.storeName) {
-        productStore = this.current.stores.find((store: any) => store.productStoreId === productStoreInfo.productStoreId);
-      }
-      this.currentProductStore = productStore || {
-        productStoreId: "",
-        storeName: "None",
-      };
-      await useSeedStore().loadProductStoreSeedData(this.currentProductStore.productStoreId);
-    },
+    
     async setUserTimeZone(tzId: string) {
       if (this.current.timeZone === tzId) return;
 
@@ -204,9 +149,9 @@ export const useUserStore = defineStore("user", {
       try {
         await this.fetchUserProfile();
         await this.fetchPermissions();
-        await this.fetchProductStores();
-        await this.fetchProductStorePreference();
-        const productStoreIds = (this.current.stores || []).map((store: any) => store.productStoreId).filter(Boolean);
+        await useProductStore().fetchProductStores();
+        await useProductStore().fetchProductStorePreference();
+        const productStoreIds = (useProductStore().getProductStores || []).map((store: any) => store.productStoreId).filter(Boolean);
         await useSeedStore().loadInitialSeedData(productStoreIds);
       } catch (error: any) {
         return Promise.reject(error);

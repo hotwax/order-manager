@@ -32,7 +32,7 @@ import "@common/css/theme.css"
 import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import localeMessages from './locales';
-import { createDxpI18n, initialiseConfig } from '@common';
+import { createDxpI18n, imagePreview, initialiseConfig } from '@common';
 import { useUserStore } from './store/user';
 
 const pinia = createPinia().use(piniaPluginPersistedstate);
@@ -65,5 +65,6 @@ if (import.meta.env.DEV) {
 }
 
 router.isReady().then(() => {
+  app.directive('image-preview', imagePreview)
   app.mount('#app');
 });

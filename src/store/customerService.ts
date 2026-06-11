@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { DateTime } from 'luxon';
+import { useOrderStore } from '@/store/order';
 import type {
   BulkActionDefinition,
   WorkflowBucket,
@@ -119,10 +120,12 @@ function generateOrders(): WorkflowOrder[] {
 function emptyFilters(): WorkflowFilters {
   return {
     query: '',
+    customerName: '',
     productStoreId: 'All',
     salesChannelEnumId: 'All',
     facilityId: 'All',
-    priority: 'All',
+    shipmentMethodTypeId: 'All',
+    priority: null,
     dateFrom: '',
     dateThru: ''
   };
@@ -131,13 +134,16 @@ function emptyFilters(): WorkflowFilters {
 function matchesFilters(order: WorkflowOrder, filters: WorkflowFilters): boolean {
   if (filters.query) {
     const q = filters.query.toLowerCase();
-    const haystack = `${order.orderName} ${order.externalId} ${order.orderId} ${order.customerName}`.toLowerCase();
+    const haystack = `${order.orderName} ${order.externalId} ${order.orderId}`.toLowerCase();
     if (!haystack.includes(q)) return false;
+  }
+  if (filters.customerName) {
+    if (!order.customerName.toLowerCase().includes(filters.customerName.toLowerCase())) return false;
   }
   if (filters.productStoreId !== 'All' && order.productStoreId !== filters.productStoreId) return false;
   if (filters.salesChannelEnumId !== 'All' && order.salesChannelEnumId !== filters.salesChannelEnumId) return false;
   if (filters.facilityId !== 'All' && order.facilityId !== filters.facilityId) return false;
-  if (filters.priority !== 'All' && order.priority !== filters.priority) return false;
+  if (filters.shipmentMethodTypeId !== 'All' && order.shippingMethodTypeId !== filters.shipmentMethodTypeId) return false;
   if (filters.dateFrom) {
     const from = DateTime.fromISO(filters.dateFrom).startOf('day');
     if (DateTime.fromISO(order.orderDate) < from) return false;
@@ -181,17 +187,24 @@ export const useCustomerServiceStore = defineStore('customerService', {
       state.orders.filter((order) => inBucket(order, bucket)),
     filteredOrders(state) {
       return (bucket: WorkflowBucket) => {
+        const orderStore = useOrderStore();
+        if (bucket === 'open' || bucket === 'inflight' || bucket === 'packed') {
+          return orderStore.workflowOrders[bucket];
+        }
         const filters = state.filters[bucket];
         return state.orders.filter((order) => inBucket(order, bucket) && matchesFilters(order, filters));
       };
     },
-    bucketCounts: (state) => ({
-      unfillable: state.orders.filter((order) => inBucket(order, 'unfillable')).length,
-      fraud: state.orders.filter((order) => inBucket(order, 'fraud')).length,
-      open: state.orders.filter((order) => inBucket(order, 'open')).length,
-      inflight: state.orders.filter((order) => inBucket(order, 'inflight')).length,
-      packed: state.orders.filter((order) => inBucket(order, 'packed')).length
-    })
+    bucketCounts: (state) => {
+      const { workflowOrders } = useOrderStore();
+      return {
+        unfillable: state.orders.filter((order) => inBucket(order, 'unfillable')).length,
+        fraud: state.orders.filter((order) => inBucket(order, 'fraud')).length,
+        open: workflowOrders.open.length,
+        inflight: workflowOrders.inflight.length,
+        packed: workflowOrders.packed.length
+      };
+    }
   },
   actions: {
     clearFilters(bucket: WorkflowBucket) {
@@ -210,6 +223,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
       this.selection[bucket] = [];
     },
     runBulkAction(bucket: WorkflowBucket, actionId: string) {
+      // TODO: API-backed buckets (open/inflight/packed) need real endpoints to execute bulk actions
       const selectedIds = new Set(this.selection[bucket]);
       if (selectedIds.size === 0) return;
 

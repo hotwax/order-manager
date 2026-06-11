@@ -1,4 +1,5 @@
 import { api } from '@common';
+import { useSolrSearch } from '@common/composables/useSolrSearch';
 import {
   allDocs,
   buildRelatedDataDocumentPayload,
@@ -27,6 +28,11 @@ export interface CustomerSearchResult {
   customers: Customer[];
   total: number;
 }
+
+export const partyTypes: Record<string, string> = {
+  PERSON: 'Person',
+  PARTY_GROUP: 'Company'
+};
 
 export interface CustomerContactMechResult {
   contactMechs: ContactMech[];
@@ -117,32 +123,43 @@ export function buildCustomerSearchRequests(params: CustomerSearchParams = {}) {
 }
 
 export async function searchCustomers(params: CustomerSearchParams = {}): Promise<CustomerSearchResult> {
+  const { runSolrQuery } = useSolrSearch();
   const searchTerm = params.queryString?.trim();
+  const rows = Number(params.pageSize ?? 50);
+  const start = rows * Number(params.pageIndex ?? 0);
 
-  if (searchTerm && (searchTerm.includes('@') || isPhoneSearch(searchTerm))) {
-    return searchCustomersByContact(searchTerm, params);
+  const payload: any = {
+    json: {
+      params: {
+        rows,
+        start,
+        qf: 'partyId^100 fullName^50 firstName^30 lastName^30 groupName^30 emailAddress^20 phoneNumber^10',
+        defType: 'edismax'
+      },
+      query: '*:*',
+      filter: 'docType: CUSTOMER'
+    }
+  };
+
+  if (searchTerm) {
+    payload.json.query = `${searchTerm}* OR "${searchTerm}"^100`;
   }
 
-  const responses = await Promise.all(buildCustomerSearchRequests(params).map((requestParams) => api({
-    url: 'oms/parties',
-    method: 'get',
-    params: requestParams
-  })));
-  const customersById = new Map<string, Customer>();
-  let total = 0;
+  if (params.status && params.status !== 'All') {
+    payload.json.filter += ` AND statusId: ${params.status}`;
+  }
 
-  responses.forEach((response) => {
-    const docs = responseList(response.data);
-    docs.map((doc: any) => normalizeCustomerDoc(doc)).forEach((customer) => {
-      if (customer.id) customersById.set(customer.id, customer);
-    });
-    total += responseTotal(response.data, docs.length);
-  });
+  if (params.partyTypeId && params.partyTypeId !== 'All') {
+    payload.json.filter += ` AND partyTypeId: ${params.partyTypeId}`;
+  }
 
-  const customers = [...customersById.values()];
+  const resp = await runSolrQuery(payload);
+  const docs: any[] = resp?.data?.response?.docs ?? [];
+  const total: number = resp?.data?.response?.numFound ?? 0;
+
   return {
-    customers,
-    total: responses.length > 1 ? customers.length : total
+    customers: docs,
+    total
   };
 }
 
