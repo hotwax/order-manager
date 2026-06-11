@@ -12,10 +12,15 @@
     <ion-content>
       <SearchFilterCard
         v-model="searchQuery"
-        :placeholder="translate('Search swap orders...')"
+        :placeholder="translate('Search')"
+        :show-clear="false"
         @search="fetchSwapTasks()"
         @clear="clearFilters"
       >
+        <ion-select v-model="assignee" :label="translate('Assignee')" label-placement="stacked" interface="popover">
+          <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
+          <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
+        </ion-select>
         <ion-input v-model="dateAfter" :label="translate('Date after')" label-placement="stacked" type="date" />
         <ion-input v-model="dateBefore" :label="translate('Date before')" label-placement="stacked" type="date" />
         <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
@@ -60,22 +65,26 @@ import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
+import { useUserStore } from '@/store/user';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
+const userStore = useUserStore();
 
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
+const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
 
 const searchQuery = ref('');
+const assignee = ref('');
 const dateAfter = ref('');
 const dateBefore = ref('');
 const orderChannel = ref('');
 
 const swapTasks = computed(() => orderTaskStore.getSwapTasks);
 const isScrollable = computed(() => orderTaskStore.isSwapTasksScrollable);
-const hasFilters = computed(() => !!(searchQuery.value || dateAfter.value || dateBefore.value || orderChannel.value));
+const hasFilters = computed(() => !!(searchQuery.value || assignee.value || dateAfter.value || dateBefore.value || orderChannel.value));
 
 function getEmptyMessage() {
   return hasFilters.value
@@ -83,12 +92,13 @@ function getEmptyMessage() {
     : translate('No records found.');
 }
 
-watch([dateAfter, dateBefore, orderChannel], () => {
+watch([assignee, dateAfter, dateBefore, orderChannel], () => {
   fetchSwapTasks();
 });
 
 function clearFilters() {
   searchQuery.value = '';
+  assignee.value = '';
   dateAfter.value = '';
   dateBefore.value = '';
   orderChannel.value = '';
@@ -105,6 +115,7 @@ const fetchSwapTasks = async (vSize?: any, vIndex?: any) => {
     ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
     ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
     ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
+    ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
   });
 
   const productIds = swapTasks.value

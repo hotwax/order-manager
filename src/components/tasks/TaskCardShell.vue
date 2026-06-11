@@ -1,5 +1,5 @@
 <template>
-  <ion-card>
+  <ion-card class="task-card-shell">
     <ion-item lines="none">
       <ion-checkbox
         v-if="selectable"
@@ -28,6 +28,9 @@
           {{ contactName || translate('Unknown') }}
           <p>{{ translate('Full name') }}</p>
         </ion-label>
+        <ion-button v-if="contactName" slot="end" size="small" fill="outline" @click="copyContact(contactName)">
+          {{ translate('Copy') }}
+        </ion-button>
       </ion-item>
       <ion-item>
         <ion-icon slot="start" :icon="callOutline" />
@@ -35,8 +38,8 @@
           {{ contactPhone || '-' }}
           <p>{{ translate('Phone') }}</p>
         </ion-label>
-        <ion-button v-if="contactPhoneHref" slot="end" fill="clear" :href="contactPhoneHref">
-          <ion-icon slot="icon-only" :icon="callOutline" />
+        <ion-button v-if="contactPhone" slot="end" size="small" fill="outline" @click="copyContact(contactPhone)">
+          {{ translate('Copy') }}
         </ion-button>
       </ion-item>
       <ion-item>
@@ -45,8 +48,8 @@
           {{ contactEmail || '-' }}
           <p>{{ translate('Email') }}</p>
         </ion-label>
-        <ion-button v-if="contactEmailHref" slot="end" fill="clear" :href="contactEmailHref">
-          <ion-icon slot="icon-only" :icon="mailOutline" />
+        <ion-button v-if="contactEmail" slot="end" size="small" fill="outline" @click="copyContact(contactEmail)">
+          {{ translate('Copy') }}
         </ion-button>
       </ion-item>
     </ion-list>
@@ -80,6 +83,7 @@ import { computed } from 'vue';
 import { IonButton, IonButtons, IonCard, IonCardContent, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
 import { callOutline, mailOutline, personOutline, ticketOutline } from 'ionicons/icons';
 import { translate } from '@common';
+import { showToast } from '@/utils';
 
 const props = withDefaults(defineProps<{
   title: string;
@@ -117,9 +121,21 @@ const hasContactDetails = computed(() => (
   || !!props.contactPhone
   || !!props.contactEmail
 ));
+
+async function copyContact(value: string) {
+  if (!value) return;
+
+  await navigator.clipboard?.writeText(value);
+  await showToast(translate('Copied'));
+}
 </script>
 
 <style scoped>
+.task-card-shell {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
 .task-card-contact-details {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

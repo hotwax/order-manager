@@ -66,8 +66,8 @@
     </ion-list>
 
     <template #actions>
-      <ion-button fill="solid" color="primary" @click="resolveTask()">{{ translate('Resolve task') }}</ion-button>
-      <ion-button fill="outline" color="secondary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
+      <ion-button fill="clear" color="primary" @click="resolveTask()">{{ translate('Resolve task') }}</ion-button>
+      <ion-button fill="clear" color="primary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
     </template>
   </TaskCardShell>
 </template>

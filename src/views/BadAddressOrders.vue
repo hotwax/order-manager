@@ -12,10 +12,14 @@
     <ion-content>
       <SearchFilterCard
         v-model="searchQuery"
-        :placeholder="translate('Search unfillable orders...')"
+        :placeholder="translate('Search')"
+        :show-clear="false"
         @clear="clearFilters"
       >
-        
+        <ion-select v-model="assignee" :label="translate('Assignee')" label-placement="stacked" interface="popover">
+          <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
+          <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
+        </ion-select>
         <ion-input v-model="dateAfter" :label="translate('Date after')" label-placement="stacked" type="date" />
         <ion-input v-model="dateBefore" :label="translate('Date before')" label-placement="stacked" type="date" />
         <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
@@ -81,13 +85,17 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
+import { useUserStore } from '@/store/user';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
+const userStore = useUserStore();
 
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
+const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
 
 const searchQuery = ref('');
+const assignee = ref('');
 const dateAfter = ref('');
 const dateBefore = ref('');
 const orderChannel = ref('');
@@ -105,7 +113,7 @@ onBeforeUpdate(() => {
 const addressValidationTasks = computed(() => orderTaskStore.getAddressValidationTasks);
 const isScrollable = computed(() => orderTaskStore.isAddressValidationTasksScrollable);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
-const hasFilters = computed(() => !!(searchQuery.value || dateAfter.value || orderChannel.value));
+const hasFilters = computed(() => !!(searchQuery.value || assignee.value || dateAfter.value || dateBefore.value || orderChannel.value));
 
 function getEmptyMessage() {
   return hasFilters.value
@@ -113,7 +121,7 @@ function getEmptyMessage() {
     : translate('No records found.');
 }
 
-watch([dateAfter, dateBefore, orderChannel], () => {
+watch([assignee, dateAfter, dateBefore, orderChannel], () => {
   fetchAddressValidationTasks();
 });
 
@@ -125,6 +133,7 @@ watch(selectAll, (val) => {
 
 function clearFilters() {
   searchQuery.value = '';
+  assignee.value = '';
   dateAfter.value = '';
   dateBefore.value = '';
   orderChannel.value = '';
@@ -141,6 +150,7 @@ const fetchAddressValidationTasks = async (vSize?: any, vIndex?: any) => {
     ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
     ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
     ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
+    ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
   });
 };
 

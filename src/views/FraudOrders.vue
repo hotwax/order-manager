@@ -12,19 +12,24 @@
     <ion-content>
       <SearchFilterCard
         v-model="searchQuery"
-        :placeholder="translate('Search fraud orders...')"
+        :placeholder="translate('Search')"
+        :show-clear="false"
         @clear="clearFilters"
       >
-        <ion-select v-model="recommendation" :label="translate('Recommendation')" label-placement="stacked" interface="popover">
-          <ion-select-option value="">{{ translate('All recommendations') }}</ion-select-option>
-          <ion-select-option v-for="rec in riskRecommendations" :key="rec.enumId" :value="rec.enumId">
-            {{ rec.description || rec.enumId }}
-          </ion-select-option>
+        <ion-select v-model="assignee" :label="translate('Assignee')" label-placement="stacked" interface="popover">
+          <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
+          <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
         </ion-select>
         <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
           <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
           <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
             {{ channel.description || channel.enumId }}
+          </ion-select-option>
+        </ion-select>
+        <ion-select v-model="recommendation" :label="translate('Recommendation')" label-placement="stacked" interface="popover">
+          <ion-select-option value="">{{ translate('All recommendations') }}</ion-select-option>
+          <ion-select-option v-for="rec in riskRecommendations" :key="rec.enumId" :value="rec.enumId">
+            {{ rec.description || rec.enumId }}
           </ion-select-option>
         </ion-select>
         <ion-select v-model="severity" :label="translate('Severity')" label-placement="stacked" interface="popover">
@@ -88,16 +93,20 @@ import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
+import { useUserStore } from '@/store/user';
 import { useProductMaster } from '@/composables/useProductMaster';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
+const userStore = useUserStore();
 
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
 const riskRecommendations = computed(() => seedStore.getEnumsByType('ORDER_RISK_RECOMMENDATION'));
 const riskLevels = computed(() => seedStore.getEnumsByType('ORDER_RISK_LEVEL'));
+const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
 
 const searchQuery = ref('');
+const assignee = ref('');
 const recommendation = ref('');
 const orderChannel = ref('');
 const severity = ref('');
@@ -116,7 +125,7 @@ onBeforeUpdate(() => {
 const fraudTasks = computed(() => orderTaskStore.getFraudTasks);
 const isScrollable = computed(() => orderTaskStore.isFraudTasksScrollable);
 const selectedTaskCount = computed(() => Object.values(selectedOrders.value).filter(Boolean).length as number);
-const hasFilters = computed(() => !!(searchQuery.value || recommendation.value || orderChannel.value || severity.value));
+const hasFilters = computed(() => !!(searchQuery.value || assignee.value || recommendation.value || orderChannel.value || severity.value));
 
 function getEmptyMessage() {
   return hasFilters.value
@@ -130,12 +139,13 @@ watch(selectAll, (val) => {
   });
 });
 
-watch([orderChannel, recommendation, severity], () => {
+watch([assignee, orderChannel, recommendation, severity], () => {
   fetchFraudTasks();
 });
 
 function clearFilters() {
   searchQuery.value = '';
+  assignee.value = '';
   recommendation.value = '';
   orderChannel.value = '';
   severity.value = '';
@@ -149,6 +159,7 @@ const fetchFraudTasks = async (vSize?: any, vIndex?: any) => {
     viewSize,
     viewIndex,
     ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
+    ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
     ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
     ...(recommendation.value && { riskRecommendationEnumId: recommendation.value }),
     ...(severity.value && { riskLevelEnumId: severity.value }),

@@ -107,9 +107,9 @@
     </ion-list>
 
     <template #actions>
-      <ion-button fill="solid" color="primary" @click="releaseUpdatedOrder(task)">{{ translate('Release updated order') }}</ion-button>
-      <ion-button fill="outline" color="danger" @click="cancelOrder(task)">{{ translate('Cancel order') }}</ion-button>
-      <ion-button fill="outline" color="medium" @click="parkOrder(task)">{{ translate('Park') }}</ion-button>
+      <ion-button fill="clear" color="primary" @click="releaseUpdatedOrder(task)">{{ translate('Release updated order') }}</ion-button>
+      <ion-button fill="clear" color="danger" @click="cancelOrder(task)">{{ translate('Cancel order') }}</ion-button>
+      <ion-button fill="clear" color="primary" @click="parkOrder(task)">{{ translate('Park') }}</ion-button>
     </template>
   </TaskCardShell>
 </template>

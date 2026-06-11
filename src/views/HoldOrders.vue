@@ -12,11 +12,15 @@
     <ion-content>
       <SearchFilterCard
         v-model="searchQuery"
-        :placeholder="translate('Search unfillable orders...')"
+        :placeholder="translate('Search')"
+        :show-clear="false"
         @search="fetchHoldTasks()"
         @clear="clearFilters"
       >
-        
+        <ion-select v-model="assignee" :label="translate('Assignee')" label-placement="stacked" interface="popover">
+          <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
+          <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
+        </ion-select>
         <ion-input v-model="dateAfter" :label="translate('Date after')" label-placement="stacked" type="date" />
         <ion-input v-model="dateBefore" :label="translate('Date before')" label-placement="stacked" type="date" />
         <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
@@ -106,9 +110,11 @@ const userStore = useUserStore();
 const seedStore = useSeedStore();
 
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
+const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
 
 const searchQuery = ref('');
 const swappable = ref(false);
+const assignee = ref('');
 const dateAfter = ref('');
 const dateBefore = ref('');
 const orderChannel = ref('');
@@ -127,7 +133,7 @@ function setCardRef(workEffortId: string, el: any) {
 const heldTasks = computed(() => orderTaskStore.getHoldTasks);
 const isScrollable = computed(() => orderTaskStore.isHoldTasksScrollable);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
-const hasFilters = computed(() => !!(searchQuery.value || dateAfter.value || dateBefore.value || orderChannel.value));
+const hasFilters = computed(() => !!(searchQuery.value || assignee.value || dateAfter.value || dateBefore.value || orderChannel.value));
 
 function getEmptyMessage() {
   return hasFilters.value
@@ -135,7 +141,7 @@ function getEmptyMessage() {
     : translate('No records found.');
 }
 
-watch([dateAfter, dateBefore, orderChannel], () => {
+watch([assignee, dateAfter, dateBefore, orderChannel], () => {
   fetchHoldTasks();
 });
 
@@ -148,6 +154,7 @@ watch(selectAll, (val) => {
 function clearFilters() {
   searchQuery.value = '';
   swappable.value = false;
+  assignee.value = '';
   dateAfter.value = '';
   dateBefore.value = '';
   orderChannel.value = '';
@@ -196,6 +203,7 @@ const fetchHoldTasks = async (vSize?: any, vIndex?: any) => {
     ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
     ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
     ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
+    ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
   });
 };
 

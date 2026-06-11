@@ -80,9 +80,9 @@
     </ion-radio-group>
 
     <template #actions>
-      <ion-button fill="solid" color="primary" @click="saveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
-      <ion-button fill="outline" color="danger" @click="cancelOrder()">{{ translate('Cancel order') }}</ion-button>
-      <ion-button fill="outline" color="medium" @click="parkOrder()">{{ translate('Park') }}</ion-button>
+      <ion-button fill="clear" color="primary" @click="saveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
+      <ion-button fill="clear" color="danger" @click="cancelOrder()">{{ translate('Cancel order') }}</ion-button>
+      <ion-button fill="clear" color="primary" @click="parkOrder()">{{ translate('Park') }}</ion-button>
     </template>
   </TaskCardShell>
 </template>
