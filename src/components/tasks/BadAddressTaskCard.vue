@@ -103,7 +103,7 @@ import {
   modalController,
 } from '@ionic/vue';
 import { commonUtil, translate } from '@common';
-import { showToast } from '@/utils';
+import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
@@ -292,6 +292,9 @@ async function cancelOrder() {
 }
 
 async function parkOrder() {
+  const confirmed = await confirmParkOrder();
+  if (!confirmed) return;
+
   const modal = await modalController.create({
     component: FacilityModal,
   });

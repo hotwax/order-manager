@@ -119,7 +119,7 @@ import { computed } from 'vue';
 import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
 import { arrowUndoOutline, closeCircleOutline, ellipsisVerticalOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
-import { showToast } from '@/utils';
+import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductActionPopover.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
@@ -317,6 +317,9 @@ async function cancelOrder(task: any) {
 }
 
 async function parkOrder(task: any) {
+  const confirmed = await confirmParkOrder();
+  if (!confirmed) return;
+
   const modal = await modalController.create({ component: FacilityModal });
   await modal.present();
   const { data: facilityId } = await modal.onWillDismiss();

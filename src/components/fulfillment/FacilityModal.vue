@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Select Parking') }}</ion-title>
+      <ion-title>{{ translate('Park order') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -31,12 +31,11 @@
         </div>
         <div v-else>
           <ion-item v-for="facility in filteredFacilities" :key="facility.facilityId">
-            <ion-radio label-placement="end" justify="start" :value="facility.facilityId">
-              <ion-label>
-                {{ facility.facilityName }}
-                <p>{{ facility.facilityId }}</p>
-              </ion-label>
-            </ion-radio>
+            <ion-radio slot="start" :value="facility.facilityId" />
+            <ion-label>
+              {{ facility.facilityName }}
+              <p>{{ facility.facilityId }}</p>
+            </ion-label>
           </ion-item>
         </div>
       </ion-list>
