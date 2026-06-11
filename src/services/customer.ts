@@ -840,7 +840,7 @@ export async function updatePartyPostalAddress(partyId: string, contactMechId: s
 }
 
 export async function expirePartyContactMech(partyId: string, contactMechId: string): Promise<void> {
-  await api({ url: `oms/customers/${partyId}/contactMechs/${contactMechId}/expire`, method: 'put', data: { partyId, contactMechId } });
+  await api({ url: `oms/customers/${partyId}/contactMechs/${contactMechId}`, method: 'delete', data: { partyId, contactMechId } });
 }
 
 function normalizeComm(doc: any): import('@/types/customer').CustomerCommunicationSummary {
