@@ -168,7 +168,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
       oldestOpenOrderDate: null as number | null
     },
     unfillable: {
-      unfillableDailyCounts: [] as { orderDate: number; shipGroupCount: number }[]
+      unfillableHourlyCounts: [] as { shipGroupDateHour: string; shipGroupCount: number }[]
     },
     facilityOrderVolume: [] as any[],
     facilityFulfillmentVelocity: [] as any[],
@@ -211,12 +211,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
       packed: state.orders.filter((order) => inBucket(order, 'packed')).length
     }),
     unfillableTrend(state): number[] {
-      const today = DateTime.now();
-      return Array.from({ length: 14 }, (_, i) => {
-        const dateStr = today.minus({ days: 13 - i }).toFormat('yyyy-MM-dd');
-        const match = state.unfillable.unfillableDailyCounts?.find((d) => 
-          DateTime.fromMillis(d.orderDate).toFormat('yyyy-MM-dd') === dateStr
-        );
+      const todayStr = DateTime.now().toFormat('yyyy-MM-dd');
+      return Array.from({ length: 24 }, (_, h) => {
+        const match = state.unfillable.unfillableHourlyCounts?.find((d) => {
+          const parsed = DateTime.fromSQL(d.shipGroupDateHour).isValid
+            ? DateTime.fromSQL(d.shipGroupDateHour)
+            : DateTime.fromISO(d.shipGroupDateHour);
+          return parsed.isValid && parsed.toFormat('yyyy-MM-dd') === todayStr && parsed.hour === h;
+        });
         return match ? match.shipGroupCount : 0;
       });
     }
@@ -271,7 +273,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
     },
     async fetchUnfillable(productStoreId?: string) {
       try {
-        const params: any = { pageSize: 14 };
+        const params: any = {};
         if (productStoreId) params.productStoreId = productStoreId;
         const resp = await api({
           url: 'oms/orders/funnelDashboard/unfillable',
