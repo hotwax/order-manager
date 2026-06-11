@@ -20,21 +20,21 @@
     <ion-radio-group v-if="editableAddresses" v-model="selectedAddressType" class="address-task-addresses">
       <ion-list lines="full">
         <ion-list-header>
-          <ion-label>{{ translate('Original Address') }}</ion-label>
-          <ion-note slot="end">{{ translate('Keep original') }}</ion-note>
-          <ion-radio slot="end" value="original" :aria-label="translate('Keep original')" />
+          <ion-label>{{ translate('Original address') }}</ion-label>
+          <ion-note slot="end">{{ translate('keep original') }}</ion-note>
+          <ion-radio slot="end" value="original" :aria-label="translate('keep original')" />
         </ion-list-header>
         <ion-item>
-          <ion-input :label="translate('Address Line 1')" label-placement="stacked" v-model="editableAddresses.original.address1" />
+          <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="editableAddresses.original.address1" />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Address Line 2')" label-placement="stacked" v-model="editableAddresses.original.address2" />
+          <ion-input :label="translate('Address line 2')" label-placement="stacked" v-model="editableAddresses.original.address2" />
         </ion-item>
         <ion-item>
           <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses.original.city" />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Postal Code')" label-placement="stacked" v-model="editableAddresses.original.postalCode" />
+          <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="editableAddresses.original.postalCode" />
         </ion-item>
         <ion-item>
           <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.original.stateProvinceGeoId" interface="popover">
@@ -50,21 +50,21 @@
 
       <ion-list lines="full">
         <ion-list-header>
-          <ion-label>{{ translate('Suggested Address') }}</ion-label>
-          <ion-note slot="end">{{ translate('Use suggested') }}</ion-note>
-          <ion-radio slot="end" value="suggested" :aria-label="translate('Use suggested')" />
+          <ion-label>{{ translate('Suggested address') }}</ion-label>
+          <ion-note slot="end">{{ translate('use suggested') }}</ion-note>
+          <ion-radio slot="end" value="suggested" :aria-label="translate('use suggested')" />
         </ion-list-header>
         <ion-item>
-          <ion-input :label="translate('Address Line 1')" label-placement="stacked" v-model="editableAddresses.suggested.address1" />
+          <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="editableAddresses.suggested.address1" />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Address Line 2')" label-placement="stacked" v-model="editableAddresses.suggested.address2" />
+          <ion-input :label="translate('Address line 2')" label-placement="stacked" v-model="editableAddresses.suggested.address2" />
         </ion-item>
         <ion-item>
           <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses.suggested.city" />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Postal Code')" label-placement="stacked" v-model="editableAddresses.suggested.postalCode" />
+          <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="editableAddresses.suggested.postalCode" />
         </ion-item>
         <ion-item>
           <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.suggested.stateProvinceGeoId" interface="popover">
