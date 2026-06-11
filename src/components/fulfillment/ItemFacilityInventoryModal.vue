@@ -126,6 +126,7 @@
           </ion-label>
           <ion-label class="ion-text-end">
             {{ formatQuantity(facility.consumedToday) }} / {{ formatOrderLimit(facility.orderLimit) }}
+            <p>{{ translate('Consumed / Limit') }}</p>
             <p>{{ translate('Remaining') }} {{ formatOrderLimit(facility.remainingCapacity) }}</p>
           </ion-label>
         </div>
