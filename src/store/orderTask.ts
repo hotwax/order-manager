@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { api } from '@common';
-import { useUserStore } from '@/store/user';
+import { useProductStore } from '@/store/productStore';
 
 export const useOrderTaskStore = defineStore('orderTask', {
   state: () => ({
@@ -42,8 +42,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
   actions: {
     async fetchHoldTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
-        const productStoreId = useUserStore().getCurrentProductStore.productStoreId;
-        const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', workEffortTypeId: 'RESOLVE_ONHOLD_ORDER', workEffortPurposeTypeId: 'ONHOLD', productStoreId } });
+        const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
+        const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', workEffortTypeId: 'RESOLVE_ONHOLD_ORDER', workEffortPurposeTypeId: 'RESOLVE_ONHOLD_ORDER', productStoreId } });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(
           tasks.map(async (task: any) => {
@@ -58,7 +58,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
     },
     async fetchAddressValidationTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
-        const productStoreId = useUserStore().getCurrentProductStore.productStoreId;
+        const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', workEffortTypeId: 'RESOLVE_ONHOLD_ORDER', workEffortPurposeTypeId: 'INVALID_ADDRESS', productStoreId } });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(
@@ -74,8 +74,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
     },
     async fetchSwapTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
-        const productStoreId = useUserStore().getCurrentProductStore.productStoreId;
-        const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', productStoreId } });
+        const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
+        const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', workEffortTypeId: 'RESOLVE_ONHOLD_ORDER', workEffortPurposeTypeId: 'NEG_RES_REVIEW', productStoreId } });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(
           tasks.map(async (task: any) => {
@@ -90,7 +90,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
     },
     async fetchFraudTasks(payload: { viewSize?: any; viewIndex?: any; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string; riskRecommendationEnumId?: string; riskLevelEnumId?: string } = {}) {
       try {
-        const productStoreId = useUserStore().getCurrentProductStore.productStoreId;
+        const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', workEffortTypeId: 'REVIEW_RISK_ORDER', productStoreId } });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(
