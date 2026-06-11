@@ -138,21 +138,18 @@
         </ion-item>
       </template>
     </ion-list>
-  </ion-content>
+    <ion-fab v-if="isEditMode" vertical="bottom" horizontal="start" slot="fixed">
+      <ion-fab-button color="danger" @click="expire()">
+        <ion-icon :icon="trashOutline" />
+      </ion-fab-button>
+    </ion-fab>
 
-  <ion-footer>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button v-if="isEditMode" color="danger" fill="clear" @click="expire()">Expire</ion-button>
-      </ion-buttons>
-      <ion-buttons slot="end">
-        <ion-button @click="dismiss()">Cancel</ion-button>
-        <ion-button :disabled="!isValid" color="primary" @click="confirm()">
-          {{ isEditMode ? 'Update' : 'Save' }}
-        </ion-button>
-      </ion-buttons>
-    </ion-toolbar>
-  </ion-footer>
+    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+      <ion-fab-button :disabled="!isValid" @click="confirm()">
+        <ion-icon :icon="saveOutline" />
+      </ion-fab-button>
+    </ion-fab>
+  </ion-content>
 </template>
 
 <script setup lang="ts">
@@ -160,7 +157,8 @@ import {
   IonButton,
   IonButtons,
   IonContent,
-  IonFooter,
+  IonFab,
+  IonFabButton,
   IonHeader,
   IonIcon,
   IonInput,
@@ -172,7 +170,7 @@ import {
   IonToolbar,
   modalController
 } from '@ionic/vue';
-import { closeOutline } from 'ionicons/icons';
+import { closeOutline, saveOutline, trashOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive } from 'vue';
 import { useSeedStore } from '@/store/seed';
 import type { CustomerContactMech } from '@/types/customer';

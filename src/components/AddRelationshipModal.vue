@@ -130,16 +130,12 @@
         />
       </ion-item>
     </ion-list>
+    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+      <ion-fab-button :disabled="!isValid" @click="confirm()">
+        <ion-icon :icon="checkmarkCircle" />
+      </ion-fab-button>
+    </ion-fab>
   </ion-content>
-
-  <ion-footer>
-    <ion-toolbar>
-      <ion-buttons slot="end">
-        <ion-button @click="dismiss()">Cancel</ion-button>
-        <ion-button :disabled="!isValid" color="primary" @click="confirm()">Add</ion-button>
-      </ion-buttons>
-    </ion-toolbar>
-  </ion-footer>
 </template>
 
 <script setup lang="ts">
@@ -147,7 +143,8 @@ import {
   IonButton,
   IonButtons,
   IonContent,
-  IonFooter,
+  IonFab,
+  IonFabButton,
   IonHeader,
   IonIcon,
   IonInput,
