@@ -53,6 +53,14 @@ export function useCustomerDetail(getPartyId: () => string) {
     return (store as any).addContact(partyId.value, contactMechTypeId, data);
   }
 
+  function updateContact(contactMechTypeId: string, contactMechId: string, data: Record<string, string>) {
+    return (store as any).updateContact(partyId.value, contactMechTypeId, contactMechId, data);
+  }
+
+  function expireContact(contactMechId: string) {
+    return (store as any).expireContact(partyId.value, contactMechId);
+  }
+
   function loadReturns() {
     return (store as any).loadCustomerReturns(partyId.value);
   }
@@ -87,6 +95,8 @@ export function useCustomerDetail(getPartyId: () => string) {
     expireRelationship,
     createRelationship,
     addContact,
+    updateContact,
+    expireContact,
     loadReturns,
     loadCommunications
   };

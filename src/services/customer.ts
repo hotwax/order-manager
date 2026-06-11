@@ -819,12 +819,28 @@ export async function createPartyEmail(partyId: string, data: { infoString: stri
   await api({ url: `oms/customers/${partyId}/emails`, method: 'post', data: { partyId, ...data } });
 }
 
+export async function updatePartyEmail(partyId: string, contactMechId: string, data: { infoString: string; contactMechPurposeTypeId?: string }): Promise<void> {
+  await api({ url: `oms/customers/${partyId}/emails`, method: 'put', data: { partyId, contactMechId, ...data } });
+}
+
 export async function createPartyTelecomNumber(partyId: string, data: { contactNumber: string; countryCode?: string; areaCode?: string; contactMechPurposeTypeId?: string }): Promise<void> {
   await api({ url: `oms/customers/${partyId}/telecomNumbers`, method: 'post', data: { partyId, ...data } });
 }
 
+export async function updatePartyTelecomNumber(partyId: string, contactMechId: string, data: { contactNumber: string; countryCode?: string; areaCode?: string; contactMechPurposeTypeId?: string }): Promise<void> {
+  await api({ url: `oms/customers/${partyId}/telecomNumbers`, method: 'put', data: { partyId, contactMechId, ...data } });
+}
+
 export async function createPartyPostalAddress(partyId: string, data: { address1: string; city: string; postalCode: string; address2?: string; stateProvinceGeoId?: string; countryGeoId?: string; contactMechPurposeTypeId?: string }): Promise<void> {
   await api({ url: `oms/customers/${partyId}/postalAddresses`, method: 'post', data: { partyId, ...data } });
+}
+
+export async function updatePartyPostalAddress(partyId: string, contactMechId: string, data: { address1: string; city: string; postalCode: string; address2?: string; stateProvinceGeoId?: string; countryGeoId?: string; contactMechPurposeTypeId?: string }): Promise<void> {
+  await api({ url: `oms/customers/${partyId}/postalAddresses`, method: 'put', data: { partyId, contactMechId, ...data } });
+}
+
+export async function expirePartyContactMech(partyId: string, contactMechId: string): Promise<void> {
+  await api({ url: `oms/customers/${partyId}/contactMechs/${contactMechId}/expire`, method: 'put', data: { partyId, contactMechId } });
 }
 
 function normalizeComm(doc: any): import('@/types/customer').CustomerCommunicationSummary {

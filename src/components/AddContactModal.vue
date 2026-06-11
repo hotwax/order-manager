@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>Add {{ sectionLabel }}</ion-title>
+      <ion-title>{{ isEditMode ? 'Edit' : 'Add' }} {{ sectionLabel }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -142,9 +142,14 @@
 
   <ion-footer>
     <ion-toolbar>
+      <ion-buttons slot="start">
+        <ion-button v-if="isEditMode" color="danger" fill="clear" @click="expire()">Expire</ion-button>
+      </ion-buttons>
       <ion-buttons slot="end">
         <ion-button @click="dismiss()">Cancel</ion-button>
-        <ion-button :disabled="!isValid" color="primary" @click="confirm()">Save</ion-button>
+        <ion-button :disabled="!isValid" color="primary" @click="confirm()">
+          {{ isEditMode ? 'Update' : 'Save' }}
+        </ion-button>
       </ion-buttons>
     </ion-toolbar>
   </ion-footer>
@@ -170,18 +175,29 @@ import {
 import { closeOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive } from 'vue';
 import { useSeedStore } from '@/store/seed';
+import type { CustomerContactMech } from '@/types/customer';
 
 const props = defineProps<{
   contactMechTypeId: string;
+  existingContact?: CustomerContactMech;
 }>();
 
 const seed = useSeedStore();
+
+const isEditMode = computed(() => !!props.existingContact);
 
 const sectionLabel = computed(() => {
   if (props.contactMechTypeId === 'EMAIL_ADDRESS') return 'Email';
   if (props.contactMechTypeId === 'TELECOM_NUMBER') return 'Phone';
   if (props.contactMechTypeId === 'POSTAL_ADDRESS') return 'Address';
   return 'Contact';
+});
+
+const purposeTypeId = computed(() => {
+  if (props.contactMechTypeId === 'EMAIL_ADDRESS') return 'PRIMARY_EMAIL';
+  if (props.contactMechTypeId === 'TELECOM_NUMBER') return 'PRIMARY_PHONE';
+  if (props.contactMechTypeId === 'POSTAL_ADDRESS') return 'PRIMARY_LOCATION';
+  return undefined;
 });
 
 const form = reactive<Record<string, string>>({
@@ -213,9 +229,29 @@ function onCountryChange() {
 
 onMounted(() => {
   if (props.contactMechTypeId === 'POSTAL_ADDRESS') {
-    // Geos are loaded at login; this is a safety net if they haven't settled yet.
     if ((seed as any).geos?.status !== 'loaded') {
       (seed as any).loadGeos?.();
+    }
+  }
+
+  if (props.existingContact) {
+    const c = props.existingContact;
+    if (props.contactMechTypeId === 'EMAIL_ADDRESS') {
+      form.infoString = c.infoString || '';
+    } else if (props.contactMechTypeId === 'TELECOM_NUMBER') {
+      form.countryCode = c.telecomNumber?.countryCode || '';
+      form.areaCode = c.telecomNumber?.areaCode || '';
+      form.contactNumber = c.telecomNumber?.contactNumber || '';
+    } else if (props.contactMechTypeId === 'POSTAL_ADDRESS') {
+      form.address1 = c.postalAddress?.address1 || '';
+      form.address2 = c.postalAddress?.address2 || '';
+      form.city = c.postalAddress?.city || '';
+      form.stateProvinceGeoId = c.postalAddress?.stateProvinceGeoId || '';
+      form.postalCode = c.postalAddress?.postalCode || '';
+      form.countryGeoId = c.postalAddress?.countryGeoId || '';
+      if (form.countryGeoId) {
+        (seed as any).loadGeoAssocs(form.countryGeoId);
+      }
     }
   }
 });
@@ -233,8 +269,14 @@ function dismiss() {
   modalController.dismiss(null, 'cancel');
 }
 
+function expire() {
+  modalController.dismiss(null, 'expire');
+}
+
 function confirm() {
   const payload: Record<string, string> = {};
+  if (purposeTypeId.value) payload.contactMechPurposeTypeId = purposeTypeId.value;
+
   if (props.contactMechTypeId === 'EMAIL_ADDRESS') {
     payload.infoString = form.infoString.trim();
   } else if (props.contactMechTypeId === 'TELECOM_NUMBER') {

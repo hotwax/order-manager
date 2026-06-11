@@ -4,7 +4,11 @@ import {
   createPartyPostalAddress,
   createPartyRelationship,
   createPartyTelecomNumber,
+  expirePartyContactMech,
   expirePartyRelationship,
+  updatePartyEmail,
+  updatePartyPostalAddress,
+  updatePartyTelecomNumber,
   getCustomerCommunications,
   getCustomerOrdersFromSolr,
   getCustomerProfile,
@@ -15,6 +19,7 @@ import {
   getPartyNames
 } from '@/services/customer';
 import { useSeedStore } from '@/store/seed';
+import { useProductMaster } from '@/composables/useProductMaster';
 import { commonUtil } from '@common';
 import type {
   ContactSection,
@@ -80,6 +85,15 @@ function isActiveThru(thruDate?: string): boolean {
   if (!thruDate) return true;
   const millis = Number(thruDate);
   return Number.isFinite(millis) ? millis > Date.now() : true;
+}
+
+function isContactActive(fromDate?: string, thruDate?: string): boolean {
+  const now = Date.now();
+  if (fromDate) {
+    const from = Number(fromDate);
+    if (Number.isFinite(from) && from > now) return false;
+  }
+  return isActiveThru(thruDate);
 }
 
 // Order/ship-group progress: target = (#statuses x 100); current = sum of each status's
@@ -193,7 +207,7 @@ export const useCustomerStore = defineStore('customerDetail', {
         label: def.label,
         contactMechTypeId: def.contactMechTypeId,
         values: contactMechs
-          .filter((contactMech) => contactMech.contactMechTypeId === def.contactMechTypeId)
+          .filter((contactMech) => contactMech.contactMechTypeId === def.contactMechTypeId && isContactActive(contactMech.fromDate, contactMech.thruDate))
           .map((contactMech) => ({
             display: contactDisplay(contactMech),
             contactMechId: contactMech.contactMechId,
@@ -355,6 +369,8 @@ export const useCustomerStore = defineStore('customerDetail', {
           error: '',
           total: result.lifetimeOrders
         };
+        const orderProductIds = result.orders.flatMap((o) => o.items.map((item) => item.productId)).filter(Boolean);
+        if (orderProductIds.length) useProductMaster().prefetch(orderProductIds).catch(() => {});
         this.lifetimeByPartyId[partyId] = {
           orders: result.lifetimeOrders,
           value: result.lifetimeValue,
@@ -411,6 +427,8 @@ export const useCustomerStore = defineStore('customerDetail', {
           error: '',
           total: returns.length
         };
+        const returnProductIds = returns.flatMap((r) => r.items.map((item) => item.productId)).filter(Boolean) as string[];
+        if (returnProductIds.length) useProductMaster().prefetch(returnProductIds).catch(() => {});
       } catch (error: any) {
         this.returnsByPartyId[partyId] = {
           payload: [],
@@ -496,6 +514,22 @@ export const useCustomerStore = defineStore('customerDetail', {
       } else if (contactMechTypeId === 'POSTAL_ADDRESS') {
         await createPartyPostalAddress(partyId, data as any);
       }
+      await this.loadCustomerProfile(partyId, true);
+    },
+
+    async updateContact(partyId: string, contactMechTypeId: string, contactMechId: string, data: Record<string, string>) {
+      if (contactMechTypeId === 'EMAIL_ADDRESS') {
+        await updatePartyEmail(partyId, contactMechId, data as any);
+      } else if (contactMechTypeId === 'TELECOM_NUMBER') {
+        await updatePartyTelecomNumber(partyId, contactMechId, data as any);
+      } else if (contactMechTypeId === 'POSTAL_ADDRESS') {
+        await updatePartyPostalAddress(partyId, contactMechId, data as any);
+      }
+      await this.loadCustomerProfile(partyId, true);
+    },
+
+    async expireContact(partyId: string, contactMechId: string) {
+      await expirePartyContactMech(partyId, contactMechId);
       await this.loadCustomerProfile(partyId, true);
     },
 

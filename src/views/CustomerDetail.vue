@@ -42,9 +42,13 @@
                 <template v-for="section in contactSections" :key="section.key">
                   <ion-item class="contact-section" lines="none">
                     <ion-label color="medium">{{ section.label }}</ion-label>
-                    <ion-button slot="end" fill="clear" size="small" @click="onAddContact(section.contactMechTypeId)">
+                    <ion-button v-if="!section.values.length" slot="end" fill="clear" size="small" @click="onAddContact(section.contactMechTypeId)">
                       Add
                       <ion-icon slot="end" :icon="addCircleOutline" />
+                    </ion-button>
+                    <ion-button v-else slot="end" fill="clear" size="small" @click="onEditContact(section)">
+                      Edit
+                      <ion-icon slot="end" :icon="pencilOutline" />
                     </ion-button>
                   </ion-item>
                   <ion-item v-for="value in section.values" :key="value.contactMechId">
@@ -223,7 +227,7 @@
         </div>
 
         <div class="ion-padding-horizontal">
-          <ion-searchbar placeholder="Search" />
+          <ion-searchbar placeholder="Search" :value="recentOrdersQuery" @ion-input="recentOrdersQuery = ($event.target as any).value ?? ''" />
         </div>
 
         <div v-if="recentOrders.length" class="recent-orders-grid">
@@ -252,7 +256,7 @@
               </ion-list-header>
               <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
                 <ion-thumbnail slot="start">
-                  <img v-if="item.imageUrl" :src="item.imageUrl" alt="Product image" />
+                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
                 </ion-thumbnail>
                 <ion-label>
                   {{ item.name }}
@@ -286,7 +290,7 @@
           <h2>All orders</h2>
         </div>
         <div class="ion-padding-horizontal">
-          <ion-searchbar placeholder="Search" />
+          <ion-searchbar placeholder="Search" :value="allOrdersQuery" @ion-input="allOrdersQuery = ($event.target as any).value ?? ''" />
         </div>
         <div v-if="allOrders.length" class="recent-orders-grid">
           <ion-card v-for="order in allOrders" :key="order.id">
@@ -311,7 +315,7 @@
               </ion-list-header>
               <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
                 <ion-thumbnail slot="start">
-                  <img v-if="item.imageUrl" :src="item.imageUrl" alt="Product image" />
+                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
                 </ion-thumbnail>
                 <ion-label>
                   {{ item.name }}
@@ -366,7 +370,7 @@
               </ion-list-header>
               <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
                 <ion-thumbnail slot="start">
-                  <img v-if="item.imageUrl" :src="item.imageUrl" alt="Product image" />
+                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
                 </ion-thumbnail>
                 <ion-label>
                   {{ item.name }}
@@ -428,6 +432,9 @@
                 <ion-label>Items</ion-label>
               </ion-list-header>
               <ion-item v-for="item in ret.items" :key="item.returnItemSeqId">
+                <ion-thumbnail slot="start">
+                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId || '')?.mainImageUrl" size="small" />
+                </ion-thumbnail>
                 <ion-label>
                   <h3>{{ item.productId || '—' }}</h3>
                   <p>Qty {{ item.returnQuantity }}{{ item.receivedQuantity != null ? ` · Received ${item.receivedQuantity}` : '' }}</p>
@@ -593,9 +600,12 @@ import {
   addCircleOutline,
   chevronUp,
   informationCircleOutline,
+  pencilOutline,
   pricetagOutline
 } from 'ionicons/icons';
+import { DxpShopifyImg } from '@common';
 import { useCustomerDetail } from '@/composables/useCustomerDetail';
+import { useProductCacheStore } from '@/store/productCache';
 import { useSeedStore } from '@/store/seed';
 import type { CustomerOrderSummary } from '@/types/customer';
 import AddContactModal from '@/components/AddContactModal.vue';
@@ -610,6 +620,9 @@ const props = defineProps<{
 
 const selectedSegment = ref('dashboard');
 const seed = useSeedStore();
+const productCache = useProductCacheStore();
+const recentOrdersQuery = ref('');
+const allOrdersQuery = ref('');
 
 const {
   customer,
@@ -635,7 +648,9 @@ const {
   loadCommunications,
   expireRelationship,
   // createRelationship, // TODO: re-enable when roleTypeId handling is ready
-  addContact
+  addContact,
+  updateContact,
+  expireContact
 } = useCustomerDetail(() => props.customerId);
 
 const customerReturns = computed(() => customerReturnsSource.value as import('@/types/customer').CustomerReturnSummary[]);
@@ -660,6 +675,7 @@ function mapOrder(order: CustomerOrderSummary) {
     orderDate: formatLongDate(order.orderDate),
     isUnfillable: order.isUnfillable,
     items: (order.items || []).map((item) => ({
+      productId: item.productId || '',
       name: item.name || item.sku || 'Item',
       secondary: item.sku || '',
       imageUrl: item.imageUrl || ''
@@ -667,10 +683,25 @@ function mapOrder(order: CustomerOrderSummary) {
   };
 }
 
+function matchesOrderQuery(order: ReturnType<typeof mapOrder>, q: string): boolean {
+  const lower = q.toLowerCase();
+  return order.name.toLowerCase().includes(lower) || order.id.toLowerCase().includes(lower);
+}
+
+type MappedOrder = ReturnType<typeof mapOrder>;
+
 // Recent orders: live customer orders from Solr (docType:ORDER, customerPartyId).
-const recentOrders = computed(() => recentOrdersSource.value.slice(0, 12).map(mapOrder));
-const allOrders = computed(() => recentOrdersSource.value.map(mapOrder));
-const unfillableOrders = computed(() => recentOrdersSource.value.filter((o) => o.isUnfillable).map(mapOrder));
+const recentOrders = computed(() => {
+  const mapped: MappedOrder[] = recentOrdersSource.value.slice(0, 12).map(mapOrder);
+  const q = recentOrdersQuery.value.trim();
+  return q ? mapped.filter((o) => matchesOrderQuery(o, q)) : mapped;
+});
+const allOrders = computed(() => {
+  const mapped: MappedOrder[] = recentOrdersSource.value.map(mapOrder);
+  const q = allOrdersQuery.value.trim();
+  return q ? mapped.filter((o) => matchesOrderQuery(o, q)) : mapped;
+});
+const unfillableOrders = computed(() => recentOrdersSource.value.filter((o: CustomerOrderSummary) => o.isUnfillable).map(mapOrder));
 
 const segmentLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -720,6 +751,23 @@ async function onAddContact(contactMechTypeId: string) {
   const { data, role } = await modal.onWillDismiss();
   if (role === 'confirm' && data) {
     await addContact(contactMechTypeId, data);
+  }
+}
+
+async function onEditContact(section: import('@/types/customer').ContactSection) {
+  const existingContact = customer.value?.contactMechs.find(
+    (cm: import('@/types/customer').CustomerContactMech) => cm.contactMechId === section.values[0]?.contactMechId
+  );
+  const modal = await modalController.create({
+    component: AddContactModal,
+    componentProps: { contactMechTypeId: section.contactMechTypeId, existingContact }
+  });
+  await modal.present();
+  const { data, role } = await modal.onWillDismiss();
+  if (role === 'confirm' && data && section.values[0]) {
+    await updateContact(section.contactMechTypeId, section.values[0].contactMechId, data);
+  } else if (role === 'expire' && section.values[0]) {
+    await expireContact(section.values[0].contactMechId);
   }
 }
 
