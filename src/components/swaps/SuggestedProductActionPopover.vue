@@ -1,61 +1,65 @@
 <template>
-    <ion-content>
-      <ion-list>
-        <ion-list-header>{{ shipmentMethod.description ? shipmentMethod.description : shipmentMethod.shipmentMethodTypeId}}</ion-list-header>
-        <ion-item button @click="cancelItem()">
-          {{ translate("Cancel item") }}
-        </ion-item>
-          <ion-item button @click="customerSwap()">
-            {{ translate("Custom swap") }}
-          </ion-item>
-          <ion-item button @click="viewInventory()">
-            {{ translate("View inventory") }}
-          </ion-item>
-      </ion-list>
-    </ion-content>
-  </template>
+  <ion-content>
+    <ion-list>
+      <ion-list-header>
+        <ion-label>{{ popoverTitle }}</ion-label>
+      </ion-list-header>
+      <ion-item button detail="false" @click="cancelItem()">
+        <ion-label>{{ translate("Cancel item") }}</ion-label>
+      </ion-item>
+      <ion-item button detail="false" @click="customSwap()">
+        <ion-label>{{ translate("Custom swap") }}</ion-label>
+      </ion-item>
+      <ion-item button detail="false" @click="viewInventory()">
+        <ion-label>{{ translate("View inventory") }}</ion-label>
+      </ion-item>
+    </ion-list>
+  </ion-content>
+</template>
   
-  <script setup lang="ts">
-  import { IonContent, IonItem, IonList, IonListHeader, modalController, popoverController } from "@ionic/vue";
-  import { translate } from "@common";
-  import ProductInventoryModal from "@/components/inventory/ProductInventoryModal.vue";
-  import CustomSwapModal from "@/components/swaps/CustomSwapModal.vue";
+<script setup lang="ts">
+import { computed } from "vue";
+import { IonContent, IonItem, IonLabel, IonList, IonListHeader, modalController, popoverController } from "@ionic/vue";
+import { translate } from "@common";
+import ProductInventoryModal from "@/components/inventory/ProductInventoryModal.vue";
+import CustomSwapModal from "@/components/swaps/CustomSwapModal.vue";
 
-  const props = defineProps(["item", "task"]);
+const props = defineProps(["item", "task"]);
 
-  const closePopover = () => popoverController.dismiss();
+const popoverTitle = computed(() => props.item?.internalName || props.item?.productName || props.item?.productId || translate("Item"));
 
-  const viewInventory = async () => {
-    closePopover();
-    const modal = await modalController.create({
-      component: ProductInventoryModal,
-      componentProps: { productId: props.item.productId }
-    });
-    await modal.present();
-  };
+const closePopover = () => popoverController.dismiss();
 
-  const cancelItem = () => {
-    const original = (props.task.items ?? []).find((i: any) => i.orderItemSeqId === props.item._sourceOrderItemSeqId);
-    if (original) original._cancel = true;
-    closePopover();
-  };
+const viewInventory = async () => {
+  closePopover();
+  const modal = await modalController.create({
+    component: ProductInventoryModal,
+    componentProps: { productId: props.item.productId }
+  });
+  await modal.present();
+};
 
-  const customerSwap = async () => {
-    closePopover();
-    // Find the original order item to get its substituteProducts list
-    const originalItem = (props.task.items ?? []).find((i: any) => i.orderItemSeqId === props.item._sourceOrderItemSeqId);
-    const modal = await modalController.create({
-      component: CustomSwapModal,
-      componentProps: {
-        substituteProducts: originalItem?.substituteProducts ?? [],
-        facilityId: props.task.facilityId,
-      },
-    });
-    await modal.present();
-    const { data: selectedProduct } = await modal.onWillDismiss();
-    if (!selectedProduct || !originalItem) return;
-    // Apply selected product as custom substitute on the original item
-    originalItem._customSubstitute = selectedProduct;
-    originalItem._cancel = false;
-  };
-  </script>
+const cancelItem = () => {
+  const original = (props.task.items ?? []).find((i: any) => i.orderItemSeqId === props.item._sourceOrderItemSeqId);
+  if (original) original._cancel = true;
+  closePopover();
+};
+
+const customSwap = async () => {
+  closePopover();
+  const originalItem = (props.task.items ?? []).find((i: any) => i.orderItemSeqId === props.item._sourceOrderItemSeqId);
+  const modal = await modalController.create({
+    component: CustomSwapModal,
+    componentProps: {
+      substituteProducts: originalItem?.substituteProducts ?? [],
+      facilityId: props.task.facilityId,
+    },
+  });
+  await modal.present();
+  const { data: selectedProduct } = await modal.onWillDismiss();
+  if (!selectedProduct || !originalItem) return;
+
+  originalItem._customSubstitute = selectedProduct;
+  originalItem._cancel = false;
+};
+</script>
