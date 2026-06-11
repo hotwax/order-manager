@@ -41,97 +41,16 @@
       </ion-item>
 
       <div class="fraud-orders">
-        <ion-card v-if="fraudTasks.length" v-for="task in fraudTasks" :key="task.workEffortId">
-          <ion-item lines="none">
-            <ion-checkbox slot="start" v-model="selectedOrders[task.workEffortId]" />
-            <ion-label>
-              {{ task.orderName }}
-              <p>{{ task.orderDate }}</p>
-            </ion-label>
-            <ion-chip slot="end" outline color="medium">
-              <ion-icon :icon="pricetagOutline" />
-              <ion-label>{{ task.workEffortId }}</ion-label>
-            </ion-chip>
-            <ion-note slot="end">{{ money(task.grandTotal) }}</ion-note>
-          </ion-item>
-
-          <ion-list lines="full" class="contact-details">
-            <ion-item>
-              <ion-icon slot="start" :icon="personOutline" />
-              <ion-label>{{ [task.customer?.firstName, task.customer?.lastName].filter(Boolean).join(' ') || translate('Unknown') }}</ion-label>
-            </ion-item>
-            <ion-item>
-              <ion-icon slot="start" :icon="callOutline" />
-              <ion-label>{{ [task.billingPhone?.countryCode, task.billingPhone?.areaCode, task.billingPhone?.contactNumber].filter(Boolean).join(' ') || '-' }}</ion-label>
-            </ion-item>
-            <ion-item>
-              <ion-icon slot="start" :icon="mailOutline" />
-              <ion-label>{{ (task.billingEmail ?? task.shippingEmail) || '-' }}</ion-label>
-            </ion-item>
-          </ion-list>
-
-          <ion-card-content>
-            <div class="fraud-card-columns">
-              <ion-list lines="full">
-                <ion-list-header>
-                  <ion-label>{{ translate('Ordered items') }}</ion-label>
-                </ion-list-header>
-                <ion-item v-for="item in task.items" :key="item.orderItemSeqId">
-                  <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="getProduct(item.productId)?.mainImageUrl">
-                    <DxpShopifyImg :src="getProduct(item.productId).mainImageUrl" :key="getProduct(item.productId).mainImageUrl" size="small" />
-                  </ion-thumbnail>
-                  <ion-label>
-                    {{ getProduct(item.productId)?.productName || item.productName || item.itemDescription }}
-                    <p>{{ translate('SKU') }}: {{ getProduct(item.productId)?.internalName || item.internalName }}</p>
-                  </ion-label>
-                  <ion-note slot="end">{{ money(item.unitPrice) }}</ion-note>
-                </ion-item>
-              </ion-list>
-
-              <ion-list lines="full">
-                <ion-list-header>
-                  <ion-label>{{ translate('Payment') }}</ion-label>
-                </ion-list-header>
-                <ion-item v-for="payment in task.payments" :key="payment.paymentMethodTypeId">
-                  <ion-label>
-                    {{ payment.paymentMethodDescription || payment.paymentMethodTypeId }}
-                    <p>{{ payment.paymentMethodTypeId }}</p>
-                    <ion-badge color="warning">{{ payment.statusId }}</ion-badge>
-                  </ion-label>
-                  <ion-note slot="end">{{ money(payment.maxAmount) }}</ion-note>
-                </ion-item>
-              </ion-list>
-
-              <ion-list lines="none">
-                <ion-list-header>
-                  <ion-label>{{ translate('Risk analysis') }}</ion-label>
-                </ion-list-header>
-
-                <ion-item v-for="risk in task.risks" :key="risk.providerId">
-                  <ion-icon slot="start" :icon="informationCircleOutline" :color="riskLevelColor(risk.riskLevelEnumId)" />
-                  <ion-label>
-                    {{ risk.providerName }} · {{ seedStore.enumDescription(risk.riskLevelEnumId) }}
-                    <template v-for="fact in risk.facts" :key="fact.factSeqId">
-                      <p>{{ fact.description }} · {{ seedStore.enumDescription(fact.sentimentEnumId) }}</p>
-                    </template>
-                  </ion-label>
-                </ion-item>
-              </ion-list>
-            </div>
-          </ion-card-content>
-
-          <div class="card-actions">
-            <ion-buttons class="action-buttons">
-              <ion-button fill="clear" color="primary" @click="resolveTask(task)">{{ translate('Resolve task') }}</ion-button>
-              <ion-button fill="clear" color="danger" @click="cancelOrder(task)">{{ translate('Cancel order') }}</ion-button>
-              <ion-button fill="clear" color="primary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
-            </ion-buttons>
-            <ion-item lines="none" class="suggested-action">
-              <ion-icon slot="start" :icon="hardwareChipOutline" />
-              <ion-label>{{ translate('Suggested action') }}: {{ task.suggestedAction }}</ion-label>
-            </ion-item>
-          </div>
-        </ion-card>
+        <FraudTaskCard
+          v-for="task in fraudTasks"
+          :key="task.workEffortId"
+          :ref="setCardRef"
+          :task="task"
+          :selectable="true"
+          :selected="!!selectedOrders[task.workEffortId]"
+          @update:selected="val => selectedOrders[task.workEffortId] = val"
+          @completed="fetchFraudTasks()"
+        />
         <div class="empty-state" v-if="!fraudTasks.length">
           <p v-html="getEmptyMessage()"></p>
         </div>
@@ -161,16 +80,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import { IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCheckbox, IonChip, IonContent, IonFooter, IonHeader, IonIcon, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonNote, IonPage, IonSelect, IonSelectOption, IonThumbnail, IonTitle, IonToolbar, alertController, onIonViewWillEnter } from '@ionic/vue';
-import { callOutline, checkmarkCircleOutline, cubeOutline, hardwareChipOutline, informationCircleOutline, mailOutline, personOutline, pricetagOutline, removeCircleOutline, warningOutline } from 'ionicons/icons';
-import { DxpShopifyImg, translate } from '@common';
+import { ref, computed, watch, onBeforeUpdate } from 'vue';
+import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonItem, IonLabel, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToolbar, IonInfiniteScroll, IonInfiniteScrollContent, alertController, onIonViewWillEnter } from '@ionic/vue';
+import { translate } from '@common';
 import { showToast } from '@/utils';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useProductMaster } from '@/composables/useProductMaster';
-import { useProductCacheStore } from '@/store/productCache';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
@@ -185,6 +103,15 @@ const orderChannel = ref('');
 const severity = ref('');
 const selectAll = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
+
+// Card component instances, collected in render order to map back to fraudTasks.
+const cardRefs = ref<any[]>([]);
+const setCardRef = (el: any) => {
+  if (el) cardRefs.value.push(el);
+};
+onBeforeUpdate(() => {
+  cardRefs.value = [];
+});
 
 const fraudTasks = computed(() => orderTaskStore.getFraudTasks);
 const isScrollable = computed(() => orderTaskStore.isFraudTasksScrollable);
@@ -213,10 +140,6 @@ function clearFilters() {
   orderChannel.value = '';
   severity.value = '';
   fetchFraudTasks();
-}
-
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
 const fetchFraudTasks = async (vSize?: any, vIndex?: any) => {
@@ -250,81 +173,19 @@ async function loadMoreFraudTasks(event: any) {
   await event.target.complete();
 }
 
-function getProduct(productId: string) {
-  return useProductCacheStore().getProduct(productId);
-}
-
-function riskLevelColor(riskLevelEnumId: string): string {
-  const map: Record<string, string> = {
-    ORLVL_HIGH: 'danger',
-    ORLVL_MEDIUM: 'warning',
-    ORLVL_LOW: 'success',
-    ORLVL_NONE: 'medium',
-    ORLVL_PENDING: 'medium',
-  };
-  return map[riskLevelEnumId] ?? 'medium';
-}
-
-
-function sentimentIcon(sentimentEnumId: string): string {
-  const map: Record<string, string> = {
-    SENT_POSITIVE: checkmarkCircleOutline,
-    SENT_NEGATIVE: warningOutline,
-    SENT_NEUTRAL: removeCircleOutline,
-  };
-  return map[sentimentEnumId] ?? informationCircleOutline;
-}
-
-function sentimentColor(sentimentEnumId: string): string {
-  const map: Record<string, string> = {
-    SENT_POSITIVE: 'success',
-    SENT_NEGATIVE: 'danger',
-    SENT_NEUTRAL: 'medium',
-  };
-  return map[sentimentEnumId] ?? 'medium';
-}
-
-
-async function resolveTask(task: any) {
-  try {
-    await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_COMPLETED');
-    await showToast(translate('Task resolved successfully.'));
-    await fetchFraudTasks();
-  } catch {
-    await showToast(translate('Failed to resolve task. Please try again.'));
-  }
-}
-
-async function cancelOrder(task: any) {
-  const alert = await alertController.create({
-    header: translate('Cancel order'),
-    message: translate('Are you sure you want to cancel this order? This action cannot be undone.'),
-    buttons: [
-      { text: translate('No'), role: 'cancel' },
-      {
-        text: translate('Yes'),
-        role: 'confirm',
-        handler: async () => {
-          const items = (task.items ?? []).map((item: any) => ({
-            orderItemSeqId: item.orderItemSeqId,
-            shipGroupSeqId: task.shipGroupSeqId,
-          }));
-          await orderTaskStore.cancelOrder(task.orderId, items);
-          await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED');
-          await fetchFraudTasks();
-        }
-      }
-    ]
-  });
-  await alert.present();
+// Collect the card instances for the currently-selected tasks, in fraudTasks order.
+function selectedCards(): any[] {
+  return fraudTasks.value
+    .map((task: any, index: number) => (selectedOrders.value[task.workEffortId] ? cardRefs.value[index] : null))
+    .filter(Boolean);
 }
 
 async function bulkResolve() {
-  const tasks = fraudTasks.value.filter((task: any) => selectedOrders.value[task.workEffortId]);
-  if (!tasks.length) return;
+  const cards = selectedCards();
+  if (!cards.length) return;
   try {
-    await Promise.all(tasks.map((task: any) => orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_COMPLETED')));
-    await showToast(translate('{count} tasks resolved.', { count: tasks.length }));
+    await Promise.all(cards.map((card: any) => card.submitResolve()));
+    await showToast(translate('{count} tasks resolved.', { count: cards.length }));
     selectedOrders.value = {};
     selectAll.value = false;
     await fetchFraudTasks();
@@ -334,25 +195,18 @@ async function bulkResolve() {
 }
 
 async function bulkCancel() {
-  const tasks = fraudTasks.value.filter((task: any) => selectedOrders.value[task.workEffortId]);
-  if (!tasks.length) return;
+  const cards = selectedCards();
+  if (!cards.length) return;
   const alert = await alertController.create({
     header: translate('Cancel orders'),
-    message: translate('Are you sure you want to cancel {count} orders? This action cannot be undone.', { count: tasks.length }),
+    message: translate('Are you sure you want to cancel {count} orders? This action cannot be undone.', { count: cards.length }),
     buttons: [
       { text: translate('No'), role: 'cancel' },
       {
         text: translate('Yes'),
         role: 'confirm',
         handler: async () => {
-          await Promise.all(tasks.map(async (task: any) => {
-            const items = (task.items ?? []).map((item: any) => ({
-              orderItemSeqId: item.orderItemSeqId,
-              shipGroupSeqId: task.shipGroupSeqId,
-            }));
-            await orderTaskStore.cancelOrder(task.orderId, items);
-            await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED');
-          }));
+          await Promise.all(cards.map((card: any) => card.submitCancel()));
           selectedOrders.value = {};
           selectAll.value = false;
           await fetchFraudTasks();
@@ -373,50 +227,9 @@ onIonViewWillEnter(() => {
   padding: 0 16px 16px;
 }
 
-.contact-details {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-}
-
-.fraud-card-columns {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-}
-
-.card-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px;
-}
-
-.action-buttons {
-  flex-wrap: wrap;
-}
-
-.suggested-action {
-  flex: 1 1 260px;
-  max-width: 360px;
-}
-
-.fact-item {
-  --padding-start: 32px;
-}
-
 @media (max-width: 640px) {
   .fraud-orders {
     padding-inline: 0;
-  }
-
-  .card-actions {
-    align-items: stretch;
-  }
-
-  .suggested-action {
-    max-width: none;
   }
 }
 </style>
