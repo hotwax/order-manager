@@ -191,7 +191,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         console.error('Failed to fetch the address validation tasks', err);
       }
     },
-    async fetchSwapTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
+    async fetchSwapTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; swappable?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', workEffortTypeId: 'RESOLVE_ONHOLD_ORDER', workEffortPurposeTypeId: 'NEG_RES_REVIEW', productStoreId } });

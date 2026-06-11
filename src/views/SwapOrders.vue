@@ -17,10 +17,7 @@
         @search="fetchSwapTasks()"
         @clear="clearFilters"
       >
-        <ion-select v-model="assignee" :label="translate('Assignee')" label-placement="stacked" interface="popover">
-          <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
-          <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
-        </ion-select>
+        <ion-toggle v-model="swappable">{{ translate('Swappable') }}</ion-toggle>
         <ion-input v-model="dateAfter" :label="translate('Date after')" label-placement="stacked" type="date" />
         <ion-input v-model="dateBefore" :label="translate('Date before')" label-placement="stacked" type="date" />
         <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
@@ -59,32 +56,29 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonInput, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToolbar, onIonViewWillEnter } from '@ionic/vue';
+import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonInput, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToggle, IonToolbar, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
-import { useUserStore } from '@/store/user';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
-const userStore = useUserStore();
 
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
-const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
 
 const searchQuery = ref('');
-const assignee = ref('');
+const swappable = ref(false);
 const dateAfter = ref('');
 const dateBefore = ref('');
 const orderChannel = ref('');
 
 const swapTasks = computed(() => orderTaskStore.getSwapTasks);
 const isScrollable = computed(() => orderTaskStore.isSwapTasksScrollable);
-const hasFilters = computed(() => !!(searchQuery.value || assignee.value || dateAfter.value || dateBefore.value || orderChannel.value));
+const hasFilters = computed(() => !!(searchQuery.value || swappable.value || dateAfter.value || dateBefore.value || orderChannel.value));
 
 function getEmptyMessage() {
   return hasFilters.value
@@ -92,13 +86,13 @@ function getEmptyMessage() {
     : translate('No records found.');
 }
 
-watch([assignee, dateAfter, dateBefore, orderChannel], () => {
+watch([swappable, dateAfter, dateBefore, orderChannel], () => {
   fetchSwapTasks();
 });
 
 function clearFilters() {
   searchQuery.value = '';
-  assignee.value = '';
+  swappable.value = '';
   dateAfter.value = '';
   dateBefore.value = '';
   orderChannel.value = '';
@@ -114,8 +108,8 @@ const fetchSwapTasks = async (vSize?: any, vIndex?: any) => {
     ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
     ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
     ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
+    ...(swappable.value && { swappable: 'Y' }),
     ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
-    ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
   });
 
   const productIds = swapTasks.value

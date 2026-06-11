@@ -14,6 +14,7 @@
         v-model="searchQuery"
         :placeholder="translate('Search')"
         :show-clear="false"
+        @search="fetchFraudTasks()"
         @clear="clearFilters"
       >
         <ion-select v-model="assignee" :label="translate('Assignee')" label-placement="stacked" interface="popover">
