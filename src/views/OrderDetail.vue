@@ -2326,6 +2326,7 @@ ion-card-header ion-buttons {
 .ship-group-expanded-options,
 .ship-group-summary-container,
 .ship-group-card-details {
+  box-sizing: content-box;
   max-height: 0;
   opacity: 0;
   overflow: hidden;
