@@ -36,6 +36,12 @@
           <ion-label>{{ translate("Blocked") }}</ion-label>
         </ion-item-divider>
         <ion-menu-toggle :auto-hide="false">
+          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/unfillable" router-direction="root">
+            <ion-icon slot="start" :icon="banOutline" />
+            <ion-label>{{ translate("Unfillable") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+        <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(SWAP_ORDER_PERMISSION)" button router-link="/swap" router-direction="root">
             <ion-icon slot="start" :icon="alertCircleOutline" />
             <ion-label>{{ translate("Swap") }}</ion-label>
@@ -62,6 +68,12 @@
         <ion-item-divider v-if="hasPermission(ORDER_VIEW_PERMISSION)">
           <ion-label>{{ translate("In progress") }}</ion-label>
         </ion-item-divider>
+        <ion-menu-toggle :auto-hide="false">
+          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/brokering" router-direction="root">
+            <ion-icon slot="start" :icon="gitNetworkOutline" />
+            <ion-label>{{ translate("Brokering queue") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/open" router-direction="root">
             <ion-icon slot="start" :icon="playCircleOutline" />
@@ -97,8 +109,10 @@ import {
   addCircleOutline,
   airplaneOutline,
   alertCircleOutline,
+  banOutline,
   cubeOutline,
   funnelOutline,
+  gitNetworkOutline,
   locationOutline,
   pauseCircleOutline,
   peopleOutline,

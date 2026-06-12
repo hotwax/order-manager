@@ -16,6 +16,12 @@ import { commonUtil, cookieHelper, logger } from '@common';
 import { accxuiConfig } from '@common/core/configRegistry';
 import { useUserStore } from '@/store/user';
 
+function redirectFromLogin() {
+  if (window.location.pathname === '/login') {
+    window.location.replace('/');
+  }
+}
+
 export async function tryDevAutoLogin(): Promise<void> {
   if (!import.meta.env.DEV) return;
   if (import.meta.env.VITE_DEV_AUTO_LOGIN === 'false') return;
@@ -28,8 +34,11 @@ export async function tryDevAutoLogin(): Promise<void> {
 
   const auth = useAuth();
   const userStore = useUserStore();
-  // If we already have a valid session for this OMS, skip — no need to re-login.
-  if (auth.isAuthenticated.value && cookieHelper().get('oms') === oms && commonUtil.getMaargURL()) return;
+  // If the browser already has a valid session, do not replace it with the dev default.
+  if (auth.isAuthenticated.value && commonUtil.getMaargURL()) {
+    redirectFromLogin();
+    return;
+  }
 
   try {
     // Seed the OMS cookie so commonUtil.getOmsURL() resolves correctly before login.
@@ -48,9 +57,7 @@ export async function tryDevAutoLogin(): Promise<void> {
     };
     accxuiConfig.value.oms = oms;
     accxuiConfig.value.current = userStore.current;
-    if (window.location.pathname === '/login') {
-      window.location.replace('/');
-    }
+    redirectFromLogin();
     logger.info('[dev] auto-login succeeded for', username, 'on', oms);
   } catch (err) {
     // Never log the password. The composable already shows a toast on failure.
