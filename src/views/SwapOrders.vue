@@ -5,7 +5,7 @@
         <ion-buttons slot="start">
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate('Swap') }}</ion-title>
+        <ion-title>{{ translate(props.pageTitle) }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
@@ -70,11 +70,18 @@ import { useStockStore } from '@/store/stock';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
+const props = withDefaults(defineProps<{
+  pageTitle?: string;
+  initialSwappable?: boolean;
+}>(), {
+  pageTitle: 'Swap',
+  initialSwappable: false
+});
 
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
 
 const searchQuery = ref('');
-const swappable = ref(false);
+const swappable = ref(props.initialSwappable);
 const dateAfter = ref('');
 const dateBefore = ref('');
 const orderChannel = ref('');
@@ -95,7 +102,7 @@ watch([swappable, dateAfter, dateBefore, orderChannel], () => {
 
 function clearFilters() {
   searchQuery.value = '';
-  swappable.value = false;
+  swappable.value = props.initialSwappable;
   dateAfter.value = '';
   dateBefore.value = '';
   orderChannel.value = '';

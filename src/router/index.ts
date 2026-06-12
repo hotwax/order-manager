@@ -20,6 +20,7 @@ import CustomerDetail from '@/views/CustomerDetail.vue';
 import Settings from '@/views/Settings.vue';
 import Funnel from '@/views/Funnel.vue';
 import SwapOrders from '@/views/SwapOrders.vue';
+import UnfillableOrders from '@/views/UnfillableOrders.vue';
 import BadAddressOrders from '@/views/BadAddressOrders.vue';
 import FraudOrders from '@/views/FraudOrders.vue';
 import HoldOrders from '@/views/HoldOrders.vue';
@@ -89,6 +90,15 @@ const routes: RouteRecordRaw[] = [
     beforeEnter: authGuard,
     meta: {
       permissionId: CUSTOMER_VIEW_PERMISSION
+    }
+  },
+  {
+    path: '/unfillable',
+    name: 'UnfillableOrders',
+    component: UnfillableOrders,
+    beforeEnter: authGuard,
+    meta: {
+      permissionId: SWAP_ORDER_PERMISSION
     }
   },
   {
