@@ -182,13 +182,7 @@ async function loadMenuCounts() {
   menuCountsLoadedFor.value = cacheKey;
   const requests: Promise<unknown>[] = [];
 
-  if (hasPermission(SWAP_ORDER_PERMISSION) || hasPermission(ORDER_UPDATE_PERMISSION) || hasPermission(ORDER_CANCEL_PERMISSION)) {
-    requests.push(customerServiceStore.fetchUnfillable(productStoreId));
-    requests.push(customerServiceStore.fetchHoldTasks(productStoreId));
-  }
-
   if (hasPermission(ORDER_VIEW_PERMISSION)) {
-    requests.push(customerServiceStore.fetchOpenOrders(productStoreId));
     requests.push(orderStore.fetchWorkflowOrders('open', menuCountFilters('open')));
     requests.push(orderStore.fetchWorkflowOrders('inflight', menuCountFilters('inflight')));
     requests.push(orderStore.fetchWorkflowOrders('packed', menuCountFilters('packed')));

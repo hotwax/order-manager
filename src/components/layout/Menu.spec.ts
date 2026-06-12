@@ -39,12 +39,15 @@ describe('order manager menu', () => {
     expect(source).toContain('slot="end">{{ formatCount(menuCounts.open) }}</ion-note>');
     expect(source).toContain('slot="end">{{ formatCount(menuCounts.inflight) }}</ion-note>');
     expect(source).toContain('slot="end">{{ formatCount(menuCounts.packed) }}</ion-note>');
-    expect(source).toContain('customerServiceStore.fetchUnfillable(productStoreId)');
-    expect(source).toContain('customerServiceStore.fetchHoldTasks(productStoreId)');
-    expect(source).toContain('customerServiceStore.fetchOpenOrders(productStoreId)');
+    expect(source).toContain('customerServiceStore.unfillableTrend');
+    expect(source).toContain('customerServiceStore.getHoldTasks');
+    expect(source).toContain('customerServiceStore.getOpenOrders');
     expect(source).toContain("orderStore.fetchWorkflowOrders('open', menuCountFilters('open'))");
     expect(source).toContain("orderStore.fetchWorkflowOrders('inflight', menuCountFilters('inflight'))");
     expect(source).toContain("orderStore.fetchWorkflowOrders('packed', menuCountFilters('packed'))");
+    expect(source).not.toContain('customerServiceStore.fetchUnfillable(productStoreId)');
+    expect(source).not.toContain('customerServiceStore.fetchHoldTasks(productStoreId)');
+    expect(source).not.toContain('customerServiceStore.fetchOpenOrders(productStoreId)');
     expect(source).not.toContain('<ion-grid');
     expect(source).not.toContain('<ion-row');
     expect(source).not.toContain('<ion-col');
