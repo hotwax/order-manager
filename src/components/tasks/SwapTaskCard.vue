@@ -37,7 +37,7 @@
       </ion-list>
     </template>
 
-    <ion-list lines="none">
+    <ion-list lines="full">
       <ion-list-header>
         <ion-label>{{ translate('Ordered items') }}</ion-label>
       </ion-list-header>
@@ -68,7 +68,7 @@
       </ion-item>
     </ion-list>
 
-    <ion-list lines="none" v-if="task.items?.length">
+    <ion-list lines="full" v-if="task.items?.length">
       <ion-list-header>
         <ion-label>{{ translate('Suggested items') }}</ion-label>
       </ion-list-header>

@@ -21,6 +21,7 @@ describe('swap task card Figma routing block', () => {
     expect(source).toContain('_sourceOrderItemSeqId: item.orderItemSeqId');
     expect(source).toContain('chevronForwardOutline');
     expect(source).toContain('openSuggestedProductActionsPopover($event, orderedSwapActionItem(item), task)');
+    expect((source.match(/<ion-list lines=\"full\"/g) ?? []).length).toBeGreaterThanOrEqual(3);
     expect(source).toContain('function productImageUrl(productId: string): string');
     expect(source).toContain('getProduct(productId)?.mainImageUrl || \'\'');
     expect(source).toContain(':src="productImageUrl(item.productId)"');
