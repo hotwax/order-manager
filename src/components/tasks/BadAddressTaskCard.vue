@@ -1,6 +1,6 @@
 <template>
   <TaskCardShell
-    :title="task.orderName"
+    :title="taskOrderTitle(task)"
     :subtitle="taskItemSummary(task)"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
@@ -101,6 +101,7 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
+import { taskOrderTitle } from '@/utils/taskCardDisplay';
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean }>(), {
   selectable: false,
