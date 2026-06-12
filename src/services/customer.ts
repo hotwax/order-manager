@@ -577,13 +577,15 @@ function mapOrderGroup(group: any): CustomerOrderSummary {
 
 /**
  * Customer orders + lifetime aggregates from Solr (enterpriseSearch core,
- * docType:ORDER, customerPartyId). The app calls runSolrQuery directly. Order docs
+ * docType:ORDER, customerPartyId). Goes through the backend-aware useSolrSearch
+ * composable (Moqui search/query vs OFBiz runSolrQuery). Order docs
  * are per-item, so we group by orderId. We PAGE THROUGH every group so the lifetime
  * value/count are accurate regardless of order volume (ngroups = order count; one
  * grandTotal per group summed = lifetime value). A Solr stats/facet sum can replace
  * this loop later for performance.
  */
 export async function getCustomerOrdersFromSolr(partyId: string, params: { pageSize?: number } = {}): Promise<CustomerOrdersResult> {
+  const { runSolrQuery } = useSolrSearch();
   const pageSize = params.pageSize ?? 200;
   const maxPages = 50; // safety cap (~10k orders)
 
@@ -592,23 +594,19 @@ export async function getCustomerOrdersFromSolr(partyId: string, params: { pageS
   let currencyUom = 'USD';
 
   for (let page = 0; page < maxPages; page++) {
-    const response = await api({
-      url: 'admin/runSolrQuery',
-      method: 'post',
-      data: {
-        coreName: 'enterpriseSearch',
-        json: {
-          query: '*:*',
-          filter: ['docType:ORDER', `customerPartyId:"${partyId}"`],
-          params: {
-            group: true,
-            'group.field': 'orderId',
-            'group.limit': 10,
-            'group.ngroups': true,
-            sort: 'orderDate desc',
-            rows: pageSize,
-            start: page * pageSize
-          }
+    const response = await runSolrQuery({
+      coreName: 'enterpriseSearch',
+      json: {
+        query: '*:*',
+        filter: ['docType:ORDER', `customerPartyId:"${partyId}"`],
+        params: {
+          group: true,
+          'group.field': 'orderId',
+          'group.limit': 10,
+          'group.ngroups': true,
+          sort: 'orderDate desc',
+          rows: pageSize,
+          start: page * pageSize
         }
       }
     });

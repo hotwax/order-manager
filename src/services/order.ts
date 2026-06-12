@@ -35,7 +35,7 @@ const orderSolrFields = [
   'customerLastName',
   'customerName',
   'customerEmailId',
-  'customerPhoneNumber',
+  'contactPhoneNumbers',
   'partyId',
   'salesChannelEnumId',
   'salesChannelDesc',
@@ -47,7 +47,6 @@ const orderSolrFields = [
   'shipmentMethodTypeId',
   'shipmentMethodDesc',
   'shipmentId',
-  'returnId',
   'priority'
 ];
 
@@ -61,7 +60,7 @@ const orderSearchQueryFields = [
   'customerPartyName^12',
   'customerName^12',
   'customerEmailId^10',
-  'customerPhoneNumber^10',
+  'contactPhoneNumbers^10',
   'productId^6',
   'productName^6',
   'internalName^6',
@@ -70,8 +69,7 @@ const orderSearchQueryFields = [
   'orderNotes^4',
   'salesChannelDesc',
   'productStoreName',
-  'shipmentId',
-  'returnId'
+  'shipmentId'
 ];
 
 export function buildOrderLookupPayload(params: OrderSearchParams = {}) {
