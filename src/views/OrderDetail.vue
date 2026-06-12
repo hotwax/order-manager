@@ -121,6 +121,8 @@
             </ion-list>
           </ion-card>
 
+          <OrderPaymentCard v-if="selectedSegment === 'holds'" :payments="order.payments" :currency="order.currency" />
+
           <ion-card>
             <ion-card-header>
               <ion-card-title>{{ translate('Source') }}</ion-card-title>
@@ -249,24 +251,7 @@
         <!-- Totals Card -->
 
         <div class="order-summary">
-          <ion-card>
-            <ion-card-header>
-              <ion-card-title>{{ translate('Payment') }}</ion-card-title>
-            </ion-card-header>
-            <ion-list lines="none">
-              <ion-item v-for="payment in order.payments" :key="payment.id">
-                <ion-label>
-                  <p class="overline">{{ payment.paymentMethodTypeId || payment.method }}</p>
-                  {{ payment.paymentMethodTypeDesc || payment.method }}
-                  <p>{{ payment.statusDesc || payment.status }}</p>
-                </ion-label>
-                <ion-note slot="end">{{ money(payment.amount, order.currency) }}</ion-note>
-              </ion-item>
-              <ion-item v-if="!order.payments?.length">
-                <ion-label>{{ translate('No payment preference records') }}</ion-label>
-              </ion-item>
-            </ion-list>
-          </ion-card>
+          <OrderPaymentCard :payments="order.payments" :currency="order.currency" />
           <ion-card class="totals">
             <ion-list lines="full">
               <ion-item>
@@ -936,6 +921,7 @@ import { useProductMaster } from '@/composables/useProductMaster';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import AddItemToOrderModal from '@/components/orders/AddItemToOrderModal.vue';
+import OrderPaymentCard from '@/components/orders/OrderPaymentCard.vue';
 import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
 import RejectItemsModal from '@/components/orders/RejectItemsModal.vue';
 import ProductInventoryModal from '@/components/inventory/ProductInventoryModal.vue';
