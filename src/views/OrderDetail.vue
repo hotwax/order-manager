@@ -17,10 +17,12 @@
         <ion-item lines="none">
           <ion-icon slot="start" :icon="ticketOutline" />
           <ion-label>
-            <p class="overline">{{ order.status }}</p>
             <h1>{{ order.orderName ? order.orderName : order.id }}</h1>
             <p>{{ order.id }}</p>
           </ion-label>
+          <ion-badge v-if="order.status" slot="end" :color="commonUtil.getStatusColor(order.statusId)">
+            {{ order.status }}
+          </ion-badge>
         </ion-item>
 
         <!-- timeline: child matching .order-detail-timeline -->
