@@ -13,6 +13,9 @@ describe('swap task card Figma routing block', () => {
     expect(source).toContain('formatRoutingTimestamp(task)');
     expect(source).toContain("translate('Routing justification')");
     expect(source).toContain("routingParts.join(' > ')");
+    expect(source).toContain('isSwapItemUnavailable(item)');
+    expect(source).toContain("translate('Unavailable')");
+    expect(source).toContain('<ion-text color="danger">');
     expect(source).not.toContain("translate('Order facility change routing')");
     expect(source).not.toContain("translate('Routing facility change description')");
     expect(source).not.toContain('<ion-grid');
