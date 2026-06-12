@@ -163,7 +163,7 @@ const seedStore = useSeedStore();
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 
 function getCustomerName(customer: any): string {
-  return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');
+  return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ');
 }
 
 function getCardTitle(task: any): string {

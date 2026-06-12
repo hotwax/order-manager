@@ -127,7 +127,7 @@ function resolutionCommunication() {
 }
 
 function getCustomerName(customer: any): string {
-  return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');
+  return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ');
 }
 
 function getPhoneNumber(task: any): string {

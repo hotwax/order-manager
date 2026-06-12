@@ -41,4 +41,21 @@ describe('task and ship-group card layout', () => {
     expect(taskShell).toContain('const normalizedValue = value > 1 ? value / 100 : value;');
     expect(taskShell).toContain('return Math.max(0, Math.min(1, normalizedValue));');
   });
+
+  it('lets empty task contact data hide the contact row', () => {
+    const taskShell = readFileSync(resolve(process.cwd(), 'src/components/tasks/TaskCardShell.vue'), 'utf8');
+    const taskCards = [
+      'src/components/tasks/BadAddressTaskCard.vue',
+      'src/components/tasks/FraudTaskCard.vue',
+      'src/components/tasks/HoldTaskCard.vue',
+      'src/components/tasks/SwapTaskCard.vue',
+    ].map((path) => readFileSync(resolve(process.cwd(), path), 'utf8'));
+
+    expect(taskShell).toContain('v-if="hasContactDetails"');
+    expect(taskShell).toContain("{{ contactName || translate('Unknown') }}");
+    taskCards.forEach((source) => {
+      expect(source).toContain("function getCustomerName(customer: any): string {\n  return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ');\n}");
+      expect(source).not.toContain("return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');");
+    });
+  });
 });
