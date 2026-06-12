@@ -14,7 +14,7 @@ This document maps the reviewed HC Ionic design system nodes to the current Ioni
 
 | Requirement | Evidence | Current result |
 | --- | --- | --- |
-| Push current work in logical PRs. | The Current PR Stack section lists each draft PR and its focused scope above the component-folder/facility-selection foundation. GitHub mergeability is checked separately from this document before updating PR descriptions. | Satisfied for the pushed frontend/documentation stack; #91 is the final mapping/documentation PR above #121. |
+| Push current work in logical PRs. | The Current PR Stack section lists each draft PR and its focused scope above the component-folder/facility-selection foundation. GitHub mergeability is checked separately from this document before updating PR descriptions. | Satisfied for the pushed frontend/documentation stack; #91 is the final mapping/documentation PR above #122. |
 | Review every provided Figma node and avoid one-pass-only mapping. | The Reviewed Figma Nodes table covers all top-level node ids from the request. The Nested Figma Contexts Reviewed table records the follow-up node ids used for deeper inspection of cards, lists, rows, footers, modals, filters, and menu structure. | Satisfied for frontend mapping; non-implemented Figma details are recorded under Remaining Gaps or Data Contract Notes. |
 | Focus styling/layout on Fraud, Hold, Swap/Unfillable, and Bad Address queues without breaking behavior. | Queue surfaces map through `FraudTaskCard.vue`, `HoldTaskCard.vue`, `SwapTaskCard.vue`, `BadAddressTaskCard.vue`, `TaskCardShell.vue`, `SearchFilterCard.vue`, `FilterSelect.vue`, `DateFilterSelect.vue`, `FilterToggle.vue`, and `SelectAllResultsItem.vue`. Focused specs and production builds are noted in Visual Validation. | Satisfied for frontend-safe Figma surfaces; blocked actions are intentionally omitted instead of mocked. |
 | Build reusable components where needed. | Shared task shell, filter controls, select-all row, order payment card, and order item row are called out in the mapping rows instead of duplicating markup per page. | Satisfied in the stacked PRs. |
@@ -131,7 +131,8 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
 | #116 | Swap card list divider alignment. |
 | #117 | Swap suggested-product popover divider alignment. |
 | #120 | Unfillable route and menu alignment. |
-| #121 | Order Manager menu section alignment. |
+| #121 | Order Manager menu section and queue-count alignment. |
+| #122 | App-wide modal compliance source guard. |
 | #91 | Figma alignment map and remaining gap documentation. |
 
 ## Visual Validation
@@ -165,6 +166,7 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
 - A follow-up suggested-product popover review found visible full-width dividers between `Cancel item`, `Custom swap`, and `View inventory`. PR #117 aligns the popover list with Ionic `ion-list lines="full"` and validates the focused popover source guard plus production build.
 - A follow-up Unfillable page/menu review found the Figma top-level frame `54191:288203` is named `Unfillable`, the toolbar title is `Unfillable`, the menu item is `Blocked > Unfillable`, and the filter card uses Searchbar, Swappable toggle, Date after, Date before, and Channel controls. PR #120 adds `/unfillable`, maps the menu entry there, keeps `/swap` titled `Swap`, and validates the route/menu/swap guards plus production build.
 - A follow-up shared menu review found `54223:47293` groups record lookup links under a `Find` divider after the `In progress` queue group and shows end-slot counts on Blocked/In progress queue rows. PR #121 moves Orders and Customers into that group, keeps Create order there without adding missing Returns or Shipments routes, and adds count notes using existing dashboard/workflow data sources.
+- PR #122 adds a modal compliance source guard across modal components and inline `ion-modal` blocks. It passed 43 checks for header start-slot close icons and editable modal fixed bottom-end FAB actions.
 - PR #109 was validated with the focused order-item row spec and a production build from a detached AccxUI checkout. A Chrome retry at `http://127.0.0.1:8121/orders/M100818` redirected back to `/funnel` through the route permission guard before item rows could be inspected.
 - In the earlier #91 browser pass, `/orders/M100818` rendered the order-detail route with the expected header, summary cards, item rows, footer actions, and tabs. Local backend warnings remained for missing fulfillment timeline and product/Solr lookup data.
 - A ship-group collapse smoke test found PR #77's open options wrapper could clip after moving padding onto the animated state because global border-box sizing made `max-height` consume padding.
@@ -174,6 +176,7 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
 
 - Editable modal components in the focused order workflows use the AccxUI header close pattern: an icon-only close button inside `ion-buttons slot="start"`.
 - Single-step editable modals use a fixed bottom-right icon-only `ion-fab-button` for save/add/confirm actions. PR #98 aligns `OrderItemAttributesModal.vue` with this rule by moving the add action out of inline content and into the fixed FAB.
+- PR #122 makes this app-wide by guarding every `*Modal.vue` component and every inline `ion-modal` block with source-level checks for the header close pattern and editable modal FAB placement.
 - `AddItemToOrderModal.vue` keeps per-row `Add` buttons because adding a product is a repeated row action inside a search result list, not the modal's single primary confirmation action.
 - View-only or result-preview modals such as inventory/history/Shopify-created previews keep close-only or completion UI because they do not collect and save a form.
 
