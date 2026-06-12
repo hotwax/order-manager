@@ -33,107 +33,16 @@
       </ion-item>
 
       <div class="hold-orders-list">
-        <ion-card v-if="heldTasks.length" v-for="task in heldTasks" :key="task.workEffortId">
-          <ion-item lines="none">
-            <ion-checkbox slot="start" v-model="selectedOrders[task.workEffortId]" />
-            <ion-label>
-              {{ task.orderName }}
-              <p>{{ task.orderDate }}</p>
-            </ion-label>
-            <ion-chip slot="end" outline color="medium">
-              {{ translate('Task') }}: {{ task.workEffortId }}
-            </ion-chip>
-            <ion-note slot="end" color="dark">{{ money(task.grandTotal) }}</ion-note>
-          </ion-item>
-
-          <ion-card-content>
-            <!-- Contact Details -->
-            <div class="contact-details border-top ion-padding-top">
-              <ion-item lines="none">
-                <ion-icon slot="start" :icon="personOutline" />
-                <ion-label>
-                  {{ getCustomerName(task.customer) }}
-                  <p>{{ translate('Customer') }}</p>
-                </ion-label>
-                <ion-buttons slot="end">
-                  <ion-button fill="clear" :href="'tel:' + commonUtil.formatPhoneNumber(task.billingPhone?.countryCode, task.billingPhone?.areaCode, task.billingPhone?.contactNumber)">
-                    <ion-icon slot="icon-only" :icon="callOutline" />
-                  </ion-button>
-                  <ion-button fill="clear" :href="'mailto:' + (task.billingEmail ?? task.shippingEmail)">
-                    <ion-icon slot="icon-only" :icon="mailOutline" />
-                  </ion-button>
-                </ion-buttons>
-              </ion-item>
-
-              <ion-item lines="none" v-if="task.customerPhone">
-                <ion-label>
-                  <p>{{ translate('Telecom contact') }}</p>
-                  {{ task.customerPhone }}
-                </ion-label>
-              </ion-item>
-
-              <ion-item lines="none" v-if="task.customerEmail">
-                <ion-label>
-                  <p>{{ translate('Email contact') }}</p>
-                  {{ task.customerEmail }}
-                </ion-label>
-              </ion-item>
-            </div>
-
-            <!-- Task Details -->
-            <div class="task-details border-top ion-padding-top">
-              <ion-list lines="none">
-                <ion-item>
-                  <ion-label>
-                    {{ task.workEffortName }}
-                    <p>{{ task.purposeDescription }}</p>
-                  </ion-label>
-                  <ion-note slot="end" v-if="task.estimatedCompletionDate">{{ translate('Due') }}: {{ task.estimatedCompletionDate }}</ion-note>
-                </ion-item>
-                <ion-item v-if="task.notes">
-                  <ion-label>
-                    <p>{{ translate('Notes') }}</p>
-                    {{ task.notes }}
-                  </ion-label>
-                </ion-item>
-              </ion-list>
-
-              <ion-list lines="none" class="ion-margin-top">
-                <ion-item>
-                  <ion-label>
-                    {{ getAssignedParty(task, 'TASK_ASSIGNEE') }}
-                    <p>{{ translate('Assignee') }}</p>
-                  </ion-label>
-                </ion-item>
-                <ion-item>
-                  <ion-label>
-                    {{ getAssignedParty(task, 'TASK_REPORTER') }}
-                    <p>{{ translate('Reporter') }}</p>
-                  </ion-label>
-                </ion-item>
-              </ion-list>
-
-              <ion-list lines="none" class="ion-margin-top">
-                <ion-item>
-                  <ion-textarea
-                    :label="translate('Resolution comment')"
-                    label-placement="stacked"
-                    :placeholder="translate('Enter resolution comment...')"
-                    v-model="resolutionComments[task.workEffortId]"
-                  />
-                </ion-item>
-              </ion-list>
-            </div>
-
-            <!-- Actions -->
-            <div class="actions border-top ion-margin-top ion-padding-top">
-              <ion-buttons>
-                <ion-button fill="solid" color="primary" @click="resolveTask(task.workEffortId)">{{ translate('Resolve task') }}</ion-button>
-                <ion-button fill="outline" color="secondary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
-              </ion-buttons>
-            </div>
-          </ion-card-content>
-        </ion-card>
+        <template v-if="heldTasks.length">
+          <HoldTaskCard
+            v-for="task in heldTasks"
+            :key="task.workEffortId"
+            :task="task"
+            :selected="!!selectedOrders[task.workEffortId]"
+            @update:selected="selectedOrders[task.workEffortId] = $event"
+            @resolve="resolveTask"
+          />
+        </template>
         <div class="empty-state" v-if="!heldTasks.length">
           <p v-html="getEmptyMessage()"></p>
         </div>
@@ -174,36 +83,23 @@ import {
   IonToolbar,
   IonItem,
   IonLabel,
-  IonList,
-  IonNote,
-  IonCard,
-  IonCardContent,
-  IonIcon,
   IonButton,
   IonCheckbox,
   IonSelect,
   IonSelectOption,
   IonInput,
-  IonChip,
-  IonTextarea,
   alertController,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
   onIonViewWillEnter
 } from '@ionic/vue';
-import {
-  personOutline,
-  callOutline,
-  mailOutline
-} from 'ionicons/icons';
-import { commonUtil, translate } from '@common';
+import { translate } from '@common';
+import HoldTaskCard from '@/components/HoldTaskCard.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
-import { useUserStore } from '@/store/user';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 
 const orderTaskStore = useOrderTaskStore();
-const userStore = useUserStore();
 const seedStore = useSeedStore();
 
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
@@ -214,7 +110,6 @@ const dateAfter = ref('');
 const dateBefore = ref('');
 const orderChannel = ref('');
 const selectAll = ref(false);
-const resolutionComments = ref<Record<string, string>>({});
 const selectedOrders = ref<Record<string, boolean>>({});
 
 const heldTasks = computed(() => orderTaskStore.getHoldTasks);
@@ -291,21 +186,6 @@ async function resolveSelectedTasks() {
   });
   await alert.present();
 }
-
-function getCustomerName(customer: any): string {
-  return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');
-}
-
-function getAssignedParty(task: any, roleTypeId: string): string {
-  const party = task.assignedParties?.find((p: any) => p.roleTypeId === roleTypeId);
-  if (!party) return roleTypeId === 'TASK_ASSIGNEE' ? translate('Unassigned') : translate('System');
-  return party.groupName || [party.firstName, party.lastName].filter(Boolean).join(' ') || party.partyId;
-}
-
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-}
-
 
 const fetchHoldTasks = async (vSize?: any, vIndex?: any) => {
   const viewSize = vSize ? vSize : import.meta.env.VITE_VIEW_SIZE;

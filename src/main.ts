@@ -48,7 +48,6 @@ const app = createApp(App)
   })
   .use(i18n)
   .use(pinia)
-  .use(router)
 
 initialiseConfig({
   postLogin: useUserStore().postLogin,
@@ -60,11 +59,13 @@ initialiseConfig({
   router: router
 })
 
-if (import.meta.env.DEV) {
-  import('./dev/autoLogin').then(({ tryDevAutoLogin }) => tryDevAutoLogin());
-}
+app.use(router)
 
-router.isReady().then(() => {
+router.isReady().then(async () => {
+  if (import.meta.env.DEV) {
+    await import('./dev/autoLogin').then(({ tryDevAutoLogin }) => tryDevAutoLogin());
+  }
+
   app.directive('image-preview', imagePreview)
   app.mount('#app');
 });

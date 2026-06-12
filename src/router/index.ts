@@ -23,6 +23,8 @@ import SwapOrders from '@/views/SwapOrders.vue';
 import BadAddressOrders from '@/views/BadAddressOrders.vue';
 import FraudOrders from '@/views/FraudOrders.vue';
 import HoldOrders from '@/views/HoldOrders.vue';
+import UnfillableOrders from '@/views/UnfillableOrders.vue';
+import BrokeringQueue from '@/views/BrokeringQueue.vue';
 import OpenOrders from '@/views/OpenOrders.vue';
 import InflightOrders from '@/views/InflightOrders.vue';
 import PackedOrders from '@/views/PackedOrders.vue';
@@ -92,6 +94,12 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/unfillable',
+    name: 'UnfillableOrders',
+    component: UnfillableOrders,
+    beforeEnter: authGuard
+  },
+  {
     path: '/swap',
     name: 'SwapOrders',
     component: SwapOrders,
@@ -126,6 +134,12 @@ const routes: RouteRecordRaw[] = [
     meta: {
       permissionId: ORDER_UPDATE_PERMISSION
     }
+  },
+  {
+    path: '/brokering',
+    name: 'BrokeringQueue',
+    component: BrokeringQueue,
+    beforeEnter: authGuard
   },
   {
     path: '/open',
