@@ -183,8 +183,8 @@
           <ion-item lines="full" class="order-items-toolbar">
             <ion-checkbox :checked="areAllSelected" justify="start" label-placement="end"
               @ionChange="toggleSelectAll($event.detail.checked)">{{ translate('Select all') }}</ion-checkbox>
-            <ion-button slot="end" fill="outline" @click="openAddItemFromItemsSegment">
-              {{ translate('Add Items') }}
+            <ion-button slot="end" fill="outline" color="medium" @click="openAddItemFromItemsSegment">
+              {{ translate('Add items') }}
             </ion-button>
           </ion-item>
           <ion-accordion-group>

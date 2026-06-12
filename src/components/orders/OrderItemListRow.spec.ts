@@ -24,4 +24,12 @@ describe('order item list row Figma variants', () => {
     expect(source).toContain("const facilityName = sg.facilityId ? (sg.facilityName || sg.facilityId) : '';");
     expect(source).toContain("if (!attributeCount) return '';");
   });
+
+  it('matches the Figma order items toolbar actions', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/views/OrderDetail.vue'), 'utf8');
+
+    expect(source).toContain("{{ translate('Select all') }}");
+    expect(source).toContain('<ion-button slot="end" fill="outline" color="medium" @click="openAddItemFromItemsSegment">');
+    expect(source).toContain("{{ translate('Add items') }}");
+  });
 });
