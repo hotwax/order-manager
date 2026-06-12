@@ -3,17 +3,15 @@ import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 
 describe('swap queue filters', () => {
-  it('uses Ionic select controls for the Figma filter row', () => {
+  it('uses an Ionic toggle for the Figma swappable filter', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/views/SwapOrders.vue'), 'utf8');
 
-    expect(source).toContain('<FilterSelect v-model="swappable"');
-    expect(source).toContain(':label="translate(\'Swappable\')"');
-    expect(source).toContain('<ion-select-option value="Y">{{ translate(\'Swappable\') }}</ion-select-option>');
-    expect(source).toContain("const swappable = ref('');");
-    expect(source).toContain("swappable.value = '';");
-    expect(source).toContain("...(swappable.value && { swappable: swappable.value })");
-    expect(source).not.toContain('<ion-toggle v-model="swappable"');
+    expect(source).toContain('<FilterToggle v-model="swappable" :label="translate(\'Swappable\')" />');
+    expect(source).toContain("import FilterToggle from '@/components/common/FilterToggle.vue';");
+    expect(source).toContain('const swappable = ref(false);');
+    expect(source).toContain('swappable.value = false;');
+    expect(source).toContain("...(swappable.value && { swappable: 'Y' })");
+    expect(source).not.toContain('<FilterSelect v-model="swappable"');
     expect(source).not.toContain('<ion-select v-model="swappable"');
-    expect(source).not.toContain('IonToggle');
   });
 });

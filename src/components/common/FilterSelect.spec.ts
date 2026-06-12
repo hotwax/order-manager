@@ -23,7 +23,8 @@ describe('filter select resting state', () => {
     expect(fraudOrders.match(/<FilterSelect/g)?.length).toBe(4);
     expect(holdOrders.match(/<FilterSelect/g)?.length).toBe(2);
     expect(badAddressOrders.match(/<FilterSelect/g)?.length).toBe(2);
-    expect(swapOrders.match(/<FilterSelect/g)?.length).toBe(2);
+    expect(swapOrders.match(/<FilterSelect/g)?.length).toBe(1);
+    expect(swapOrders).toContain('<FilterToggle v-model="swappable"');
     expect(`${fraudOrders}\n${holdOrders}\n${badAddressOrders}\n${swapOrders}`).not.toContain('IonSelect,');
   });
 });
