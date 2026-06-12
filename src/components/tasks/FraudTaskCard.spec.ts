@@ -1,0 +1,19 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { describe, expect, it } from 'vitest';
+
+describe('fraud task card Figma footer', () => {
+  it('renders suggested action as an Ionic item with a described action value', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/components/tasks/FraudTaskCard.vue'), 'utf8');
+
+    expect(source).toContain('class="suggested-action"');
+    expect(source).toContain('<ion-text :color="suggestedActionColor(task)">');
+    expect(source).toContain('suggestedActionLabel(task)');
+    expect(source).toContain('seedStore.enumDescription(task.riskRecommendationEnumId)');
+    expect(source).toContain('recommendation.includes(\'CANCEL\') ? \'danger\' : undefined');
+    expect(source).not.toContain("{{ translate('Suggested action') }}: {{ task.suggestedAction }}");
+    expect(source).not.toContain('<ion-grid');
+    expect(source).not.toContain('<ion-row');
+    expect(source).not.toContain('<ion-col');
+  });
+});
