@@ -1,27 +1,46 @@
 <template>
-    <ion-content>
-      <ion-list>
-        <ion-list-header>{{ shipmentMethod.description ? shipmentMethod.description : shipmentMethod.shipmentMethodTypeId}}</ion-list-header>
-        <ion-item button @click="cancelItem()">
-          {{ translate("Cancel item") }}
-        </ion-item>
-          <ion-item button @click="customerSwap()">
-            {{ translate("Custom swap") }}
-          </ion-item>
-          <ion-item button @click="viewInventory()">
-            {{ translate("View inventory") }}
-          </ion-item>
-      </ion-list>
-    </ion-content>
-  </template>
-  
-  <script setup lang="ts">
-  import { IonContent, IonItem, IonList, IonListHeader, modalController, popoverController } from "@ionic/vue";
-  import { translate } from "@common";
+  <ion-content>
+    <ion-list>
+      <ion-list-header>
+        <ion-label>{{ productIdentifier }}</ion-label>
+      </ion-list-header>
+      <ion-item button detail="false" @click="cancelItem()">
+        {{ translate("Cancel item") }}
+      </ion-item>
+      <ion-item button detail="false" @click="customerSwap()">
+        {{ translate("Custom swap") }}
+      </ion-item>
+      <ion-item button detail="false" @click="viewInventory()">
+        {{ translate("View inventory") }}
+      </ion-item>
+    </ion-list>
+  </ion-content>
+</template>
+
+<script setup lang="ts">
+  import { computed } from "vue";
+  import { IonContent, IonItem, IonLabel, IonList, IonListHeader, modalController, popoverController } from "@ionic/vue";
+  import { commonUtil, translate } from "@common";
   import ProductInventoryModal from "@/components/inventory/ProductInventoryModal.vue";
   import CustomSwapModal from "@/components/swaps/CustomSwapModal.vue";
+  import { useProductCacheStore } from "@/store/productCache";
+  import { useProductStore } from "@/store/productStore";
 
   const props = defineProps(["item", "task"]);
+
+  const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+
+  const productIdentifier = computed(() => {
+    const product = props.item?.productId
+      ? useProductCacheStore().getProduct(props.item.productId)
+      : undefined;
+
+    return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, product)
+      || props.item?.productId
+      || props.item?.sku
+      || props.item?.internalName
+      || translate("Product");
+  });
 
   const closePopover = () => popoverController.dismiss();
 
