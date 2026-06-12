@@ -21,6 +21,12 @@
       <slot name="heading-end" />
     </ion-item>
 
+    <ion-progress-bar
+      v-if="normalizedProgressValue !== undefined"
+      :value="normalizedProgressValue"
+      :color="progressColor || undefined"
+    />
+
     <ion-list v-if="hasContactDetails" lines="full" class="task-card-contact-details">
       <ion-item>
         <ion-icon slot="start" :icon="personOutline" />
@@ -77,7 +83,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonButton, IonButtons, IonCard, IonCardContent, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
+import { IonButton, IonButtons, IonCard, IonCardContent, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonList, IonNote, IonProgressBar } from '@ionic/vue';
 import { callOutline, mailOutline, personOutline, ticketOutline } from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
 
@@ -92,6 +98,8 @@ const props = withDefaults(defineProps<{
   contactEmail?: string;
   contactEmailHref?: string;
   contentLayout?: 'grid' | 'stack';
+  progressValue?: number;
+  progressColor?: string;
   selectable?: boolean;
   selected?: boolean;
 }>(), {
@@ -104,6 +112,8 @@ const props = withDefaults(defineProps<{
   contactEmail: '',
   contactEmailHref: '',
   contentLayout: 'stack',
+  progressValue: undefined,
+  progressColor: '',
   selectable: false,
   selected: false,
 });
@@ -117,6 +127,16 @@ const hasContactDetails = computed(() => (
   || !!props.contactPhone
   || !!props.contactEmail
 ));
+
+const normalizedProgressValue = computed(() => {
+  if (props.progressValue == null) return undefined;
+
+  const value = Number(props.progressValue);
+  if (!Number.isFinite(value)) return undefined;
+
+  const normalizedValue = value > 1 ? value / 100 : value;
+  return Math.max(0, Math.min(1, normalizedValue));
+});
 
 async function copyContact(value: string) {
   if (!value) return;

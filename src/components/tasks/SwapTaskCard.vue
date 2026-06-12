@@ -7,6 +7,8 @@
     :contact-phone-href="getPhoneHref(task)"
     :contact-email="getEmailAddress(task)"
     :contact-email-href="getEmailHref(task)"
+    :progress-value="taskProgressValue(task)"
+    :progress-color="task.progressColor"
     content-layout="grid"
     :selectable="selectable"
     :selected="selected"
@@ -240,6 +242,18 @@ function isVirtualFacility(task: any): boolean {
 
 function brokerageLabel(task: any): string {
   return isVirtualFacility(task) ? translate('Not Brokered') : translate('Brokered');
+}
+
+function taskProgressValue(task: any): number | undefined {
+  const rawValue = task.progressValue
+    ?? task.progress
+    ?? task.progressPercent
+    ?? task.completionPercentage;
+
+  if (rawValue == null || rawValue === '') return undefined;
+
+  const value = Number(rawValue);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 function getPhoneNumber(task: any): string {
