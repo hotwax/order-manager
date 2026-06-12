@@ -146,7 +146,7 @@
           <ion-label>{{ translate('Items') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="ship-groups">
-          <ion-label>{{ translate('Ship groups') }}</ion-label>
+          <ion-label>{{ translate('Shipgroups') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="holds">
           <ion-label>{{ translate('Holds') }}</ion-label>
