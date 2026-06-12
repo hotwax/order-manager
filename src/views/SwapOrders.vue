@@ -17,7 +17,10 @@
         @search="fetchSwapTasks()"
         @clear="clearFilters"
       >
-        <ion-toggle v-model="swappable">{{ translate('Swappable') }}</ion-toggle>
+        <ion-select v-model="swappable" :label="translate('Swappable')" label-placement="stacked" interface="popover">
+          <ion-select-option value="">{{ translate('All') }}</ion-select-option>
+          <ion-select-option value="Y">{{ translate('Swappable') }}</ion-select-option>
+        </ion-select>
         <ion-input v-model="dateAfter" :label="translate('Date after')" label-placement="stacked" type="date" />
         <ion-input v-model="dateBefore" :label="translate('Date before')" label-placement="stacked" type="date" />
         <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
@@ -56,7 +59,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonInput, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToggle, IonToolbar, onIonViewWillEnter } from '@ionic/vue';
+import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonInput, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToolbar, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
@@ -71,7 +74,7 @@ const seedStore = useSeedStore();
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
 
 const searchQuery = ref('');
-const swappable = ref(false);
+const swappable = ref('');
 const dateAfter = ref('');
 const dateBefore = ref('');
 const orderChannel = ref('');
@@ -92,7 +95,7 @@ watch([swappable, dateAfter, dateBefore, orderChannel], () => {
 
 function clearFilters() {
   searchQuery.value = '';
-  swappable.value = false;
+  swappable.value = '';
   dateAfter.value = '';
   dateBefore.value = '';
   orderChannel.value = '';
@@ -108,7 +111,7 @@ const fetchSwapTasks = async (vSize?: any, vIndex?: any) => {
     ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
     ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
     ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
-    ...(swappable.value && { swappable: 'Y' }),
+    ...(swappable.value && { swappable: swappable.value }),
     ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
   });
 
