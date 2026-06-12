@@ -17,28 +17,28 @@
         @search="fetchFraudTasks()"
         @clear="clearFilters"
       >
-        <ion-select v-model="assignee" :label="translate('Assignee')" label-placement="stacked" interface="popover">
+        <FilterSelect v-model="assignee" :label="translate('Assignee')">
           <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
           <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
-        </ion-select>
-        <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
+        </FilterSelect>
+        <FilterSelect v-model="orderChannel" :label="translate('Channel')">
           <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
           <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
             {{ channel.description || channel.enumId }}
           </ion-select-option>
-        </ion-select>
-        <ion-select v-model="recommendation" :label="translate('Recommendation')" label-placement="stacked" interface="popover">
+        </FilterSelect>
+        <FilterSelect v-model="recommendation" :label="translate('Recommendation')">
           <ion-select-option value="">{{ translate('All recommendations') }}</ion-select-option>
           <ion-select-option v-for="rec in riskRecommendations" :key="rec.enumId" :value="rec.enumId">
             {{ rec.description || rec.enumId }}
           </ion-select-option>
-        </ion-select>
-        <ion-select v-model="severity" :label="translate('Severity')" label-placement="stacked" interface="popover">
+        </FilterSelect>
+        <FilterSelect v-model="severity" :label="translate('Severity')">
           <ion-select-option value="">{{ translate('All severity') }}</ion-select-option>
           <ion-select-option v-for="level in riskLevels" :key="level.enumId" :value="level.enumId">
             {{ level.description || level.enumId }}
           </ion-select-option>
-        </ion-select>
+        </FilterSelect>
       </SearchFilterCard>
 
       <ion-item lines="none" v-if="fraudTasks.length">
@@ -87,9 +87,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUpdate } from 'vue';
-import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonItem, IonLabel, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToolbar, IonInfiniteScroll, IonInfiniteScrollContent, alertController, onIonViewWillEnter } from '@ionic/vue';
+import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonItem, IonLabel, IonMenuButton, IonPage, IonSelectOption, IonTitle, IonToolbar, IonInfiniteScroll, IonInfiniteScrollContent, alertController, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
 import { showToast } from '@/utils';
+import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';

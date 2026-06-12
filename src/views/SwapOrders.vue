@@ -17,18 +17,18 @@
         @search="fetchSwapTasks()"
         @clear="clearFilters"
       >
-        <ion-select v-model="swappable" :label="translate('Swappable')" label-placement="stacked" interface="popover">
+        <FilterSelect v-model="swappable" :label="translate('Swappable')">
           <ion-select-option value="">{{ translate('All') }}</ion-select-option>
           <ion-select-option value="Y">{{ translate('Swappable') }}</ion-select-option>
-        </ion-select>
+        </FilterSelect>
         <DateFilterSelect v-model="dateAfter" :label="translate('Date after')" />
         <DateFilterSelect v-model="dateBefore" :label="translate('Date before')" />
-        <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
+        <FilterSelect v-model="orderChannel" :label="translate('Channel')">
           <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
           <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
             {{ channel.description || channel.enumId }}
           </ion-select-option>
-        </ion-select>
+        </FilterSelect>
       </SearchFilterCard>
 
       <div class="swap-order-list">
@@ -59,9 +59,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToolbar, onIonViewWillEnter } from '@ionic/vue';
+import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonMenuButton, IonPage, IonSelectOption, IonTitle, IonToolbar, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
+import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
