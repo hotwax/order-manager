@@ -16,7 +16,7 @@ This document maps the reviewed HC Ionic design system nodes to the current Ioni
 | --- | --- | --- | --- |
 | `54760:1223` | `Order / Park - Alert` | `confirmParkOrder()` in `src/utils/index.ts` uses Ionic `alertController` with Cancel and Park order actions. | Aligned. |
 | `54775:47722` | `Order / Park - Modal` | `src/components/fulfillment/FacilityModal.vue` renders the four parking buckets as an `ion-radio-group` and uses the fixed save FAB. | Aligned in PR #75. |
-| `54187:184360` | `Order / Holds` order-detail frame | `src/views/OrderDetail.vue` maps the header identity item, summary cards, timeline, `ion-segment`, and Holds segment task-card rendering. | Broad structure aligned; PR #106 aligns the ship-group segment label to the Figma `Shipgroups` copy, and PR #111 maps the order status to the identity row end-slot badge. Task-card details are tracked by queue-specific rows below. |
+| `54187:184360` | `Order / Holds` order-detail frame | `src/views/OrderDetail.vue` maps the header identity item, summary cards, timeline, `ion-segment`, and Holds segment task-card rendering. | Broad structure aligned; PR #106 aligns the ship-group segment label to the Figma `Shipgroups` copy, PR #111 maps the order status to the identity row end-slot badge, and PR #112 aligns the Order identifications and Source card labels/order. Payment-card placement remains tracked below. |
 | `54191:288203` | Swap queue page | `src/views/SwapOrders.vue`, `src/components/tasks/SwapTaskCard.vue`, and `src/components/swaps/SuggestedProductActionPopover.vue`. | Aligned in PRs #92, #94, #95, #96, #97, #100, #101, #104, #105, and #107; progress renders from task data when provided, headings fall back to order identifiers when order names are missing, Park passes the task id to the parking endpoint, Swap status/footer colors match the nested card, empty non-date filter selects render the Figma `Select` resting text, and empty contact rows can collapse for the unfillable-parking variant. |
 | `54190:286012` | Swap suggested-product popover | `src/components/swaps/SuggestedProductActionPopover.vue` uses Ionic popover/list/header/items for Cancel item, Custom swap, and View inventory. | Aligned in PR #80. |
 | `54181:113016` | `Order / Shipgroups` page, collapsed and expanded cards | `src/views/OrderDetail.vue` ship-group card: header, progress bar, hold warning row, option chips, selected option rows, timeline, collapsed summary, expanded details, actions, and smooth collapse handling. | Aligned across PRs #77, #90, and #99 plus follow-ups; padding is animated on the collapsible wrapper. |
@@ -34,6 +34,9 @@ These nested calls were used to avoid treating the large page frames as complete
 | `54760:1223` | `Order / Park - Alert` | Park alert uses the Ionic Alert component with title `Park this order?`, explanatory message, and trailing `Cancel` / `Park order` buttons. | `confirmParkOrder()` creates an Ionic `alertController` alert with matching title, message, cancel role button, and confirm-role Park order button. |
 | `54775:47722`, `54786:9928`, `54786:11088`, `54786:12252`, `54786:13416`, `54780:1223` | `Order / Park - Modal` | Park modal uses Ionic Modal/Toolbar/Item/Radio/FAB components: header start close icon, title `Park order`, four radio rows for Rejected, Unfillable, Backorder, Pre-order, and a fixed bottom-right save FAB. | `FacilityModal.vue` maps this to `ion-header`, `ion-toolbar`, icon-only close button, `ion-radio-group` rows backed by the four parking facility ids, and an icon-only fixed save `ion-fab-button`. |
 | `54190:189194` | `54187:184360` | Order-detail identity item uses Ionic `Item` and `Badge`: leading `ticket-outline`, `<order name>` primary text, `<order id>` secondary text, and an `Approved` badge in the item end slot. | `OrderDetail.vue` uses a leading `ticketOutline` icon, order name/id label, and PR #111 moves `order.status` into an end-slot `ion-badge` colored through `commonUtil.getStatusColor(order.statusId)`. |
+| `54190:189192` | `54187:184360` | Order identifications card uses Ionic list-card rows ordered as `Order Number`, `Order ID`, and `Order Name`. | PR #112 reorders the existing `OrderDetail.vue` identifications rows to external id, order id, and order name, with labels matching the nested Figma card. |
+| `54190:189204` | `54187:184360` | Source card uses Ionic list-card rows labeled `Brand` and `Channel`. | PR #112 renames the existing Source rows from product-store/sales-channel wording to `Brand` and `Channel` while keeping the same Ionic card/list structure. |
+| `54190:189205` | `54187:184360` | Payment card uses an Ionic list-card row with payment method id overline, method label, status text, and amount in the end slot. | Current `OrderDetail.vue` has the same payment row structure inside the Items segment summary. Moving or duplicating it into the always-visible header cluster is deferred until the Order / Items and Order / Holds card clusters are reconciled together. |
 | `54190:215460` | `54187:184360` | Order-detail segment uses Ionic Segment button components with labels `Items`, `Shipgroups`, selected `Holds`, and `Comms`. | `OrderDetail.vue` uses `ion-segment` and `ion-segment-button` for the same four segment values; PR #106 changes the ship-group tab label to `Shipgroups` to match the nested Figma component. |
 | `54187:183970` | `54181:113016` | Ship-group warning item with warning icon, `Hold task: ...`, and `View details` button. | `src/views/OrderDetail.vue` renders an Ionic warning `ion-item` and switches to the Holds segment in PR #90. |
 | `54184:146519` | `54181:113016` | Ship-group selected options render as Ionic `Item` components; the gift-message selected option includes a `trash-outline` end action. | `src/views/OrderDetail.vue` keeps selected options visible in collapsed and expanded states. PR #99 maps the gift-message trash action to `clearGiftMessage(shipGroup)` through the existing ship-group update path. |
@@ -101,6 +104,7 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
 | #109 | Order item chip variant guards. |
 | #110 | Order items add-action alignment. |
 | #111 | Order-detail identity status badge alignment. |
+| #112 | Order-detail header card label alignment. |
 | #91 | Figma alignment map and remaining gap documentation. |
 
 ## Visual Validation
@@ -121,6 +125,7 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
 - A follow-up nested Order / Items review found the chip-heavy detail row should only appear for real facility or attribute data. PR #109 keeps empty facility values and zero-attribute counts on the normal quantity row variant.
 - A follow-up nested Order / Items toolbar review found the add action should be an outline medium Ionic button labeled `Add items`. PR #110 aligns that toolbar action while leaving other `Add Items` actions unchanged.
 - A follow-up nested Order / Holds identity-item review found the order status belongs in an end-slot Ionic badge rather than as duplicate overline text above the order name. PR #111 moves `order.status` into that badge and validates the pattern with a focused source guard plus production build.
+- Follow-up nested Order / Holds list-card reviews found Figma labels for the Order identifications and Source cards. PR #112 aligns those row labels/order and validates the pattern with the same focused header spec plus production build.
 - PR #109 was validated with the focused order-item row spec and a production build from a detached AccxUI checkout. A Chrome retry at `http://127.0.0.1:8121/orders/M100818` redirected back to `/funnel` through the route permission guard before item rows could be inspected.
 - In the earlier #91 browser pass, `/orders/M100818` rendered the order-detail route with the expected header, summary cards, item rows, footer actions, and tabs. Local backend warnings remained for missing fulfillment timeline and product/Solr lookup data.
 - A ship-group collapse smoke test found PR #77's open options wrapper could clip after moving padding onto the animated state because global border-box sizing made `max-height` consume padding.
@@ -148,6 +153,12 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
    - The local status seed probe did not return a `TASK_PARKED` status.
    - PR #101 makes Bad Address and Swap pass `workEffortId` to `parkOrder(...)` and avoids direct frontend status normalization after parking.
    - Backend confirmation is still needed for the post-park task lifecycle: whether the Park endpoint closes, cancels, or leaves the task open when a work-effort id is supplied.
+
+3. Order-detail payment card placement:
+   - Nested Figma node `54190:189205` places the Payment list card in the `Order / Holds` header detail cluster.
+   - Current `OrderDetail.vue` renders the Payment card in the Items segment summary, next to totals.
+   - Moving it into the always-visible header would improve `Order / Holds` alignment, but duplicating it would violate the screen deduplication rule.
+   - This should be resolved by reconciling the `Order / Items` and `Order / Holds` header/detail clusters together before moving the payment card.
 
 ## Data Contract Notes
 
