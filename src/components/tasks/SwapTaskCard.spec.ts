@@ -16,6 +16,7 @@ describe('swap task card Figma routing block', () => {
     expect(source).toContain('isSwapItemUnavailable(item)');
     expect(source).toContain("translate('Unavailable')");
     expect(source).toContain('<ion-text color="danger">');
+    expect(source).toContain('<ion-text color="success">{{ translate(\'Approved swap\') }}</ion-text>');
     expect(source).toContain('orderedSwapActionItem(item)');
     expect(source).toContain('_sourceOrderItemSeqId: item.orderItemSeqId');
     expect(source).toContain('chevronForwardOutline');
@@ -31,6 +32,7 @@ describe('swap task card Figma routing block', () => {
     expect(source).toContain('?? task.progressPercent');
     expect(source).toContain('?? task.completionPercentage');
     expect(source).toContain('parkOrder(task.orderId, task.shipGroupSeqId, facilityId, task.workEffortId)');
+    expect(source).toContain('<ion-button fill="clear" color="primary" @click="cancelOrder(task)">{{ translate(\'Cancel order\') }}</ion-button>');
     expect(source).not.toContain("//await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED')");
     expect(source).not.toContain('getProduct(item.productId).mainImageUrl');
     expect(source).not.toContain("translate('Order facility change routing')");
