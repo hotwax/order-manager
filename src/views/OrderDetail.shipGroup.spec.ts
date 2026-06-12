@@ -19,7 +19,11 @@ describe('order detail ship group card', () => {
     expect(source).toContain('shipGroupHoldTaskLabel(shipGroup)');
     expect(source).toContain("selectedSegment.value = 'holds'");
     expect(source).toContain('warningOutline');
+    expect(source).toContain('trashOutline');
     expect(source).toContain("translate('View details')");
+    expect(source).toContain("translate('Clear gift message')");
+    expect(source).toContain('@click.stop="clearGiftMessage(shipGroup)"');
+    expect(source).toContain('await updateShipGroup(shipGroup.id, { giftMessage: null });');
     expect(source).toContain("`${translate('Hold task')}: ${taskName}`");
     expect(source).not.toContain('transition: grid-template-rows');
     expect(source).not.toContain('grid-template-rows: 0fr');

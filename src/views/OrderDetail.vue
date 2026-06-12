@@ -360,6 +360,15 @@
                     <p>{{ translate('Gift message') }}</p>
                     {{ shipGroup.giftMessage }}
                   </ion-label>
+                  <ion-button
+                    slot="end"
+                    fill="clear"
+                    color="medium"
+                    :aria-label="translate('Clear gift message')"
+                    @click.stop="clearGiftMessage(shipGroup)"
+                  >
+                    <ion-icon slot="icon-only" :icon="trashOutline" />
+                  </ion-button>
                 </ion-item>
                 <ion-item v-if="shipGroup.shipAfterDate || shipGroup.shipByDate" button detail="false" lines="none"
                   @click="openShippingDatesModal(shipGroup)">
@@ -917,7 +926,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { calendarOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, saveOutline, sendOutline, shieldOutline, ticketOutline, warningOutline } from 'ionicons/icons';
+import { calendarOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, saveOutline, sendOutline, shieldOutline, ticketOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
@@ -1620,6 +1629,15 @@ async function saveGiftMessage(shipGroup: any) {
     await showToast(translate('Gift message saved.'));
   } catch {
     await showToast(translate('Failed to save gift message.'));
+  }
+}
+
+async function clearGiftMessage(shipGroup: any) {
+  try {
+    await updateShipGroup(shipGroup.id, { giftMessage: null });
+    await showToast(translate('Gift message cleared.'));
+  } catch {
+    await showToast(translate('Failed to clear gift message.'));
   }
 }
 
