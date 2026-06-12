@@ -18,63 +18,54 @@
     </template>
 
     <ion-radio-group v-if="editableAddresses" v-model="selectedAddressType" class="address-task-addresses">
-      <ion-list lines="full">
+      <ion-list v-for="addressOption in addressOptions" :key="addressOption.type" lines="full">
         <ion-list-header>
-          <ion-label>{{ translate('Original address') }}</ion-label>
-          <ion-note slot="end">{{ translate('keep original') }}</ion-note>
-          <ion-radio slot="end" value="original" :aria-label="translate('keep original')" />
+          <ion-label>{{ addressOption.title }}</ion-label>
+          <ion-note slot="end">{{ addressOption.actionLabel }}</ion-note>
+          <ion-radio slot="end" :value="addressOption.type" :aria-label="addressOption.actionLabel" />
         </ion-list-header>
-        <ion-item>
-          <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="editableAddresses.original.address1" />
-        </ion-item>
-        <ion-item>
-          <ion-input :label="translate('Address line 2')" label-placement="stacked" v-model="editableAddresses.original.address2" />
-        </ion-item>
-        <ion-item>
-          <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses.original.city" />
-        </ion-item>
-        <ion-item>
-          <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="editableAddresses.original.postalCode" />
-        </ion-item>
-        <ion-item>
-          <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.original.stateProvinceGeoId" interface="popover">
-            <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
-          </ion-select>
-        </ion-item>
-        <ion-item>
-          <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.original.countryGeoId" interface="popover" @ionChange="editableAddresses.original.stateProvinceGeoId = ''">
-            <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
-          </ion-select>
-        </ion-item>
-      </ion-list>
 
-      <ion-list lines="full">
-        <ion-list-header>
-          <ion-label>{{ translate('Suggested address') }}</ion-label>
-          <ion-note slot="end">{{ translate('use suggested') }}</ion-note>
-          <ion-radio slot="end" value="suggested" :aria-label="translate('use suggested')" />
-        </ion-list-header>
-        <ion-item>
-          <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="editableAddresses.suggested.address1" />
-        </ion-item>
-        <ion-item>
-          <ion-input :label="translate('Address line 2')" label-placement="stacked" v-model="editableAddresses.suggested.address2" />
-        </ion-item>
-        <ion-item>
-          <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses.suggested.city" />
-        </ion-item>
-        <ion-item>
-          <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="editableAddresses.suggested.postalCode" />
-        </ion-item>
-        <ion-item>
-          <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.suggested.stateProvinceGeoId" interface="popover">
-            <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
-          </ion-select>
-        </ion-item>
-        <ion-item>
-          <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.suggested.countryGeoId" interface="popover" @ionChange="editableAddresses.suggested.stateProvinceGeoId = ''">
-            <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
-          </ion-select>
+        <ion-item
+          v-for="row in addressRows(addressOption.type)"
+          :key="row.field"
+          :button="!isEditingAddressField(addressOption.type, row.field)"
+          detail="false"
+          @click="editAddressField(addressOption.type, row.field)"
+        >
+          <template v-if="isEditingAddressField(addressOption.type, row.field)">
+            <ion-input
+              v-if="row.control === 'text'"
+              class="address-task-field-control"
+              :label="row.label"
+              label-placement="stacked"
+              :value="fieldValue(addressOption.type, row.field)"
+              @click.stop
+              @ionInput="setAddressField(addressOption.type, row.field, String($event.detail.value ?? ''))"
+              @ionBlur="clearEditingAddressField"
+            />
+            <ion-select
+              v-else
+              class="address-task-field-control"
+              :label="row.label"
+              label-placement="stacked"
+              interface="popover"
+              :value="fieldValue(addressOption.type, row.field)"
+              @click.stop
+              @ionChange="setAddressField(addressOption.type, row.field, String($event.detail.value ?? '')); clearEditingAddressField()"
+            >
+              <ion-select-option
+                v-for="geo in row.control === 'country' ? countries : states"
+                :key="geo.geoId"
+                :value="geo.geoId"
+              >
+                {{ geo.geoName }}
+              </ion-select-option>
+            </ion-select>
+          </template>
+          <ion-label v-else>
+            <p class="overline">{{ row.label }}</p>
+            {{ row.value || '-' }}
+          </ion-label>
         </ion-item>
       </ion-list>
     </ion-radio-group>
@@ -146,8 +137,31 @@ interface EditableAddress {
   suggested: AddressForm;
 }
 
-const selectedAddressType = ref<string>('original');
+type AddressType = 'original' | 'suggested';
+type AddressField = 'address1' | 'address2' | 'city' | 'postalCode' | 'stateProvinceGeoId' | 'countryGeoId';
+type AddressControl = 'text' | 'state' | 'country';
+
+interface AddressOption {
+  type: AddressType;
+  title: string;
+  actionLabel: string;
+}
+
+interface AddressRow {
+  field: AddressField;
+  label: string;
+  value: string;
+  control: AddressControl;
+}
+
+const selectedAddressType = ref<AddressType>('original');
 const editableAddresses = ref<EditableAddress | null>(null);
+const activeAddressField = ref<{ type: AddressType; field: AddressField } | null>(null);
+
+const addressOptions = computed<AddressOption[]>(() => ([
+  { type: 'original', title: translate('Original address'), actionLabel: translate('keep original') },
+  { type: 'suggested', title: translate('Suggested address'), actionLabel: translate('use suggested') },
+]));
 
 watch(() => props.task, (task) => {
   if (!task) return;
@@ -157,6 +171,7 @@ watch(() => props.task, (task) => {
     original: addressFormFrom(task.shippingAddress, task),
     suggested,
   };
+  activeAddressField.value = null;
 }, { immediate: true });
 
 function addressFormFrom(src: any, task: any): AddressForm {
@@ -199,6 +214,48 @@ function hasAddressValue(address: AddressForm): boolean {
   return [address.address1, address.address2, address.city, address.postalCode, address.stateProvinceGeoId, address.countryGeoId].some(Boolean);
 }
 
+function addressRows(type: AddressType): AddressRow[] {
+  const address = editableAddresses.value?.[type];
+  if (!address) return [];
+
+  return [
+    { field: 'address1', label: translate('Address line 1'), value: address.address1, control: 'text' },
+    { field: 'address2', label: translate('Address line 2'), value: address.address2, control: 'text' },
+    { field: 'city', label: translate('City'), value: address.city, control: 'text' },
+    { field: 'postalCode', label: translate('Postal code'), value: address.postalCode, control: 'text' },
+    { field: 'stateProvinceGeoId', label: translate('State'), value: seedStore.geoName(address.stateProvinceGeoId), control: 'state' },
+    { field: 'countryGeoId', label: translate('Country'), value: seedStore.geoName(address.countryGeoId), control: 'country' },
+  ];
+}
+
+function fieldValue(type: AddressType, field: AddressField): string {
+  return editableAddresses.value?.[type]?.[field] ?? '';
+}
+
+function setAddressField(type: AddressType, field: AddressField, value: string) {
+  const address = editableAddresses.value?.[type];
+  if (!address) return;
+
+  address[field] = value;
+
+  if (field === 'countryGeoId') {
+    address.stateProvinceGeoId = '';
+  }
+}
+
+function editAddressField(type: AddressType, field: AddressField) {
+  selectedAddressType.value = type;
+  activeAddressField.value = { type, field };
+}
+
+function clearEditingAddressField() {
+  activeAddressField.value = null;
+}
+
+function isEditingAddressField(type: AddressType, field: AddressField): boolean {
+  return activeAddressField.value?.type === type && activeAddressField.value?.field === field;
+}
+
 function validateAddress(address: AddressForm): string | null {
   if (!address.address1?.trim()) return translate('Address Line 1 is required');
   if (!address.city?.trim()) return translate('City is required');
@@ -239,16 +296,14 @@ function taskItemSummary(task: any): string {
 
 // Returns the validation error for the currently selected address, or null if valid.
 function validate(): string | null {
-  const type = selectedAddressType.value as 'original' | 'suggested';
-  const address = editableAddresses.value?.[type];
+  const address = editableAddresses.value?.[selectedAddressType.value];
   if (!address) return null;
   return validateAddress(address);
 }
 
 async function submitSaveAndRelease() {
   const task = props.task;
-  const type = selectedAddressType.value as 'original' | 'suggested';
-  const address = editableAddresses.value![type];
+  const address = editableAddresses.value![selectedAddressType.value];
   await orderTaskStore.updateShippingInformation(task.orderId, task.shipGroupSeqId, address);
   await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_COMPLETED');
 }
@@ -339,6 +394,10 @@ defineExpose({
 
 .address-task-addresses>ion-list:not(:first-child) {
   border-inline-start: var(--border-medium);
+}
+
+.address-task-field-control {
+  width: 100%;
 }
 
 @media (max-width: 640px) {
