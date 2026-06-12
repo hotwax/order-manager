@@ -23,7 +23,7 @@ This document maps the reviewed HC Ionic design system nodes to the current Ioni
 | `54191:295583` | Hold queue page | `src/views/HoldOrders.vue` and `src/components/tasks/HoldTaskCard.vue`. | Mostly aligned; resolution comments are wired in PR #88, filter date selectors in PR #97, task heading/date fallback in PR #100, assigned-date display in the assignee row is present, the task id chip copy affordance is in PR #102, empty non-date filter selects render `Select` in PR #105, and the select-all row maps to Figma in PR #108. Assign action is blocked by backend contract. |
 | `54190:216632` | Bad Address queue page | `src/views/BadAddressOrders.vue` and `src/components/tasks/BadAddressTaskCard.vue`. | Aligned in PRs #84, #97, #100, #101, #105, and #108: two Ionic address lists, radio choice, editable rows, filter date selectors, empty non-date filter select resting text, Figma select-all results row, footer actions, task heading fallback, and Park task id handoff. |
 | `54642:47115` | Fraud queue page | `src/views/FraudOrders.vue` and `src/components/tasks/FraudTaskCard.vue`. | Aligned in PRs #81, #100, #102, #103, #105, and #108: three content columns, suggested-action footer item, readable order heading/date values when the API omits `orderName`, shared task id chip copy affordance, Figma-mapped payment/risk rows, empty filter selects rendering `Select`, and the select-all results row. |
-| `54304:40833` | `Order / Items` order-detail page | `src/views/OrderDetail.vue` items segment and `src/components/orders/OrderItemListRow.vue`. | Aligned in PRs #72 and #89: reusable row with key area, quantity/facility/configuration cells, status, amount, and actions. |
+| `54304:40833` | `Order / Items` order-detail page | `src/views/OrderDetail.vue` items segment and `src/components/orders/OrderItemListRow.vue`. | Aligned in PRs #72, #89, and #109: reusable row with key area, quantity/facility/configuration cells, status, amount, actions, and data-guarded chip variants. |
 
 ## Nested Figma Contexts Reviewed
 
@@ -50,7 +50,7 @@ These nested calls were used to avoid treating the large page frames as complete
 | `54191:298387`, `54191:295642` | Swap and Hold contact rows | Contact details are three Ionic `Item` components for name, phone, and email, each with a small outline `Copy` button. | `TaskCardShell.vue` renders the shared contact-details list with Ionic items, person/call/mail icons, and outline copy buttons when contact fields exist; Fraud, Hold, Bad Address, and Swap reuse it. PR #107 keeps the row data-dependent instead of forcing `Unknown`. |
 | `54190:286878`, `54191:288288`, `54191:295662` | Bad Address, Swap, and Hold action footers | Footer buttons are Ionic button components. Bad Address uses Save and release hold, Cancel order, Park; Swap uses Release updated order, Cancel order, Park; Hold uses Resolve task and View order. The trailing `stopwatch-outline` instance exists in these Figma footers but is `opacity-0`. | `TaskCardShell.vue` footer actions intentionally render only the visible buttons. No stopwatch icon is mapped because the Figma instance is hidden. |
 | `54642:47118`, `54191:295614`, `54190:219644`, `54191:288234` | Queue filter cards | Fraud, Hold, Bad Address, and Swap all use a Figma `Card` containing `Searchbar` and a four-control `Filters` row of `Select / Resting` components. Hold labels are `Assignee`, `Order date after`, `Order date before`, `Channel`; Bad Address and Swap use `Date after` and `Date before`; empty non-date selects show the resting value `Select`. | `SearchFilterCard.vue` provides the shared Ionic card/searchbar/equal-width filter row in PR #96. `SwapOrders.vue` uses an Ionic select for the swappable filter in PR #95. `DateFilterSelect.vue` maps date filters to an item-style select trigger and Ionic date modal in PR #97, preserving arbitrary date selection while matching the Figma resting control. `FilterSelect.vue` in PR #105 wraps non-date Ionic selects so empty filter values display `Select` while retaining the blank clear option in the popover. |
-| `54361:67841` | `54304:40833` | Order item row variants: checkbox, item key, quantity, status/configuration, amount/adjustment, facility chip, and attributes chip. | `OrderItemListRow.vue` handles rollup and detail row variants, with chip cells and quantity suppression covered by PR #89. |
+| `54361:67841` | `54304:40833` | Order item row variants: checkbox, item key, quantity, status/configuration, amount/adjustment, facility chip, and attributes chip. The chip-heavy detail variant appears only when facility or attribute data exists. | `OrderItemListRow.vue` handles rollup and detail row variants. PR #89 maps the chip cells and quantity suppression; PR #109 prevents empty facility values and zero-attribute counts from forcing the chip variant. |
 
 ## Current PR Stack
 
@@ -96,11 +96,12 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
 | #106 | Order-detail segment label copy alignment. |
 | #107 | Empty task contact row collapse. |
 | #108 | Select-all results row alignment. |
+| #109 | Order item chip variant guards. |
 | #91 | Figma alignment map and remaining gap documentation. |
 
 ## Visual Validation
 
-- Served the current #91 checkout, based on #106, from a detached AccxUI validation worktree at `http://127.0.0.1:8120`.
+- Previously served the #91 checkout, then based on #106, from a detached AccxUI validation worktree at `http://127.0.0.1:8120`.
 - The validation server was started from `/Users/adityapatel/Documents/GitHub/accxui` with the local dev auto-login env and a valid `VITE_DEFAULT_PRODUCT_STORE_SETTINGS` override.
 - Chrome authenticated against local OMS and rendered `/swap`, `/bad-address`, `/fraud`, `/hold`, and `/orders/M100818`.
 - `/swap`, `/bad-address`, and `/hold` rendered the shared filter card with one Ionic searchbar and the expected date filter select triggers. These routes returned no local task records in the current data set.
@@ -113,7 +114,9 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
 - A follow-up order-detail copy review found the Figma segment label is `Shipgroups`. PR #106 updates the `OrderDetail.vue` segment label and locale keys without removing the existing `Ship groups` translation key.
 - A follow-up nested Swap variant review found the `001 Unfillable parking` card omits contact details when none are present. PR #107 lets the shared task-card contact row collapse instead of forcing an `Unknown` customer name.
 - Follow-up nested Fraud, Hold, and Bad Address queue reviews found the select-all row should read `Select all results` with the result count in the end slot. PR #108 adds a shared Ionic `SelectAllResultsItem` used by those queues.
-- `/orders/M100818` rendered the order-detail route with the expected header, summary cards, item rows, footer actions, and tabs. Local backend warnings remain for missing fulfillment timeline and product/Solr lookup data, but the route no longer redirects away from the validation checkout.
+- A follow-up nested Order / Items review found the chip-heavy detail row should only appear for real facility or attribute data. PR #109 keeps empty facility values and zero-attribute counts on the normal quantity row variant.
+- PR #109 was validated with the focused order-item row spec and a production build from a detached AccxUI checkout. A Chrome retry at `http://127.0.0.1:8121/orders/M100818` redirected back to `/funnel` through the route permission guard before item rows could be inspected.
+- In the earlier #91 browser pass, `/orders/M100818` rendered the order-detail route with the expected header, summary cards, item rows, footer actions, and tabs. Local backend warnings remained for missing fulfillment timeline and product/Solr lookup data.
 - A ship-group collapse smoke test found PR #77's open options wrapper could clip after moving padding onto the animated state because global border-box sizing made `max-height` consume padding.
 - PR #77 now sets the collapsible wrappers to content-box sizing. A validation-only cherry-pick of #77 commit `891cda8` onto the current #91 checkout confirmed `/orders/M100818` ship-group geometry in Chrome: collapsed expanded-options `height: 0`, `padding-block: 0`, summary visible; expanded options `height/max-height/scrollHeight: 88px`, `padding-block: 24px 24px`, summary collapsed, and details visible.
 
