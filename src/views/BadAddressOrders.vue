@@ -21,8 +21,8 @@
           <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
           <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
         </ion-select>
-        <ion-input v-model="dateAfter" :label="translate('Date after')" label-placement="stacked" type="date" />
-        <ion-input v-model="dateBefore" :label="translate('Date before')" label-placement="stacked" type="date" />
+        <DateFilterSelect v-model="dateAfter" :label="translate('Date after')" />
+        <DateFilterSelect v-model="dateBefore" :label="translate('Date before')" />
         <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
           <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
           <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
@@ -78,9 +78,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUpdate } from 'vue';
-import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonInput, IonItem, IonLabel, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
+import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
 import { showToast } from '@/utils';
+import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
