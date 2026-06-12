@@ -33,13 +33,14 @@
     <ion-list lines="none">
       <ion-item>
         <ion-label>
-          {{ getAssignedParty(task, 'TASK_ASSIGNEE') }}
+          {{ assignedPartyName(task, 'TASK_ASSIGNEE') }}
+          <p v-if="assignedPartyDate(task, 'TASK_ASSIGNEE')">{{ assignedPartyDate(task, 'TASK_ASSIGNEE') }}</p>
         </ion-label>
       </ion-item>
       <ion-item>
         <ion-label>
           <p class="overline">{{ translate('Reporter') }}</p>
-          {{ getAssignedParty(task, 'TASK_REPORTER') }}
+          {{ assignedPartyName(task, 'TASK_REPORTER') }}
         </ion-label>
       </ion-item>
     </ion-list>
@@ -64,6 +65,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { DateTime } from 'luxon';
 import {
   IonButton,
   IonItem,
@@ -140,10 +142,27 @@ function getEmailHref(task: any): string {
   return email ? `mailto:${email}` : '';
 }
 
-function getAssignedParty(task: any, roleTypeId: string): string {
-  const party = task.assignedParties?.find((p: any) => p.roleTypeId === roleTypeId);
+function assignedParty(task: any, roleTypeId: string): any {
+  return task.assignedParties?.find((party: any) => party.roleTypeId === roleTypeId);
+}
+
+function assignedPartyName(task: any, roleTypeId: string): string {
+  const party = assignedParty(task, roleTypeId);
   if (!party) return roleTypeId === 'TASK_ASSIGNEE' ? translate('Unassigned') : translate('System');
   return party.groupName || [party.firstName, party.lastName].filter(Boolean).join(' ') || party.partyId;
+}
+
+function assignedPartyDate(task: any, roleTypeId: string): string {
+  const fromDate = assignedParty(task, roleTypeId)?.fromDate;
+  if (!fromDate) return '';
+
+  const value = String(fromDate);
+  const numericValue = Number(value);
+  const dt = Number.isFinite(numericValue)
+    ? DateTime.fromMillis(value.length <= 10 ? numericValue * 1000 : numericValue)
+    : (DateTime.fromISO(value).isValid ? DateTime.fromISO(value) : DateTime.fromSQL(value));
+
+  return dt.isValid ? dt.toFormat('yyyy-LL-dd HH:mm') : value;
 }
 
 function money(value: number) {
