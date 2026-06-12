@@ -44,6 +44,9 @@
           <DxpShopifyImg :src="getProduct(item.productId).mainImageUrl" :key="getProduct(item.productId).mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
+          <p v-if="isSwapItemUnavailable(item)" class="overline">
+            <ion-text color="danger">{{ translate('Unavailable') }}</ion-text>
+          </p>
           {{ productPrimary(item) }}
           <p>{{ productSecondary(item) }}</p>
         </ion-label>
@@ -118,7 +121,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
+import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
 import { arrowUndoOutline, closeCircleOutline, ellipsisVerticalOutline, gitBranchOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { DateTime } from 'luxon';
