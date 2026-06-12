@@ -14,24 +14,6 @@
             <ion-label>{{ translate("Funnel") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
-        <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/orders" router-direction="root">
-            <ion-icon slot="start" :icon="searchOutline" />
-            <ion-label>{{ translate("Find order") }}</ion-label>
-          </ion-item>
-        </ion-menu-toggle>
-        <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(CUSTOMER_VIEW_PERMISSION)" button router-link="/customers" router-direction="root">
-            <ion-icon slot="start" :icon="peopleOutline" />
-            <ion-label>{{ translate("Find customers") }}</ion-label>
-          </ion-item>
-        </ion-menu-toggle>
-        <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(`${ORDER_CREATE_PERMISSION} OR ${CUSTOMER_CREATE_PERMISSION}`)" button router-link="/create-order" router-direction="root">
-            <ion-icon slot="start" :icon="addCircleOutline" />
-            <ion-label>{{ translate("Create order") }}</ion-label>
-          </ion-item>
-        </ion-menu-toggle>
         <ion-item-divider v-if="hasPermission(SWAP_ORDER_PERMISSION) || hasPermission(ORDER_UPDATE_PERMISSION) || hasPermission(ORDER_CANCEL_PERMISSION)">
           <ion-label>{{ translate("Blocked") }}</ion-label>
         </ion-item-divider>
@@ -80,6 +62,27 @@
             <ion-label>{{ translate("Packed") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
+        <ion-item-divider v-if="hasPermission(ORDER_VIEW_PERMISSION) || hasPermission(CUSTOMER_VIEW_PERMISSION) || hasPermission(`${ORDER_CREATE_PERMISSION} OR ${CUSTOMER_CREATE_PERMISSION}`)">
+          <ion-label>{{ translate("Find") }}</ion-label>
+        </ion-item-divider>
+        <ion-menu-toggle :auto-hide="false">
+          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/orders" router-direction="root">
+            <ion-icon slot="start" :icon="ticketOutline" />
+            <ion-label>{{ translate("Orders") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+        <ion-menu-toggle :auto-hide="false">
+          <ion-item v-if="hasPermission(CUSTOMER_VIEW_PERMISSION)" button router-link="/customers" router-direction="root">
+            <ion-icon slot="start" :icon="personCircleOutline" />
+            <ion-label>{{ translate("Customers") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+        <ion-menu-toggle :auto-hide="false">
+          <ion-item v-if="hasPermission(`${ORDER_CREATE_PERMISSION} OR ${CUSTOMER_CREATE_PERMISSION}`)" button router-link="/create-order" router-direction="root">
+            <ion-icon slot="start" :icon="addCircleOutline" />
+            <ion-label>{{ translate("Create order") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
           <ion-item button router-link="/settings" router-direction="root">
             <ion-icon slot="start" :icon="settingsOutline" />
@@ -101,11 +104,11 @@ import {
   funnelOutline,
   locationOutline,
   pauseCircleOutline,
-  peopleOutline,
+  personCircleOutline,
   playCircleOutline,
-  searchOutline,
   settingsOutline,
-  shieldHalfOutline
+  shieldHalfOutline,
+  ticketOutline
 } from 'ionicons/icons';
 import { translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
