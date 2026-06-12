@@ -4,6 +4,12 @@ import { useProductStore } from '@/store/productStore';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
 
+interface TaskStatusCommunicationOptions {
+  content?: string;
+  communicationEventTypeId?: string;
+  subject?: string;
+}
+
 // ── Per-task enrichment helpers ───────────────────────────────────────────────
 // Shared by both the queue list fetches and the order-scoped detail fetch so the
 // two paths stay in lockstep (no duplicated enrichment logic).
@@ -303,9 +309,21 @@ export const useOrderTaskStore = defineStore('orderTask', {
         console.error('Failed to cancel the order', err);
       }
     },
-    async changeTaskStatus(workEffortId: string, statusId: string) {
+    async changeTaskStatus(workEffortId: string, statusId: string, communication?: TaskStatusCommunicationOptions) {
+      const content = communication?.content?.trim();
       try {
-        await api({ url: `oms/orders/tasks/${workEffortId}/status`, method: 'POST', data: { statusId } });
+        await api({
+          url: `oms/orders/tasks/${workEffortId}/status`,
+          method: 'POST',
+          data: {
+            statusId,
+            ...(content ? {
+              content,
+              communicationEventTypeId: communication?.communicationEventTypeId ?? 'ORDER_NOTE',
+              subject: communication?.subject ?? 'NA',
+            } : {}),
+          },
+        });
       } catch (err) {
         console.error('Failed to change the task status', err);
       }

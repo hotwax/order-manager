@@ -107,7 +107,7 @@ async function resolveTask() {
         text: translate('Yes'),
         role: 'confirm',
         handler: async () => {
-          await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED');
+          await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED', resolutionCommunication());
           emit('completed');
         }
       }
@@ -117,7 +117,12 @@ async function resolveTask() {
 }
 
 async function submitResolve() {
-  await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED');
+  await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED', resolutionCommunication());
+}
+
+function resolutionCommunication() {
+  const content = resolutionComment.value.trim();
+  return content ? { content } : undefined;
 }
 
 function getCustomerName(customer: any): string {
