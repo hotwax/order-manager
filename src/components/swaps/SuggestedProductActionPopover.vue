@@ -1,6 +1,6 @@
 <template>
   <ion-content>
-    <ion-list>
+    <ion-list lines="full">
       <ion-list-header>
         <ion-label>{{ popoverTitle }}</ion-label>
       </ion-list-header>

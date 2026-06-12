@@ -6,6 +6,7 @@ describe('suggested product action popover', () => {
   it('maps the Figma popover to an Ionic list of item actions', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/components/swaps/SuggestedProductActionPopover.vue'), 'utf8');
 
+    expect(source).toContain('<ion-list lines="full">');
     expect(source).toContain('<ion-list-header>');
     expect(source).toContain('popoverTitle');
     expect(source).toContain('commonUtil.getProductIdentificationValue');
