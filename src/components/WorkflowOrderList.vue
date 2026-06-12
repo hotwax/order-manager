@@ -167,9 +167,6 @@ import EmptyState from '@/components/EmptyState.vue';
 import SearchFilterCard from '@/components/SearchFilterCard.vue';
 import { commonUtil, translate } from '@common';
 
-const actualOrderIds = ['M100051'];
-const fallbackActualOrderId = actualOrderIds[Math.floor(Math.random() * actualOrderIds.length)];
-
 const props = defineProps<{
   bucket: WorkflowBucket;
   title: string;
@@ -334,7 +331,7 @@ function setOrderSelection(orderId: string, checked: boolean) {
 }
 
 function orderDetailLink(order: WorkflowOrder) {
-  return `/orders/${order.orderId.startsWith('ORD-') ? fallbackActualOrderId : order.orderId}`;
+  return `/orders/${order.orderId}`;
 }
 
 async function runAction(action: BulkActionDefinition) {
