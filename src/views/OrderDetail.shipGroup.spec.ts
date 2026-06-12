@@ -15,6 +15,12 @@ describe('order detail ship group card', () => {
     expect(source).toContain('transition: max-height 180ms ease, opacity 160ms ease, padding-block 180ms ease;');
     expect(source).toContain('padding-block: 0;');
     expect(source).toContain('padding-block: var(--spacer-base);');
+    expect(source).toContain('shipGroupHoldTask(shipGroup)');
+    expect(source).toContain('shipGroupHoldTaskLabel(shipGroup)');
+    expect(source).toContain("selectedSegment.value = 'holds'");
+    expect(source).toContain('warningOutline');
+    expect(source).toContain("translate('View details')");
+    expect(source).toContain("`${translate('Hold task')}: ${taskName}`");
     expect(source).not.toContain('transition: grid-template-rows');
     expect(source).not.toContain('grid-template-rows: 0fr');
     expect(source).not.toContain('grid-template-rows: 1fr');

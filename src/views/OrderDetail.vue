@@ -294,6 +294,15 @@
 
             <ion-progress-bar :value="shipGroupProgress(shipGroup)"
               :color="shipGroupProgress(shipGroup) === 1 ? 'success' : 'primary'" />
+
+            <ion-item v-if="shipGroupHoldTask(shipGroup)" color="warning" lines="none">
+              <ion-icon slot="start" :icon="warningOutline" />
+              <ion-label>{{ shipGroupHoldTaskLabel(shipGroup) }}</ion-label>
+              <ion-button slot="end" fill="solid" color="dark" size="small" @click="showShipGroupHoldTask">
+                {{ translate('View details') }}
+              </ion-button>
+            </ion-item>
+
             <div class="ship-group-options-wrapper">
               <!-- shows when expanded -->
               <div v-collapsible class="ship-group-expanded-options"
@@ -836,7 +845,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { calendarOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, ellipsisVertical, giftOutline, mailOutline, saveOutline, sendOutline, ticketOutline } from 'ionicons/icons';
+import { calendarOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, ellipsisVertical, giftOutline, mailOutline, saveOutline, sendOutline, ticketOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
@@ -1091,6 +1100,27 @@ const hasOrderHoldTasks = computed(() =>
   || orderFraudTasks.value.length > 0
   || orderHoldTasks.value.length > 0
 );
+
+const orderShipGroupHoldTasks = computed(() => [
+  ...orderAddressValidationTasks.value,
+  ...orderSwapTasks.value,
+  ...orderFraudTasks.value,
+  ...orderHoldTasks.value,
+]);
+
+function shipGroupHoldTask(shipGroup: any): any {
+  return orderShipGroupHoldTasks.value.find((task: any) => task.shipGroupSeqId === shipGroup.id);
+}
+
+function shipGroupHoldTaskLabel(shipGroup: any): string {
+  const task = shipGroupHoldTask(shipGroup);
+  const taskName = task?.purposeDescription || task?.workEffortName || task?.workEffortPurposeTypeId || task?.workEffortId;
+  return taskName ? `${translate('Hold task')}: ${taskName}` : translate('Hold task');
+}
+
+function showShipGroupHoldTask() {
+  selectedSegment.value = 'holds';
+}
 
 function reloadHoldTasks() {
   return orderTaskStore.fetchOrderHoldTasks(props.orderId);
