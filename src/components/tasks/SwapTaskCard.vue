@@ -77,7 +77,9 @@
           <DxpShopifyImg :src="productImageUrl(suggested.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>
-          <p class="overline" v-if="suggested._isSubstitute">{{ translate('Approved swap') }}</p>
+          <p class="overline" v-if="suggested._isSubstitute">
+            <ion-text color="success">{{ translate('Approved swap') }}</ion-text>
+          </p>
           <p class="overline" v-else-if="suggested._noReplacement">{{ translate('No replacement in stock') }}</p>
           {{ productPrimary(suggested) }}
           <p>{{ productSecondary(suggested) }}</p>
@@ -124,7 +126,7 @@
 
     <template #actions>
       <ion-button fill="clear" color="primary" @click="releaseUpdatedOrder(task)">{{ translate('Release updated order') }}</ion-button>
-      <ion-button fill="clear" color="danger" @click="cancelOrder(task)">{{ translate('Cancel order') }}</ion-button>
+      <ion-button fill="clear" color="primary" @click="cancelOrder(task)">{{ translate('Cancel order') }}</ion-button>
       <ion-button fill="clear" color="primary" @click="parkOrder(task)">{{ translate('Park') }}</ion-button>
     </template>
   </TaskCardShell>
