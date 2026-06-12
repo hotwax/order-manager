@@ -10,6 +10,16 @@ This document maps the reviewed HC Ionic design system nodes to the current Ioni
 - Keep modal behavior aligned with AccxUI rules: close icon-only button in the header start slot, single-step save as fixed bottom-right icon-only FAB, multi-step flows with footer toolbar navigation.
 - Keep behavior backed by current frontend and OMS contracts. Do not add visible actions that cannot safely persist.
 
+## Objective Audit
+
+| Requirement | Evidence | Current result |
+| --- | --- | --- |
+| Push current work in logical PRs. | The Current PR Stack section lists each draft PR and its focused scope above the component-folder/facility-selection foundation. GitHub mergeability is checked separately from this document before updating PR descriptions. | Satisfied for the pushed frontend/documentation stack; #91 is the final mapping/documentation PR above #121. |
+| Review every provided Figma node and avoid one-pass-only mapping. | The Reviewed Figma Nodes table covers all top-level node ids from the request. The Nested Figma Contexts Reviewed table records the follow-up node ids used for deeper inspection of cards, lists, rows, footers, modals, filters, and menu structure. | Satisfied for frontend mapping; non-implemented Figma details are recorded under Remaining Gaps or Data Contract Notes. |
+| Focus styling/layout on Fraud, Hold, Swap/Unfillable, and Bad Address queues without breaking behavior. | Queue surfaces map through `FraudTaskCard.vue`, `HoldTaskCard.vue`, `SwapTaskCard.vue`, `BadAddressTaskCard.vue`, `TaskCardShell.vue`, `SearchFilterCard.vue`, `FilterSelect.vue`, `DateFilterSelect.vue`, `FilterToggle.vue`, and `SelectAllResultsItem.vue`. Focused specs and production builds are noted in Visual Validation. | Satisfied for frontend-safe Figma surfaces; blocked actions are intentionally omitted instead of mocked. |
+| Build reusable components where needed. | Shared task shell, filter controls, select-all row, order payment card, and order item row are called out in the mapping rows instead of duplicating markup per page. | Satisfied in the stacked PRs. |
+| Keep AccxUI/Ionic constraints. | Implementation rules, Modal Compliance Scan, and PR-level source guards cover core Ionic components, no Ionic grid primitives, modal close/save placement, and no new font/color styling. | Satisfied for the reviewed stack; future backend-driven gaps should keep the same constraints. |
+
 ## Reviewed Figma Nodes
 
 | Figma node | Design surface | Current Ionic mapping | Status |
