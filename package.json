@@ -43,6 +43,7 @@
     "@types/file-saver": "catalog:",
     "@types/luxon": "catalog:",
     "@types/papaparse": "catalog:",
+    "chrome-ide-trace": "^0.1.0",
     "eslint": "catalog:",
     "typescript": "~4.7.4"
   }

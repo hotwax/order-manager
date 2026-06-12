@@ -295,12 +295,12 @@ function productImageUrl(productId: string): string {
 }
 
 function productPrimary(item: any): string {
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, getProduct(item.productId))
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, getProduct(item.productId) || {})
     || item.productId;
 }
 
 function productSecondary(item: any): string {
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.secondaryId, getProduct(item.productId))
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.secondaryId, getProduct(item.productId) || {})
     || item.internalName
     || item.itemDescription
     || '';

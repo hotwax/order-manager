@@ -35,7 +35,7 @@ const popoverTitle = computed(() => {
     ? useProductCacheStore().getProduct(props.item.productId)
     : undefined;
 
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, product)
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, product || {})
     || props.item?.productId
     || props.item?.sku
     || props.item?.internalName
