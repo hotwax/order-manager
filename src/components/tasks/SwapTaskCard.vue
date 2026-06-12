@@ -40,8 +40,8 @@
         <ion-label>{{ translate('Ordered items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="item in task.items" :key="item.orderItemSeqId">
-        <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="getProduct(item.productId)?.mainImageUrl">
-          <DxpShopifyImg :src="getProduct(item.productId).mainImageUrl" :key="getProduct(item.productId).mainImageUrl" size="small" />
+        <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="productImageUrl(item.productId)">
+          <DxpShopifyImg :src="productImageUrl(item.productId)" :key="productImageUrl(item.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>
           <p v-if="isSwapItemUnavailable(item)" class="overline">
@@ -62,8 +62,8 @@
         <ion-label>{{ translate('Suggested items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="(suggested, index) in getSuggestedItems(task).list" :key="`suggested-${index}`">
-        <ion-thumbnail slot="start" :key="getProduct(suggested.productId)?.mainImageUrl">
-          <DxpShopifyImg :src="getProduct(suggested.productId)?.mainImageUrl" size="small" />
+        <ion-thumbnail slot="start" :key="productImageUrl(suggested.productId)">
+          <DxpShopifyImg :src="productImageUrl(suggested.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>
           <p class="overline" v-if="suggested._isSubstitute">{{ translate('Approved swap') }}</p>
@@ -262,6 +262,10 @@ function getEmailHref(task: any): string {
 
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);
+}
+
+function productImageUrl(productId: string): string {
+  return getProduct(productId)?.mainImageUrl || '';
 }
 
 function productPrimary(item: any): string {
