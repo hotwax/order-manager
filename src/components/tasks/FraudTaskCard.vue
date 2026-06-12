@@ -206,7 +206,7 @@ async function cancelOrder() {
     header: translate('Cancel order'),
     message: translate('Are you sure you want to cancel this order? This action cannot be undone.'),
     buttons: [
-      { text: translate('No'), role: 'cancel' },
+      { text: translate('Cancel'), role: 'cancel' },
       {
         text: translate('Yes'),
         role: 'confirm',

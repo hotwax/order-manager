@@ -103,7 +103,7 @@ async function resolveTask() {
     header: translate('Resolve task'),
     message: translate('Are you sure you want to mark this task as resolved?'),
     buttons: [
-      { text: translate('No'), role: 'cancel' },
+      { text: translate('Cancel'), role: 'cancel' },
       {
         text: translate('Yes'),
         role: 'confirm',

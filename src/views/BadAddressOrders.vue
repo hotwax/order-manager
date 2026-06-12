@@ -173,7 +173,7 @@ async function bulkSaveAndReleaseHold() {
     header: translate('Save and release hold'),
     message: translate('Are you sure you want to save address and release hold for {count} selected order(s)?').replace('{count}', String(cards.length)),
     buttons: [
-      { text: translate('No'), role: 'cancel' },
+      { text: translate('Cancel'), role: 'cancel' },
       {
         text: translate('Yes'),
         role: 'confirm',
@@ -197,7 +197,7 @@ async function bulkCancelOrder() {
     header: translate('Cancel orders'),
     message: translate('Are you sure you want to cancel {count} selected order(s)? This action cannot be undone.').replace('{count}', String(cards.length)),
     buttons: [
-      { text: translate('No'), role: 'cancel' },
+      { text: translate('Cancel'), role: 'cancel' },
       {
         text: translate('Yes'),
         role: 'confirm',

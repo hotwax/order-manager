@@ -179,6 +179,7 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
 - Editable modal components in the focused order workflows use the AccxUI header close pattern: an icon-only close button inside `ion-buttons slot="start"`.
 - Single-step editable modals use a fixed bottom-right icon-only `ion-fab-button` for save/add/confirm actions. PR #98 aligns `OrderItemAttributesModal.vue` with this rule by moving the add action out of inline content and into the fixed FAB.
 - PR #122 makes this app-wide by guarding every `*Modal.vue` component and every inline `ion-modal` block with source-level checks for the header close pattern and editable modal FAB placement.
+- A follow-up alert guard keeps dismissive `role="cancel"` confirmation actions labeled `Cancel`, matching the reviewed park-order alert instead of presenting destructive choices as `No`.
 - `AddItemToOrderModal.vue` keeps per-row `Add` buttons because adding a product is a repeated row action inside a search result list, not the modal's single primary confirmation action.
 - View-only or result-preview modals such as inventory/history/Shopify-created previews keep close-only or completion UI because they do not collect and save a form.
 
