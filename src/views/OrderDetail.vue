@@ -96,20 +96,20 @@
             <ion-list lines="none">
               <ion-item>
                 <ion-label>
-                  <p>{{ translate('Order name') }}</p>
-                  {{ order.orderName || translate('Order name') }}
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Order external ID') }}</p>
-                  {{ order.externalId || translate('Order external ID') }}
+                  <p>{{ translate('Order Number') }}</p>
+                  {{ order.externalId || translate('Order Number') }}
                 </ion-label>
               </ion-item>
               <ion-item>
                 <ion-label>
                   <p>{{ translate('Order ID') }}</p>
                   {{ order.id }}
+                </ion-label>
+              </ion-item>
+              <ion-item>
+                <ion-label>
+                  <p>{{ translate('Order Name') }}</p>
+                  {{ order.orderName || translate('Order Name') }}
                 </ion-label>
               </ion-item>
               <ion-item v-for="id in order.identifications" :key="id.orderIdentificationTypeId">
@@ -128,14 +128,14 @@
             <ion-list lines="none">
               <ion-item>
                 <ion-label>
-                  <p>{{ translate('Product store name') }}</p>
+                  <p>{{ translate('Brand') }}</p>
                   {{ order.productStoreName }}
                 </ion-label>
               </ion-item>
               <ion-item>
                 <ion-label>
-                  <p>{{ translate('Sales channel') }}</p>
-                  {{ order.channel || translate('Sales channel enum') }}
+                  <p>{{ translate('Channel') }}</p>
+                  {{ order.channel || translate('Channel') }}
                 </ion-label>
               </ion-item>
             </ion-list>
