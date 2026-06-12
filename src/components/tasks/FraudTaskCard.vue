@@ -69,7 +69,10 @@
     <template #actions-end>
       <ion-item lines="none" class="suggested-action">
         <ion-icon slot="start" :icon="hardwareChipOutline" />
-        <ion-label>{{ translate('Suggested action') }}: {{ task.suggestedAction }}</ion-label>
+        <ion-label>
+          {{ translate('Suggested action') }}:
+          <ion-text :color="suggestedActionColor(task)">{{ suggestedActionLabel(task) }}</ion-text>
+        </ion-label>
       </ion-item>
     </template>
   </TaskCardShell>
@@ -77,7 +80,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonButton, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonThumbnail, alertController } from '@ionic/vue';
+import { IonButton, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController } from '@ionic/vue';
 import { hardwareChipOutline, informationCircleOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { showToast } from '@/utils';
@@ -142,6 +145,23 @@ function riskLevelColor(riskLevelEnumId: string): string {
     ORLVL_PENDING: 'medium',
   };
   return map[riskLevelEnumId] ?? 'medium';
+}
+
+function suggestedActionLabel(task: any): string {
+  return task.suggestedAction
+    || seedStore.enumDescription(task.riskRecommendationEnumId)
+    || seedStore.enumDescription(task.recommendationEnumId)
+    || translate('Review');
+}
+
+function suggestedActionColor(task: any): string | undefined {
+  const recommendation = [
+    task.suggestedAction,
+    task.riskRecommendationEnumId,
+    task.recommendationEnumId
+  ].filter(Boolean).join(' ').toUpperCase();
+
+  return recommendation.includes('CANCEL') ? 'danger' : undefined;
 }
 
 function getCustomerName(customer: any): string {
