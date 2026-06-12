@@ -91,11 +91,11 @@
 
 <script setup lang="ts">
 import { showToast } from '@/utils';
-import { commonUtil, emitter, translate } from '@common';
-import { IonAvatar, IonFooter, IonInput, IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonSegment, IonSegmentButton, IonSegmentView, IonSegmentContent, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonSearchbar, IonText, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { arrowForwardOutline, checkmarkCircle, closeOutline, saveOutline } from "ionicons/icons";
+import { emitter, translate } from '@common';
+import { IonInput, IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonSegment, IonSegmentButton, IonSegmentView, IonSegmentContent, IonItem, IonLabel, IonSearchbar, IonTitle, IonToolbar, modalController } from '@ionic/vue';
+import { closeOutline, saveOutline } from "ionicons/icons";
 import { ref } from 'vue';
-import { searchShopifyCustomers, createShopifyCustomer, getShopifyShops } from '@/services/customer';
+import { searchShopifyCustomers, createShopifyCustomer } from '@/services/customer';
 
 const queryString = ref("")
 const selectedSection = ref("search")
