@@ -69,6 +69,20 @@
 
         <ion-card>
           <ion-card-header>
+            <ion-card-title>{{ translate("Barcode Identifier") }}</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            {{ translate("Specify which product identifier should be used to scan barcodes to look up products.") }}
+          </ion-card-content>
+          <ion-item lines="none">
+            <ion-select :label="translate('Barcode Identifier')" interface="popover" :placeholder="translate('Select')" :value="barcodeIdentificationPref" @ionChange="setBarcodeIdentificationPref($event.detail.value)">
+              <ion-select-option v-for="identification in barcodeIdentificationOptions" :key="identification.goodIdentificationTypeId" :value="identification.goodIdentificationTypeId">{{ identification.description ? identification.description : identification.goodIdentificationTypeId }}</ion-select-option>
+            </ion-select>
+          </ion-item>
+        </ion-card>
+
+        <ion-card>
+          <ion-card-header>
             <ion-card-title>{{ translate("Timezone") }}</ion-card-title>
           </ion-card-header>
           <ion-card-content>
@@ -184,6 +198,8 @@ const userStore = useUserStore();
 const userProfile = computed(() => userStore.getUserProfile);
 const currentProductStore = computed(() => useProductStore().getCurrentProductStore);
 const productStores = computed(() => useProductStore().getProductStores || []);
+const barcodeIdentificationPref = computed(() => useProductStore().getBarcodeIdentifierPref);
+const barcodeIdentificationOptions = computed(() => useProductStore().getBarcodeIdentifierOptions);
 const timeZones = computed(() => userStore.getAvailableTimeZones);
 const currentTimeZone = computed(() => userStore.getUserTimeZone || userProfile.value?.userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone);
 const omsInstance = computed(() => cookieHelper().get('oms') || userStore.oms);
@@ -248,6 +264,14 @@ function setCurrentProductStore(event: CustomEvent) {
     const selectedProductStore = productStores.value.find((store: any) => store.productStoreId == event.detail.value)
     useProductStore().setProductStorePreference(selectedProductStore)
   }
+}
+
+async function setBarcodeIdentificationPref(value: string) {
+  await useProductStore().setProductStoreSetting(
+    currentProductStore.value.productStoreId,
+    "BARCODE_IDEN_PREF",
+    value
+  )
 }
 
 async function saveUserTimeZone() {

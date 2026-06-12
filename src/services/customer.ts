@@ -757,12 +757,11 @@ export async function createShopifyCustomer(shopId: string, customerData: any): 
   return response.data;
 }
 
-export async function getShopifyShops(): Promise<any[]> {
+export async function getShopifyShops(params: { productStoreId: string }): Promise<any[]> {
   const response = await api({
     url: 'oms/shopifyShops/shops',
-    method: 'get'
+    method: 'get',
+    params
   });
   return response.data || [];
 }
-
-

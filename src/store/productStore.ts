@@ -17,6 +17,10 @@ export const useProductStore = defineStore('productStore', {
         sampleProducts: [],
         currentSampleProduct: null
       },
+      barcodeIdentifier: {
+        barcodeIdentifierPref: "",
+        barcodeIdentifierOptions: [] as any[],
+      },
     } as any,
     productStores: [] as any[],
   }),
@@ -26,7 +30,9 @@ export const useProductStore = defineStore('productStore', {
     getProductStores: (state) => state.productStores,
     getSettings: (state) => state.settings,
     getProductIdentificationPref: (state) => state.settings.productIdentifier.productIdentificationPref,
+    getBarcodeIdentifierPref: (state) => state.settings.barcodeIdentifier.barcodeIdentifierPref,
     getProductIdentificationOptions: (state) => state.settings.productIdentifier.productIdentificationOptions,
+    getBarcodeIdentifierOptions: (state) => state.settings.barcodeIdentifier.barcodeIdentifierOptions,
     getCurrentSampleProduct: (state) => state.settings.productIdentifier.currentSampleProduct,
   },
 
