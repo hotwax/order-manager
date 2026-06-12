@@ -17,10 +17,7 @@
         @search="fetchSwapTasks()"
         @clear="clearFilters"
       >
-        <FilterSelect v-model="swappable" :label="translate('Swappable')">
-          <ion-select-option value="">{{ translate('All') }}</ion-select-option>
-          <ion-select-option value="Y">{{ translate('Swappable') }}</ion-select-option>
-        </FilterSelect>
+        <FilterToggle v-model="swappable" :label="translate('Swappable')" />
         <DateFilterSelect v-model="dateAfter" :label="translate('Date after')" />
         <DateFilterSelect v-model="dateBefore" :label="translate('Date before')" />
         <FilterSelect v-model="orderChannel" :label="translate('Channel')">
@@ -63,6 +60,7 @@ import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScroll
 import { translate } from '@common';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import FilterSelect from '@/components/common/FilterSelect.vue';
+import FilterToggle from '@/components/common/FilterToggle.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
@@ -76,7 +74,7 @@ const seedStore = useSeedStore();
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
 
 const searchQuery = ref('');
-const swappable = ref('');
+const swappable = ref(false);
 const dateAfter = ref('');
 const dateBefore = ref('');
 const orderChannel = ref('');
@@ -97,7 +95,7 @@ watch([swappable, dateAfter, dateBefore, orderChannel], () => {
 
 function clearFilters() {
   searchQuery.value = '';
-  swappable.value = '';
+  swappable.value = false;
   dateAfter.value = '';
   dateBefore.value = '';
   orderChannel.value = '';
@@ -113,7 +111,7 @@ const fetchSwapTasks = async (vSize?: any, vIndex?: any) => {
     ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
     ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
     ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
-    ...(swappable.value && { swappable: swappable.value }),
+    ...(swappable.value && { swappable: 'Y' }),
     ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
   });
 
