@@ -178,6 +178,13 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
    - PR #101 makes Bad Address and Swap pass `workEffortId` to `parkOrder(...)` and avoids direct frontend status normalization after parking.
    - Backend confirmation is still needed for the post-park task lifecycle: whether the Park endpoint closes, cancels, or leaves the task open when a work-effort id is supplied.
 
+3. Unfillable route separation:
+   - Product direction now treats Swap and Unfillable as separate routes, so `/swap` should not be relabeled to `Unfillable`.
+   - Current `router/index.ts` exposes `/swap`, `/bad-address`, `/fraud`, and `/hold`, but no `/unfillable` route.
+   - `Funnel.vue` already links the Unfillable stat card and Substitute task row to `/unfillable`; today that route falls through the catch-all redirect.
+   - The Figma menu and toolbar nodes that say `Unfillable` should map to a future `/unfillable` route/page, not to `SwapOrders.vue`.
+   - Implementing that route needs a confirmed page data contract: parked unfillable orders, substitution work-effort tasks, or both.
+
 ## Data Contract Notes
 
 1. Swap card progress:
