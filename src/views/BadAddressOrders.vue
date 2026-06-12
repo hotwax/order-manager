@@ -31,10 +31,7 @@
         </FilterSelect>
       </SearchFilterCard>
 
-      <ion-item lines="none" class="select-all-item" v-if="addressValidationTasks.length">
-        <ion-checkbox slot="start" v-model="selectAll" />
-        <ion-label>{{ translate('Select all') }}</ion-label>
-      </ion-item>
+      <SelectAllResultsItem v-if="addressValidationTasks.length" v-model="selectAll" :count="addressValidationTasks.length" />
 
       <div class="bad-address-list">
         <BadAddressTaskCard
@@ -78,12 +75,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUpdate } from 'vue';
-import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonMenuButton, IonPage, IonSelectOption, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
+import { IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonMenuButton, IonPage, IonSelectOption, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
 import { showToast } from '@/utils';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import SelectAllResultsItem from '@/components/common/SelectAllResultsItem.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';

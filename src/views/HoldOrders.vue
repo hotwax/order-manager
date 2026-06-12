@@ -31,10 +31,7 @@
         </FilterSelect>
       </SearchFilterCard>
 
-      <ion-item lines="none" class="select-all-item" v-if="heldTasks.length">
-        <ion-checkbox slot="start" v-model="selectAll" />
-        <ion-label>{{ translate('Select all') }}</ion-label>
-      </ion-item>
+      <SelectAllResultsItem v-if="heldTasks.length" v-model="selectAll" :count="heldTasks.length" />
 
       <div class="hold-orders-list">
         <HoldTaskCard
@@ -86,10 +83,7 @@ import {
   IonPage,
   IonTitle,
   IonToolbar,
-  IonItem,
-  IonLabel,
   IonButton,
-  IonCheckbox,
   IonSelectOption,
   alertController,
   IonInfiniteScroll,
@@ -100,6 +94,7 @@ import { translate } from '@common';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import SelectAllResultsItem from '@/components/common/SelectAllResultsItem.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useUserStore } from '@/store/user';
 import { useOrderTaskStore } from '@/store/orderTask';
