@@ -27,4 +27,26 @@ describe('order manager menu', () => {
     expect(source).not.toContain('translate("Find order")');
     expect(source).not.toContain('translate("Find customers")');
   });
+
+  it('renders Figma queue counts from existing dashboard and workflow stores', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/components/layout/Menu.vue'), 'utf8');
+
+    expect(source).toContain('IonNote');
+    expect(source).toContain('slot="end">{{ formatSwappableCount(menuCounts.unfillable) }}</ion-note>');
+    expect(source).toContain('slot="end">{{ formatCount(menuCounts.badAddress) }}</ion-note>');
+    expect(source).toContain('slot="end">{{ formatCount(menuCounts.fraud) }}</ion-note>');
+    expect(source).toContain('slot="end">{{ formatCount(menuCounts.hold) }}</ion-note>');
+    expect(source).toContain('slot="end">{{ formatCount(menuCounts.open) }}</ion-note>');
+    expect(source).toContain('slot="end">{{ formatCount(menuCounts.inflight) }}</ion-note>');
+    expect(source).toContain('slot="end">{{ formatCount(menuCounts.packed) }}</ion-note>');
+    expect(source).toContain('customerServiceStore.fetchUnfillable(productStoreId)');
+    expect(source).toContain('customerServiceStore.fetchHoldTasks(productStoreId)');
+    expect(source).toContain('customerServiceStore.fetchOpenOrders(productStoreId)');
+    expect(source).toContain("orderStore.fetchWorkflowOrders('open', menuCountFilters('open'))");
+    expect(source).toContain("orderStore.fetchWorkflowOrders('inflight', menuCountFilters('inflight'))");
+    expect(source).toContain("orderStore.fetchWorkflowOrders('packed', menuCountFilters('packed'))");
+    expect(source).not.toContain('<ion-grid');
+    expect(source).not.toContain('<ion-row');
+    expect(source).not.toContain('<ion-col');
+  });
 });
