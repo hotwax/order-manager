@@ -1452,10 +1452,12 @@ const num = (value: any): number | undefined => {
 };
 
 /**
- * Resolve postal codes to coordinates via the Solr `postalCode` core (fields:
- * postcode / latitude / longitude). Returns a { zip: {lat, lon} } map. Only the
- * customer ship-to zip needs this — the origin facility exposes its own
- * lat/lon directly (see fetchDistancesForOrder).
+ * Fallback geocoder: resolve postal codes to coordinates via the Solr `postalCode`
+ * core (fields: postcode / latitude / longitude), returning a { zip: {lat, lon} }
+ * map. Used only for endpoints whose postal address isn't already geocoded; both
+ * the ship-to address and the origin facility normally carry lat/lon directly
+ * (see fetchDistancesForOrder). A failed/absent core is swallowed — the distance
+ * simply isn't shown for that ship group.
  */
 async function lookupPostalCoordinates(zips: string[]): Promise<Record<string, { lat: number; lon: number }>> {
   const coords: Record<string, { lat: number; lon: number }> = {};
@@ -1502,8 +1504,10 @@ async function fetchFacilityOrigins(facilityIds: string[]): Promise<Record<strin
 
 /**
  * Distance (miles) between each BROKERED ship group's origin facility and the
- * order's ship-to address. Origin coordinates come straight from the facility's
- * postal address; the customer ship-to is geocoded from its zip via Solr.
+ * order's ship-to address. Both endpoints expose latitude/longitude directly on
+ * their postal address, so use those; the Solr `postalCode` zip lookup is only a
+ * fallback for whichever endpoint isn't geocoded (and is skipped entirely when
+ * nothing needs it — not every OMS exposes a `postalCode` Solr core).
  */
 const fetchDistancesForOrder = async (shipGroups: any[]) => {
   shipGroupDistances.value = {};
@@ -1512,18 +1516,26 @@ const fetchDistancesForOrder = async (shipGroups: any[]) => {
 
   const origins = await fetchFacilityOrigins([...new Set(brokered.map((sg: any) => sg.facilityId))]);
 
-  // Collect zips needing a Solr lookup: every ship-to zip, plus any origin
-  // facility that wasn't geocoded (fall back to its zip).
+  // Prefer the lat/lon already on each ship-to address; collect zips for a Solr
+  // fallback only for endpoints (ship-to or origin facility) that aren't geocoded.
+  const destCoordsBySg: Record<string, { lat: number; lon: number }> = {};
   const destZipBySg: Record<string, string> = {};
   const zipsToLookup = new Set<string>();
   brokered.forEach((sg: any) => {
     const mech = sg.contactMechId
       ? orderDetailStore.contactMechsById[sg.contactMechId]
       : orderDetailStore.contactMechsByPurpose['SHIPPING_LOCATION'];
-    const destZip = mech?.postalAddress?.postalCode?.trim();
-    if (destZip) {
-      destZipBySg[sg.id] = destZip;
-      zipsToLookup.add(destZip);
+    const addr = mech?.postalAddress;
+    const destLat = num(addr?.latitude);
+    const destLon = num(addr?.longitude);
+    if (destLat !== undefined && destLon !== undefined) {
+      destCoordsBySg[sg.id] = { lat: destLat, lon: destLon };
+    } else {
+      const destZip = addr?.postalCode?.trim();
+      if (destZip) {
+        destZipBySg[sg.id] = destZip;
+        zipsToLookup.add(destZip);
+      }
     }
     const origin = origins[sg.facilityId];
     if (origin && (origin.lat === undefined || origin.lon === undefined) && origin.zip) {
@@ -1531,14 +1543,14 @@ const fetchDistancesForOrder = async (shipGroups: any[]) => {
     }
   });
 
-  const zipCoords = await lookupPostalCoordinates([...zipsToLookup]);
+  const zipCoords = zipsToLookup.size ? await lookupPostalCoordinates([...zipsToLookup]) : {};
 
   brokered.forEach((sg: any) => {
     const origin = origins[sg.facilityId];
     const originCoords = origin && origin.lat !== undefined && origin.lon !== undefined
       ? { lat: origin.lat, lon: origin.lon }
       : (origin?.zip ? zipCoords[origin.zip] : undefined);
-    const destCoords = zipCoords[destZipBySg[sg.id]];
+    const destCoords = destCoordsBySg[sg.id] ?? zipCoords[destZipBySg[sg.id]];
     if (originCoords && destCoords) {
       shipGroupDistances.value[sg.id] = haversineMiles(originCoords.lat, originCoords.lon, destCoords.lat, destCoords.lon).toFixed(1);
     }
