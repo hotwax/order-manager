@@ -30,6 +30,8 @@ describe('swap task card Figma routing block', () => {
     expect(source).toContain('?? task.progress');
     expect(source).toContain('?? task.progressPercent');
     expect(source).toContain('?? task.completionPercentage');
+    expect(source).toContain('parkOrder(task.orderId, task.shipGroupSeqId, facilityId, task.workEffortId)');
+    expect(source).not.toContain("//await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED')");
     expect(source).not.toContain('getProduct(item.productId).mainImageUrl');
     expect(source).not.toContain("translate('Order facility change routing')");
     expect(source).not.toContain("translate('Routing facility change description')");

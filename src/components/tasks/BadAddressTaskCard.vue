@@ -321,8 +321,7 @@ async function submitCancel() {
 
 async function submitPark(facilityId: string) {
   const task = props.task;
-  await orderTaskStore.parkOrder(task.orderId, task.shipGroupSeqId, facilityId);
-  await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_PARKED');
+  await orderTaskStore.parkOrder(task.orderId, task.shipGroupSeqId, facilityId, task.workEffortId);
 }
 
 async function saveAndReleaseHold() {
