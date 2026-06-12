@@ -146,6 +146,7 @@ import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
 import { isSwapItemUnavailable } from '@/utils/swapItems';
+import { taskOrderTitle } from '@/utils/taskCardDisplay';
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean }>(), {
   selectable: false,
@@ -164,7 +165,7 @@ function getCustomerName(customer: any): string {
 }
 
 function getCardTitle(task: any): string {
-  return seedStore.facilityName(task.facilityId) || task.orderName;
+  return seedStore.facilityName(task.facilityId) || taskOrderTitle(task);
 }
 
 function routingFacilityName(task: any): string {
