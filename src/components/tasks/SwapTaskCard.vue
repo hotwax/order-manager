@@ -52,6 +52,15 @@
           {{ productPrimary(item) }}
           <p>{{ productSecondary(item) }}</p>
         </ion-label>
+        <ion-button
+          v-if="isSwapItemUnavailable(item)"
+          slot="end"
+          fill="clear"
+          color="medium"
+          @click.stop="openSuggestedProductActionsPopover($event, orderedSwapActionItem(item), task)"
+        >
+          <ion-icon slot="icon-only" :icon="chevronForwardOutline" />
+        </ion-button>
       </ion-item>
       <ion-item>
         <ion-label>{{ translate('Original total') }}</ion-label>
@@ -124,7 +133,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
-import { arrowUndoOutline, closeCircleOutline, ellipsisVerticalOutline, gitBranchOutline } from 'ionicons/icons';
+import { arrowUndoOutline, chevronForwardOutline, closeCircleOutline, ellipsisVerticalOutline, gitBranchOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { DateTime } from 'luxon';
 import { confirmParkOrder, showToast } from '@/utils';
@@ -292,6 +301,13 @@ function productSecondary(item: any): string {
     || item.internalName
     || item.itemDescription
     || '';
+}
+
+function orderedSwapActionItem(item: any) {
+  return {
+    ...item,
+    _sourceOrderItemSeqId: item.orderItemSeqId,
+  };
 }
 
 function getSubstitute(item: any) {
