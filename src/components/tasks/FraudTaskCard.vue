@@ -36,9 +36,11 @@
       </ion-list-header>
       <ion-item v-for="payment in task.payments" :key="payment.paymentMethodTypeId">
         <ion-label>
-          <p>{{ payment.paymentMethodTypeId }}</p>
+          <p class="overline">{{ payment.paymentMethodTypeId }}</p>
           {{ paymentMethodLabel(payment) }}
-          <p>{{ paymentStatusLabel(payment) }}</p>
+          <p>
+            <ion-text :color="paymentStatusColor(payment)">{{ paymentStatusLabel(payment) }}</ion-text>
+          </p>
         </ion-label>
         <ion-note slot="end">{{ money(payment.maxAmount) }}</ion-note>
       </ion-item>
@@ -50,7 +52,7 @@
       </ion-list-header>
 
       <ion-item v-for="risk in task.risks" :key="risk.providerId">
-        <ion-icon slot="start" :icon="informationCircleOutline" :color="riskLevelColor(risk.riskLevelEnumId)" />
+        <ion-icon slot="start" :icon="informationCircleOutline" color="medium" />
         <ion-label>
           {{ risk.providerName }} · {{ seedStore.enumDescription(risk.riskLevelEnumId) }}
           <template v-for="fact in risk.facts" :key="fact.factSeqId">
@@ -141,15 +143,13 @@ function paymentStatusLabel(payment: any): string {
     || payment.statusId;
 }
 
-function riskLevelColor(riskLevelEnumId: string): string {
-  const map: Record<string, string> = {
-    ORLVL_HIGH: 'danger',
-    ORLVL_MEDIUM: 'warning',
-    ORLVL_LOW: 'success',
-    ORLVL_NONE: 'medium',
-    ORLVL_PENDING: 'medium',
-  };
-  return map[riskLevelEnumId] ?? 'medium';
+function paymentStatusColor(payment: any): string | undefined {
+  const status = [payment.statusDescription, payment.statusId]
+    .filter(Boolean)
+    .join(' ')
+    .toUpperCase();
+
+  return status.includes('PENDING') ? 'warning' : undefined;
 }
 
 function suggestedActionLabel(task: any): string {

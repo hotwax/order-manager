@@ -14,6 +14,11 @@ describe('fraud task card Figma footer', () => {
     expect(source).toContain('function productImageUrl(productId: string): string');
     expect(source).toContain('getProduct(productId)?.mainImageUrl || \'\'');
     expect(source).toContain(':src="productImageUrl(item.productId)"');
+    expect(source).toContain('<p class="overline">{{ payment.paymentMethodTypeId }}</p>');
+    expect(source).toContain('<ion-text :color="paymentStatusColor(payment)">{{ paymentStatusLabel(payment) }}</ion-text>');
+    expect(source).toContain('return status.includes(\'PENDING\') ? \'warning\' : undefined;');
+    expect(source).toContain('<ion-icon slot="start" :icon="informationCircleOutline" color="medium" />');
+    expect(source).not.toContain(':color="riskLevelColor(risk.riskLevelEnumId)"');
     expect(source).not.toContain('getProduct(item.productId).mainImageUrl');
     expect(source).not.toContain("{{ translate('Suggested action') }}: {{ task.suggestedAction }}");
     expect(source).not.toContain('<ion-grid');
