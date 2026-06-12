@@ -173,6 +173,7 @@
   "Grand Total": "Grand Total",
   "Grand total": "Grand total",
   "Hold": "Hold",
+  "Hold task": "Hold task",
   "Holds": "Holds",
   "ID": "ID",
   "Initial status details": "Initial status details",
@@ -407,6 +408,7 @@
   "Validation error": "Validation error",
   "Value": "Value",
   "Version": "Versión",
+  "View details": "View details",
   "View order": "View order",
   "Yes": "Yes"
 }
