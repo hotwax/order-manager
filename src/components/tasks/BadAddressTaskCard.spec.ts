@@ -17,6 +17,8 @@ describe('bad address task card Figma address comparison', () => {
     expect(source).toContain('editAddressField(addressOption.type, row.field)');
     expect(source).toContain('isEditingAddressField(addressOption.type, row.field)');
     expect(source).toContain('setAddressField(addressOption.type, row.field');
+    expect(source).toContain('parkOrder(task.orderId, task.shipGroupSeqId, facilityId, task.workEffortId)');
+    expect(source).not.toContain("'TASK_PARKED'");
     expect(source).not.toContain('v-model="editableAddresses.original.address1"');
     expect(source).not.toContain('v-model="editableAddresses.suggested.address1"');
     expect(source).not.toContain('<ion-grid');

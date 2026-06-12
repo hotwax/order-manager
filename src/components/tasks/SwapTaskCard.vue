@@ -461,8 +461,7 @@ async function parkOrder(task: any) {
   if (!facilityId) return;
 
   try {
-    await orderTaskStore.parkOrder(task.orderId, task.shipGroupSeqId, facilityId);
-    //await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED');
+    await orderTaskStore.parkOrder(task.orderId, task.shipGroupSeqId, facilityId, task.workEffortId);
     await showToast(translate('Order successfully moved to parking.'));
     emit('completed');
   } catch {
