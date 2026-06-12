@@ -28,4 +28,14 @@ describe('order detail header', () => {
     expect(source).not.toContain("translate('Product store name')");
     expect(source).not.toContain("translate('Sales channel')");
   });
+
+  it('places payment in the Holds header cluster without duplicating the payment markup', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/views/OrderDetail.vue'), 'utf8');
+
+    expect(source).toContain('import OrderPaymentCard');
+    expect(source).toContain('<OrderPaymentCard v-if="selectedSegment === \'holds\'" :payments="order.payments" :currency="order.currency" />');
+    expect(source).toContain('<OrderPaymentCard :payments="order.payments" :currency="order.currency" />');
+    expect(source.indexOf('<OrderPaymentCard v-if="selectedSegment === \'holds\'"')).toBeLessThan(source.indexOf("translate('Source')"));
+    expect(source).not.toContain("<ion-card-title>{{ translate('Payment') }}</ion-card-title>");
+  });
 });
