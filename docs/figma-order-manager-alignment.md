@@ -9,6 +9,7 @@ This document maps the reviewed HC Ionic design system nodes to the current Ioni
 - Keep layout CSS limited to structure and spacing; do not add font or color styling.
 - Keep modal behavior aligned with AccxUI rules: close icon-only button in the header start slot, single-step save as fixed bottom-right icon-only FAB, multi-step flows with footer toolbar navigation.
 - Keep behavior backed by current frontend and OMS contracts. Do not add visible actions that cannot safely persist.
+- Figma is the structure and component reference, not the only allowed action inventory. Extra workflow buttons are acceptable when they fill real development gaps, stay backed by current behavior, and use the same Ionic patterns instead of custom styling.
 
 ## Objective Audit
 
