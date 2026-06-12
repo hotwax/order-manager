@@ -134,6 +134,7 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
 | #121 | Order Manager menu section and queue-count alignment. |
 | #122 | App-wide modal compliance source guard. |
 | #123 | Optional menu count probe cleanup and locale warning fixes. |
+| #127 | Confirmation alert action-copy alignment. |
 | #91 | Figma alignment map and remaining gap documentation. |
 
 ## Visual Validation
@@ -169,6 +170,8 @@ These draft PRs contain the relevant Figma alignment work above the component-fo
 - A follow-up shared menu review found `54223:47293` groups record lookup links under a `Find` divider after the `In progress` queue group and shows end-slot counts on Blocked/In progress queue rows. PR #121 moves Orders and Customers into that group, keeps Create order there without adding missing Returns or Shipments routes, and adds count notes using existing dashboard/workflow data sources.
 - PR #122 adds a modal compliance source guard across modal components and inline `ion-modal` blocks. It passed 43 checks for header start-slot close icons and editable modal fixed bottom-end FAB actions.
 - A latest-stack Chrome pass served PR #123 at `http://127.0.0.1:8125` from a detached AccxUI checkout. `/orders/M100818` rendered the order header, Items segment, payment/totals, and footer actions; `/fraud` rendered the shared filter card, select-all row, two real task cards, Payment/Risk columns, and Resolve/Cancel/View actions; `/hold` and `/bad-address` rendered their filter cards with no records in the local dataset; `/unfillable?validation=runtime-warnings` rendered the Unfillable title, Swappable toggle, date filters, Channel select, and menu groups/count notes without optional `funnelDashboard/*` menu-count requests.
+- A latest metadata re-audit reloaded the Hold, Fraud, Bad Address, and Unfillable top-level Figma nodes and confirmed their toolbar, filter-card, task-card, contact row, list, footer, and menu structures are already represented by the mapped Ionic components. No new frontend-safe mismatch was found beyond the remaining backend/route-contract gaps below.
+- PR #127 aligns Ionic confirmation-alert copy with the reviewed park-order alert: cancel-role actions read `Cancel`, confirm-role actions use the operation being confirmed, and the source guard passed two focused checks.
 - PR #109 was validated with the focused order-item row spec and a production build from a detached AccxUI checkout. A Chrome retry at `http://127.0.0.1:8121/orders/M100818` redirected back to `/funnel` through the route permission guard before item rows could be inspected.
 - In the earlier #91 browser pass, `/orders/M100818` rendered the order-detail route with the expected header, summary cards, item rows, footer actions, and tabs. Local backend warnings remained for missing fulfillment timeline and product/Solr lookup data.
 - A ship-group collapse smoke test found PR #77's open options wrapper could clip after moving padding onto the animated state because global border-box sizing made `max-height` consume padding.
