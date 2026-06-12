@@ -38,7 +38,7 @@
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(SWAP_ORDER_PERMISSION)" button router-link="/swap" router-direction="root">
             <ion-icon slot="start" :icon="alertCircleOutline" />
-            <ion-label>{{ translate("Swap") }}</ion-label>
+            <ion-label>{{ translate("Unfillable") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">

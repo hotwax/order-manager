@@ -3,6 +3,13 @@ import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 
 describe('swap queue filters', () => {
+  it('uses the Figma Unfillable toolbar title', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/views/SwapOrders.vue'), 'utf8');
+
+    expect(source).toContain("<ion-title>{{ translate('Unfillable') }}</ion-title>");
+    expect(source).not.toContain("<ion-title>{{ translate('Swap') }}</ion-title>");
+  });
+
   it('uses an Ionic toggle for the Figma swappable filter', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/views/SwapOrders.vue'), 'utf8');
 
