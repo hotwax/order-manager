@@ -16,6 +16,10 @@ describe('swap task card Figma routing block', () => {
     expect(source).toContain('isSwapItemUnavailable(item)');
     expect(source).toContain("translate('Unavailable')");
     expect(source).toContain('<ion-text color="danger">');
+    expect(source).toContain('orderedSwapActionItem(item)');
+    expect(source).toContain('_sourceOrderItemSeqId: item.orderItemSeqId');
+    expect(source).toContain('chevronForwardOutline');
+    expect(source).toContain('openSuggestedProductActionsPopover($event, orderedSwapActionItem(item), task)');
     expect(source).toContain('function productImageUrl(productId: string): string');
     expect(source).toContain('getProduct(productId)?.mainImageUrl || \'\'');
     expect(source).toContain(':src="productImageUrl(item.productId)"');
