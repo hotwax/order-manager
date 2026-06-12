@@ -1,5 +1,5 @@
 <template>
-  <div class="list-item order-item-list-row">
+  <div class="list-item order-item-list-row" :style="rowColumnStyle">
     <ion-item class="order-item-list-key" lines="none">
       <ion-checkbox
         v-if="selectable"
@@ -20,31 +20,32 @@
       </ion-label>
     </ion-item>
 
-    <ion-label class="tablet order-item-quantity">
+    <ion-label v-if="showQuantityColumn" class="tablet order-item-quantity">
       {{ quantity }}
       <p>{{ quantityLabel }}</p>
     </ion-label>
 
-    <div v-if="facilityLabel || attributesLabel" class="tablet order-item-details">
-      <ion-chip
-        v-if="facilityLabel"
-        outline
-        :disabled="facilityDisabled"
-        @click.stop="emit('facility-click')"
-      >
-        <ion-icon :icon="businessOutline" />
-        <ion-label>{{ facilityLabel }}</ion-label>
-      </ion-chip>
-      <ion-chip
-        v-if="attributesLabel"
-        outline
-        :disabled="attributesDisabled"
-        @click.stop="emit('attributes-click')"
-      >
-        <ion-icon :icon="listOutline" />
-        <ion-label>{{ attributesLabel }}</ion-label>
-      </ion-chip>
-    </div>
+    <ion-chip
+      v-if="facilityLabel"
+      class="tablet order-item-facility"
+      outline
+      :disabled="facilityDisabled"
+      @click.stop="emit('facility-click')"
+    >
+      <ion-icon :icon="businessOutline" />
+      <ion-label>{{ facilityLabel }}</ion-label>
+    </ion-chip>
+
+    <ion-chip
+      v-if="attributesLabel"
+      class="tablet order-item-attributes"
+      outline
+      :disabled="attributesDisabled"
+      @click.stop="emit('attributes-click')"
+    >
+      <ion-icon :icon="listOutline" />
+      <ion-label>{{ attributesLabel }}</ion-label>
+    </ion-chip>
 
     <ion-label class="tablet order-item-status">
       <ion-badge v-if="statusLabel" :color="statusColor">{{ statusLabel }}</ion-badge>
@@ -62,11 +63,12 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { IonBadge, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonThumbnail } from '@ionic/vue';
 import { businessOutline, listOutline } from 'ionicons/icons';
 import { DxpShopifyImg } from '@common';
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   primary: string;
   secondary?: string;
   badgeLabel?: string;
@@ -76,6 +78,7 @@ withDefaults(defineProps<{
   selected?: boolean;
   quantity: string | number;
   quantityLabel: string;
+  showQuantity?: boolean;
   facilityLabel?: string;
   facilityDisabled?: boolean;
   attributesLabel?: string;
@@ -96,6 +99,7 @@ withDefaults(defineProps<{
   facilityDisabled: false,
   attributesLabel: '',
   attributesDisabled: false,
+  showQuantity: true,
   statusLabel: '',
   statusColor: 'medium',
   statusDetail: '',
@@ -107,6 +111,23 @@ const emit = defineEmits<{
   (event: 'facility-click'): void;
   (event: 'attributes-click'): void;
 }>();
+
+const showQuantityColumn = computed(() => props.showQuantity && !props.facilityLabel && !props.attributesLabel);
+const rowColumnStyle = computed(() => {
+  const columnCount = [
+    true,
+    showQuantityColumn.value,
+    !!props.facilityLabel,
+    !!props.attributesLabel,
+    true,
+    true,
+  ].filter(Boolean).length;
+
+  return {
+    '--columns-desktop': String(columnCount),
+    '--columns-tablet': String(columnCount),
+  };
+});
 </script>
 
 <style scoped>
@@ -130,13 +151,6 @@ const emit = defineEmits<{
 
 .order-item-list-key {
   width: 100%;
-}
-
-.order-item-details {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacer-xs);
-  justify-content: center;
 }
 
 .order-item-status,
