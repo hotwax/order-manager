@@ -2009,7 +2009,7 @@ async function cancelOrderItems() {
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
-        text: translate('Yes'),
+        text: translate('Cancel items'),
         role: 'confirm',
         handler: async () => {
           try {
@@ -2092,7 +2092,7 @@ async function cancelSingleItem(item: any) {
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
-        text: translate('Yes'),
+        text: translate('Cancel item'),
         role: 'confirm',
         handler: async () => {
           try {
@@ -2199,7 +2199,7 @@ async function runOrderStatusAction(action: any) {
       message: translate("Are you sure you want to change this order's status?"),
       buttons: [
         { text: translate('Cancel'), role: 'cancel' },
-        { text: translate('Yes'), role: 'confirm', handler: () => { changeOrderStatus(orderId, action.toStatusId); } }
+        { text: translate(action.label), role: 'confirm', handler: () => { changeOrderStatus(orderId, action.toStatusId); } }
       ]
     });
     await alert.present();

@@ -214,7 +214,7 @@ async function bulkCancel() {
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
-        text: translate('Yes'),
+        text: translate('Cancel orders'),
         role: 'confirm',
         handler: async () => {
           await Promise.all(cards.map((card: any) => card.submitCancel()));

@@ -16,18 +16,28 @@ function rel(path: string) {
   return relative(process.cwd(), path);
 }
 
-function cancelRoleUsesNo(source: string) {
-  const noBeforeRole = /text:\s*translate\(['"]No['"]\)[\s\S]{0,120}role:\s*['"]cancel['"]/;
-  const roleBeforeNo = /role:\s*['"]cancel['"][\s\S]{0,120}text:\s*translate\(['"]No['"]\)/;
+function roleUsesGenericCopy(source: string, role: string, copy: string) {
+  const copyPattern = copy.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const copyBeforeRole = new RegExp(`text:\\s*translate\\(['"]${copyPattern}['"]\\)[\\s\\S]{0,120}role:\\s*['"]${role}['"]`);
+  const roleBeforeCopy = new RegExp(`role:\\s*['"]${role}['"][\\s\\S]{0,120}text:\\s*translate\\(['"]${copyPattern}['"]\\)`);
 
-  return noBeforeRole.test(source) || roleBeforeNo.test(source);
+  return copyBeforeRole.test(source) || roleBeforeCopy.test(source);
 }
 
 describe('alert compliance', () => {
   it('does not label cancel-role alert buttons as No', () => {
     const matches = walkFiles(srcRoot)
       .filter((path) => path.endsWith('.vue') || path.endsWith('.ts'))
-      .filter((path) => cancelRoleUsesNo(readFileSync(path, 'utf8')))
+      .filter((path) => roleUsesGenericCopy(readFileSync(path, 'utf8'), 'cancel', 'No'))
+      .map(rel);
+
+    expect(matches).toEqual([]);
+  });
+
+  it('does not label confirm-role alert buttons as Yes', () => {
+    const matches = walkFiles(srcRoot)
+      .filter((path) => path.endsWith('.vue') || path.endsWith('.ts'))
+      .filter((path) => roleUsesGenericCopy(readFileSync(path, 'utf8'), 'confirm', 'Yes'))
       .map(rel);
 
     expect(matches).toEqual([]);

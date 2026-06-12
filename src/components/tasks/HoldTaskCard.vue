@@ -105,7 +105,7 @@ async function resolveTask() {
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
-        text: translate('Yes'),
+        text: translate('Resolve task'),
         role: 'confirm',
         handler: async () => {
           await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED', resolutionCommunication());

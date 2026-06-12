@@ -168,7 +168,7 @@ async function resolveSelectedTasks() {
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
-        text: translate('Yes'),
+        text: translate('Resolve tasks'),
         role: 'confirm',
         handler: async () => {
           await Promise.all(

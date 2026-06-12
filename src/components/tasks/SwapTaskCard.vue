@@ -436,7 +436,7 @@ async function cancelOrder(task: any) {
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
-        text: translate('Yes'),
+        text: translate('Cancel order'),
         role: 'confirm',
         handler: async () => {
           const items = (task.items ?? []).map((item: any) => ({
