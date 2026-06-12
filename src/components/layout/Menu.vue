@@ -9,25 +9,25 @@
     <ion-content>
       <ion-list>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/funnel" router-direction="root">
+          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/funnel" router-direction="root" :class="{ selected: selectedPage === '/funnel' }">
             <ion-icon slot="start" :icon="funnelOutline" />
             <ion-label>{{ translate("Funnel") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/orders" router-direction="root">
+          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/orders" router-direction="root" :class="{ selected: selectedPage === '/orders' }">
             <ion-icon slot="start" :icon="searchOutline" />
             <ion-label>{{ translate("Find order") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(CUSTOMER_VIEW_PERMISSION)" button router-link="/customers" router-direction="root">
+          <ion-item v-if="hasPermission(CUSTOMER_VIEW_PERMISSION)" button router-link="/customers" router-direction="root" :class="{ selected: selectedPage === '/customers' }">
             <ion-icon slot="start" :icon="peopleOutline" />
             <ion-label>{{ translate("Find customers") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(`${ORDER_CREATE_PERMISSION} OR ${CUSTOMER_CREATE_PERMISSION}`)" button router-link="/create-order" router-direction="root">
+          <ion-item v-if="hasPermission(`${ORDER_CREATE_PERMISSION} OR ${CUSTOMER_CREATE_PERMISSION}`)" button router-link="/create-order" router-direction="root" :class="{ selected: selectedPage === '/create-order' }">
             <ion-icon slot="start" :icon="addCircleOutline" />
             <ion-label>{{ translate("Create order") }}</ion-label>
           </ion-item>
@@ -36,31 +36,31 @@
           <ion-label>{{ translate("Blocked") }}</ion-label>
         </ion-item-divider>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/unfillable" router-direction="root">
+          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/unfillable" router-direction="root" :class="{ selected: selectedPage === '/unfillable' }">
             <ion-icon slot="start" :icon="banOutline" />
             <ion-label>{{ translate("Unfillable") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(SWAP_ORDER_PERMISSION)" button router-link="/swap" router-direction="root">
+          <ion-item v-if="hasPermission(SWAP_ORDER_PERMISSION)" button router-link="/swap" router-direction="root" :class="{ selected: selectedPage === '/swap' }">
             <ion-icon slot="start" :icon="alertCircleOutline" />
             <ion-label>{{ translate("Swap") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(ORDER_UPDATE_PERMISSION)" button router-link="/bad-address" router-direction="root">
+          <ion-item v-if="hasPermission(ORDER_UPDATE_PERMISSION)" button router-link="/bad-address" router-direction="root" :class="{ selected: selectedPage === '/bad-address' }">
             <ion-icon slot="start" :icon="locationOutline" />
             <ion-label>{{ translate("Bad address") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(ORDER_CANCEL_PERMISSION)" button router-link="/fraud" router-direction="root">
+          <ion-item v-if="hasPermission(ORDER_CANCEL_PERMISSION)" button router-link="/fraud" router-direction="root" :class="{ selected: selectedPage === '/fraud' }">
             <ion-icon slot="start" :icon="shieldHalfOutline" />
             <ion-label>{{ translate("Fraud") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(ORDER_UPDATE_PERMISSION)" button router-link="/hold" router-direction="root">
+          <ion-item v-if="hasPermission(ORDER_UPDATE_PERMISSION)" button router-link="/hold" router-direction="root" :class="{ selected: selectedPage === '/hold' }">
             <ion-icon slot="start" :icon="pauseCircleOutline" />
             <ion-label>{{ translate("Hold") }}</ion-label>
           </ion-item>
@@ -69,31 +69,31 @@
           <ion-label>{{ translate("In progress") }}</ion-label>
         </ion-item-divider>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/brokering" router-direction="root">
+          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/brokering" router-direction="root" :class="{ selected: selectedPage === '/brokering' }">
             <ion-icon slot="start" :icon="gitNetworkOutline" />
             <ion-label>{{ translate("Brokering queue") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/open" router-direction="root">
+          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/open" router-direction="root" :class="{ selected: selectedPage === '/open' }">
             <ion-icon slot="start" :icon="playCircleOutline" />
             <ion-label>{{ translate("Open") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/inflight" router-direction="root">
+          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/inflight" router-direction="root" :class="{ selected: selectedPage === '/inflight' }">
             <ion-icon slot="start" :icon="airplaneOutline" />
             <ion-label>{{ translate("Inflight") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/packed" router-direction="root">
+          <ion-item v-if="hasPermission(ORDER_VIEW_PERMISSION)" button router-link="/packed" router-direction="root" :class="{ selected: selectedPage === '/packed' }">
             <ion-icon slot="start" :icon="cubeOutline" />
             <ion-label>{{ translate("Packed") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item button router-link="/settings" router-direction="root">
+          <ion-item button router-link="/settings" router-direction="root" :class="{ selected: selectedPage === '/settings' }">
             <ion-icon slot="start" :icon="settingsOutline" />
             <ion-label>{{ translate("Settings") }}</ion-label>
           </ion-item>
@@ -134,6 +134,7 @@ import {
 } from '@/authorization/permissions';
 import router from '@/router';
 import { useUserStore } from '@/store/user';
+import { computed } from 'vue';
 
 const { isAuthenticated } = useAuth();
 const userStore = useUserStore();
@@ -141,4 +142,20 @@ const userStore = useUserStore();
 function hasPermission(permissionId: string) {
   return userStore.hasPermission(permissionId);
 }
+
+const selectedPage = computed(() => {
+  return router.currentRoute.value.path
+})
 </script>
+
+<style scoped>
+  ion-menu.md ion-item.selected ion-icon {
+    color: var(--ion-color-secondary);
+  }
+  ion-menu.ios ion-item.selected ion-icon {
+    color: var(--ion-color-secondary);
+  }
+  ion-item.selected {
+    --color: var(--ion-color-secondary);
+  }
+</style>
