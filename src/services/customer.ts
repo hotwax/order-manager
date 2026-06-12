@@ -376,6 +376,49 @@ function isPhoneSearch(value: string) {
  * CustomerProfile shape the detail store/getters consume. Bounded profile only -
  * orders, tasks, returns, and communications are separate paginated calls.
  */
+export interface PartySearchResult {
+  partyId: string;
+  name: string;
+  partyTypeId: string;
+}
+
+export async function findParties(params: {
+  partyTypeId: 'PERSON' | 'PARTY_GROUP';
+  firstName?: string;
+  lastName?: string;
+  groupName?: string;
+  pageSize?: number;
+}): Promise<PartySearchResult[]> {
+  const query: Record<string, any> = {
+    partyTypeId: params.partyTypeId,
+    statusId: 'PARTY_ENABLED',
+    pageSize: params.pageSize ?? 20
+  };
+  if (params.firstName?.trim()) { query.firstName_op = 'contains'; query.firstName = params.firstName.trim(); }
+  if (params.lastName?.trim()) { query.lastName_op = 'contains'; query.lastName = params.lastName.trim(); }
+  if (params.groupName?.trim()) { query.groupName_op = 'contains'; query.groupName = params.groupName.trim(); }
+  const response = await api({ url: 'oms/parties', method: 'get', params: query });
+  return asList(response.data).map((doc: any) => ({
+    partyId: toStringValue(doc.partyId),
+    name: toStringValue(doc.groupName) || [doc.firstName, doc.lastName].filter(Boolean).join(' ').trim() || toStringValue(doc.partyId),
+    partyTypeId: toStringValue(doc.partyTypeId)
+  }));
+}
+
+export async function getPartyNames(partyIds: string[]): Promise<Array<{ partyId: string; name: string; partyTypeId: string }>> {
+  if (!partyIds.length) return [];
+  const response = await api({
+    url: 'oms/parties',
+    method: 'get',
+    params: { partyId_op: 'in', partyId: partyIds.join(',') }
+  });
+  return asList(response.data).map((doc: any) => ({
+    partyId: toStringValue(doc.partyId),
+    name: toStringValue(doc.groupName) || [doc.firstName, doc.lastName].filter(Boolean).join(' ').trim() || toStringValue(doc.partyId),
+    partyTypeId: toStringValue(doc.partyTypeId)
+  }));
+}
+
 export async function getCustomerProfile(partyId: string): Promise<CustomerProfile> {
   const response = await api({
     url: `oms/customers/${partyId}`,
@@ -392,8 +435,13 @@ export function normalizeCustomerProfile(doc: any, partyId = ''): CustomerProfil
     || toStringValue(doc?.partyId)
     || partyId;
 
+  const id = toStringValue(doc?.partyId) || partyId;
+
+  const relationshipsFrom: any[] = doc?.relationshipsFrom || [];
+  const relationshipsTo: any[] = doc?.relationshipsTo || [];
+
   return {
-    id: toStringValue(doc?.partyId) || partyId,
+    id,
     name,
     partyTypeId: toStringValue(doc?.partyTypeId),
     statusId: toStringValue(doc?.statusId),
@@ -412,40 +460,43 @@ export function normalizeCustomerProfile(doc: any, partyId = ''): CustomerProfil
       idValue: toStringValue(identification.idValue)
     })),
     contactMechs: (doc?.contactMechs || []).map(normalizeCustomerContactMech),
-    relationshipsFrom: (doc?.relationshipsFrom || []).map(normalizeCustomerRelationship),
-    relationshipsTo: (doc?.relationshipsTo || []).map(normalizeCustomerRelationship)
+    relationshipsFrom: relationshipsFrom.map(normalizeCustomerRelationship),
+    relationshipsTo: relationshipsTo.map(normalizeCustomerRelationship)
   };
 }
 
-export function normalizeCustomerContactMech(contactMech: any): CustomerContactMech {
-  const mech = contactMech?.contactMech || {};
-  const purposeTypeIds = (contactMech?.purposes || [])
-    .map((purpose: any) => toStringValue(purpose.contactMechPurposeTypeId))
-    .filter(Boolean);
-  const postal = contactMech?.postalAddress;
-  const telecom = contactMech?.telecomNumber;
+export function normalizeCustomerContactMech(raw: any): CustomerContactMech {
+  const mech = raw?.contactMech || raw || {};
+  const contactMechTypeId = toStringValue(mech.contactMechTypeId || raw?.contactMechTypeId);
+  const infoString = toStringValue(mech.infoString ?? raw?.infoString);
+  const purposeTypeIds = raw?.purposes
+    ? (raw.purposes as any[]).map((p) => toStringValue(p.contactMechPurposeTypeId)).filter(Boolean)
+    : (raw?.contactMechPurposeTypeId ? [toStringValue(raw.contactMechPurposeTypeId)] : []);
+
+  const postal = raw?.postalAddress;
+  const telecom = raw?.telecomNumber;
 
   return {
-    partyId: toStringValue(contactMech?.partyId),
-    contactMechId: toStringValue(contactMech?.contactMechId),
-    contactMechTypeId: toStringValue(mech.contactMechTypeId),
+    partyId: toStringValue(raw?.partyId),
+    contactMechId: toStringValue(raw?.contactMechId),
+    contactMechTypeId,
     contactMechPurposeTypeId: purposeTypeIds[0] || '',
     purposeTypeIds,
-    infoString: toStringValue(mech.infoString),
-    fromDate: contactMech?.fromDate ? toStringValue(contactMech.fromDate) : undefined,
-    thruDate: contactMech?.thruDate ? toStringValue(contactMech.thruDate) : undefined,
-    postalAddress: postal ? {
-      address1: postal.address1,
-      address2: postal.address2,
-      city: postal.city,
-      stateProvinceGeoId: postal.stateProvinceGeoId,
-      postalCode: postal.postalCode,
-      countryGeoId: postal.countryGeoId
+    infoString,
+    fromDate: raw?.fromDate ? toStringValue(raw.fromDate) : undefined,
+    thruDate: raw?.thruDate ? toStringValue(raw.thruDate) : undefined,
+    postalAddress: contactMechTypeId === 'POSTAL_ADDRESS' ? {
+      address1: postal?.address1 ?? raw?.address1,
+      address2: postal?.address2 ?? raw?.address2,
+      city: postal?.city ?? raw?.city,
+      stateProvinceGeoId: postal?.stateProvinceGeoId ?? raw?.stateProvinceGeoId,
+      postalCode: postal?.postalCode ?? raw?.postalCode,
+      countryGeoId: postal?.countryGeoId ?? raw?.countryGeoId
     } : undefined,
-    telecomNumber: telecom ? {
-      countryCode: telecom.countryCode,
-      areaCode: telecom.areaCode,
-      contactNumber: telecom.contactNumber
+    telecomNumber: contactMechTypeId === 'TELECOM_NUMBER' ? {
+      countryCode: telecom?.countryCode ?? raw?.countryCode,
+      areaCode: telecom?.areaCode ?? raw?.areaCode,
+      contactNumber: telecom?.contactNumber ?? raw?.contactNumber
     } : undefined
   };
 }
@@ -469,8 +520,10 @@ export function normalizeCustomerRelationship(relationship: any): CustomerRelati
 
 function partyNameFromDetail(detail: any): string {
   if (!detail) return '';
+  if (detail.partyGroup?.groupName) return toStringValue(detail.partyGroup.groupName);
   if (detail.groupName) return toStringValue(detail.groupName);
-  return [detail.firstName, detail.lastName].filter(Boolean).join(' ').trim();
+  const person = detail.person || detail;
+  return [person.firstName, person.lastName].filter(Boolean).join(' ').trim();
 }
 
 export interface CustomerOrdersResult {
@@ -496,6 +549,7 @@ function mapOrderGroup(group: any): CustomerOrderSummary {
   const head = docs[0] || {};
   const statusId = toStringValue(head.orderStatusId || head.statusId);
   const unitCount = docs.reduce((sum, doc) => sum + Number(doc.quantity || 0), 0);
+  const isUnfillable = docs.some((doc) => toStringValue(doc.facilityId) === 'UNFILLABLE_PARKING');
 
   return {
     orderId: toStringValue(group.groupValue),
@@ -509,6 +563,7 @@ function mapOrderGroup(group: any): CustomerOrderSummary {
     unitCount,
     progressLabel: head.orderStatusDesc || statusId,
     progressValue: ORDER_PROGRESS[statusId] ?? 0.4,
+    isUnfillable,
     items: docs.slice(0, 3).map((doc) => ({
       orderItemSeqId: toStringValue(doc.orderItemSeqId),
       productId: toStringValue(doc.productId),
@@ -533,7 +588,6 @@ export async function getCustomerOrdersFromSolr(partyId: string, params: { pageS
   const maxPages = 50; // safety cap (~10k orders)
 
   const orders: CustomerOrderSummary[] = [];
-  let lifetimeValue = 0;
   let lifetimeOrders = 0;
   let currencyUom = 'USD';
 
@@ -566,12 +620,40 @@ export async function getCustomerOrdersFromSolr(partyId: string, params: { pageS
 
     groups.forEach((group) => {
       const summary = mapOrderGroup(group);
-      lifetimeValue += summary.grandTotal;
-      currencyUom = summary.currencyUom || currencyUom;
       orders.push(summary);
     });
 
     if (orders.length >= lifetimeOrders) break;
+  }
+
+  // Fetch grandTotal and currencyUom from the Orders REST API for all orders,
+  // since grandTotal is not indexed in the Solr ORDER doc.
+  let lifetimeValue = 0;
+  if (orders.length) {
+    try {
+      const orderIds = orders.map((o) => o.orderId).join(',');
+      const ordersRes = await api({
+        url: 'oms/orders',
+        method: 'get',
+        params: { orderId_op: 'in', orderId: orderIds, pageSize: orders.length }
+      });
+      const orderHeaders: any[] = asList(ordersRes.data);
+      const totalsById: Record<string, { grandTotal: number; currencyUom: string }> = {};
+      orderHeaders.forEach((h: any) => {
+        const id = toStringValue(h.orderId);
+        if (id) totalsById[id] = { grandTotal: Number(h.grandTotal || 0), currencyUom: toStringValue(h.currencyUom) || 'USD' };
+      });
+      orders.forEach((order) => {
+        const totals = totalsById[order.orderId];
+        if (totals) {
+          order.grandTotal = totals.grandTotal;
+          currencyUom = totals.currencyUom || currencyUom;
+        }
+        lifetimeValue += order.grandTotal;
+      });
+    } catch {
+      // Best-effort — lifetime value stays 0 if the batch call fails
+    }
   }
 
   // Earliest order date (orders are sorted desc) - "customer since" fallback.
@@ -731,6 +813,104 @@ export async function expirePartyRelationship(key: RelationshipKey, thruDate: st
     method: 'put',
     data: { ...key, thruDate }
   });
+}
+
+export async function createPartyEmail(partyId: string, data: { infoString: string; contactMechPurposeTypeId?: string }): Promise<void> {
+  await api({ url: `oms/customers/${partyId}/emails`, method: 'post', data: { partyId, ...data } });
+}
+
+export async function updatePartyEmail(partyId: string, contactMechId: string, data: { infoString: string; contactMechPurposeTypeId?: string }): Promise<void> {
+  await api({ url: `oms/customers/${partyId}/emails`, method: 'put', data: { partyId, contactMechId, ...data } });
+}
+
+export async function createPartyTelecomNumber(partyId: string, data: { contactNumber: string; countryCode?: string; areaCode?: string; contactMechPurposeTypeId?: string }): Promise<void> {
+  await api({ url: `oms/customers/${partyId}/telecomNumbers`, method: 'post', data: { partyId, ...data } });
+}
+
+export async function updatePartyTelecomNumber(partyId: string, contactMechId: string, data: { contactNumber: string; countryCode?: string; areaCode?: string; contactMechPurposeTypeId?: string }): Promise<void> {
+  await api({ url: `oms/customers/${partyId}/telecomNumbers`, method: 'put', data: { partyId, contactMechId, ...data } });
+}
+
+export async function createPartyPostalAddress(partyId: string, data: { address1: string; city: string; postalCode: string; address2?: string; stateProvinceGeoId?: string; countryGeoId?: string; contactMechPurposeTypeId?: string }): Promise<void> {
+  await api({ url: `oms/customers/${partyId}/postalAddresses`, method: 'post', data: { partyId, ...data } });
+}
+
+export async function updatePartyPostalAddress(partyId: string, contactMechId: string, data: { address1: string; city: string; postalCode: string; address2?: string; stateProvinceGeoId?: string; countryGeoId?: string; contactMechPurposeTypeId?: string }): Promise<void> {
+  await api({ url: `oms/customers/${partyId}/postalAddresses`, method: 'put', data: { partyId, contactMechId, ...data } });
+}
+
+export async function expirePartyContactMech(partyId: string, contactMechId: string): Promise<void> {
+  await api({ url: `oms/customers/${partyId}/contactMechs/${contactMechId}`, method: 'delete', data: { partyId, contactMechId } });
+}
+
+function normalizeComm(doc: any): import('@/types/customer').CustomerCommunicationSummary {
+  return {
+    communicationEventId: toStringValue(doc.communicationEventId),
+    communicationEventTypeId: toStringValue(doc.communicationEventTypeId),
+    statusId: toStringValue(doc.statusId),
+    subject: doc.subject ? toStringValue(doc.subject) : undefined,
+    entryDate: doc.entryDate ? toStringValue(doc.entryDate) : undefined,
+    datetimeStarted: doc.datetimeStarted ? toStringValue(doc.datetimeStarted) : undefined,
+    datetimeEnded: doc.datetimeEnded ? toStringValue(doc.datetimeEnded) : undefined,
+    partyIdFrom: doc.partyIdFrom ? toStringValue(doc.partyIdFrom) : undefined,
+    partyIdTo: doc.partyIdTo ? toStringValue(doc.partyIdTo) : undefined,
+    roleTypeIdFrom: doc.roleTypeIdFrom ? toStringValue(doc.roleTypeIdFrom) : undefined,
+    roleTypeIdTo: doc.roleTypeIdTo ? toStringValue(doc.roleTypeIdTo) : undefined,
+    contactMechTypeId: doc.contactMechTypeId ? toStringValue(doc.contactMechTypeId) : undefined,
+    content: doc.content ? toStringValue(doc.content) : undefined,
+    note: doc.note ? toStringValue(doc.note) : undefined
+  };
+}
+
+export async function getCustomerCommunications(partyId: string): Promise<import('@/types/customer').CustomerCommunicationSummary[]> {
+  const [fromRes, toRes] = await Promise.all([
+    api({ url: 'oms/customers/communications', method: 'get', params: { partyIdFrom: partyId, orderByField: '-entryDate', pageSize: 100 } }),
+    api({ url: 'oms/customers/communications', method: 'get', params: { partyIdTo: partyId, orderByField: '-entryDate', pageSize: 100 } })
+  ]);
+  const seen = new Set<string>();
+  const results: import('@/types/customer').CustomerCommunicationSummary[] = [];
+  for (const doc of [...asList(fromRes.data), ...asList(toRes.data)]) {
+    const id = toStringValue(doc.communicationEventId);
+    if (id && !seen.has(id)) {
+      seen.add(id);
+      results.push(normalizeComm(doc));
+    }
+  }
+  return results.sort((a, b) => (b.entryDate || '').localeCompare(a.entryDate || ''));
+}
+
+function normalizeCustomerReturn(doc: any): import('@/types/customer').CustomerReturnSummary {
+  const items: any[] = doc.items || [];
+  const returnTotal = items.reduce((sum: number, item: any) => sum + Number(item.returnPrice || 0) * Number(item.returnQuantity || 1), 0);
+  return {
+    returnId: toStringValue(doc.returnId),
+    externalId: doc.externalId ? toStringValue(doc.externalId) : undefined,
+    statusId: toStringValue(doc.statusId),
+    entryDate: toStringValue(doc.entryDate),
+    returnTotal,
+    currencyUomId: toStringValue(doc.currencyUomId) || 'USD',
+    destinationFacilityId: doc.destinationFacilityId ? toStringValue(doc.destinationFacilityId) : undefined,
+    returnChannelEnumId: doc.returnChannelEnumId ? toStringValue(doc.returnChannelEnumId) : undefined,
+    itemCount: items.length,
+    items: items.map((item: any) => ({
+      returnItemSeqId: toStringValue(item.returnItemSeqId),
+      productId: item.productId ? toStringValue(item.productId) : undefined,
+      orderId: item.orderId ? toStringValue(item.orderId) : undefined,
+      orderItemSeqId: item.orderItemSeqId ? toStringValue(item.orderItemSeqId) : undefined,
+      statusId: toStringValue(item.statusId),
+      returnReasonId: item.returnReasonId ? toStringValue(item.returnReasonId) : undefined,
+      returnTypeId: item.returnTypeId ? toStringValue(item.returnTypeId) : undefined,
+      returnQuantity: Number(item.returnQuantity || 0),
+      receivedQuantity: item.receivedQuantity != null ? Number(item.receivedQuantity) : undefined,
+      returnPrice: Number(item.returnPrice || 0),
+      description: item.description ? toStringValue(item.description) : undefined
+    }))
+  };
+}
+
+export async function getCustomerReturns(partyId: string): Promise<import('@/types/customer').CustomerReturnSummary[]> {
+  const response = await api({ url: 'oms/returns', method: 'get', params: { fromPartyId: partyId } });
+  return asList(response.data).map(normalizeCustomerReturn);
 }
 
 export async function searchShopifyCustomers(shopId: string, searchText: string): Promise<Customer[]> {

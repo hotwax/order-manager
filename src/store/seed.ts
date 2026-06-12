@@ -16,8 +16,7 @@ const statusTypeIds = [
   "ORDER_STATUS",
   "ORDER_ITEM_STATUS",
   "SHIPMENT_STATUS",
-  "RETURN_HEADER_STATUS",
-  "RETURN_ITEM_STATUS",
+  "ORDER_RETURN_STTS",
   "PAYMENT_PREF_STATUS",
   "COM_EVENT_STATUS",
   "PARTY_STATUS",
@@ -113,7 +112,9 @@ export const useSeedStore = defineStore("seed", {
     carriers: dataset(),
     shipmentMethodTypes: dataset(),
     shopifyShops: dataset(),
-    shopifyShopLocations: dataset()
+    shopifyShopLocations: dataset(),
+    partyRelationshipTypes: dataset(),
+    geoAssocsByCountry: {} as Record<string, { ids: string[]; status: LoadStatus }>
   }),
   getters: {
     getStatusItemsByType: (state) => (typeId: string) => {
@@ -153,7 +154,7 @@ export const useSeedStore = defineStore("seed", {
         state.contactMechPurposeTypes, state.roleTypes, state.paymentMethodTypes,
         state.communicationEventTypes, state.returnReasons, state.returnTypes,
         state.returnItemTypes, state.orderAdjustmentTypes, state.shipmentMethodTypes,
-        state.facilityTypes
+        state.facilityTypes, state.partyRelationshipTypes
       ];
       for (const lookup of lookups) {
         if (lookup.byId[id]) return itemDescription(lookup.byId[id], id);
@@ -191,6 +192,16 @@ export const useSeedStore = defineStore("seed", {
       .map((id) => state.geos.byId[id])
       .filter((geo) => geo.geoTypeEnumId === "GEOT_STATE" || geo.geoTypeEnumId === "GEOT_PROVINCE")
       .sort((a, b) => (a.geoName || "").localeCompare(b.geoName || "")),
+    getStatesForCountry: (state) => (countryGeoId: string) => {
+      const assoc = state.geoAssocsByCountry[countryGeoId];
+      if (!assoc?.ids.length) return [];
+      return assoc.ids
+        .map((id) => state.geos.byId[id])
+        .filter(Boolean)
+        .sort((a, b) => (a.geoName || "").localeCompare(b.geoName || ""));
+    },
+    geoAssocStatus: (state) => (countryGeoId: string): LoadStatus =>
+      state.geoAssocsByCountry[countryGeoId]?.status || "idle",
     getCarrierOptions: (state) => state.carriers.ids.map((partyId) => ({ id: partyId, label: carrierLabel(state.carriers.byId[partyId]) })),
     getShipmentMethodOptions: (state) => state.shipmentMethodTypes.ids.map((shipmentMethodTypeId) => ({
       id: shipmentMethodTypeId,
@@ -461,6 +472,41 @@ export const useSeedStore = defineStore("seed", {
     },
     async loadShopifyShopLocations() {
       await this.loadDataset(this.shopifyShopLocations, { url: "oms/shopifyShops/locations", method: "GET", params: { pageSize: 1000 } }, (location) => compositeKey(location, ["shopId", "locationId"]));
+    },
+    async loadGeoAssocs(countryGeoId: string) {
+      if (!countryGeoId) return;
+      const existing = this.geoAssocsByCountry[countryGeoId];
+      if (existing?.status === "loaded" || existing?.status === "loading") return;
+
+      if (!this.geoAssocsByCountry[countryGeoId]) {
+        this.geoAssocsByCountry[countryGeoId] = { ids: [], status: "idle" };
+      }
+      this.geoAssocsByCountry[countryGeoId].status = "loading";
+
+      try {
+        const resp = await api({
+          url: "admin/geos/assocs",
+          method: "GET",
+          baseURL: commonUtil.getMaargURL(),
+          params: { geoId: countryGeoId, geoAssocTypeEnumId: "GAT_REGIONS", pageSize: 500 }
+        });
+        const rows: any[] = responseList(resp.data);
+        this.geoAssocsByCountry[countryGeoId].ids = rows.map((r) => r.toGeoId).filter(Boolean);
+        this.geoAssocsByCountry[countryGeoId].status = "loaded";
+      } catch {
+        this.geoAssocsByCountry[countryGeoId].status = "error";
+      }
+    },
+    async loadPartyRelationshipTypes() {
+      await this.loadDataset(this.partyRelationshipTypes, {
+        url: "oms/partyRelationshipTypes",
+        method: "GET",
+        params: { pageSize: 500 }
+      }, (type) => {
+        // Normalize partyRelationshipName → description so describe() resolves it.
+        if (type.partyRelationshipName && !type.description) type.description = type.partyRelationshipName;
+        return type.partyRelationshipTypeId;
+      });
     },
     scopedDataset(collection: Record<string, SeedDatasetState>, id: string) {
       if (!collection[id]) collection[id] = dataset();

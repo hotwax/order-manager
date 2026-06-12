@@ -17,11 +17,26 @@ const HEADER_SEQ_ID = "_NA_";
 
 const newEntry = (): OrderEntry => ({ payload: null, status: "idle", loadedAt: "", error: "" });
 
+const adjustmentDisplayLabel = (adj: any) =>
+  adj.comments || adj.comment || adj.description || adj.orderAdjustmentTypeId || "OTHER_ADJUSTMENT";
+
+const adjustmentUniqueKey = (adj: any, fallbackSeqId = "") =>
+  adj.orderAdjustmentId || [
+    fallbackSeqId || adj.orderItemSeqId || "",
+    adj.shipGroupSeqId || "",
+    adj.orderAdjustmentTypeId || "",
+    adjustmentDisplayLabel(adj),
+    Number(adj.amount || 0)
+  ].join("|");
+
 export const useOrderDetailStore = defineStore("orderDetail", {
   state: () => ({
     byOrderId: {} as Record<string, OrderEntry>,
     currentOrderId: "",
     orderHeaderWorkEfforts: [] as any[],
+    riskAssessmentsByOrderId: {} as Record<string, any[]>,
+    riskAssessmentsStatusByOrderId: {} as Record<string, LoadStatus>,
+    riskAssessmentsErrorByOrderId: {} as Record<string, string>,
     commEvents: [] as any[],
     shippingMethods: [] as any[],
     carrierParties: [] as any[],
@@ -122,11 +137,15 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     adjustmentsByExternalId(): Record<string, Record<string, number>> {
       const index: Record<string, Record<string, number>> = {};
       const seqIdToExtId = this.itemExternalIdBySeqId;
+      const seenAdjustments = new Set<string>();
 
       const recordAdj = (seqId: string, adj: any) => {
         const extId = seqIdToExtId[seqId] || seqId;
         if (!extId) return;
-        const comment = adj.comments || adj.comment || adj.description || 'Adjustment';
+        const uniqueKey = `${extId}:${adjustmentUniqueKey(adj, seqId)}`;
+        if (seenAdjustments.has(uniqueKey)) return;
+        seenAdjustments.add(uniqueKey);
+        const comment = adjustmentDisplayLabel(adj);
         if (!index[extId]) index[extId] = {};
         index[extId][comment] = (index[extId][comment] || 0) + Number(adj.amount || 0);
       };
@@ -188,7 +207,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       return quantities;
     },
 
-    /** Order totals (subtotal, adjustments grouped by type, total) */
+    /** Order totals (subtotal, adjustments grouped by comment/type, total) */
     totals(): { subtotal: number; adjustments: Record<string, number>; total: number } {
       if (!this.current) return { subtotal: 0, adjustments: {}, total: 0 };
 
@@ -201,17 +220,26 @@ export const useOrderDetailStore = defineStore("orderDetail", {
 
       const adjustments: Record<string, number> = {};
       let adjustmentsTotal = 0;
+      const seenAdjustments = new Set<string>();
 
-      (this.current.adjustments || []).forEach((adj: any) => {
+      const recordAdjustment = (adj: any, fallbackSeqId = "") => {
+        const uniqueKey = adjustmentUniqueKey(adj, fallbackSeqId);
+        if (seenAdjustments.has(uniqueKey)) return;
+        seenAdjustments.add(uniqueKey);
+
         const amount = Number(adj.amount || 0);
         adjustmentsTotal += amount;
 
-        // Group only order-level adjustments
-        const seqId = adj.orderItemSeqId;
-        if (!seqId || seqId === HEADER_SEQ_ID) {
-          const typeId = adj.orderAdjustmentTypeId || "OTHER_ADJUSTMENT";
-          adjustments[typeId] = (adjustments[typeId] || 0) + amount;
-        }
+        const label = adjustmentDisplayLabel(adj);
+        adjustments[label] = (adjustments[label] || 0) + amount;
+      };
+
+      (this.current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
+
+      (this.current.shipGroups || []).forEach((sg: any) => {
+        (sg.items || []).forEach((item: any) => {
+          (item.adjustments || []).forEach((adj: any) => recordAdjustment(adj, item.orderItemSeqId));
+        });
       });
 
       // Filter out zero-sum adjustments
@@ -251,6 +279,10 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     hasOpenHolds(): boolean {
       return this.openHolds.length > 0;
     },
+
+    riskAssessments: (state): any[] => state.riskAssessmentsByOrderId[state.currentOrderId] || [],
+    riskAssessmentsStatus: (state): LoadStatus => state.riskAssessmentsStatusByOrderId[state.currentOrderId] || "idle",
+    riskAssessmentsError: (state): string => state.riskAssessmentsErrorByOrderId[state.currentOrderId] || "",
 
     /** Shipping methods for a given carrier partyId, derived from the fetched carrierShipmentMethods list. */
     shippingMethodsByCarrier: (state) => (carrierPartyId: string) =>
@@ -316,6 +348,26 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         this.commEvents = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
       } catch (error: any) {
         logger.error("Failed to load communication events", error);
+      }
+    },
+
+    async fetchRiskAssessments(orderId: string, force = false) {
+      if (!orderId) return;
+      if (this.riskAssessmentsStatusByOrderId[orderId] === "loaded" && !force) return;
+      if (this.riskAssessmentsStatusByOrderId[orderId] === "loading") return;
+
+      this.riskAssessmentsStatusByOrderId[orderId] = "loading";
+      this.riskAssessmentsErrorByOrderId[orderId] = "";
+
+      try {
+        const resp = await useOrderDetail().getRiskAssessments(orderId);
+        if (commonUtil.hasError(resp)) throw resp.data;
+        this.riskAssessmentsByOrderId[orderId] = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
+        this.riskAssessmentsStatusByOrderId[orderId] = "loaded";
+      } catch (error: any) {
+        logger.error("Failed to load order risk assessments", error);
+        this.riskAssessmentsStatusByOrderId[orderId] = "error";
+        this.riskAssessmentsErrorByOrderId[orderId] = error?.message || "Failed to load order risk assessments";
       }
     },
 

@@ -125,7 +125,7 @@
           <ion-toolbar>
             <ion-buttons slot="start">
               <ion-button @click="closeModal">
-                <ion-icon :icon="closeOutline" />
+                <ion-icon slot="icon-only" :icon="closeOutline" />
               </ion-button>
             </ion-buttons>
             <ion-title>{{ translate("Select time zone") }}</ion-title>
@@ -191,8 +191,8 @@ import { commonUtil, cookieHelper, i18n, translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore'
-import DxpProductIdentifier from "@/components/DxpProductIdentifier.vue";
-import DxpAppVersionInfo from "@/components/DxpAppVersionInfo.vue";
+import DxpProductIdentifier from "@/components/settings/DxpProductIdentifier.vue";
+import DxpAppVersionInfo from "@/components/settings/DxpAppVersionInfo.vue";
 
 const userStore = useUserStore();
 const userProfile = computed(() => userStore.getUserProfile);

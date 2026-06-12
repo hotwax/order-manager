@@ -80,7 +80,7 @@
             />
           </span>
           <ion-label>{{ translate("{loaded} of {total} orders", { loaded: searchResults.length, total: searchTotal }) }}</ion-label>
-          <ion-button fill="clear" size="small" @click="toggleSelectMode">
+          <ion-button v-if="canUseBulkActions" fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
@@ -124,9 +124,9 @@
       <ion-toolbar>
         <ion-title size="small">{{ selectedOrderIds.length }} {{ translate('selected') }}</ion-title>
         <ion-buttons slot="end" class="bulk-action-buttons">
-          <ion-button :disabled="!selectedOrderIds.length" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
-          <ion-button :disabled="!selectedOrderIds.length" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
-          <ion-button :disabled="!selectedOrderIds.length" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
+          <ion-button :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
+          <ion-button :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
+          <ion-button :disabled="!selectedOrderIds.length || !canCreateOrderTasks" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
@@ -169,12 +169,17 @@ import { useOrderStore } from '@/store/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
 import { useSeedStore } from '@/store/seed';
-import AddOrderTaskModal from '@/components/AddOrderTaskModal.vue';
-import EditShippingMethodModal from '@/components/EditShippingMethodModal.vue';
-import EmptyState from '@/components/EmptyState.vue';
-import ErrorState from '@/components/ErrorState.vue';
-import SearchFilterCard from '@/components/SearchFilterCard.vue';
+import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
+import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
+import EmptyState from '@/components/common/EmptyState.vue';
+import ErrorState from '@/components/common/ErrorState.vue';
+import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import { showToast } from '@/utils';
+import {
+  ORDER_CANCEL_PERMISSION,
+  ORDER_TASK_CREATE_PERMISSION,
+  ORDER_UPDATE_PERMISSION
+} from '@/authorization/permissions';
 
 const orderStore = useOrderStore();
 const orderDetailStore = useOrderDetailStore();
@@ -207,6 +212,10 @@ const allCurrentPageSelected = computed(() => {
 const someCurrentPageSelected = computed(() => {
   return currentPageOrderIds.value.some((orderId) => selectedOrderIds.value.includes(orderId));
 });
+const canCancelOrders = computed(() => userStore.hasPermission(ORDER_CANCEL_PERMISSION));
+const canUpdateOrders = computed(() => userStore.hasPermission(ORDER_UPDATE_PERMISSION));
+const canCreateOrderTasks = computed(() => userStore.hasPermission(ORDER_TASK_CREATE_PERMISSION));
+const canUseBulkActions = computed(() => canCancelOrders.value || canUpdateOrders.value || canCreateOrderTasks.value);
 
 onMounted(async () => {
   orderStore.searchFilters.productStoreId = selectedProductStoreId.value;

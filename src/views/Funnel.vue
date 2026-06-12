@@ -31,27 +31,32 @@
             <!-- Date Today -->
             <p class="overline">Today</p>
             <!-- Order Count today -->
-            <h1 class="big-number">1,248</h1>
+            <h1 class="big-number">{{ (fulfillmentProgress.totalOrdersCount || 0).toLocaleString() }}</h1>
             <!-- Time since day start -->
-            <p class="time-elapsed">12 hours since day start</p>
+            <p class="time-elapsed">{{ new Date().getHours() }} hours since day start</p>
           </div>
 
           <div class="metrics">
-            <ion-item button detail="true" lines="none" class="metric" router-link="/open">
-              <!-- Brokering Status -->
-              <div class="metric-label">
-                <p>Brokering status</p>
-                <p>85%</p>
+            <ion-item button :detail="true" lines="none" class="metric" router-link="/open">
+              <div style="width: 100%;">
+                <div class="metric-label">
+                  <p>Brokering status</p>
+                  <p>{{ fulfillmentStats.brokeringPercentage }}%</p>
+                </div>
+                <ion-progress-bar :value="fulfillmentStats.brokeringPercentage / 100"></ion-progress-bar>
               </div>
-              <ion-progress-bar :value="0.85"></ion-progress-bar>
             </ion-item>
-            <ion-item button detail="true" lines="none" class="metric" router-link="/packed">
-              <!-- Picked and Packed -->
-              <div class="metric-label">
-                <p>Picked and packed</p>
-                <p>62%</p>
+            <ion-item button detail lines="none" class="metric" router-link="/packed">
+              <div style="width: 100%;">
+                <div class="metric-label">
+                  <p>Picked and packed</p>
+                  <p>{{ fulfillmentStats.pickedAndPackedText }}%</p>
+                </div>
+                <div class="custom-progress-track">
+                  <div class="custom-progress-packed" :style="{ width: fulfillmentStats.packedPercentage + '%' }"></div>
+                  <div class="custom-progress-picked" :style="{ width: fulfillmentStats.pickedPercentage + '%' }"></div>
+                </div>
               </div>
-              <ion-progress-bar :value="0.62" color="success"></ion-progress-bar>
             </ion-item>
           </div>
         </ion-card-content>
@@ -67,47 +72,47 @@
           button
           router-link="/open"
           title="Open Orders"
-          :stat="345"
-          subtitle="Oldest: May 30, 2026 10:15 AM"
+          :stat="openOrders.openOrdersCount || 0"
+          :subtitle="oldestOpenOrderDateStr"
         />
 
         <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard button router-link="/unfillable" title="Unfillable" :stat="42">
+        <StatCard button router-link="/unfillable" title="Unfillable" :stat="totalUnfillable">
           <Sparkline :points="unfillableTrend" color="danger" />
         </StatCard>
 
         <!-- Card 3: Order Hold Tasks — drilldown follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Display list of tasks requiring resolution -->
         <!-- stat: number of orders with hold tasks -->
-        <StatCard title="Order Hold Tasks" :stat="32">
+        <StatCard title="Order Hold Tasks" :stat="holdTasks.holdTasksTotalCount || 0">
           <ion-list lines="none" class="hold-tasks-list">
             <!-- Substitute workefforts -->
-            <ion-item button detail="true" router-link="/unfillable">
+            <ion-item button :detail="true" router-link="/unfillable">
               <ion-label>
                 Substitute
                 <!-- number of workefforts where purpose type is substitute -->
               </ion-label>
-              <p slot="end">12 tasks</p>
+              <p slot="end">{{ holdTasks.holdSubstituteCount || 0 }} tasks</p>
             </ion-item>
 
             <!-- Bad Address workefforts -->
-            <ion-item button detail="true" router-link="/bad-address">
+            <ion-item button :detail="true" router-link="/bad-address">
               <ion-label>
                 Bad Address
                 <!-- number of workefforts where purpose type is bad address -->
               </ion-label>
-              <p slot="end">15 tasks</p>
+              <p slot="end">{{ holdTasks.holdBadAddressCount || 0 }} tasks</p>
             </ion-item>
 
             <!-- Fraud Risk workefforts -->
-            <ion-item button detail="true" router-link="/fraud">
+            <ion-item button :detail="true" router-link="/fraud">
               <ion-label>
                 Fraud Risk
                 <!-- number of workefforts where purpose type is fraud -->
               </ion-label>
-              <p slot="end">5 tasks</p>
+              <p slot="end">{{ holdTasks.holdFraudRiskCount || 0 }} tasks</p>
             </ion-item>
           </ion-list>
         </StatCard>
@@ -120,18 +125,16 @@
       <ion-item lines="none" class="facility-header">
         <ion-icon slot="start" :icon="businessOutline" />
         <ion-label>
-          <h1>Facility Name</h1>
+          <h1>{{ selectedFacilityName }}</h1>
         </ion-label>
       </ion-item>
 
       <div class="dimension ion-padding-horizontal">
         <!-- Search facilities -->
-        <!-- BUSINESS LOGIC COMMENT: Bind value to searchQuery ref to filter facility list -->
-        <ion-searchbar placeholder="Search facilities"></ion-searchbar>
+        <ion-searchbar v-model="searchQuery" placeholder="Search facilities"></ion-searchbar>
         
         <!-- Segment selection -->
-        <!-- BUSINESS LOGIC COMMENT: Bind segment value to dimension ref (e.g. order volume, velocity, partials) -->
-        <ion-segment value="volume">
+        <ion-segment v-model="selectedDimension">
           <ion-segment-button value="volume">
             <ion-label>Order Volume</ion-label>
           </ion-segment-button>
@@ -145,56 +148,31 @@
       </div>
 
       <!-- Facilities List -->
-      <!-- BUSINESS LOGIC COMMENT: Display top 10 facilities by selected dimension or filtered search results -->
       <ion-list class="facilities ion-padding-top">
         <ion-list-header>
           <ion-label>Top 10 facilities by selected dimension or Search results</ion-label>
         </ion-list-header>
 
-        <!-- BUSINESS LOGIC COMMENT: Bind selected facility ID to ref via ion-radio-group -->
         <ion-radio-group v-model="selectedFacilityId">
-          <!-- Facility 1 (highest ranking, 100% progress) -->
-          <!-- BUSINESS LOGIC COMMENT: progress bar value is computed as: metric count / max count in result set -->
-          <ion-item lines="none" class="facility-radio-item">
-            <ion-radio slot="start" value="WH_RNO" />
+          <ion-item v-for="item in filteredFacilities" :key="item.facilityId" lines="none" class="facility-radio-item">
+            <ion-radio slot="start" :value="item.facilityId" />
             <div class="facility-metric">
               <div class="facility-metric-label">
-                <ion-label>Reno DC</ion-label>
-                <ion-note>450 orders</ion-note>
+                <ion-label>{{ item.name }}</ion-label>
+                <ion-note>{{ item.label }}</ion-note>
               </div>
-              <ion-progress-bar :value="1.0" color="primary" />
+              <ion-progress-bar :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0" color="primary" />
             </div>
           </ion-item>
-
-          <!-- Facility 2 (e.g., 300 orders -> 66% progress) -->
-          <ion-item lines="none" class="facility-radio-item">
-            <ion-radio slot="start" value="WH_ATL" />
-            <div class="facility-metric">
-              <div class="facility-metric-label">
-                <ion-label>Atlanta DC</ion-label>
-                <ion-note>300 orders</ion-note>
-              </div>
-              <ion-progress-bar :value="300 / 450" color="primary" />
-            </div>
-          </ion-item>
-
-          <!-- Facility 3 (e.g., 150 orders -> 33% progress) -->
-          <ion-item lines="none" class="facility-radio-item">
-            <ion-radio slot="start" value="WH_LDN" />
-            <div class="facility-metric">
-              <div class="facility-metric-label">
-                <ion-label>London DC</ion-label>
-                <ion-note>150 orders</ion-note>
-              </div>
-              <ion-progress-bar :value="150 / 450" color="primary" />
-            </div>
+          <ion-item v-if="filteredFacilities.length === 0" lines="none">
+            <ion-label>No facilities found</ion-label>
           </ion-item>
         </ion-radio-group>
       </ion-list>
 
       <!-- Online Order Fulfillment Dashboard at selected Facility -->
       <div class="fulfillment-dashboard-section ion-padding">
-        <h1 class="section-title">Fill rate at Facility Name</h1>
+        <h1 class="section-title">Fill rate at {{ selectedFacilityName }}</h1>
 
         <!-- Copied exactly from Dashboard.vue -->
         <div class="fulfillment">
@@ -205,18 +183,18 @@
               <ion-icon slot="end" :icon="informationCircleOutline" />
             </ion-item>
             <ion-list lines="none">
-              <h1>94%</h1>
+              <h1>{{ Math.round((facilityFulfillmentProgress?.fillRate || 0) * 100) }}%</h1>
               <ion-item>
                 <ion-label>Order allocated</ion-label>
-                <ion-label slot="end">150/Unlimited</ion-label>
+                <ion-label slot="end">{{ facilityFulfillmentProgress?.ordersAllocated ?? 0 }}/{{ facilityFulfillmentProgress?.capacityLimit ?? 'Unlimited' }}</ion-label>
               </ion-item>
               <ion-item>
                 <ion-label>Orders packed</ion-label>
-                <ion-label slot="end" color="success">141</ion-label>
+                <ion-label slot="end" color="success">{{ facilityFulfillmentProgress?.ordersPacked ?? 0 }}</ion-label>
               </ion-item>
               <ion-item>
                 <ion-label>Orders rejected</ion-label>
-                <ion-label slot="end" color="danger">9</ion-label>
+                <ion-label slot="end" color="danger">{{ facilityFulfillmentProgress?.ordersRejected ?? 0 }}</ion-label>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -225,44 +203,36 @@
           <ion-card class="orders">
             <p class="overline title">Orders Pending Fulfillment</p>
             <div class="pending">
-              <h1>24</h1>
+              <h1>{{ facilityFulfillmentProgress?.totalPending ?? 0 }}</h1>
               <ion-item lines="none">
                 <ion-label>
                   <p>Oldest order assigned</p>
-                  3 hours ago
+                  {{ oldestAssignedRelativeStr }}
                 </ion-label>
               </ion-item>
             </div>
             <div class="fulfill">
               <ion-item lines="full" :button="true" :detail="true" :router-link="workflowRoute('/open')">
                 <ion-icon :icon="mailUnreadOutline" slot="start" />
-                <ion-label>14 open</ion-label>
+                <ion-label>{{ facilityFulfillmentProgress?.openCount ?? 0 }} open</ion-label>
               </ion-item>
               <ion-item lines="none" :button="true" :detail="true" :router-link="workflowRoute('/inflight')">
                 <ion-icon :icon="mailOpenOutline" slot="start" />
-                <ion-label>10 in progress</ion-label>
+                <ion-label>{{ facilityFulfillmentProgress?.inProgressCount ?? 0 }} in progress</ion-label>
               </ion-item>
             </div>
           </ion-card>
 
-          <ion-progress-bar class="fulfillment-progress-bar" :value="0.7" color="success" />
-
-          <!-- Scheduling -->
-          <div class="scheduling">
-            <ion-item lines="none">
-              <ion-icon slot="start" :icon="sendOutline" color="warning" />
-              <ion-label>
-                Carrier pickup scheduled
-                <p>04:30pm</p>
-              </ion-label>
-            </ion-item>
-            <ion-item lines="none">
-              <ion-icon slot="start" :icon="storefrontOutline" color="danger" />
-              <ion-label>
-                Store closes in 2 hours
-                <p>07:00pm</p>
-              </ion-label>
-            </ion-item>
+          <div class="fulfillment-progress-bar custom-progress-track">
+            <div class="progress-segment packed" :style="{ width: progressPercent.packed + '%' }"></div>
+            <div class="progress-segment rejected" :style="{ width: progressPercent.rejected + '%' }"></div>
+            <div 
+              class="progress-segment allocated" 
+              :style="{ 
+                width: progressPercent.allocated + '%',
+                borderRight: progressPercent.allocated > 0 ? '1.5px solid var(--ion-color-primary, #3880ff)' : 'none'
+              }"
+            ></div>
           </div>
         </div>
       </div>
@@ -272,7 +242,6 @@
 
 <script setup lang="ts">
 import {
-  IonBadge,
   IonCard,
   IonCardContent,
   IonContent,
@@ -297,38 +266,152 @@ import {
 } from '@ionic/vue';
 import { ref } from 'vue';
 import {
-  airplaneOutline,
-  alertCircleOutline,
-  cubeOutline,
-  playCircleOutline,
-  shieldHalfOutline,
   globeOutline,
   businessOutline,
   informationCircleOutline,
   mailUnreadOutline,
-  mailOpenOutline,
-  sendOutline,
-  storefrontOutline
+  mailOpenOutline
 } from 'ionicons/icons';
-import { computed } from 'vue';
-import { translate, RadioFacetGroup, StatCard, Sparkline } from '@common';
+import { computed, watch } from 'vue';
+import { translate, RadioFacetGroup, StatCard, Sparkline, commonUtil } from '@common';
 import { useCustomerServiceStore } from '@/store/customerService';
-
-// Recent unfillable-order trend (mock). Higher values plot higher.
-const unfillableTrend = [12, 18, 9, 24, 16, 30, 14, 22, 11, 26, 23];
+import { useProductStore } from '@/store/productStore';
+import { DateTime } from 'luxon';
 
 const store = useCustomerServiceStore();
-const counts = computed(() => store.bucketCounts);
+const productStore = useProductStore() as any;
 
-const storeOptions = store.productStores.map((productStore) => ({
-  value: productStore.id,
-  primary: productStore.name
-}));
-const selectedStoreId = ref(storeOptions[0]?.value ?? '');
-const selectedStoreName = computed(
-  () => storeOptions.find((s) => s.value === selectedStoreId.value)?.primary ?? ''
-);
+const fulfillmentProgress = computed(() => store.getFulfillmentProgress);
+const openOrders = computed(() => store.getOpenOrders);
+const holdTasks = computed(() => store.getHoldTasks);
+const facilityFulfillmentProgress = computed(() => store.getFacilityFulfillmentProgress);
+const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
+const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);
+const facilityPartialFulfillments = computed(() => store.getFacilityPartialFulfillments);
+const unfillableTrend = computed(() => store.unfillableTrend);
+const facilities = computed(() => store.facilities);
+
+const selectedStoreId = ref('');
 const selectedFacilityId = ref('WH_RNO');
+const searchQuery = ref('');
+const selectedDimension = ref('volume');
+
+const oldestOpenOrderDateStr = computed(() => {
+  const timestamp = openOrders.value.oldestOpenOrderDate;
+  return timestamp ? 'Oldest: ' + commonUtil.getDateAndTime(timestamp) : 'No open orders';
+});
+
+const totalUnfillable = computed(() => unfillableTrend.value.reduce((sum, val) => sum + val, 0));
+
+const storeOptions = computed(() => {
+  return productStore.getProductStores.map((pStore: any) => ({
+    value: pStore.productStoreId,
+    primary: pStore.storeName
+  }));
+});
+
+watch(storeOptions, (newOptions) => {
+  if (newOptions.length > 0 && !selectedStoreId.value) {
+    selectedStoreId.value = newOptions[0].value;
+  }
+}, { immediate: true });
+
+watch(selectedStoreId, (newStoreId) => {
+  if (newStoreId) {
+    store.fetchFulfillmentProgress(newStoreId);
+    store.fetchOpenOrders(newStoreId);
+    store.fetchUnfillable(newStoreId);
+    store.fetchFacilityOrderVolume(newStoreId);
+    store.fetchFacilityFulfillmentVelocity(newStoreId);
+    store.fetchFacilityPartialFulfillments(newStoreId);
+    store.fetchHoldTasks(newStoreId);
+    if (selectedFacilityId.value) {
+      store.fetchFacilityFulfillmentProgress(selectedFacilityId.value, newStoreId);
+    }
+  }
+}, { immediate: true });
+
+watch(selectedFacilityId, (newFacilityId) => {
+  if (newFacilityId && selectedStoreId.value) {
+    store.fetchFacilityFulfillmentProgress(newFacilityId, selectedStoreId.value);
+  }
+});
+
+const fulfillmentStats = computed(() => {
+  const fp = fulfillmentProgress.value || {};
+  const total = fp.totalShipGroupsCount || 0;
+  const brokered = fp.brokeredShipGroupsCount || 0;
+  const picked = fp.pickedShipGroupsCount || 0;
+  const packedTotal = (fp.packedShipGroupsCount || 0) + (fp.shippedShipGroupsCount || 0);
+
+  return {
+    brokeringPercentage: total ? Math.round((brokered / total) * 100) : 0,
+    pickedPercentage: brokered ? (picked / brokered) * 100 : 0,
+    packedPercentage: brokered ? (packedTotal / brokered) * 100 : 0,
+    pickedAndPackedText: brokered ? Math.round(((picked + packedTotal) / brokered) * 100) : 0,
+  };
+});
+
+const selectedStoreName = computed(
+  () => storeOptions.value.find((s: any) => s.value === selectedStoreId.value)?.primary ?? ''
+);
+
+function getFacilityName(facilityId: string) {
+  const fac = facilities.value.find(f => f.id === facilityId);
+  return fac ? fac.name : facilityId;
+}
+
+const selectedFacilityName = computed(() => {
+  const selected = filteredFacilities.value.find(item => item.facilityId === selectedFacilityId.value);
+  return selected ? selected.name : getFacilityName(selectedFacilityId.value);
+});
+
+const filteredFacilities = computed(() => {
+  let list: any[] = [];
+  if (selectedDimension.value === 'volume') {
+    list = facilityOrderVolume.value.map(item => ({
+      facilityId: item.facilityId,
+      name: item.facilityName || getFacilityName(item.facilityId),
+      value: item.lastOrderCount,
+      label: `${item.lastOrderCount} orders`
+    }));
+  } else if (selectedDimension.value === 'velocity') {
+    list = facilityFulfillmentVelocity.value.map(item => ({
+      facilityId: item.facilityId,
+      name: item.facilityName || getFacilityName(item.facilityId),
+      value: item.fulfillmentVelocity || 0,
+      label: `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
+    }));
+  } else if (selectedDimension.value === 'partial') {
+    list = facilityPartialFulfillments.value.map(item => ({
+      facilityId: item.facilityId,
+      name: item.facilityName || getFacilityName(item.facilityId),
+      value: item.partialFulfillmentRatio || 0,
+      label: `${Math.round((item.partialFulfillmentRatio || 0) * 100)}% partial (${item.partialFulfilledOrders || 0}/${item.totalFulfilledOrders || 0} orders)`
+    }));
+  }
+
+  if (searchQuery.value) {
+    const query = searchQuery.value.toLowerCase();
+    list = list.filter(item => item.name.toLowerCase().includes(query));
+  }
+
+  return list.slice(0, 10);
+});
+
+const maxMetricValue = computed(() => {
+  if (filteredFacilities.value.length === 0) return 1;
+  return filteredFacilities.value[0].value || 1;
+});
+
+watch(filteredFacilities, (newList) => {
+  if (newList.length > 0) {
+    const exists = newList.some(item => item.facilityId === selectedFacilityId.value);
+    if (!exists) {
+      selectedFacilityId.value = newList[0].facilityId;
+    }
+  }
+});
 
 const workflowRouteQuery = computed(() => ({
   productStoreId: selectedStoreId.value,
@@ -342,15 +425,62 @@ function workflowRoute(path: string) {
   };
 }
 
-const totalBlocked = computed(() => {
-  return counts.value['unfillable'] + counts.value['fraud'];
+
+const oldestAssignedRelativeStr = computed(() => {
+  const timestamp = facilityFulfillmentProgress.value?.oldestAssignedTime;
+  return timestamp ? commonUtil.getRelativeTime(timestamp) : 'No pending orders';
 });
 
-const totalInProgress = computed(() => {
-  return counts.value['open'] + counts.value['inflight'] + counts.value['packed'];
+const progressPercent = computed(() => {
+  const progress = facilityFulfillmentProgress.value;
+  if (!progress) return { packed: 0, rejected: 0, allocated: 0 };
+  const total = progress.capacityLimit || (progress.assignedBeforeTodayCount + progress.ordersAllocated) || 1;
+  const remainingAllocated = Math.max(0, progress.ordersAllocated - progress.ordersPacked - progress.ordersRejected);
+  return {
+    packed: (progress.ordersPacked / total) * 100,
+    rejected: (progress.ordersRejected / total) * 100,
+    allocated: (remainingAllocated / total) * 100
+  };
 });
 
-const totalOrders = computed(() => totalBlocked.value + totalInProgress.value);
+const carrierPickupTimeStr = computed(() => {
+  const time = facilityFulfillmentProgress.value?.carrierPickupTime;
+  if (!time) return '04:30pm';
+  return DateTime.fromFormat(time, 'HH:mm:ss').toFormat('hh:mma').toLowerCase();
+});
+
+const storeClosingTimeStr = computed(() => {
+  const time = facilityFulfillmentProgress.value?.closeTime;
+  if (!time) return '07:00pm';
+  return DateTime.fromFormat(time, 'HH:mm:ss').toFormat('hh:mma').toLowerCase();
+});
+
+const storeCloseRemainingStr = computed(() => {
+  const progress = facilityFulfillmentProgress.value;
+  if (!progress || !progress.closeTime || !progress.facilityTimeZone) {
+    return 'Store closes in 2 hours';
+  }
+  const facilityZone = progress.facilityTimeZone;
+  const nowInFacility = DateTime.now().setZone(facilityZone);
+  const closeTimeParts = progress.closeTime.split(':');
+  const closeTimeToday = nowInFacility.set({
+    hour: parseInt(closeTimeParts[0]),
+    minute: parseInt(closeTimeParts[1]),
+    second: parseInt(closeTimeParts[2] || '0'),
+    millisecond: 0
+  });
+  if (nowInFacility >= closeTimeToday) {
+    return 'Store is closed';
+  }
+  const diff = closeTimeToday.diff(nowInFacility, ['hours', 'minutes']);
+  const hours = Math.floor(diff.hours);
+  const minutes = Math.floor(diff.minutes);
+  if (hours > 0) {
+    return `Store closes in ${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+  } else {
+    return `Store closes in ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`;
+  }
+});
 </script>
 
 <style scoped>
@@ -413,6 +543,26 @@ const totalOrders = computed(() => totalBlocked.value + totalInProgress.value);
   height: var(--spacer-lg);
   border-radius: var(--spacer-xs);
   overflow: hidden;
+}
+
+/* Custom 3-tier progress bar */
+.custom-progress-track {
+  width: 100%;
+  height: var(--spacer-lg);
+  background: #d4f2da; /* Light pale green for background */
+  border-radius: var(--spacer-xs);
+  display: flex;
+  overflow: hidden;
+}
+
+.custom-progress-packed {
+  background: #1e8f42; /* Dark distinct green for packed */
+  height: 100%;
+}
+
+.custom-progress-picked {
+  background: var(--ion-color-success, #2dd36f); /* Vibrant base green for picked */
+  height: 100%;
 }
 
 @media (max-width: 767px) {
@@ -575,6 +725,29 @@ const totalOrders = computed(() => totalBlocked.value + totalInProgress.value);
   min-width: 0;
   height: var(--spacer-lg);
   border-radius: var(--spacer-xs);
+}
+
+.custom-progress-track {
+  display: flex;
+  background-color: var(--ion-color-step-50, #ffffff);
+  border: 1px solid var(--ion-color-step-300, #b3b3b3);
+  overflow: hidden;
+}
+
+.progress-segment {
+  height: 100%;
+}
+
+.progress-segment.packed {
+  background-color: var(--ion-color-success, #2dd36f);
+}
+
+.progress-segment.rejected {
+  background-color: var(--ion-color-danger, #eb445a);
+}
+
+.progress-segment.allocated {
+  background-color: #d2e0fb;
 }
 
 .scheduling {

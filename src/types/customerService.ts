@@ -45,3 +45,34 @@ export interface BulkActionDefinition {
   label: string;
   confirmText?: string;
 }
+
+export interface ProductStore {
+  productStoreId: string;
+  storeName: string;
+}
+
+export interface FacilityFulfillmentProgress {
+  ordersAllocated: number;
+  ordersPacked: number;
+  ordersRejected: number;
+  capacityLimit: number | null;
+  fillRate: number;
+  openCount: number;
+  inProgressCount: number;
+  totalPending: number;
+  oldestAssignedTime: number | null;
+  assignedBeforeTodayCount: number;
+  openTime: string | null;
+  closeTime: string | null;
+  facilityTimeZone: string | null;
+  carrierPickupTime: string | null;
+}
+
+export interface FulfillmentProgress {
+  totalOrdersCount: number;
+  totalShipGroupsCount: number;
+  brokeredShipGroupsCount: number;
+  pickedShipGroupsCount: number;
+  packedShipGroupsCount: number;
+  shippedShipGroupsCount: number;
+}

@@ -37,5 +37,12 @@ export function useOrderDetail() {
     });
   }
 
-  return { getOrder, getWorkEfforts, getCommunicationEvents };
+  async function getRiskAssessments(orderId: string): Promise<any> {
+    return api({
+      url: `oms/orders/${orderId}/risks`,
+      method: "GET"
+    });
+  }
+
+  return { getOrder, getWorkEfforts, getCommunicationEvents, getRiskAssessments };
 }
