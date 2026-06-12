@@ -21,5 +21,7 @@ describe('order item list row Figma variants', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/views/OrderDetail.vue'), 'utf8');
 
     expect(source).toContain(':show-quantity="!item.facilityName && !item.attributeCount"');
+    expect(source).toContain("const facilityName = sg.facilityId ? (sg.facilityName || sg.facilityId) : '';");
+    expect(source).toContain("if (!attributeCount) return '';");
   });
 });

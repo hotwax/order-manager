@@ -1281,12 +1281,14 @@ const groupedItems = computed(() => {
           items: []
         };
       }
+      const facilityName = sg.facilityId ? (sg.facilityName || sg.facilityId) : '';
+
       groups[externalId].items.push({
         orderItemSeqId: item.id,
         externalId,
         shipGroupSeqId: sg.id,
         facilityId: sg.facilityId || '',
-        facilityName: sg.facilityName || 'Facility',
+        facilityName,
         quantity: item.quantity,
         statusId,
         status,
@@ -1877,7 +1879,10 @@ function itemLineTotal(item: any): number {
 }
 
 function attributeChipLabel(count: number): string {
-  return `${count || 0} ${Number(count) === 1 ? translate('attribute') : translate('attributes')}`;
+  const attributeCount = Number(count || 0);
+  if (!attributeCount) return '';
+
+  return `${attributeCount} ${attributeCount === 1 ? translate('attribute') : translate('attributes')}`;
 }
 
 function itemAdjustmentLabel(adj: any): string {
