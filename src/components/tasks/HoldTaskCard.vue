@@ -14,7 +14,7 @@
     :selected="selected"
     @update:selected="emit('update:selected', $event)"
   >
-    <ion-list lines="none">
+    <ion-list lines="full">
       <ion-item>
         <ion-label>
           {{ task.workEffortName }}
@@ -30,7 +30,7 @@
       </ion-item>
     </ion-list>
 
-    <ion-list lines="none">
+    <ion-list lines="full">
       <ion-item>
         <ion-label>
           {{ assignedPartyName(task, 'TASK_ASSIGNEE') }}
@@ -45,7 +45,7 @@
       </ion-item>
     </ion-list>
 
-    <ion-list lines="none">
+    <ion-list lines="full">
       <ion-item>
         <ion-textarea
           :label="translate('Resolution comment')"

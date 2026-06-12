@@ -11,6 +11,7 @@ describe('hold task card assignment details', () => {
     expect(source).toContain('party.roleTypeId === roleTypeId');
     expect(source).toContain('DateTime.fromSQL(value)');
     expect(source).toContain("v-model=\"resolutionComment\"");
+    expect((source.match(/<ion-list lines=\"full\">/g) ?? []).length).toBeGreaterThanOrEqual(3);
     expect(source).toContain("changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED', resolutionCommunication())");
     expect(source).toContain('const content = resolutionComment.value.trim()');
     expect(source).not.toContain("{{ getAssignedParty(task, 'TASK_ASSIGNEE') }}");
