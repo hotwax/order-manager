@@ -17,18 +17,18 @@
         @search="fetchHoldTasks()"
         @clear="clearFilters"
       >
-        <ion-select v-model="assignee" :label="translate('Assignee')" label-placement="stacked" interface="popover">
+        <FilterSelect v-model="assignee" :label="translate('Assignee')">
           <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
           <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
-        </ion-select>
+        </FilterSelect>
         <DateFilterSelect v-model="dateAfter" :label="translate('Order date after')" />
         <DateFilterSelect v-model="dateBefore" :label="translate('Order date before')" />
-        <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
+        <FilterSelect v-model="orderChannel" :label="translate('Channel')">
           <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
           <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
             {{ channel.description || channel.enumId }}
           </ion-select-option>
-        </ion-select>
+        </FilterSelect>
       </SearchFilterCard>
 
       <ion-item lines="none" class="select-all-item" v-if="heldTasks.length">
@@ -90,7 +90,6 @@ import {
   IonLabel,
   IonButton,
   IonCheckbox,
-  IonSelect,
   IonSelectOption,
   alertController,
   IonInfiniteScroll,
@@ -99,6 +98,7 @@ import {
 } from '@ionic/vue';
 import { translate } from '@common';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
+import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useUserStore } from '@/store/user';

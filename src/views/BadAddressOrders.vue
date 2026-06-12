@@ -17,18 +17,18 @@
         @search="fetchAddressValidationTasks()"
         @clear="clearFilters"
       >
-        <ion-select v-model="assignee" :label="translate('Assignee')" label-placement="stacked" interface="popover">
+        <FilterSelect v-model="assignee" :label="translate('Assignee')">
           <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
           <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
-        </ion-select>
+        </FilterSelect>
         <DateFilterSelect v-model="dateAfter" :label="translate('Date after')" />
         <DateFilterSelect v-model="dateBefore" :label="translate('Date before')" />
-        <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
+        <FilterSelect v-model="orderChannel" :label="translate('Channel')">
           <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
           <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
             {{ channel.description || channel.enumId }}
           </ion-select-option>
-        </ion-select>
+        </FilterSelect>
       </SearchFilterCard>
 
       <ion-item lines="none" class="select-all-item" v-if="addressValidationTasks.length">
@@ -78,10 +78,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUpdate } from 'vue';
-import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
+import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonMenuButton, IonPage, IonSelectOption, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
 import { showToast } from '@/utils';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
+import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
