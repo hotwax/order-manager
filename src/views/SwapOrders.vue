@@ -21,8 +21,8 @@
           <ion-select-option value="">{{ translate('All') }}</ion-select-option>
           <ion-select-option value="Y">{{ translate('Swappable') }}</ion-select-option>
         </ion-select>
-        <ion-input v-model="dateAfter" :label="translate('Date after')" label-placement="stacked" type="date" />
-        <ion-input v-model="dateBefore" :label="translate('Date before')" label-placement="stacked" type="date" />
+        <DateFilterSelect v-model="dateAfter" :label="translate('Date after')" />
+        <DateFilterSelect v-model="dateBefore" :label="translate('Date before')" />
         <ion-select v-model="orderChannel" :label="translate('Channel')" label-placement="stacked" interface="popover">
           <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
           <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
@@ -59,8 +59,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
-import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonInput, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToolbar, onIonViewWillEnter } from '@ionic/vue';
+import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonMenuButton, IonPage, IonSelect, IonSelectOption, IonTitle, IonToolbar, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
+import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
