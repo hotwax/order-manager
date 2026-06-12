@@ -1,7 +1,7 @@
 <template>
   <TaskCardShell
-    :title="task.orderName"
-    :subtitle="task.orderDate"
+    :title="taskOrderTitle(task)"
+    :subtitle="formatTaskDate(task.orderDate)"
     :amount="money(task.grandTotal)"
     :chip-label="task.workEffortId"
     :contact-name="getCustomerName(task.customer)"
@@ -89,6 +89,7 @@ import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
+import { formatTaskDate, taskOrderTitle } from '@/utils/taskCardDisplay';
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean }>(), {
   selectable: false,
