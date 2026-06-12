@@ -1,6 +1,6 @@
 <template>
   <ion-card>
-    <ion-card-content>
+    <ion-card-content class="search-filter-card-content">
       <ion-searchbar
         :value="modelValue"
         :placeholder="placeholder"
@@ -8,9 +8,11 @@
         @ionChange="$emit('search')"
       />
 
-      <div class="search-filter-grid">
-        <slot />
-        <ion-button v-if="showClear" fill="clear" @click="$emit('clear')">{{ translate('Clear') }}</ion-button>
+      <div class="search-filter-row">
+        <div class="search-filter-controls">
+          <slot />
+        </div>
+        <ion-button v-if="showClear" class="search-filter-clear" fill="clear" @click="$emit('clear')">{{ translate('Clear') }}</ion-button>
       </div>
     </ion-card-content>
   </ion-card>
@@ -40,16 +42,55 @@ function updateSearch(event: CustomEvent) {
 </script>
 
 <style scoped>
-.search-filter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: var(--spacer-base);
-  align-items: end;
+.search-filter-card-content,
+.search-filter-row,
+.search-filter-controls {
+  display: flex;
+  gap: var(--spacer-sm);
+}
+
+.search-filter-card-content {
+  flex-direction: column;
+  padding: var(--spacer-sm);
+}
+
+.search-filter-row,
+.search-filter-controls {
+  align-items: center;
+}
+
+.search-filter-row {
+  flex-wrap: nowrap;
+}
+
+.search-filter-controls {
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.search-filter-controls :slotted(*) {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.search-filter-clear {
+  flex: 0 0 auto;
 }
 
 @media (max-width: 640px) {
-  .search-filter-grid {
-    grid-template-columns: 1fr;
+  .search-filter-row,
+  .search-filter-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .search-filter-controls :slotted(*) {
+    flex-basis: auto;
+  }
+
+  .search-filter-clear {
+    align-self: stretch;
   }
 }
 </style>
