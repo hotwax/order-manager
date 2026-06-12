@@ -13,9 +13,18 @@
           <p v-if="subtitle">{{ subtitle }}</p>
         </slot>
       </ion-label>
-      <ion-chip v-if="chipLabel" class="task-card-heading-chip" outline color="medium">
+      <ion-chip
+        v-if="chipLabel"
+        class="task-card-heading-chip"
+        outline
+        color="medium"
+        button
+        :aria-label="translate('Copy')"
+        @click="copyChipLabel"
+      >
         <ion-icon :icon="ticketOutline" />
         <ion-label>{{ chipLabel }}</ion-label>
+        <ion-icon :icon="copyOutline" />
       </ion-chip>
       <ion-note v-if="amount" slot="end" color="dark">{{ amount }}</ion-note>
       <slot name="heading-end" />
@@ -84,7 +93,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { IonButton, IonButtons, IonCard, IonCardContent, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonList, IonNote, IonProgressBar } from '@ionic/vue';
-import { callOutline, mailOutline, personOutline, ticketOutline } from 'ionicons/icons';
+import { callOutline, copyOutline, mailOutline, personOutline, ticketOutline } from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
 
 const props = withDefaults(defineProps<{
@@ -142,6 +151,10 @@ async function copyContact(value: string) {
   if (!value) return;
 
   await commonUtil.copyToClipboard(value, 'Copied');
+}
+
+async function copyChipLabel() {
+  await copyContact(props.chipLabel);
 }
 </script>
 

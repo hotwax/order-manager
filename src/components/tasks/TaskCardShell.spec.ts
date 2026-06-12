@@ -18,6 +18,10 @@ describe('task and ship-group card layout', () => {
 
     expect(taskShell).toContain(":class=\"{ 'task-card-heading-has-chip': chipLabel }\"");
     expect(taskShell).toContain('class="task-card-heading-chip"');
+    expect(taskShell).toContain('button');
+    expect(taskShell).toContain('@click="copyChipLabel"');
+    expect(taskShell).toContain('copyOutline');
+    expect(taskShell).toContain('await copyContact(props.chipLabel);');
     expect(taskShell).not.toContain('slot="end" outline color="medium"');
     expect(taskShell).toContain('.task-card-heading-has-chip .task-card-heading-title');
     expect(taskShell).toContain('position: absolute;');
