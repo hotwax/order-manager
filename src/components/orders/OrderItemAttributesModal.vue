@@ -42,12 +42,6 @@
           :disabled="saving"
         />
       </ion-item>
-      <div class="ion-padding">
-        <ion-button expand="block" :disabled="!form.attrName.trim() || saving" @click="addAttribute">
-          <ion-spinner v-if="saving" name="crescent" slot="start" />
-          {{ translate('Add') }}
-        </ion-button>
-      </div>
     </ion-list>
 
     <ion-list v-if="localAttributes.length">
@@ -61,8 +55,8 @@
           <p v-if="attr.attrDescription">{{ attr.attrDescription }}</p>
         </ion-label>
         <ion-button slot="end" fill="clear" color="danger" :disabled="deletingAttr === attr.attrName" @click="deleteAttribute(attr)">
-          <ion-spinner v-if="deletingAttr === attr.attrName" name="crescent" />
-          <ion-icon v-else :icon="trashOutline" />
+          <ion-spinner v-if="deletingAttr === attr.attrName" slot="icon-only" name="crescent" />
+          <ion-icon v-else slot="icon-only" :icon="trashOutline" />
         </ion-button>
       </ion-item>
     </ion-list>
@@ -72,12 +66,19 @@
       :title="translate('No attributes')"
       :message="translate('This order item has no attributes.')"
     />
+
+    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+      <ion-fab-button :disabled="!form.attrName.trim() || saving" :aria-label="translate('Add Attribute')" @click="addAttribute">
+        <ion-spinner v-if="saving" name="crescent" />
+        <ion-icon v-else :icon="addOutline" />
+      </ion-fab-button>
+    </ion-fab>
   </ion-content>
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, trashOutline } from 'ionicons/icons';
+import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
+import { addOutline, closeOutline, trashOutline } from 'ionicons/icons';
 import { reactive, ref } from 'vue';
 import { api, translate } from '@common';
 import EmptyState from '@/components/common/EmptyState.vue';
