@@ -196,6 +196,7 @@
                     :selected="item.selected"
                     :quantity="item.quantity"
                     :quantity-label="translate('qty')"
+                    :show-quantity="!item.facilityName && !item.attributeCount"
                     :facility-label="item.facilityName"
                     :facility-disabled="['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)"
                     :attributes-label="attributeChipLabel(item.attributeCount)"
