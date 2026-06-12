@@ -74,7 +74,7 @@ const seedStore = useSeedStore();
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
 
 const searchQuery = ref('');
-const swappable = ref(false);
+const swappable = ref(true);
 const dateAfter = ref('');
 const dateBefore = ref('');
 const orderChannel = ref('');
