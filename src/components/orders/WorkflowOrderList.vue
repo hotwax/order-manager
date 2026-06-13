@@ -43,7 +43,7 @@
         <ion-input v-model="filters.dateThru" :label="translate('Order date thru')" label-placement="stacked" type="date" />
       </SearchFilterCard>
 
-      <ion-list>
+      <ion-list v-if="orders.length">
         <ion-list-header>
           <ion-checkbox
             class="ion-margin-end"
