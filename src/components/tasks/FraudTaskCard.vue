@@ -65,7 +65,7 @@
     <template #actions>
       <ion-button fill="clear" color="primary" @click="resolveTask()">{{ translate('Resolve task') }}</ion-button>
       <ion-button fill="clear" color="danger" @click="cancelOrder()">{{ translate('Cancel order') }}</ion-button>
-      <ion-button fill="clear" color="primary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
+      <ion-button v-if="showViewOrderAction && task.orderId" fill="clear" color="primary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
     </template>
 
     <template #actions-end>
@@ -93,9 +93,10 @@ import { useProductStore } from '@/store/productStore';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { formatTaskDate, taskOrderTitle } from '@/utils/taskCardDisplay';
 
-const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean }>(), {
+const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean; showViewOrderAction?: boolean }>(), {
   selectable: false,
   selected: false,
+  showViewOrderAction: false,
 });
 
 const emit = defineEmits<{

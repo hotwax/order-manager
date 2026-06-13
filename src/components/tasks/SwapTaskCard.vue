@@ -131,6 +131,7 @@
       <ion-button fill="clear" color="primary" @click="releaseUpdatedOrder(task)">{{ translate('Release updated order') }}</ion-button>
       <ion-button fill="clear" color="primary" @click="cancelOrder(task)">{{ translate('Cancel order') }}</ion-button>
       <ion-button fill="clear" color="primary" @click="parkOrder(task)">{{ translate('Park') }}</ion-button>
+      <ion-button v-if="showViewOrderAction && task.orderId" fill="clear" color="primary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
     </template>
   </TaskCardShell>
 </template>
@@ -153,9 +154,10 @@ import { useStockStore } from '@/store/stock';
 import { isSwapItemUnavailable } from '@/utils/swapItems';
 import { taskOrderTitle } from '@/utils/taskCardDisplay';
 
-const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean }>(), {
+const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean; showViewOrderAction?: boolean }>(), {
   selectable: false,
   selected: false,
+  showViewOrderAction: false,
 });
 
 const emit = defineEmits<{ (e: 'update:selected', value: boolean): void; (e: 'completed'): void }>();

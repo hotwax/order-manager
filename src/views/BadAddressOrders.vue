@@ -40,6 +40,7 @@
           :task="task"
           :selectable="true"
           :selected="!!selectedOrders[task.workEffortId]"
+          show-view-order-action
           @update:selected="val => selectedOrders[task.workEffortId] = val"
           @completed="fetchAddressValidationTasks()"
           :ref="setCardRef"

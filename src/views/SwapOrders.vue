@@ -33,6 +33,7 @@
           v-for="task in swapTasks"
           :key="task.workEffortId"
           :task="task"
+          show-view-order-action
           @completed="fetchSwapTasks()"
         />
         <div class="empty-state" v-if="!swapTasks.length">
