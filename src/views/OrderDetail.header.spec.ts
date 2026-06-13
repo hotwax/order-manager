@@ -37,7 +37,7 @@ describe('order detail header', () => {
 
     expect(detailsStart).toBeGreaterThan(-1);
     expect(detailsEnd).toBeGreaterThan(detailsStart);
-    expect(detailsSource).toContain("<ion-card-title>{{ translate('Order attributes') }}</ion-card-title>");
+    expect(detailsSource).toContain("<ion-card-title>{{ translate('Attributes') }}</ion-card-title>");
     expect(detailsSource).toContain('v-for="attribute in order.attributes"');
     expect(detailsSource).toContain("{{ attribute.value || translate('Value not available') }}");
     expect(detailsSource).toContain("{{ translate('No order attributes') }}");
@@ -110,9 +110,9 @@ describe('order detail header', () => {
 
     expect(timelineStart).toBeGreaterThan(-1);
     expect(timelineEnd).toBeGreaterThan(timelineStart);
-    expect(timelineSource).toContain('<ion-icon slot="start" :icon="timeOutline" class="mobile-only" />');
+    expect(timelineSource).toContain('<ion-icon slot="start" :icon="timeOutline" />');
     expect(timelineSource).toContain('<h2>{{ translate(\'Timeline\') }}</h2>');
-    expect(timelineSource).toContain('<ion-list class="ion-margin-start desktop-only">');
+    expect(timelineSource).toContain('<ion-list class="ion-margin-start">');
     expect(timelineSource).toContain('<ion-item v-for="event in orderTimeline" :key="event.id">');
     expect(timelineSource).toContain('<ion-icon :icon="event.icon" slot="start" />');
     expect(timelineSource).toContain('<p v-if="event.timeDiff">{{ event.timeDiff }}</p>');

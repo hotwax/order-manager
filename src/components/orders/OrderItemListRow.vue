@@ -1,13 +1,15 @@
 <template>
   <div class="list-item order-item-list-row">
-    <div class="order-item-list-key">
+    <ion-item class="order-item-list-key" lines="none">
       <ion-checkbox
         v-if="selectable"
+        slot="start"
         :checked="selected"
         @click.stop
+        @keydown.stop
         @ionChange="emit('update:selected', $event.detail.checked)"
       />
-      <ion-thumbnail v-if="imageUrl" v-image-preview="previewProduct" :key="imageUrl">
+      <ion-thumbnail v-if="imageUrl" slot="start" v-image-preview="previewProduct" :key="imageUrl">
         <DxpShopifyImg :src="imageUrl" :key="imageUrl" size="small" />
       </ion-thumbnail>
       <ion-label>
@@ -17,7 +19,7 @@
         </div>
         <p v-if="secondary">{{ secondary }}</p>
       </ion-label>
-    </div>
+    </ion-item>
 
     <ion-label class="tablet order-item-quantity">
       <template v-if="showQuantity">
@@ -63,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { IonBadge, IonCheckbox, IonChip, IonIcon, IonLabel, IonThumbnail } from '@ionic/vue';
+import { IonBadge, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonThumbnail } from '@ionic/vue';
 import { businessOutline, listOutline } from 'ionicons/icons';
 import { DxpShopifyImg } from '@common';
 
@@ -132,10 +134,6 @@ const emit = defineEmits<{
 }
 
 .order-item-list-key {
-  display: flex;
-  align-items: center;
-  gap: var(--spacer-sm);
-  min-width: 0;
   width: 100%;
 }
 

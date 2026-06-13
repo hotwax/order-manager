@@ -28,14 +28,14 @@
         <!-- timeline: child matching .order-detail-timeline -->
         <div class="timeline order-detail-timeline">
           <ion-item lines="none">
-            <ion-icon slot="start" :icon="timeOutline" class="mobile-only" />
+            <ion-icon slot="start" :icon="timeOutline" />
             <h2>{{ translate('Timeline') }}</h2>
             <ion-badge v-if="order.status" slot="end" :color="commonUtil.getStatusColor(order.statusId)">
               {{ order.status }}
             </ion-badge>
           </ion-item>
 
-          <ion-list class="ion-margin-start desktop-only">
+          <ion-list class="ion-margin-start">
             <ion-item v-for="event in orderTimeline" :key="event.id">
               <ion-icon :icon="event.icon" slot="start" />
               <ion-label>
@@ -173,7 +173,7 @@
 
           <ion-card>
             <ion-card-header>
-              <ion-card-title>{{ translate('Order attributes') }}</ion-card-title>
+              <ion-card-title>{{ translate('Attributes') }}</ion-card-title>
             </ion-card-header>
             <ion-list lines="none">
               <ion-item v-for="attribute in order.attributes" :key="attribute.id">
@@ -2786,14 +2786,6 @@ ion-card-header ion-buttons {
   border-left: var(--border-medium);
 }
 
-.desktop-only {
-  display: none;
-}
-
-.mobile-only {
-  display: unset;
-}
-
 @media (min-width: 900px) {
   .order-detail-header {
     align-items: start;
@@ -2805,13 +2797,6 @@ ion-card-header ion-buttons {
     grid-template-columns: 1fr;
   }
 
-  .desktop-only {
-    display: block;
-  }
-
-  .mobile-only {
-    display: none;
-  }
 }
 
 .comm-event-row {
