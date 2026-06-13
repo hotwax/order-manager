@@ -26,29 +26,38 @@
         </ion-item>
 
         <!-- timeline: child matching .order-detail-timeline -->
-        <div class="order-detail-timeline">
-          <ion-list>
-            <ion-list-header>
-              <ion-label>{{ translate('Timeline') }}</ion-label>
-            </ion-list-header>
+        <div class="timeline order-detail-timeline">
+          <ion-item lines="none">
+            <ion-icon slot="start" :icon="timeOutline" />
+            <h2>{{ translate('Timeline') }}</h2>
+            <ion-badge v-if="order.status" slot="end" :color="commonUtil.getStatusColor(order.statusId)">
+              {{ order.status }}
+            </ion-badge>
+          </ion-item>
 
-            <ion-item v-for="historyEntry in order.history" :key="historyEntry.id">
+          <ion-list class="ion-margin-start">
+            <ion-item v-for="event in orderTimeline" :key="event.id">
+              <ion-icon :icon="event.icon" slot="start" />
               <ion-label>
-                {{ historyEntry.label }}
-                <p>{{ historyEntry.detail }}</p>
-                <p v-if="historyEntry.changeReason">{{ historyEntry.changeReason }}</p>
+                <p v-if="event.timeDiff">{{ event.timeDiff }}</p>
+                {{ translate(event.label) }}
+                <p v-if="event.metaData">{{ event.metaData }}</p>
               </ion-label>
-              <ion-note slot="end">{{ formatDate(historyEntry.at) }}</ion-note>
+              <ion-note slot="end" v-if="event.value && event.valueType === 'date-time-millis'">
+                {{ formatDateTime(event.value) }}
+              </ion-note>
             </ion-item>
 
-            <template v-if="!order.history?.length">
+            <template v-if="!orderTimeline.length">
               <ion-item>
+                <ion-icon :icon="pulseOutline" slot="start" />
                 <ion-label>
                   {{ translate('Order status') }}
                   <p>{{ translate('Initial status details') }}</p>
                 </ion-label>
               </ion-item>
               <ion-item>
+                <ion-icon :icon="compassOutline" slot="start" />
                 <ion-label>
                   {{ translate('Order facility change') }}
                   <p>{{ translate('Facility details') }}</p>
@@ -70,12 +79,29 @@
                   <p>{{ translate('Email') }}</p>
                   {{ customer?.email || translate('Email not available') }}
                 </ion-label>
+                <ion-button v-if="!customer?.email && customerPartyId" slot="end" fill="clear" size="small"
+                  @click="openCustomerContactModal('EMAIL_ADDRESS', 'ORDER_EMAIL')">
+                  {{ translate('Add') }}
+                </ion-button>
               </ion-item>
               <ion-item>
                 <ion-label>
                   <p>{{ translate('Phone') }}</p>
                   {{ customer?.phone || translate('Phone not available') }}
                 </ion-label>
+                <ion-button v-if="!customer?.phone && customerPartyId" slot="end" fill="clear" size="small"
+                  @click="openCustomerContactModal('TELECOM_NUMBER', 'PHONE_BILLING')">
+                  {{ translate('Add') }}
+                </ion-button>
+              </ion-item>
+              <ion-item>
+                <ion-label>
+                  <p>{{ translate('Locale') }}</p>
+                  {{ order.localeString || translate('Locale not available') }}
+                </ion-label>
+                <ion-button v-if="!order.localeString" slot="end" fill="clear" size="small" @click="openLocalePrompt">
+                  {{ translate('Add') }}
+                </ion-button>
               </ion-item>
               <ion-item>
                 <ion-label>
@@ -85,6 +111,10 @@
                   </template>
                   <div v-else>{{ translate('Billing address not available') }}</div>
                 </ion-label>
+                <ion-button v-if="!billingAddress?.lines?.length && customerPartyId" slot="end" fill="clear" size="small"
+                  @click="openCustomerContactModal('POSTAL_ADDRESS', 'BILLING_LOCATION')">
+                  {{ translate('Add') }}
+                </ion-button>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -121,8 +151,6 @@
             </ion-list>
           </ion-card>
 
-          <OrderPaymentCard v-if="selectedSegment === 'holds'" :payments="order.payments" :currency="order.currency" />
-
           <ion-card>
             <ion-card-header>
               <ion-card-title>{{ translate('Source') }}</ion-card-title>
@@ -139,6 +167,24 @@
                   <p>{{ translate('Channel') }}</p>
                   {{ order.channel || translate('Channel') }}
                 </ion-label>
+              </ion-item>
+            </ion-list>
+          </ion-card>
+
+          <ion-card>
+            <ion-card-header>
+              <ion-card-title>{{ translate('Attributes') }}</ion-card-title>
+            </ion-card-header>
+            <ion-list lines="none">
+              <ion-item v-for="attribute in order.attributes" :key="attribute.id">
+                <ion-label>
+                  <p>{{ attribute.name }}</p>
+                  {{ attribute.value || translate('Value not available') }}
+                  <p v-if="attribute.description">{{ attribute.description }}</p>
+                </ion-label>
+              </ion-item>
+              <ion-item v-if="!order.attributes.length">
+                <ion-label>{{ translate('No order attributes') }}</ion-label>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -195,7 +241,6 @@
             <ion-accordion v-for="group in groupedItems" :key="group.externalId" :value="group.externalId">
               <OrderItemListRow
                 slot="header"
-                class="order-item-rollup-entry"
                 :primary="groupPrimaryIdentifier(group)"
                 :secondary="groupSecondaryIdentifier(group)"
                 :badge-label="isKit(group) ? translate('Kit') : ''"
@@ -221,6 +266,7 @@
                     :selected="item.selected"
                     :quantity="item.quantity"
                     :quantity-label="translate('qty')"
+                    :show-quantity="false"
                     :facility-label="item.facilityName"
                     :facility-disabled="['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)"
                     :attributes-label="attributeChipLabel(item.attributeCount)"
@@ -250,7 +296,24 @@
         <!-- Totals Card -->
 
         <div class="order-summary">
-          <OrderPaymentCard :payments="order.payments" :currency="order.currency" />
+          <ion-card>
+            <ion-card-header>
+              <ion-card-title>{{ translate('Payment') }}</ion-card-title>
+            </ion-card-header>
+            <ion-list lines="none">
+              <ion-item v-for="(payment, index) in order.payments" :key="payment.id || `${payment.paymentMethodTypeId}-${index}`">
+                <ion-label>
+                  <p class="overline">{{ payment.paymentMethodTypeId || payment.method }}</p>
+                  {{ payment.paymentMethodTypeDesc || payment.method }}
+                  <p>{{ payment.statusDesc || payment.status || payment.statusId }}</p>
+                </ion-label>
+                <ion-note slot="end">{{ money(payment.amount, order.currency) }}</ion-note>
+              </ion-item>
+              <ion-item v-if="!order.payments.length">
+                <ion-label>{{ translate('No payment preference records') }}</ion-label>
+              </ion-item>
+            </ion-list>
+          </ion-card>
           <ion-card class="totals">
             <ion-list lines="full">
               <ion-item>
@@ -912,15 +975,15 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { calendarOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, saveOutline, sendOutline, shieldOutline, ticketOutline, trashOutline, warningOutline } from 'ionicons/icons';
+import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
+import AddContactModal from '@/components/AddContactModal.vue';
 import AddItemToOrderModal from '@/components/orders/AddItemToOrderModal.vue';
-import OrderPaymentCard from '@/components/orders/OrderPaymentCard.vue';
 import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
 import RejectItemsModal from '@/components/orders/RejectItemsModal.vue';
 import ProductInventoryModal from '@/components/inventory/ProductInventoryModal.vue';
@@ -941,6 +1004,8 @@ import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
+import { useCustomerStore } from '@/store/customer';
+import type { CustomerContactMech } from '@/types/customer';
 
 const props = defineProps<{
   orderId: string;
@@ -949,10 +1014,12 @@ const props = defineProps<{
 const orderDetailStore = useOrderDetailStore();
 const seed = useSeedStore();
 const productCache = useProductCacheStore();
+const customerStore = useCustomerStore();
 
 const { isLoading: loading, error } = storeToRefs(orderDetailStore);
 
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+const customerPartyId = computed(() => orderDetailStore.customerPartyId);
 /**
  * View model — adapts the raw order master-detail payload to the shape this template
  * already binds, joining IDs to labels through the seed store and product cache. The
@@ -971,6 +1038,7 @@ const order = computed(() => {
     channel: seed.enumDescription(raw.salesChannelEnumId),
     productStoreName: seed.productStoreName(raw.productStoreId),
     currency: raw.currencyUom,
+    localeString: raw.localeString || raw.locale,
     riskRecommendationEnumId: raw.riskRecommendationEnumId,
     riskLevelEnumId: raw.riskLevelEnumId,
     customerName: orderDetailStore.customerName,
@@ -994,6 +1062,7 @@ const order = computed(() => {
       statusId: payment.statusId,
       statusDesc: seed.statusDescription(payment.statusId)
     })),
+    attributes: orderAttributeRows(raw),
     shipGroups: (raw.shipGroups || []).map((shipGroup: any) => ({
       id: shipGroup.shipGroupSeqId,
       facilityId: shipGroup.facilityId,
@@ -1030,22 +1099,131 @@ const order = computed(() => {
   };
 });
 
+const customerProfile = computed(() => customerPartyId.value ? customerStore.getCustomer(customerPartyId.value) : null);
+
 const customer = computed(() => {
   const raw = orderDetailStore.current;
   if (!raw) return undefined;
-  const email = orderDetailStore.contactMechsByPurpose['ORDER_EMAIL']?.contactMech?.infoString;
-  const telecomMech = (raw.contactMechs || []).find((mech: any) => mech.telecomNumber);
-  const telecom = telecomMech?.telecomNumber;
-  const phone = telecom
-    ? [telecom.countryCode, telecom.areaCode, telecom.contactNumber].filter(Boolean).join(' ')
-    : '';
-  return { email, phone };
+
+  const emailContact = findOrderContact('EMAIL_ADDRESS', ['ORDER_EMAIL'])
+    || findCustomerContact('EMAIL_ADDRESS', ['ORDER_EMAIL', 'PRIMARY_EMAIL']);
+  const phoneContact = findOrderContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE'])
+    || findCustomerContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE']);
+
+  return {
+    email: contactInfoString(emailContact),
+    phone: formatTelecomNumber(contactTelecomNumber(phoneContact)) || contactInfoString(phoneContact)
+  };
 });
 
 const billingAddress = computed(() => {
-  const mech = orderDetailStore.contactMechsByPurpose['BILLING_LOCATION'];
-  const lines = addressLines(mech?.postalAddress);
+  const mech = findOrderContact('POSTAL_ADDRESS', ['BILLING_LOCATION'])
+    || findCustomerContact('POSTAL_ADDRESS', ['BILLING_LOCATION']);
+  const lines = addressLines(contactPostalAddress(mech));
   return lines.length ? { lines } : undefined;
+});
+
+const orderTimeline = computed(() => {
+  const raw = orderDetailStore.current;
+  if (!raw) return [];
+
+  const timeline = [] as Array<{
+    id: string;
+    icon: string;
+    label: string;
+    metaData?: string;
+    timeDiff?: string;
+    value?: number;
+    valueType: 'date-time-millis';
+  }>;
+  const usedStatusIds = new Set<string>();
+  const orderDate = timelineMillis(raw.orderDate);
+  const entryDate = timelineMillis(raw.entryDate);
+  const approvedDate = statusTimelineDate(['ORDER_APPROVED', 'ORDER_ACCEPTED']);
+  const completedDate = statusTimelineDate(['ORDER_COMPLETED']);
+  const firstBrokeredDate = fulfillmentTimelineDate('firstBrokeredDate');
+
+  if (orderDate) {
+    timeline.push({
+      label: 'Created in Shopify',
+      id: 'orderDate',
+      value: orderDate,
+      icon: sunnyOutline,
+      valueType: 'date-time-millis'
+    });
+    usedStatusIds.add('ORDER_CREATED');
+  }
+
+  if (entryDate) {
+    timeline.push({
+      label: 'Imported from Shopify',
+      id: 'entryDate',
+      value: entryDate,
+      icon: downloadOutline,
+      valueType: 'date-time-millis',
+      timeDiff: findTimeDiff(orderDate, entryDate)
+    });
+  }
+
+  if (approvedDate) {
+    timeline.push({
+      label: 'Approved for fulfillment',
+      id: 'approvedDate',
+      value: approvedDate,
+      icon: checkmarkDoneOutline,
+      valueType: 'date-time-millis',
+      timeDiff: findTimeDiff(orderDate, approvedDate)
+    });
+    usedStatusIds.add('ORDER_APPROVED');
+    usedStatusIds.add('ORDER_ACCEPTED');
+  }
+
+  if (firstBrokeredDate) {
+    timeline.push({
+      label: 'First Brokered',
+      id: 'firstBrokeredDate',
+      value: firstBrokeredDate,
+      icon: checkmarkDoneOutline,
+      valueType: 'date-time-millis',
+      timeDiff: findTimeDiff(orderDate, firstBrokeredDate)
+    });
+  }
+
+  if (completedDate) {
+    timeline.push({
+      label: 'Order completed',
+      id: 'completedDate',
+      value: completedDate,
+      icon: pulseOutline,
+      valueType: 'date-time-millis',
+      timeDiff: findTimeDiff(orderDate, completedDate)
+    });
+    usedStatusIds.add('ORDER_COMPLETED');
+  }
+
+  orderDetailStore.headerStatuses
+    .filter((status: any) => status.statusId && !usedStatusIds.has(status.statusId))
+    .forEach((status: any) => {
+      const value = timelineMillis(status.statusDatetime);
+      if (!value) return;
+
+      timeline.push({
+        label: seed.statusDescription(status.statusId),
+        id: status.orderStatusId || `${status.statusId}-${status.statusDatetime}`,
+        value,
+        icon: pulseOutline,
+        valueType: 'date-time-millis',
+        timeDiff: findTimeDiff(orderDate, value),
+        metaData: [status.statusUserLogin, status.changeReason].filter(Boolean).join(' - ')
+      });
+    });
+
+  return timeline.sort((left, right) => {
+    if (left.value === right.value) return 0;
+    if (left.value == undefined) return 1;
+    if (right.value == undefined) return -1;
+    return left.value - right.value;
+  });
 });
 
 const timelineByShipGroup = computed(() => orderDetailStore.timelineByShipGroup);
@@ -1375,6 +1553,9 @@ async function loadOrder(orderId: string, force = false) {
   } else {
     await orderDetailStore.setCurrentOrder(orderId);
   }
+  if (customerPartyId.value) {
+    await customerStore.loadCustomerProfile(customerPartyId.value, force);
+  }
   // Rich product data (name/SKU/image): fetch only uncached products, never refetch.
   useProductMaster().init();
   await useProductMaster().prefetch(orderDetailStore.allItems.map((item: any) => item.productId));
@@ -1383,6 +1564,73 @@ async function loadOrder(orderId: string, force = false) {
     orderDetailStore.fetchShippingMethods(),
     orderDetailStore.fetchCarrierParties(),
   ]);
+}
+
+async function openCustomerContactModal(contactMechTypeId: string, contactMechPurposeTypeId: string) {
+  const partyId = customerPartyId.value;
+  if (!partyId) {
+    await showToast(translate('Customer is not available for this order.'));
+    return;
+  }
+
+  const modal = await modalController.create({
+    component: AddContactModal,
+    componentProps: { contactMechTypeId, contactMechPurposeTypeId },
+  });
+  await modal.present();
+  const { data, role } = await modal.onWillDismiss();
+  if (role !== 'confirm' || !data) return;
+
+  try {
+    await (customerStore as any).addContact(partyId, contactMechTypeId, data);
+    if (order.value?.id) await loadOrder(order.value.id, true);
+    await showToast(translate('Customer contact updated successfully.'));
+  } catch {
+    await showToast(translate('Failed to update customer contact. Please try again.'));
+  }
+}
+
+async function openLocalePrompt() {
+  if (!order.value?.id) return;
+
+  const alert = await alertController.create({
+    header: translate('Locale'),
+    inputs: [{
+      name: 'localeString',
+      type: 'text',
+      placeholder: 'en-US',
+    }],
+    buttons: [
+      { text: translate('Cancel'), role: 'cancel' },
+      {
+        text: translate('Save'),
+        role: 'confirm',
+        handler: (data) => {
+          const localeString = String(data?.localeString || '').trim();
+          if (!localeString) return false;
+          saveOrderLocale(localeString);
+          return true;
+        },
+      },
+    ],
+  });
+  await alert.present();
+}
+
+async function saveOrderLocale(localeString: string) {
+  if (!order.value?.id) return;
+
+  try {
+    await api({
+      url: `oms/orders/${order.value.id}`,
+      method: 'PUT',
+      data: { orderId: order.value.id, localeString },
+    });
+    await loadOrder(order.value.id, true);
+    await showToast(translate('Order locale updated successfully.'));
+  } catch {
+    await showToast(translate('Failed to update order locale. Please try again.'));
+  }
 }
 
 const availableCarriers = computed(() =>
@@ -1813,8 +2061,141 @@ function addressLines(postalAddress: any): string[] {
   ].filter(Boolean) as string[];
 }
 
+function orderAttributeRows(raw: any) {
+  return (raw?.attributes || raw?.orderAttributes || raw?.orderAttributeList || [])
+    .map((attribute: any, index: number) => {
+      const name = attribute.name ?? attribute.attrName ?? attribute.attributeName ?? attribute.orderAttributeName ?? attribute.orderAttributeTypeId;
+      const value = attribute.value ?? attribute.attrValue ?? attribute.attributeValue ?? attribute.orderAttributeValue;
+      const description = attribute.description ?? attribute.attrDescription ?? attribute.attributeDescription ?? '';
+
+      return {
+        id: attribute.orderAttributeId || `${name || 'attribute'}-${index}`,
+        name: name ? String(name) : translate('Attribute'),
+        value: value == undefined ? '' : String(value),
+        description: description ? String(description) : ''
+      };
+    })
+    .filter((attribute: any) => attribute.name || attribute.value || attribute.description);
+}
+
+function contactPurposeIds(contact: any): string[] {
+  return [
+    contact?.contactMechPurposeTypeId,
+    ...(contact?.purposeTypeIds || []),
+    ...((contact?.purposes || []).map((purpose: any) => purpose.contactMechPurposeTypeId))
+  ].filter(Boolean);
+}
+
+function contactMatchesPurpose(contact: any, purposeTypeIds: string[]) {
+  if (!purposeTypeIds.length) return true;
+  const purposes = new Set(contactPurposeIds(contact));
+  return purposeTypeIds.some((purposeTypeId) => purposes.has(purposeTypeId));
+}
+
+function contactMechTypeId(contact: any) {
+  return contact?.contactMechTypeId || contact?.contactMech?.contactMechTypeId;
+}
+
+function contactInfoString(contact: any) {
+  return contact?.contactMech?.infoString || contact?.infoString || '';
+}
+
+function contactPostalAddress(contact: any) {
+  return contact?.postalAddress || contact?.contactMech?.postalAddress;
+}
+
+function contactTelecomNumber(contact: any) {
+  return contact?.telecomNumber || contact?.contactMech?.telecomNumber;
+}
+
+function formatTelecomNumber(telecom: any) {
+  if (!telecom) return '';
+  return [telecom.countryCode, telecom.areaCode, telecom.contactNumber].filter(Boolean).join(' ');
+}
+
+function findOrderContact(contactMechTypeId: string, purposeTypeIds: string[]) {
+  return (orderDetailStore.current?.contactMechs || []).find((contact: any) =>
+    contactMechTypeId === contactMechTypeIdFromContact(contact, contactMechTypeId)
+    && contactMatchesPurpose(contact, purposeTypeIds)
+  );
+}
+
+function contactMechTypeIdFromContact(contact: any, fallbackTypeId: string) {
+  return contactMechTypeId(contact) || (contactPostalAddress(contact) ? 'POSTAL_ADDRESS' : contactTelecomNumber(contact) ? 'TELECOM_NUMBER' : fallbackTypeId);
+}
+
+function isActiveCustomerContact(contact: CustomerContactMech) {
+  if (!contact.thruDate) return true;
+  const thruMillis = timelineMillis(contact.thruDate);
+  return !thruMillis || thruMillis > Date.now();
+}
+
+function findCustomerContact(contactMechTypeId: string, purposeTypeIds: string[]) {
+  return (customerProfile.value?.contactMechs || []).find((contact) =>
+    contact.contactMechTypeId === contactMechTypeId
+    && isActiveCustomerContact(contact)
+    && contactMatchesPurpose(contact, purposeTypeIds)
+  );
+}
+
 function money(value: number, currency = 'USD') {
   return commonUtil.formatCurrency(value, currency);
+}
+
+function timelineMillis(value: string | number | undefined | null) {
+  if (!value) return undefined;
+
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue)) {
+    return String(value).length === 10 ? numericValue * 1000 : numericValue;
+  }
+
+  const stringValue = String(value);
+  const sqlDate = DateTime.fromSQL(stringValue);
+  if (sqlDate.isValid) return sqlDate.toMillis();
+
+  const isoDate = DateTime.fromISO(stringValue);
+  return isoDate.isValid ? isoDate.toMillis() : undefined;
+}
+
+function statusTimelineDate(statusIds: string[]) {
+  const dates = orderDetailStore.headerStatuses
+    .filter((status: any) => statusIds.includes(status.statusId))
+    .map((status: any) => timelineMillis(status.statusDatetime))
+    .filter((value): value is number => value != undefined);
+
+  return dates.length ? Math.min(...dates) : undefined;
+}
+
+function fulfillmentTimelineDate(field: string) {
+  const dates = orderDetailStore.fulfillmentTimeline
+    .map((entry: any) => timelineMillis(entry?.[field]))
+    .filter((value): value is number => value != undefined);
+
+  return dates.length ? Math.min(...dates) : undefined;
+}
+
+function formatDateTime(value: string | number | undefined) {
+  const millis = timelineMillis(value);
+  return millis
+    ? DateTime.fromMillis(millis).toLocaleString({ hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'short', year: 'numeric', hourCycle: 'h12' })
+    : '';
+}
+
+function findTimeDiff(startTime: string | number | undefined, endTime: string | number | undefined) {
+  const startMillis = timelineMillis(startTime);
+  const endMillis = timelineMillis(endTime);
+  if (!startMillis || !endMillis) return '';
+
+  const timeDiff = DateTime.fromMillis(endMillis).diff(DateTime.fromMillis(startMillis), ['years', 'months', 'days', 'hours', 'minutes']);
+  let diffString = '+ ';
+  if (timeDiff.years) diffString += `${Math.round(timeDiff.years)} years `;
+  if (timeDiff.months) diffString += `${Math.round(timeDiff.months)} months `;
+  if (timeDiff.days) diffString += `${Math.round(timeDiff.days)} days `;
+  if (timeDiff.hours) diffString += `${Math.round(timeDiff.hours)} hours `;
+  if (timeDiff.minutes) diffString += `${Math.round(timeDiff.minutes)} minutes`;
+
+  return diffString.trim() === '+' ? '' : diffString.trim();
 }
 
 function formatDate(value: string | number | undefined) {
@@ -2402,8 +2783,8 @@ ion-card-header ion-buttons {
 .order-detail-timeline {
   grid-column: 2;
   grid-row: span 2;
+  border-left: var(--border-medium);
 }
-
 
 @media (min-width: 900px) {
   .order-detail-header {
@@ -2415,6 +2796,7 @@ ion-card-header ion-buttons {
     align-items: start;
     grid-template-columns: 1fr;
   }
+
 }
 
 .comm-event-row {
@@ -2568,6 +2950,7 @@ ion-card-header ion-buttons {
 
 .order-summary {
   display: grid;
+  align-items: start;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
 }

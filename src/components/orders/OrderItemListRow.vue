@@ -6,6 +6,7 @@
         slot="start"
         :checked="selected"
         @click.stop
+        @keydown.stop
         @ionChange="emit('update:selected', $event.detail.checked)"
       />
       <ion-thumbnail v-if="imageUrl" slot="start" v-image-preview="previewProduct" :key="imageUrl">
@@ -21,11 +22,13 @@
     </ion-item>
 
     <ion-label class="tablet order-item-quantity">
-      {{ quantity }}
-      <p>{{ quantityLabel }}</p>
+      <template v-if="showQuantity">
+        {{ quantity }}
+        <p>{{ quantityLabel }}</p>
+      </template>
     </ion-label>
 
-    <div v-if="facilityLabel || attributesLabel" class="tablet order-item-details">
+    <div class="tablet order-item-details">
       <ion-chip
         v-if="facilityLabel"
         outline
@@ -76,6 +79,7 @@ withDefaults(defineProps<{
   selected?: boolean;
   quantity: string | number;
   quantityLabel: string;
+  showQuantity?: boolean;
   facilityLabel?: string;
   facilityDisabled?: boolean;
   attributesLabel?: string;
@@ -92,6 +96,7 @@ withDefaults(defineProps<{
   previewProduct: undefined,
   selectable: true,
   selected: false,
+  showQuantity: true,
   facilityLabel: '',
   facilityDisabled: false,
   attributesLabel: '',

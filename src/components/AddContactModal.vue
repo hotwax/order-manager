@@ -177,6 +177,7 @@ import type { CustomerContactMech } from '@/types/customer';
 
 const props = defineProps<{
   contactMechTypeId: string;
+  contactMechPurposeTypeId?: string;
   existingContact?: CustomerContactMech;
 }>();
 
@@ -192,6 +193,7 @@ const sectionLabel = computed(() => {
 });
 
 const purposeTypeId = computed(() => {
+  if (props.contactMechPurposeTypeId) return props.contactMechPurposeTypeId;
   if (props.contactMechTypeId === 'EMAIL_ADDRESS') return 'PRIMARY_EMAIL';
   if (props.contactMechTypeId === 'TELECOM_NUMBER') return 'PRIMARY_PHONE';
   if (props.contactMechTypeId === 'POSTAL_ADDRESS') return 'PRIMARY_LOCATION';
