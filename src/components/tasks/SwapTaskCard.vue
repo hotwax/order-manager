@@ -79,11 +79,10 @@
         <ion-label>
           <p
             class="overline"
-            :class="{ 'swap-suggested-overline-hidden': !suggestedItemOverlineLabel(suggested) }"
+            :style="{ visibility: suggestedItemOverlineLabel(suggested) ? undefined : 'hidden' }"
             :aria-hidden="!suggestedItemOverlineLabel(suggested)"
           >
-            <ion-text v-if="suggested._isSubstitute" color="success">{{ suggestedItemOverlineLabel(suggested) }}</ion-text>
-            <span v-else>{{ suggestedItemOverlineLabel(suggested) || ' ' }}</span>
+            <ion-text :color="suggested._isSubstitute ? 'success' : undefined">{{ suggestedItemOverlineLabel(suggested) || 'placeholder' }}</ion-text>
           </p>
           {{ productPrimary(suggested) }}
           <p>{{ productSecondary(suggested) }}</p>
@@ -484,9 +483,3 @@ async function parkOrder(task: any) {
 
 defineExpose({ task: props.task });
 </script>
-
-<style scoped>
-.swap-suggested-overline-hidden {
-  visibility: hidden;
-}
-</style>
