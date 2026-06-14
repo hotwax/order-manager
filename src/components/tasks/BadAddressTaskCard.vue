@@ -21,8 +21,7 @@
       <ion-list lines="full">
         <ion-list-header>
           <ion-label>{{ translate('Original address') }}</ion-label>
-          <ion-note slot="end">{{ translate('keep original') }}</ion-note>
-          <ion-radio slot="end" value="original" :aria-label="translate('keep original')" />
+          <ion-radio class="ion-margin-end" value="original" label-placement="start">{{ translate('keep original') }}</ion-radio>
         </ion-list-header>
         <ion-item>
           <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="editableAddresses.original.address1" />
@@ -51,8 +50,7 @@
       <ion-list lines="full">
         <ion-list-header>
           <ion-label>{{ translate('Suggested address') }}</ion-label>
-          <ion-note slot="end">{{ translate('use suggested') }}</ion-note>
-          <ion-radio slot="end" value="suggested" :aria-label="translate('use suggested')" />
+          <ion-radio class="ion-margin-end" value="suggested" label-placement="start">{{ translate('use suggested') }}</ion-radio>
         </ion-list-header>
         <ion-item>
           <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="editableAddresses.suggested.address1" />

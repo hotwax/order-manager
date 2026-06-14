@@ -701,7 +701,7 @@
               </div>
             </div>
 
-            <div class="ship-group-actions ion-padding-horizontal ion-padding-bottom">
+            <div class="ship-group-actions">
               <ion-button v-if="isVirtualFacility(shipGroup)" fill="clear" @click="brokerShipGroup(shipGroup.id)">{{
                 translate('Broker ship group') }}</ion-button>
               <ion-button fill="clear" :disabled="!selectedItemsForShipGroup(shipGroup.id).length"

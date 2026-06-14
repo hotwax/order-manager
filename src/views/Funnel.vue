@@ -12,7 +12,7 @@
     <ion-content>
       <!-- Facets: Product Store selector -->
       <!-- Loops over the product stores the user is linked to; selection binds to selectedStoreId -->
-      <div class="facets ion-padding">
+      <div class="facets ion-padding-top">
         <RadioFacetGroup v-model="selectedStoreId" :options="storeOptions" />
       </div>
 
@@ -183,7 +183,7 @@
               <ion-icon slot="end" :icon="informationCircleOutline" />
             </ion-item>
             <ion-list lines="none">
-              <h1>{{ Math.round((facilityFulfillmentProgress?.fillRate || 0) * 100) }}%</h1>
+              <h1 class="ion-margin-start">{{ Math.round((facilityFulfillmentProgress?.fillRate || 0) * 100) }}%</h1>
               <ion-item>
                 <ion-label>Order allocated</ion-label>
                 <ion-label slot="end">{{ facilityFulfillmentProgress?.ordersAllocated ?? 0 }}/{{ facilityFulfillmentProgress?.capacityLimit ?? 'Unlimited' }}</ion-label>

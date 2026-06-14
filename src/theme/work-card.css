@@ -114,7 +114,6 @@
   flex-wrap: wrap;
   gap: var(--spacer-xs);
   justify-content: flex-start;
-  border-block-start: var(--border-medium);
 }
 
 @media (prefers-reduced-motion: reduce) {
