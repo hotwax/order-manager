@@ -507,11 +507,11 @@ const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
 const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);
 const facilityPartialFulfillments = computed(() => store.getFacilityPartialFulfillments);
 const unfillableTrend = computed(() => store.unfillableTrend);
-const facilities = computed(() => store.facilities);
+
 const fulfillmentSyncData = computed(() => store.getFulfillmentSyncData);
 
 const selectedStoreId = ref('');
-const selectedFacilityId = ref('BROADWAY');
+const selectedFacilityId = ref('');
 const hoveredSegmentId = ref<string | null>(null);
 const searchQuery = ref('');
 const selectedDimension = ref('volume');
@@ -579,8 +579,8 @@ const selectedStoreName = computed(
 );
 
 function getFacilityName(facilityId: string) {
-  const fac = facilities.value.find(f => f.id === facilityId);
-  return fac ? fac.name : facilityId;
+  const seedStore = useSeedStore()
+  return seedStore.facilityName(facilityId);
 }
 
 const selectedFacilityName = computed(() => {
