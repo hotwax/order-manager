@@ -153,12 +153,10 @@ function clearFilters() {
   fetchFraudTasks();
 }
 
-const fetchFraudTasks = async (vSize?: any, vIndex?: any) => {
-  const viewSize = vSize ? vSize : import.meta.env.VITE_VIEW_SIZE;
-  const viewIndex = vIndex ? vIndex : 0;
+const fetchFraudTasks = async (pageSize?: any, pageIndex?: any) => {
   await orderTaskStore.fetchFraudTasks({
-    viewSize,
-    viewIndex,
+    pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
+    pageIndex: pageIndex ?? 0,
     ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
     ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
     ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),

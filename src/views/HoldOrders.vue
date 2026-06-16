@@ -189,12 +189,10 @@ async function resolveSelectedTasks() {
 }
 
 
-const fetchHoldTasks = async (vSize?: any, vIndex?: any) => {
-  const viewSize = vSize ? vSize : import.meta.env.VITE_VIEW_SIZE;
-  const viewIndex = vIndex ? vIndex : 0;
+const fetchHoldTasks = async (pageSize?: any, pageIndex?: any) => {
   await orderTaskStore.fetchHoldTasks({
-    viewSize,
-    viewIndex,
+    pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
+    pageIndex: pageIndex ?? 0,
     ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
     ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
     ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),

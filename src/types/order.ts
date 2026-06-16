@@ -403,3 +403,22 @@ export interface Order {
   }>;
   contactInfo?: Address[];
 }
+
+export interface AddressForm {
+  address1: string;
+  address2: string;
+  city: string;
+  postalCode: string;
+  stateProvinceGeoId: string;
+  countryGeoId: string;
+  contactMechId: string;
+  contactMechPurposeTypeId: string;
+  partyId: string;
+  isEdited: boolean;
+}
+
+export interface AddressState {
+  selectedAddressType: 'original' | 'suggested';
+  original: AddressForm;
+  suggested: AddressForm;
+}

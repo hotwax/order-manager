@@ -38,6 +38,8 @@
           v-for="task in addressValidationTasks"
           :key="task.workEffortId"
           :task="task"
+          :address-state="addressStateMap[task.workEffortId]"
+          :countries="countries"
           :selectable="true"
           :selected="!!selectedOrders[task.workEffortId]"
           show-view-order-action
@@ -88,13 +90,63 @@ import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
+import type { AddressForm, AddressState } from '@/types/order';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
 const userStore = useUserStore();
 
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
+// Computed once here and passed as a prop — avoids N per-card reactive subscriptions.
+const countries = computed(() => seedStore.getCountries);
 const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
+
+// Address state map — keyed by workEffortId, populated when tasks load.
+// Cards read/mutate their slice directly; no per-card watcher or local state needed.
+const addressStateMap = ref<Record<string, AddressState>>({});
+
+function buildAddressForm(src: any, task: any): AddressForm {
+  return {
+    address1: src?.address1 ?? '',
+    address2: src?.address2 ?? '',
+    city: src?.city ?? '',
+    postalCode: src?.postalCode ?? '',
+    stateProvinceGeoId: src?.stateProvinceGeoId ?? '',
+    countryGeoId: src?.countryGeoId ?? '',
+    contactMechId: task?.shippingAddress?.contactMechId ?? '',
+    contactMechPurposeTypeId: task?.shippingAddress?.contactMechPurposeTypeId || 'SHIPPING_LOCATION',
+    partyId: task?.customer?.partyId ?? '',
+    isEdited: true,
+  };
+}
+
+function buildSuggestedForm(task: any): AddressForm {
+  let parsed: any = {};
+  try { parsed = task.locationDesc ? JSON.parse(task.locationDesc) : {}; } catch { parsed = {}; }
+  return {
+    address1: parsed.address1 ?? '',
+    address2: parsed.address2 ?? '',
+    city: parsed.city ?? '',
+    postalCode: parsed.postalCode ?? '',
+    stateProvinceGeoId: seedStore.getGeoIdByCode(parsed.stateOrProvinceCode ?? ''),
+    countryGeoId: seedStore.getGeoIdByCode(parsed.countryCode ?? ''),
+    contactMechId: task?.shippingAddress?.contactMechId ?? '',
+    contactMechPurposeTypeId: task?.shippingAddress?.contactMechPurposeTypeId || 'SHIPPING_LOCATION',
+    partyId: task?.customer?.partyId ?? '',
+    isEdited: true,
+  };
+}
+
+function buildAddressState(task: any): AddressState {
+  const suggested = buildSuggestedForm(task);
+  const hasSuggested = [suggested.address1, suggested.address2, suggested.city, suggested.postalCode, suggested.stateProvinceGeoId, suggested.countryGeoId].some(Boolean);
+  const original = buildAddressForm(task.shippingAddress, task);
+  return {
+    selectedAddressType: hasSuggested ? 'suggested' : 'original',
+    original,
+    suggested,
+  };
+}
 
 const searchQuery = ref('');
 const assignee = ref('');
@@ -123,6 +175,27 @@ function getEmptyMessage() {
     : translate('No records found.');
 }
 
+watch(addressValidationTasks, (tasks) => {
+  const incoming = new Set(tasks.map((t: any) => t.workEffortId));
+
+  // Collect unique country IDs only from newly loaded tasks, then load assocs once per country.
+  const countriesToLoad = new Set<string>();
+  tasks.forEach((task: any) => {
+    if (!addressStateMap.value[task.workEffortId]) {
+      addressStateMap.value[task.workEffortId] = buildAddressState(task);
+      const { original, suggested } = addressStateMap.value[task.workEffortId];
+      if (original.countryGeoId) countriesToLoad.add(original.countryGeoId);
+      if (suggested.countryGeoId) countriesToLoad.add(suggested.countryGeoId);
+    }
+  });
+  countriesToLoad.forEach(countryGeoId => seedStore.loadGeoAssocs(countryGeoId));
+
+  // Remove entries for tasks no longer in the list (after a filter/refresh).
+  Object.keys(addressStateMap.value).forEach(id => {
+    if (!incoming.has(id)) delete addressStateMap.value[id];
+  });
+});
+
 watch([assignee, dateAfter, dateBefore, orderChannel], () => {
   fetchAddressValidationTasks();
 });
@@ -142,12 +215,10 @@ function clearFilters() {
   fetchAddressValidationTasks();
 }
 
-const fetchAddressValidationTasks = async (vSize?: any, vIndex?: any) => {
-  const viewSize = vSize ? vSize : import.meta.env.VITE_VIEW_SIZE;
-  const viewIndex = vIndex ? vIndex : 0;
+const fetchAddressValidationTasks = async (pageSize?: any, pageIndex?: any) => {
   await orderTaskStore.fetchAddressValidationTasks({
-    viewSize,
-    viewIndex,
+    pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
+    pageIndex: pageIndex ?? 0,
     ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
     ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
     ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),

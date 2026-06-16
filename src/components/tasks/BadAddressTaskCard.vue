@@ -17,31 +17,31 @@
       </ion-item>
     </template>
 
-    <ion-radio-group v-if="editableAddresses" v-model="selectedAddressType" class="address-task-addresses">
+    <ion-radio-group v-if="addressState" v-model="addressState.selectedAddressType" class="address-task-addresses">
       <ion-list class="ion-no-padding" lines="full">
         <ion-list-header>
           <ion-label>{{ translate('Original address') }}</ion-label>
           <ion-radio class="ion-margin-end" value="original" label-placement="start">{{ translate('keep original') }}</ion-radio>
         </ion-list-header>
         <ion-item>
-          <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="editableAddresses.original.address1" />
+          <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="addressState.original.address1" />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Address line 2')" label-placement="stacked" v-model="editableAddresses.original.address2" />
+          <ion-input :label="translate('Address line 2')" label-placement="stacked" v-model="addressState.original.address2" />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses.original.city" />
+          <ion-input :label="translate('City')" label-placement="stacked" v-model="addressState.original.city" />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="editableAddresses.original.postalCode" />
+          <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="addressState.original.postalCode" />
         </ion-item>
         <ion-item>
-          <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.original.stateProvinceGeoId" interface="popover">
-            <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
+          <ion-select :label="translate('State')" label-placement="stacked" v-model="addressState.original.stateProvinceGeoId" interface="popover">
+            <ion-select-option v-for="state in originalStates" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
           </ion-select>
         </ion-item>
         <ion-item>
-          <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.original.countryGeoId" interface="popover" @ionChange="editableAddresses.original.stateProvinceGeoId = ''">
+          <ion-select :label="translate('Country')" label-placement="stacked" v-model="addressState.original.countryGeoId" interface="popover" @ionChange="onCountryChange(addressState.original, $event)">
             <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
           </ion-select>
         </ion-item>
@@ -53,24 +53,24 @@
           <ion-radio class="ion-margin-end" value="suggested" label-placement="start">{{ translate('use suggested') }}</ion-radio>
         </ion-list-header>
         <ion-item>
-          <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="editableAddresses.suggested.address1" />
+          <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="addressState.suggested.address1" />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Address line 2')" label-placement="stacked" v-model="editableAddresses.suggested.address2" />
+          <ion-input :label="translate('Address line 2')" label-placement="stacked" v-model="addressState.suggested.address2" />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('City')" label-placement="stacked" v-model="editableAddresses.suggested.city" />
+          <ion-input :label="translate('City')" label-placement="stacked" v-model="addressState.suggested.city" />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="editableAddresses.suggested.postalCode" />
+          <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="addressState.suggested.postalCode" />
         </ion-item>
         <ion-item>
-          <ion-select :label="translate('State')" label-placement="stacked" v-model="editableAddresses.suggested.stateProvinceGeoId" interface="popover">
-            <ion-select-option v-for="state in states" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
+          <ion-select :label="translate('State')" label-placement="stacked" v-model="addressState.suggested.stateProvinceGeoId" interface="popover">
+            <ion-select-option v-for="state in suggestedStates" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
           </ion-select>
         </ion-item>
         <ion-item>
-          <ion-select :label="translate('Country')" label-placement="stacked" v-model="editableAddresses.suggested.countryGeoId" interface="popover" @ionChange="editableAddresses.suggested.stateProvinceGeoId = ''">
+          <ion-select :label="translate('Country')" label-placement="stacked" v-model="addressState.suggested.countryGeoId" interface="popover" @ionChange="onCountryChange(addressState.suggested, $event)">
             <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
           </ion-select>
         </ion-item>
@@ -87,7 +87,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { computed } from 'vue';
 import {
   IonButton,
   IonInput,
@@ -95,7 +95,6 @@ import {
   IonLabel,
   IonList,
   IonListHeader,
-  IonNote,
   IonRadio,
   IonRadioGroup,
   IonSelect,
@@ -110,8 +109,16 @@ import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { taskOrderTitle } from '@/utils/taskCardDisplay';
+import type { AddressState } from '@/types/order';
 
-const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean; showViewOrderAction?: boolean }>(), {
+const props = withDefaults(defineProps<{
+  task: any;
+  addressState: AddressState;
+  countries: any[];
+  selectable?: boolean;
+  selected?: boolean;
+  showViewOrderAction?: boolean;
+}>(), {
   selectable: false,
   selected: false,
   showViewOrderAction: false,
@@ -125,82 +132,16 @@ const emit = defineEmits<{
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
 
-const countries = computed(() => seedStore.getCountries);
-const states = computed(() => seedStore.getStates);
-const getGeoIdByCode = (code: string) => seedStore.getGeoIdByCode(code);
+const originalStates = computed(() => seedStore.getStatesForCountry(props.addressState.original.countryGeoId));
+const suggestedStates = computed(() => seedStore.getStatesForCountry(props.addressState.suggested.countryGeoId));
 
-interface AddressForm {
-  address1: string;
-  address2: string;
-  city: string;
-  postalCode: string;
-  stateProvinceGeoId: string;
-  countryGeoId: string;
-  contactMechId: string;
-  contactMechPurposeTypeId: string;
-  partyId: string;
-  isEdited: boolean;
+function onCountryChange(address: AddressState['original'], event: any) {
+  address.stateProvinceGeoId = '';
+  const countryGeoId = event.detail?.value;
+  if (countryGeoId) seedStore.loadGeoAssocs(countryGeoId);
 }
 
-interface EditableAddress {
-  original: AddressForm;
-  suggested: AddressForm;
-}
-
-const selectedAddressType = ref<string>('original');
-const editableAddresses = ref<EditableAddress | null>(null);
-
-watch(() => props.task, (task) => {
-  if (!task) return;
-  const suggested = suggestedAddressFormFrom(task);
-  selectedAddressType.value = hasAddressValue(suggested) ? 'suggested' : 'original';
-  editableAddresses.value = {
-    original: addressFormFrom(task.shippingAddress, task),
-    suggested,
-  };
-}, { immediate: true });
-
-function addressFormFrom(src: any, task: any): AddressForm {
-  return {
-    address1: src?.address1 ?? '',
-    address2: src?.address2 ?? '',
-    city: src?.city ?? '',
-    postalCode: src?.postalCode ?? '',
-    stateProvinceGeoId: src?.stateProvinceGeoId ?? '',
-    countryGeoId: src?.countryGeoId ?? '',
-    contactMechId: task?.shippingAddress?.contactMechId ?? '',
-    contactMechPurposeTypeId: task?.shippingAddress?.contactMechPurposeTypeId || 'SHIPPING_LOCATION',
-    partyId: task?.customer?.partyId ?? '',
-    isEdited: true,
-  };
-}
-
-function suggestedAddressFormFrom(task: any): AddressForm {
-  let parsed: any = {};
-  try {
-    parsed = task.locationDesc ? JSON.parse(task.locationDesc) : {};
-  } catch {
-    parsed = {};
-  }
-  return {
-    address1: parsed.address1 ?? '',
-    address2: parsed.address2 ?? '',
-    city: parsed.city ?? '',
-    postalCode: parsed.postalCode ?? '',
-    stateProvinceGeoId: getGeoIdByCode(parsed.stateOrProvinceCode ?? ''),
-    countryGeoId: getGeoIdByCode(parsed.countryCode ?? ''),
-    contactMechId: task?.shippingAddress?.contactMechId ?? '',
-    contactMechPurposeTypeId: task?.shippingAddress?.contactMechPurposeTypeId || 'SHIPPING_LOCATION',
-    partyId: task?.customer?.partyId ?? '',
-    isEdited: true,
-  };
-}
-
-function hasAddressValue(address: AddressForm): boolean {
-  return [address.address1, address.address2, address.city, address.postalCode, address.stateProvinceGeoId, address.countryGeoId].some(Boolean);
-}
-
-function validateAddress(address: AddressForm): string | null {
+function validateAddress(address: AddressState['original']): string | null {
   if (!address.address1?.trim()) return translate('Address Line 1 is required');
   if (!address.city?.trim()) return translate('City is required');
   if (!address.postalCode?.trim()) return translate('Postal Code is required');
@@ -234,22 +175,17 @@ function taskItemSummary(task: any): string {
   const items = task.items ?? [];
   const itemCount = items.length;
   const unitCount = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
-
   return `${itemCount} ${itemCount === 1 ? translate('item') : translate('items')} ${unitCount} ${unitCount === 1 ? translate('unit') : translate('units')}`;
 }
 
-// Returns the validation error for the currently selected address, or null if valid.
 function validate(): string | null {
-  const type = selectedAddressType.value as 'original' | 'suggested';
-  const address = editableAddresses.value?.[type];
-  if (!address) return null;
+  const address = props.addressState[props.addressState.selectedAddressType];
   return validateAddress(address);
 }
 
 async function submitSaveAndRelease() {
   const task = props.task;
-  const type = selectedAddressType.value as 'original' | 'suggested';
-  const address = editableAddresses.value![type];
+  const address = props.addressState[props.addressState.selectedAddressType];
   await orderTaskStore.updateShippingInformation(task.orderId, task.shipGroupSeqId, address);
   await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_COMPLETED');
 }
@@ -306,9 +242,7 @@ async function parkOrder() {
   const confirmed = await confirmParkOrder();
   if (!confirmed) return;
 
-  const modal = await modalController.create({
-    component: FacilityModal,
-  });
+  const modal = await modalController.create({ component: FacilityModal });
   await modal.present();
   const { data: facilityId } = await modal.onWillDismiss();
   if (!facilityId) return;

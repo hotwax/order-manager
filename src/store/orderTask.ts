@@ -175,46 +175,85 @@ export const useOrderTaskStore = defineStore('orderTask', {
     getOrderFraudTasks: (state) => state.orderFraudTasks,
   },
   actions: {
-    async fetchHoldTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
+    async fetchHoldTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
-        const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', workEffortTypeId: 'RESOLVE_ONHOLD_ORDER', workEffortPurposeTypeId: 'RESOLVE_ONHOLD_ORDER', productStoreId } });
+        const listResponse = await api({
+          url: 'oms/orders/tasks/shipGroupTasks',
+          method: 'GET',
+          params: {
+            ...payload,
+            statusId: 'TASK_CREATED',
+            workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+            workEffortPurposeTypeId: 'RESOLVE_ONHOLD_ORDER',
+            productStoreId,
+          },
+        });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map((task: any) => enrichHoldTask(task)));
-        this.holdTasks = payload.viewIndex > 0 ? [...this.holdTasks, ...detailedTasks] : detailedTasks;
+        this.holdTasks = payload.pageIndex > 0 ? [...this.holdTasks, ...detailedTasks] : detailedTasks;
       } catch (err) {
         console.error('Failed to fetch the hold tasks', err);
       }
     },
-    async fetchAddressValidationTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
+    async fetchAddressValidationTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
-        const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', workEffortTypeId: 'RESOLVE_ONHOLD_ORDER', workEffortPurposeTypeId: 'INVALID_ADDRESS', productStoreId } });
+        const listResponse = await api({
+          url: 'oms/orders/tasks/shipGroupTasks',
+          method: 'GET',
+          params: {
+            ...payload,
+            statusId: 'TASK_CREATED',
+            workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+            workEffortPurposeTypeId: 'INVALID_ADDRESS',
+            productStoreId,
+          },
+        });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
-        this.addressValidationTasks = payload.viewIndex > 0 ? [...this.addressValidationTasks, ...detailedTasks] : detailedTasks;
+        this.addressValidationTasks = payload.pageIndex > 0 ? [...this.addressValidationTasks, ...detailedTasks] : detailedTasks;
       } catch (err) {
         console.error('Failed to fetch the address validation tasks', err);
       }
     },
-    async fetchSwapTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; swappable?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
+    async fetchSwapTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; swappable?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
-        const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', workEffortTypeId: 'RESOLVE_ONHOLD_ORDER', workEffortPurposeTypeId: 'NEG_RES_REVIEW', productStoreId } });
+        const listResponse = await api({
+          url: 'oms/orders/tasks/shipGroupTasks',
+          method: 'GET',
+          params: {
+            ...payload,
+            statusId: 'TASK_CREATED',
+            workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+            workEffortPurposeTypeId: 'NEG_RES_REVIEW',
+            productStoreId,
+          },
+        });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
-        this.swapTasks = payload.viewIndex > 0 ? [...this.swapTasks, ...detailedTasks] : detailedTasks;
+        this.swapTasks = payload.pageIndex > 0 ? [...this.swapTasks, ...detailedTasks] : detailedTasks;
       } catch (err) {
         console.error('Failed to fetch the swap tasks', err);
       }
     },
-    async fetchFraudTasks(payload: { viewSize?: any; viewIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string; riskRecommendationEnumId?: string; riskLevelEnumId?: string } = {}) {
+    async fetchFraudTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string; riskRecommendationEnumId?: string; riskLevelEnumId?: string } = {}) {
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
-        const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { ...payload, statusId: 'TASK_CREATED', workEffortTypeId: 'REVIEW_RISK_ORDER', productStoreId } });
+        const listResponse = await api({
+          url: 'oms/orders/tasks',
+          method: 'GET',
+          params: {
+            ...payload,
+            statusId: 'TASK_CREATED',
+            workEffortTypeId: 'REVIEW_RISK_ORDER',
+            productStoreId,
+          },
+        });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map((task: any) => enrichFraudTask(task)));
-        this.fraudTasks = payload.viewIndex > 0 ? [...this.fraudTasks, ...detailedTasks] : detailedTasks;
+        this.fraudTasks = payload.pageIndex > 0 ? [...this.fraudTasks, ...detailedTasks] : detailedTasks;
       } catch (err) {
         console.error('Failed to fetch the fraud tasks', err);
       }
@@ -231,7 +270,17 @@ export const useOrderTaskStore = defineStore('orderTask', {
 
       const fetchHold = async () => {
         try {
-          const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { orderId, statusId: 'TASK_CREATED', workEffortTypeId: 'RESOLVE_ONHOLD_ORDER', workEffortPurposeTypeId: 'RESOLVE_ONHOLD_ORDER', productStoreId } });
+          const listResponse = await api({
+            url: 'oms/orders/tasks/shipGroupTasks',
+            method: 'GET',
+            params: {
+              orderId,
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+              workEffortPurposeTypeId: 'RESOLVE_ONHOLD_ORDER',
+              productStoreId,
+            },
+          });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
           this.orderHoldTasks = await Promise.all(tasks.map((task: any) => enrichHoldTask(task)));
         } catch (err) {
@@ -241,7 +290,17 @@ export const useOrderTaskStore = defineStore('orderTask', {
 
       const fetchAddress = async () => {
         try {
-          const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { orderId, statusId: 'TASK_CREATED', workEffortTypeId: 'RESOLVE_ONHOLD_ORDER', workEffortPurposeTypeId: 'INVALID_ADDRESS', productStoreId } });
+          const listResponse = await api({
+            url: 'oms/orders/tasks/shipGroupTasks',
+            method: 'GET',
+            params: {
+              orderId,
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+              workEffortPurposeTypeId: 'INVALID_ADDRESS',
+              productStoreId,
+            },
+          });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
           this.orderAddressValidationTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
         } catch (err) {
@@ -251,7 +310,17 @@ export const useOrderTaskStore = defineStore('orderTask', {
 
       const fetchSwap = async () => {
         try {
-          const listResponse = await api({ url: 'oms/orders/tasks/shipGroupTasks', method: 'GET', params: { orderId, statusId: 'TASK_CREATED', workEffortTypeId: 'RESOLVE_ONHOLD_ORDER', workEffortPurposeTypeId: 'NEG_RES_REVIEW', productStoreId } });
+          const listResponse = await api({
+            url: 'oms/orders/tasks/shipGroupTasks',
+            method: 'GET',
+            params: {
+              orderId,
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+              workEffortPurposeTypeId: 'NEG_RES_REVIEW',
+              productStoreId,
+            },
+          });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
           const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
           this.orderSwapTasks = detailedTasks;
@@ -263,7 +332,16 @@ export const useOrderTaskStore = defineStore('orderTask', {
 
       const fetchFraud = async () => {
         try {
-          const listResponse = await api({ url: 'oms/orders/tasks', method: 'GET', params: { orderId, statusId: 'TASK_CREATED', workEffortTypeId: 'REVIEW_RISK_ORDER', productStoreId } });
+          const listResponse = await api({
+            url: 'oms/orders/tasks',
+            method: 'GET',
+            params: {
+              orderId,
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'REVIEW_RISK_ORDER',
+              productStoreId,
+            },
+          });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
           const detailedTasks = await Promise.all(tasks.map((task: any) => enrichFraudTask(task)));
           this.orderFraudTasks = detailedTasks;
