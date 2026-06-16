@@ -15,7 +15,7 @@
         :placeholder="translate('Order name, order ID, external ID')"
         @clear="clearFilters"
       >
-        <ion-input v-model="filters.customerName" label="Customer name" label-placement="stacked" :clear-input="true" />
+        <ion-input v-model="filters.customerName" label="Customer name" :placeholder="translate('Search by name')" label-placement="stacked" :clear-input="true" />
         <ion-select v-model="filters.priority" label="Priority" label-placement="stacked" interface="popover">
           <ion-select-option :value="null">All</ion-select-option>
           <ion-select-option :value="true">High priority</ion-select-option>
@@ -440,7 +440,7 @@ function setOrderSelection(orderId: string, checked: boolean) {
 }
 
 function orderDetailLink(order: WorkflowOrder) {
-  return `/orders/${order.orderId}`;
+  return `/inflight/${order.orderId}`;
 }
 
 async function runAction(action: BulkActionDefinition) {
