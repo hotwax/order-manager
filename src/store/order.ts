@@ -55,7 +55,13 @@ async function fetchWorkflowPage(
       shippingMethodTypeId: toStringValue(doc.shipmentMethodTypeId),
       shipmentMethodDesc: (() => { const m = seedStore.shipmentMethodTypes.byId[toStringValue(doc.shipmentMethodTypeId)]; return m?.description || toStringValue(doc.shipmentMethodTypeId); })(),
       carrierPartyId: toStringValue(doc.carrierPartyId),
-      priority: toStringValue(doc.priority) === 'Y' ? 'HIGH' as const : 'NORMAL' as const,
+      priority: (() => {
+        const p = Number(doc.priority);
+        if (isNaN(p)) return 'NORMAL' as const;
+        if (p >= 1 && p <= 3) return 'HIGH' as const;
+        if (p >= 4 && p <= 6) return 'NORMAL' as const;
+        return 'LOW' as const;
+      })(),
       facilityId: toStringValue(doc.facilityId) || null,
       facilityName: toStringValue(doc.facilityName) || null,
       brokeringDate: null,

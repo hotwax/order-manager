@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 import { DateTime } from 'luxon';
 import { useOrderStore } from '@/store/order';
-import { api } from '@common';
+import { api, commonUtil, translate } from '@common';
 import type {
   BulkActionDefinition,
   WorkflowBucket,
@@ -10,14 +10,9 @@ import type {
   FulfillmentProgress,
   FacilityFulfillmentProgress
 } from '@/types/customerService';
+import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
+import { useSeedStore } from '@/store/seed';
 
-const FACILITIES = [
-  { id: 'WH_RNO', name: 'Reno DC' },
-  { id: 'WH_ATL', name: 'Atlanta DC' },
-  { id: 'WH_LDN', name: 'London DC' }
-];
-
-const CHANNELS = ['WEB_SALES_CHANNEL', 'POS_SALES_CHANNEL', 'MOBILE_SALES_CHANNEL', 'MARKETPLACE_CHANNEL'];
 
 function emptyFilters(): WorkflowFilters {
   return {
@@ -88,6 +83,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
     facilityFulfillmentVelocity: [] as any[],
     facilityPartialFulfillments: [] as any[],
     facilityFulfillmentProgress: null as FacilityFulfillmentProgress | null,
+    pickProfileGroups: [] as any[],
     orders: [] as WorkflowOrder[],
     filters: {
       unfillable: emptyFilters(),
@@ -103,11 +99,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
       inflight: [] as string[],
       packed: [] as string[]
     } as Record<WorkflowBucket, string[]>,
-    lastAction: '' as string
+    lastAction: '' as string,
+    fulfillmentSyncData: null as any
   }),
   getters: {
-    facilities: () => FACILITIES,
-    channels: () => CHANNELS,
     priorities: () => ['HIGH', 'NORMAL', 'LOW'],
     ordersInBucket: (state) => (bucket: WorkflowBucket) =>
       state.orders.filter((order) => inBucket(order, bucket)),
@@ -150,7 +145,8 @@ export const useCustomerServiceStore = defineStore('customerService', {
     getFacilityOrderVolume: (state) => state.facilityOrderVolume,
     getFacilityFulfillmentVelocity: (state) => state.facilityFulfillmentVelocity,
     getFacilityPartialFulfillments: (state) => state.facilityPartialFulfillments,
-    getFacilityFulfillmentProgress: (state) => state.facilityFulfillmentProgress
+    getFacilityFulfillmentProgress: (state) => state.facilityFulfillmentProgress,
+    getFulfillmentSyncData: (state) => state.fulfillmentSyncData
   },
   actions: {
     async fetchFulfillmentProgress(productStoreId?: string) {
@@ -386,6 +382,312 @@ export const useCustomerServiceStore = defineStore('customerService', {
 
       } catch (error) {
         console.error('Failed to fetch facility fulfillment progress', error);
+      }
+    },
+    async fetchPickProfileGroups(facilityId?: string) {
+      try {
+        const params: any = {};
+        if (facilityId) params.facilityId = facilityId;
+        this.pickProfileGroups = await getPickProfileGroups(params);
+      } catch (error) {
+        console.error('Failed to fetch pick profile groups', error);
+      }
+    },
+    async updateSortRulesOrder(facilityId: string, updatedSortRules: any[]) {
+      const group = this.pickProfileGroups.find(g => g.facilityId === facilityId);
+      if (!group) return;
+
+      const activeProfile = group.profiles?.find((p: any) => p.statusId === 'PICK_PROF_ACTIVE');
+      if (!activeProfile) return;
+
+      const filters = activeProfile.pickProfileFilters || [];
+
+
+      updatedSortRules.forEach((rule, idx) => {
+        const cond = filters.find((f: any) => f.fieldName === rule.id && f.conditionTypeEnumId === 'ENTCT_SORT_BY');
+        if (cond) {
+          cond.sequenceNum = (idx + 1) * 10;
+        }
+      });
+      try {
+        await this.savePickProfile(activeProfile);
+        await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
+      } catch (error) {
+        console.error('Failed to update sort rules order', error);
+        commonUtil.showToast(translate('Failed to reorder sort rules.'));
+      }
+    },
+    async addSortRule(facilityId: string, fieldName: string) {
+      const group = this.pickProfileGroups.find(g => g.facilityId === facilityId);
+      if (!group) return;
+
+      const activeProfile = group.profiles?.find((p: any) => p.statusId === 'PICK_PROF_ACTIVE');
+      if (!activeProfile) return;
+
+      const filters = activeProfile.pickProfileFilters || [];
+
+      const alreadyExists = filters.some((f: any) => f.fieldName === fieldName && f.conditionTypeEnumId === 'ENTCT_SORT_BY');
+      if (!alreadyExists) {
+        const maxSeqId = Math.max(0, ...filters.map((f: any) => parseInt(f.conditionSeqId) || 0));
+        const nextSeqId = String(maxSeqId + 1).padStart(2, '0');
+        const sortFilters = filters.filter((f: any) => f.conditionTypeEnumId === 'ENTCT_SORT_BY');
+        const maxSeqNum = Math.max(0, ...sortFilters.map((f: any) => f.sequenceNum ?? 0));
+
+        filters.push({
+          profileId: activeProfile.profileId,
+          conditionSeqId: nextSeqId,
+          conditionTypeEnumId: 'ENTCT_SORT_BY',
+          fieldName,
+          conditionOperator: 'equals',
+          fieldValue: 'ASC',
+          sequenceNum: maxSeqNum + 10
+        });
+      }
+      try {
+        await this.savePickProfile(activeProfile);
+        await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
+      } catch (error) {
+        console.error('Failed to add sort rule', error);
+        commonUtil.showToast(translate('Failed to add sort rule.'));
+      }
+    },
+    async removeSortRule(facilityId: string, fieldName: string) {
+      const group = this.pickProfileGroups.find(g => g.facilityId === facilityId);
+      if (!group) return;
+
+      const activeProfile = group.profiles?.find((p: any) => p.statusId === 'PICK_PROF_ACTIVE');
+      if (!activeProfile) return;
+
+      const filters = activeProfile.pickProfileFilters || [];
+      const cond = filters.find((f: any) => f.fieldName === fieldName && f.conditionTypeEnumId === 'ENTCT_SORT_BY');
+      if (!cond || !cond.conditionSeqId) return;
+
+      try {
+        const resp = await api({
+          url: `poorti/pickProfile/${activeProfile.profileId}/conditions/${cond.conditionSeqId}`,
+          method: 'DELETE'
+        });
+        if (resp && commonUtil.hasError(resp)) {
+          throw new Error('Failed to delete condition from server');
+        }
+        await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
+      } catch (error) {
+        console.error('Failed to remove sort rule', error);
+        commonUtil.showToast(translate('Failed to remove sort rule.'));
+      }
+    },
+    async updateBatchSize(facilityId: string, batchSize: number) {
+      console.log('updateBatchSize called with facilityId:', facilityId, 'batchSize:', batchSize);
+      const group = this.pickProfileGroups.find(g => g.facilityId === facilityId);
+      if (!group) {
+        console.error('updateBatchSize: group not found for facilityId:', facilityId);
+        return;
+      }
+
+      const activeProfileBasic = group.profiles?.find((p: any) => p.statusId === 'PICK_PROF_ACTIVE');
+      if (!activeProfileBasic) {
+        console.error('updateBatchSize: activeProfileBasic not found');
+        return;
+      }
+
+      // Fetch full active profile details first to preserve existing conditions
+      let activeProfile = activeProfileBasic;
+      try {
+        const profileResp = await api({
+          url: `poorti/pickProfile/${activeProfileBasic.profileId}`,
+          method: 'GET'
+        });
+        if (profileResp.data) {
+          activeProfile = profileResp.data;
+        }
+      } catch (error) {
+        console.error('Failed to fetch profile before updating batch size', error);
+      }
+
+      const filters = activeProfile.pickProfileFilters || [];
+      console.log('updateBatchSize - existing filters:', JSON.stringify(filters, null, 2));
+
+      let batchSizeFilter = filters.find((f: any) => f.conditionTypeEnumId === 'PPF_BATCH_SIZE' || (f.conditionTypeEnumId === 'ENTCT_FILTER' && f.fieldName === 'orderLimit'));
+
+      if (!batchSizeFilter) {
+        console.log('updateBatchSize - no existing batch size filter, creating a new one.');
+        const maxSeqId = Math.max(0, ...filters.map((f: any) => parseInt(f.conditionSeqId) || 0));
+        const nextSeqId = String(maxSeqId + 1).padStart(2, '0');
+        const standardFilters = filters.filter((f: any) => f.conditionTypeEnumId !== 'ENTCT_SORT_BY');
+        const maxSeqNum = Math.max(0, ...standardFilters.map((f: any) => f.sequenceNum ?? 0));
+
+        batchSizeFilter = {
+          profileId: activeProfile.profileId,
+          conditionSeqId: nextSeqId,
+          conditionTypeEnumId: 'PPF_BATCH_SIZE',
+          fieldName: 'orderLimit',
+          conditionOperator: 'equals',
+          fieldValue: String(batchSize),
+          sequenceNum: maxSeqNum + 10
+        };
+        filters.push(batchSizeFilter);
+      } else {
+        console.log('updateBatchSize - found existing filter. Updating and normalizing type.', batchSizeFilter);
+        batchSizeFilter.fieldValue = String(batchSize);
+        batchSizeFilter.conditionTypeEnumId = 'PPF_BATCH_SIZE'; // ensure it is normalized to PPF_BATCH_SIZE
+      }
+
+      try {
+        await this.savePickProfile(activeProfile);
+        await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
+      } catch (error) {
+        console.error('Failed to update batch size', error);
+        commonUtil.showToast(translate('Failed to update batch size.'));
+      }
+    },
+    async fetchFulfillmentSyncData(facilityId: string, productStoreId: string) {
+      try {
+        const params: any = {};
+        if (facilityId) params.facilityId = facilityId;
+        this.pickProfileGroups = await getPickProfileGroups(params);
+
+        const group = this.pickProfileGroups.find((g: any) => g.facilityId === facilityId);
+        if (!group) {
+          this.fulfillmentSyncData = null;
+          return;
+        }
+
+        const activeProfileBasic = group.profiles?.find((p: any) => p.statusId === 'PICK_PROF_ACTIVE');
+        if (!activeProfileBasic) {
+          this.fulfillmentSyncData = null;
+          return;
+        }
+
+        // Fetch the full active profile details containing filters/conditions
+        let activeProfile = activeProfileBasic;
+        try {
+          const profileResp = await api({
+            url: `poorti/pickProfile/${activeProfileBasic.profileId}`,
+            method: 'GET'
+          });
+          if (profileResp.data) {
+            activeProfile = profileResp.data;
+          }
+        } catch (error) {
+          console.error('Failed to fetch single pick profile details', error);
+        }
+
+        const filters = activeProfile.pickProfileFilters || [];
+
+        // 1. Batch Size (PPF_BATCH_SIZE filter value)
+        const batchSizeFilter = filters.find((f: any) => f.conditionTypeEnumId === 'PPF_BATCH_SIZE' || (f.conditionTypeEnumId === 'ENTCT_FILTER' && f.fieldName === "orderLimit"));
+        const batchSize = batchSizeFilter ? Number(batchSizeFilter.fieldValue) : 200;
+
+        // Fetch Service Job Details for Frequency
+        let frequency = 'EVERY 5 MINUTES';
+        let jobPaused = 'N';
+        let cronExpression = '0 */5 * ? * *';
+        if (group.jobName) {
+          try {
+            const jobResp = await api({
+              url: `admin/serviceJobs/${group.jobName}`,
+              method: 'GET'
+            });
+            const jobDetail = jobResp.data?.jobDetail;
+            if (jobDetail) {
+              frequency = jobDetail.cronDescription || jobDetail.cronExpression || 'EVERY 5 MINUTES';
+              jobPaused = jobDetail.paused || 'N';
+              cronExpression = jobDetail.cronExpression || '0 */5 * ? * *';
+            }
+          } catch (error) {
+            console.error('Failed to fetch service job details', error);
+          }
+        }
+
+        // 2. Sort Rules (ENTCT_SORT_BY conditions)
+        const sortConditions = filters
+          .filter((f: any) => f.conditionTypeEnumId === 'ENTCT_SORT_BY')
+          .sort((a: any, b: any) => (a.sequenceNum ?? 0) - (b.sequenceNum ?? 0));
+
+        const seedStore = useSeedStore() as any;
+        const sortParamEnums = seedStore.getEnumsByType('PP_SORT_PARAM_TYPE') || [];
+
+        const sortRules: SortRule[] = sortConditions.map((cond: any) => {
+          const enumRecord = sortParamEnums.find((e: any) => e.enumCode === cond.fieldName);
+          return {
+            id: cond.fieldName,
+            name: enumRecord ? enumRecord.description : cond.fieldName,
+            sequenceNum: cond.sequenceNum ?? 0,
+            conditionSeqId: cond.conditionSeqId
+          };
+        });
+
+        // 3. Fetch order counts grouped by topSortField
+        const topSortField = sortRules[0]?.id || 'deliveryDays';
+        let groupByFields = [topSortField];
+
+        let records: any[] = [];
+        if (activeProfile.profileId) {
+          try {
+            const countResp = await api({
+              url: `poorti/pickProfile/${activeProfile.profileId}/orderCount`,
+              method: 'POST',
+              data: {
+                groupByFields
+              }
+            });
+            records = countResp.data?.records || [];
+          } catch (error) {
+            console.error('Failed to fetch pick profile order counts', error);
+          }
+        }
+
+        const totalPendingSync = records.reduce((sum, rec) => sum + Number(rec.orderCount || 0), 0);
+
+        this.fulfillmentSyncData = {
+          settings: {
+            pendingSyncCount: totalPendingSync,
+            batchSize,
+            frequency,
+            cronExpression,
+            paused: jobPaused,
+            jobName: group.jobName,
+            sortRules
+          },
+          rawOrderCountRecords: records
+        };
+      } catch (error) {
+        console.error('Failed to fetch fulfillment sync data', error);
+      }
+    },
+    async updateServiceJob(jobName: string, cronExpression: string, paused: string, facilityId: string, productStoreId: string) {
+      try {
+        const resp = await api({
+          url: `admin/serviceJobs/${jobName}`,
+          method: 'PUT',
+          data: {
+            cronExpression,
+            paused
+          }
+        });
+        if (resp && commonUtil.hasError(resp)) {
+          throw new Error('Failed to update service job');
+        }
+        await this.fetchFulfillmentSyncData(facilityId, productStoreId);
+        commonUtil.showToast(translate('Fulfillment sync schedule updated successfully.'));
+      } catch (error) {
+        console.error('Failed to update service job', error);
+        commonUtil.showToast(translate('Failed to update fulfillment sync schedule.'));
+      }
+    },
+    async savePickProfile(profile: any) {
+      try {
+        const resp = await api({
+          url: `poorti/pickProfile/${profile.profileId}`,
+          method: 'PUT',
+          data: profile
+        });
+        if (resp && commonUtil.hasError(resp)) {
+          throw new Error('Failed to save pick profile');
+        }
+      } catch (error) {
+        console.error('Failed to save pick profile', error);
+        throw error;
       }
     },
     clearFilters(bucket: WorkflowBucket) {

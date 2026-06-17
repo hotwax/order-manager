@@ -42,7 +42,7 @@ export interface WorkflowFilters {
   salesChannelEnumId: string;
   facilityId: string;
   shipmentMethodTypeId: string;
-  priority: boolean | null;
+  priority: 'HIGH' | 'NORMAL' | 'LOW' | null;
   dateFrom: string;
   dateThru: string;
 }
