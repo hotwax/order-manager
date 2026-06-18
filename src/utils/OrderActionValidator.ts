@@ -195,6 +195,7 @@ export interface OrderLifecyclePolicy {
 
 export interface ShipGroupTimeline {
   firstBrokeredDate?: string | number | null;
+  firstReleasedDate?: string | number | null;
   picklistDate?: string | number | null;
   packedDate?: string | number | null;
   shippedDate?: string | number | null;
@@ -293,7 +294,7 @@ export const OrderActionValidator = {
 
   /** Brokered == assigned to a real (physical) facility OR timeline shows a brokered date. */
   isShipGroupBrokered(shipGroup: any, ctx?: OrderLifecycleContext): boolean {
-    if (ctx?.timeline?.firstBrokeredDate) return true;
+    if (ctx?.timeline?.firstBrokeredDate || ctx?.timeline?.firstReleasedDate) return true;
     return !this.isVirtualFacility(shipGroup, ctx);
   },
 
