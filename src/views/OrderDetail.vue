@@ -456,11 +456,11 @@
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="compassOutline" />
                 <ion-label>
-                  <p class="overline" v-if="timelineByShipGroup[shipGroup.id]?.firstBrokeredDate">{{
-                    commonUtil.getRelativeTime(timelineByShipGroup[shipGroup.id]?.firstBrokeredDate) }}</p>
+                  <p class="overline" v-if="timelineByShipGroup[shipGroup.id]?.firstBrokeredDate || timelineByShipGroup[shipGroup.id]?.firstReleasedDate">{{
+                    commonUtil.getRelativeTime(timelineByShipGroup[shipGroup.id]?.firstBrokeredDate || timelineByShipGroup[shipGroup.id]?.firstReleasedDate) }}</p>
                   {{ translate('Brokered') }}
                 </ion-label>
-                <ion-note slot="end">{{ formatTime(timelineByShipGroup[shipGroup.id]?.firstBrokeredDate) ||
+                <ion-note slot="end">{{ formatTime(timelineByShipGroup[shipGroup.id]?.firstBrokeredDate) || formatTime(timelineByShipGroup[shipGroup.id]?.firstReleasedDate) ||
                   translate('Pending')
                   }}</ion-note>
               </ion-item>
@@ -1141,7 +1141,7 @@ const orderTimeline = computed(() => {
   const entryDate = timelineMillis(raw.entryDate);
   const approvedDate = statusTimelineDate(['ORDER_APPROVED', 'ORDER_ACCEPTED']);
   const completedDate = statusTimelineDate(['ORDER_COMPLETED']);
-  const firstBrokeredDate = fulfillmentTimelineDate('firstBrokeredDate');
+  const firstBrokeredDate = fulfillmentTimelineDate('firstBrokeredDate') ?? fulfillmentTimelineDate('firstReleasedDate');
 
   if (orderDate) {
     timeline.push({
@@ -1277,7 +1277,7 @@ function shipGroupProgress(shipGroup: any): number {
   const tl = timelineByShipGroup.value[shipGroup.id];
   if (!tl) return 0;
   let progress = 0;
-  if (tl.firstBrokeredDate) progress += 0.25;
+  if (tl.firstBrokeredDate || tl.firstReleasedDate) progress += 0.25;
   if (tl.picklistDate) progress += 0.25;
   if (tl.packedDate) progress += 0.25;
   if (tl.shippedDate) progress += 0.25;
