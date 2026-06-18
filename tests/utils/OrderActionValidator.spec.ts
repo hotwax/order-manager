@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { OrderActionValidator } from './OrderActionValidator';
+import { OrderActionValidator } from '@/utils/OrderActionValidator';
 
 /**
  * Enriched transition rows as seed.allowedTransitions() returns them, modelled

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { useOrderDetailStore } from './orderDetail';
+import { useOrderDetailStore } from '@/store/orderDetail';
 
 vi.mock('@common', () => ({
   api: vi.fn(),
@@ -9,11 +9,8 @@ vi.mock('@common', () => ({
   },
   cookieHelper: () => ({
     get: () => ''
-  })
-}));
-
-vi.mock('@/logger', () => ({
-  default: {
+  }),
+  logger: {
     debug: vi.fn(),
     error: vi.fn(),
     info: vi.fn(),

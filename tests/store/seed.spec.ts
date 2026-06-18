@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { api } from '@common';
-import { useSeedStore } from './seed';
+import { useSeedStore } from '@/store/seed';
 
 vi.mock('@common', () => ({
   api: vi.fn(),

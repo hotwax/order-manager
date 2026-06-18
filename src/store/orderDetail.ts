@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
-import { api, commonUtil } from "@common";
-import logger from "@/logger";
+import { api, commonUtil, logger} from "@common";
 import { useOrderDetail } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
 

@@ -1,4 +1,4 @@
-import { api } from '@common';
+import { api, logger } from '@common';
 import { defineStore } from 'pinia';
 import {
   searchOrders as searchOrderService,
@@ -8,7 +8,6 @@ import { toStringValue, toNumberValue } from '@/services/OrderService';
 import type { Customer, Order, ReturnRecord, Shipment } from '@/types/order';
 import type { WorkflowOrder, WorkflowFilters } from '@/types/customerService';
 import { useSeedStore } from '@/store/seed';
-import logger from '@/logger';
 import { useProductStore } from './productStore';
 
 

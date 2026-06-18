@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { filterFacilityRows, normalizeFacilityRows, sortFacilityRows } from './facilityInventory';
+import { filterFacilityRows, normalizeFacilityRows, sortFacilityRows } from '@/utils/facilityInventory';
 
 describe('facility inventory rows', () => {
   it('combines product inventory, fulfillment, and capacity details by facility', () => {

@@ -11,8 +11,7 @@
 import { IonApp, IonRouterOutlet, IonSplitPane, loadingController } from '@ionic/vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Settings } from 'luxon';
-import { translate } from '@common';
-import emitter from '@/event-bus';
+import { emitter, translate } from '@common';
 import Menu from '@/components/layout/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';

@@ -1,6 +1,5 @@
 import { ref } from "vue";
-import { useSolrSearch, commonUtil } from "@common";
-import logger from "@/logger";
+import { useSolrSearch, commonUtil, logger} from "@common";
 import { useProductCacheStore, type CachedProduct, type ProductIdentification } from "@/store/productCache";
 
 /**

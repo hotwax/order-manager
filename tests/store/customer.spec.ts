@@ -6,7 +6,7 @@ import {
   getCustomerRelationships,
   getCustomerTasks
 } from '@/services/customer';
-import { useCustomerStore } from './customer';
+import { useCustomerStore } from '@/store/customer';
 import type { CustomerProfile } from '@/types/customer';
 
 vi.mock('@/services/customer', () => ({

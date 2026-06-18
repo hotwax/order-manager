@@ -1,8 +1,6 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 import router from './router';
-import logger from './logger';
-
 import { IonicVue } from '@ionic/vue';
 
 /* Core CSS required for Ionic components to work properly */
@@ -33,7 +31,7 @@ import "@common/css/theme.css"
 import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import localeMessages from './locales';
-import { createDxpI18n, imagePreview, initialiseConfig } from '@common';
+import { createDxpI18n, imagePreview, initialiseConfig, logger } from '@common';
 import { useUserStore } from './store/user';
 
 const pinia = createPinia().use(piniaPluginPersistedstate);

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { commonUtil, useSolrSearch } from '@common';
-import { buildOrderLookupPayload, searchOrders } from './order';
+import { buildOrderLookupPayload, searchOrders } from '@/services/order';
 
 vi.mock('@common', () => ({
   api: vi.fn(),

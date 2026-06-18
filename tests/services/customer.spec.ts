@@ -6,7 +6,7 @@ import {
   getCustomerContactMechs,
   getCustomerOrders,
   searchCustomers
-} from './customer';
+} from '@/services/customer';
 
 vi.mock('@common', () => ({
   api: vi.fn(),

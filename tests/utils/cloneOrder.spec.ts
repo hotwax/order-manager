@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildClonePayload, cloneCustomerName, defaultCloneNote, type BuildClonePayloadOptions } from './cloneOrder';
+import { buildClonePayload, cloneCustomerName, defaultCloneNote, type BuildClonePayloadOptions } from '@/utils/cloneOrder';
 
 const geoName = (geoId: string) => ({ NY: 'New York', USA: 'United States' } as Record<string, string>)[geoId] || geoId;
 

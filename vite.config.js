@@ -29,6 +29,7 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    include: ['tests/**/*.spec.ts', 'tests/**/*.test.ts'],
     exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', '.claude']
   }
 })

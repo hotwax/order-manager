@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
-import { cookieHelper } from "@common";
-import logger from "@/logger";
+import { cookieHelper, logger } from "@common";
 import { getProductDb, type CachedProduct, type ProductIdentification } from "@/services/productDb";
 
 export type { CachedProduct, ProductIdentification };

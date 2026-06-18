@@ -142,9 +142,7 @@ import {
 } from '@ionic/vue';
 import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import { computed, onMounted, ref, watch } from 'vue';
-import { api, translate } from '@common';
-import emitter from '@/event-bus';
-import logger from '@/logger';
+import { api, emitter, logger, translate } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';

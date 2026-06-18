@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { api } from '@common';
-import { useOrderTaskStore } from './orderTask';
+import { useOrderTaskStore } from '@/store/orderTask';
 
 vi.mock('@common', () => ({
   api: vi.fn(),
