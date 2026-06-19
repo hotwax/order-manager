@@ -1969,9 +1969,7 @@ function toDateInputValue(value: any): string {
 // ── Shipping address display & edit ──────────────────────────────────────────
 
 function shippingAddressLines(shipGroup: any): string[] {
-  const mech = shipGroup.contactMechId
-    ? orderDetailStore.contactMechsById[shipGroup.contactMechId]
-    : orderDetailStore.contactMechsByPurpose['SHIPPING_LOCATION'];
+  const mech = shipGroupShippingContactMech(shipGroup);
   return addressLines(mech?.postalAddress);
 }
 
@@ -1980,9 +1978,7 @@ function shippingAddressLines(shipGroup: any): string[] {
  * & 2) / locality (city, zip, state, country). Returns null when no address.
  */
 function shippingAddressView(shipGroup: any): { name: string; street: string; locality: string } | null {
-  const mech = shipGroup.contactMechId
-    ? orderDetailStore.contactMechsById[shipGroup.contactMechId]
-    : orderDetailStore.contactMechsByPurpose['SHIPPING_LOCATION'];
+  const mech = shipGroupShippingContactMech(shipGroup);
   const addr = mech?.postalAddress;
   if (!addr) return null;
   return {
@@ -1990,6 +1986,12 @@ function shippingAddressView(shipGroup: any): { name: string; street: string; lo
     street: [addr.address1, addr.address2].filter(Boolean).join(', '),
     locality: [addr.city, addr.postalCode, seed.geoName(addr.stateProvinceGeoId), seed.geoName(addr.countryGeoId)].filter(Boolean).join(', ')
   };
+}
+
+function shipGroupShippingContactMech(shipGroup: any) {
+  return shipGroup.contactMechId
+    ? orderDetailStore.contactMechsById[shipGroup.contactMechId]
+    : orderDetailStore.contactMechsByPurpose['SHIPPING_LOCATION'];
 }
 
 const editingShipGroupId = ref<string | null>(null);
@@ -2006,9 +2008,7 @@ const shippingAddressForm = ref({
 const statesForCountry = computed(() => seed.getStates);
 
 function openEditShippingAddress(shipGroup: any) {
-  const mech = shipGroup.contactMechId
-    ? orderDetailStore.contactMechsById[shipGroup.contactMechId]
-    : orderDetailStore.contactMechsByPurpose['SHIPPING_LOCATION'];
+  const mech = shipGroupShippingContactMech(shipGroup);
   const addr = mech?.postalAddress ?? {};
   shippingAddressForm.value = {
     address1: addr.address1 ?? '',
@@ -2027,10 +2027,19 @@ function closeEditShippingAddress() {
 
 async function saveShippingAddress(shipGroup: any) {
   if (!order.value) return;
+  const partyId = customerPartyId.value;
+  if (!partyId) {
+    await showToast(translate('Customer is not available for this order.'));
+    return;
+  }
+
+  const contactMechId = shipGroupShippingContactMech(shipGroup)?.contactMechId || shipGroup.contactMechId;
   savingShippingAddress.value = true;
   try {
     await orderTaskStore.updateShippingInformation(order.value.id, shipGroup.id, {
       ...shippingAddressForm.value,
+      partyId,
+      contactMechId,
       contactMechPurposeTypeId: 'SHIPPING_LOCATION',
       isEdited: true,
     });
