@@ -159,7 +159,6 @@ import {
 } from '@ionic/vue';
 import { computed, onMounted, ref, watch } from 'vue';
 import { DateTime } from 'luxon';
-import { useRoute } from 'vue-router';
 import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useSeedStore } from '@/store/seed';
@@ -167,6 +166,7 @@ import type { BulkActionDefinition, WorkflowBucket, WorkflowOrder } from '@/type
 import EmptyState from '@/components/common/EmptyState.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import { commonUtil, translate } from '@common';
+import router from '@/router';
 
 const props = defineProps<{
   bucket: WorkflowBucket;
@@ -180,7 +180,7 @@ const props = defineProps<{
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const seedStore = useSeedStore();
-const route = useRoute();
+const route = router.currentRoute.value;
 const toastMessage = ref('');
 
 const filters = computed({

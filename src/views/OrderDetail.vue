@@ -2422,7 +2422,19 @@ async function cancelOrderItems() {
 async function rejectAndReleaseItem(item: any, productId: string) {
   const orderId = order.value!.id;
 
-  // Step 1 — reject (pull back) the item with hardcoded reason
+  // Step 1 — pick a facility with inventory to release to
+  const facilityModal = await modalController.create({
+    component: ItemFacilityInventoryModal,
+    componentProps: { productId, productStoreId: orderDetailStore.current?.productStoreId },
+    cssClass: 'item-facility-inventory-modal'
+  });
+  await facilityModal.present();
+  const { data: facilityId } = await facilityModal.onWillDismiss();
+  if (!facilityId) {
+    return;
+  }
+
+  // Step 2 — reject the item with default reason
   try {
     await api({
       url: `oms/orders/${orderId}/reject`,
@@ -2438,20 +2450,6 @@ async function rejectAndReleaseItem(item: any, productId: string) {
     });
   } catch {
     await showToast(translate('Failed to reject the item. Please try again.'));
-    return;
-  }
-
-  // Step 2 — pick a facility with inventory to release to
-  const facilityModal = await modalController.create({
-    component: ItemFacilityInventoryModal,
-    componentProps: { productId, productStoreId: orderDetailStore.current?.productStoreId },
-    cssClass: 'item-facility-inventory-modal'
-  });
-  await facilityModal.present();
-  const { data: facilityId } = await facilityModal.onWillDismiss();
-  if (!facilityId) {
-    // Rejected but no facility chosen — still refresh
-    await loadOrder(orderId, true);
     return;
   }
 

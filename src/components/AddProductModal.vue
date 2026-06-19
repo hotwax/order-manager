@@ -104,7 +104,9 @@ async function getProducts(vSize?: any, vIndex?: any) {
       keyword: queryString.value.trim(),
       viewSize,
       viewIndex,
-      filters: {}
+      filters: {
+        productStoreIds_s: { value: useProductStore().getCurrentProductStore.productStoreId }
+      }
     });
 
     if (resp.total) {

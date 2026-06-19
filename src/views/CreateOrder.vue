@@ -227,8 +227,8 @@
                   <DxpShopifyImg :src="lineItem.mainImageUrl" :key="lineItem.mainImageUrl"/>
                 </ion-thumbnail>
                 <ion-label>
-                  {{ getProduct(lineItem.productId)?.productId ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(lineItem.productId)) : lineItem.title }}
-                  <p v-if="commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(lineItem.productId)) !== 'null'">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(lineItem.productId)) }}</p>
+                  {{ lineItem.productId ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(lineItem.productId)) : lineItem.title }}
+                  <p v-if="lineItem.productId && commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(lineItem.productId)) !== 'null'">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(lineItem.productId)) }}</p>
                 </ion-label>
               </ion-item>
               <div class="tablet">
