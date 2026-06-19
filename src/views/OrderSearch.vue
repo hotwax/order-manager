@@ -88,7 +88,7 @@
           v-for="order in searchResults"
           :key="order.id"
           button
-          @click="handleItemClick(order, $event)"
+          @click="handleOrderRowClick(order, $event)"
         >
           <ion-checkbox
             v-if="selectMode"
