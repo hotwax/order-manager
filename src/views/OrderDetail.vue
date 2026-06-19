@@ -281,6 +281,10 @@
                     @attributes-click="openItemAttributesModal(item)"
                   >
                     <template #actions>
+                      <ion-button v-if="item.statusId === 'ITEM_CREATED'" fill="clear"
+                        size="small" @click.stop="approveSingleItem(item)">
+                        {{ translate('Approve') }}
+                      </ion-button>
                       <ion-button v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)" fill="clear"
                         size="small" color="danger" @click.stop="cancelSingleItem(item)">
                         {{ translate('Cancel') }}
@@ -1036,6 +1040,7 @@ const order = computed(() => {
     status: seed.statusDescription(raw.statusId),
     statusId: raw.statusId,
     channel: seed.enumDescription(raw.salesChannelEnumId),
+    productStoreId: raw.productStoreId,
     productStoreName: seed.productStoreName(raw.productStoreId),
     currency: raw.currencyUom,
     localeString: raw.localeString || raw.locale,
@@ -1282,6 +1287,29 @@ function shipGroupProgress(shipGroup: any): number {
   if (tl.packedDate) progress += 0.25;
   if (tl.shippedDate) progress += 0.25;
   return progress;
+}
+
+function hasShipByDatePassed(shipGroup: any): boolean {
+  const shipByDate = timelineMillis(shipGroup.shipByDate);
+  return Boolean(shipByDate && shipByDate < Date.now());
+}
+
+function shipGroupHasStartedFulfillment(shipGroup: any): boolean {
+  const tl = timelineByShipGroup.value[shipGroup.id] || {};
+  return Boolean(tl.firstBrokeredDate || tl.firstReleasedDate || tl.picklistDate || tl.packedDate || tl.shippedDate);
+}
+
+function requiresAddItemFulfillmentReview(shipGroup: any): boolean {
+  return Boolean(
+    order.value?.statusId === 'ORDER_APPROVED'
+    || order.value?.statusId === 'ORDER_ACCEPTED'
+    || shipGroupHasStartedFulfillment(shipGroup)
+    || hasShipByDatePassed(shipGroup)
+  );
+}
+
+function defaultAddedItemStatusId(shipGroup: any): string | undefined {
+  return requiresAddItemFulfillmentReview(shipGroup) ? 'ITEM_APPROVED' : undefined;
 }
 
 function isShipGroupExpanded(shipGroupId: string): boolean {
@@ -2501,6 +2529,26 @@ async function cancelSingleItem(item: any) {
   await alert.present();
 }
 
+async function approveSingleItem(item: any) {
+  const raw = orderDetailStore.current;
+  if (!raw) return;
+  try {
+    await api({
+      url: `oms/orders/${raw.orderId}/items/${item.orderItemSeqId}/status`,
+      method: 'PUT',
+      data: {
+        orderId: raw.orderId,
+        orderItemSeqId: item.orderItemSeqId,
+        statusId: 'ITEM_APPROVED',
+      }
+    });
+    await showToast(translate('Item approved for fulfillment.'));
+    await loadOrder(raw.orderId, true);
+  } catch {
+    await showToast(translate('Failed to approve the item. Please try again.'));
+  }
+}
+
 async function parkFullOrder() {
   const facilityId = await openFacilityModal();
   if (!facilityId) return;
@@ -2637,7 +2685,16 @@ async function openAddTaskModal(shipGroup: any) {
 async function openAddItemModal(shipGroup: any) {
   const modal = await modalController.create({
     component: AddItemToOrderModal,
-    componentProps: { orderId: order.value!.id, shipGroupSeqId: shipGroup.id, onItemAdded: () => loadOrder(order.value!.id) },
+    componentProps: {
+      orderId: order.value!.id,
+      shipGroupSeqId: shipGroup.id,
+      productStoreId: order.value!.productStoreId,
+      shipGroupFacilityId: shipGroup.facilityId,
+      shipGroupFacilityName: shipGroup.facilityName,
+      defaultItemStatusId: defaultAddedItemStatusId(shipGroup),
+      requiresFulfillmentReview: requiresAddItemFulfillmentReview(shipGroup),
+      onItemAdded: () => loadOrder(order.value!.id)
+    },
   });
   await modal.present();
   const { role } = await modal.onWillDismiss();
