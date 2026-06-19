@@ -10,17 +10,11 @@
     </ion-header>
 
     <ion-content>
-      <!-- Facets: Product Store selector -->
-      <!-- Loops over the product stores the user is linked to; selection binds to selectedStoreId -->
-      <div class="facets ion-padding-top">
-        <RadioFacetGroup v-model="selectedStoreId" :options="storeOptions" />
-      </div>
-
       <!-- Page Heading: Name of the selected product store -->
       <ion-item lines="none" class="selected-store-header">
         <ion-icon slot="start" :icon="globeOutline" />
         <ion-label>
-          <h1>{{ selectedStoreName }}</h1>
+          <h1>{{ productStore.currentProductStore.storeName || selectedStoreId }}</h1>
         </ion-label>
       </ion-item>
 
@@ -29,18 +23,18 @@
         <ion-card-content>
           <div class="total-orders">
             <!-- Date Today -->
-            <p class="overline">Today</p>
+            <p class="overline">{{ translate("Today") }}</p>
             <!-- Order Count today -->
             <h1 class="big-number">{{ (fulfillmentProgress.totalOrdersCount || 0).toLocaleString() }}</h1>
             <!-- Time since day start -->
-            <p class="time-elapsed">{{ new Date().getHours() }} hours since day start</p>
+            <p class="time-elapsed">{{ new Date().getHours() }} {{ translate("hours since day start") }}</p>
           </div>
 
           <div class="metrics">
             <ion-item button :detail="true" lines="none" class="metric" router-link="/open">
               <div style="width: 100%;">
                 <div class="metric-label">
-                  <p>Brokering status</p>
+                  <p>{{ translate("Brokering status") }}</p>
                   <p>{{ fulfillmentStats.brokeringPercentage }}%</p>
                 </div>
                 <ion-progress-bar :value="fulfillmentStats.brokeringPercentage / 100"></ion-progress-bar>
@@ -49,7 +43,7 @@
             <ion-item button detail lines="none" class="metric" router-link="/packed">
               <div style="width: 100%;">
                 <div class="metric-label">
-                  <p>Picked and packed</p>
+                  <p>{{ translate("Picked and packed") }}</p>
                   <p>{{ fulfillmentStats.pickedAndPackedText }}%</p>
                 </div>
                 <div class="custom-progress-track">
@@ -71,7 +65,7 @@
         <StatCard
           button
           router-link="/open"
-          title="Open Orders"
+          :title="translate('Open Orders')"
           :stat="openOrders.openOrdersCount || 0"
           :subtitle="oldestOpenOrderDateStr"
         />
@@ -79,40 +73,40 @@
         <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard button router-link="/unfillable" title="Unfillable" :stat="totalUnfillable">
+        <StatCard button router-link="/unfillable" :title="translate('Unfillable today')" :stat="totalUnfillable">
           <Sparkline :points="unfillableTrend" color="danger" />
         </StatCard>
 
         <!-- Card 3: Order Hold Tasks — drilldown follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Display list of tasks requiring resolution -->
         <!-- stat: number of orders with hold tasks -->
-        <StatCard title="Order Hold Tasks" :stat="holdTasks.holdTasksTotalCount || 0">
+        <StatCard :title="translate('Order Hold Tasks')" :stat="holdTasks.holdTasksTotalCount || 0">
           <ion-list lines="none" class="hold-tasks-list">
             <!-- Substitute workefforts -->
             <ion-item button :detail="true" router-link="/swap">
               <ion-label>
-                Substitute
+                {{ translate("Substitute") }}
                 <!-- number of workefforts where purpose type is substitute -->
               </ion-label>
-              <p slot="end">{{ holdTasks.holdSubstituteCount || 0 }} tasks</p>
+              <p slot="end">{{ holdTasks.holdSubstituteCount || 0 }} {{ translate("tasks") }}</p>
             </ion-item>
 
             <!-- Bad Address workefforts -->
             <ion-item button :detail="true" router-link="/bad-address">
               <ion-label>
-                Bad Address
+                {{ translate("Bad Address") }}
                 <!-- number of workefforts where purpose type is bad address -->
               </ion-label>
-              <p slot="end">{{ holdTasks.holdBadAddressCount || 0 }} tasks</p>
+              <p slot="end">{{ holdTasks.holdBadAddressCount || 0 }} {{ translate("tasks") }}</p>
             </ion-item>
 
             <!-- Fraud Risk workefforts -->
             <ion-item button :detail="true" router-link="/fraud">
               <ion-label>
-                Fraud Risk
+                {{ translate("Fraud Risk") }}
                 <!-- number of workefforts where purpose type is fraud -->
               </ion-label>
-              <p slot="end">{{ holdTasks.holdFraudRiskCount || 0 }} tasks</p>
+              <p slot="end">{{ holdTasks.holdFraudRiskCount || 0 }} {{ translate("tasks") }}</p>
             </ion-item>
           </ion-list>
         </StatCard>
@@ -125,24 +119,24 @@
       <ion-item lines="none" class="facility-header">
         <ion-icon slot="start" :icon="businessOutline" />
         <ion-label>
-          <h1>{{ selectedFacilityName }}</h1>
+          <h1>{{ translate("Facilities") }}</h1>
         </ion-label>
       </ion-item>
 
       <div class="dimension ion-padding-horizontal">
         <!-- Search facilities -->
-        <ion-searchbar v-model="searchQuery" placeholder="Search facilities"></ion-searchbar>
+        <ion-searchbar v-model="searchQuery" :placeholder="translate('Search facilities')"></ion-searchbar>
         
         <!-- Segment selection -->
         <ion-segment v-model="selectedDimension">
           <ion-segment-button value="volume">
-            <ion-label>Order Volume</ion-label>
+            <ion-label>{{ translate("Order Volume") }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="velocity">
-            <ion-label>Fulfillment Velocity</ion-label>
+            <ion-label>{{ translate("Fulfillment Velocity") }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="partial">
-            <ion-label>Partial Fulfillments</ion-label>
+            <ion-label>{{ translate("Partial Fulfillments") }}</ion-label>
           </ion-segment-button>
         </ion-segment>
       </div>
@@ -150,7 +144,7 @@
       <!-- Facilities List -->
       <ion-list class="facilities ion-padding-top">
         <ion-list-header>
-          <ion-label>Top 10 facilities by selected dimension or Search results</ion-label>
+          <ion-label>{{ translate("Top 10 facilities by") }} {{ selectedDimension }} {{ searchQuery && translate("or") }} {{ searchQuery }}</ion-label>
         </ion-list-header>
 
         <ion-radio-group v-model="selectedFacilityId">
@@ -164,36 +158,36 @@
               <ion-progress-bar :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0" color="primary" />
             </div>
           </ion-item>
-          <ion-item v-if="filteredFacilities.length === 0" lines="none">
-            <ion-label>No facilities found</ion-label>
+          <ion-item v-if="!filteredFacilities.length" lines="none">
+            <ion-label>{{ translate("No facilities found") }}</ion-label>
           </ion-item>
         </ion-radio-group>
       </ion-list>
 
       <!-- Online Order Fulfillment Dashboard at selected Facility -->
-      <div class="fulfillment-dashboard-section ion-padding">
-        <h1 class="section-title">Fill rate at {{ selectedFacilityName }}</h1>
+      <div v-if="selectedFacilityId" class="fulfillment-dashboard-section ion-padding">
+        <h1 class="section-title">{{ translate("Fill rate at") }} {{ selectedFacilityName }}</h1>
 
         <!-- Copied exactly from Dashboard.vue -->
         <div class="fulfillment">
           <!-- Fill Rate Card -->
           <ion-card class="fill-rate">
             <ion-item lines="none">
-              <p class="overline">Today's Fill Rate</p>
+              <p class="overline">{{ translate("Today's Fill Rate") }}</p>
               <ion-icon slot="end" :icon="informationCircleOutline" />
             </ion-item>
             <ion-list lines="none">
               <h1 class="ion-margin-start">{{ Math.round((facilityFulfillmentProgress?.fillRate || 0) * 100) }}%</h1>
               <ion-item>
-                <ion-label>Order allocated</ion-label>
+                <ion-label>{{ translate("Order allocated") }}</ion-label>
                 <ion-label slot="end">{{ facilityFulfillmentProgress?.ordersAllocated ?? 0 }}/{{ facilityFulfillmentProgress?.capacityLimit ?? 'Unlimited' }}</ion-label>
               </ion-item>
               <ion-item>
-                <ion-label>Orders packed</ion-label>
+                <ion-label>{{ translate("Orders packed") }}</ion-label>
                 <ion-label slot="end" color="success">{{ facilityFulfillmentProgress?.ordersPacked ?? 0 }}</ion-label>
               </ion-item>
               <ion-item>
-                <ion-label>Orders rejected</ion-label>
+                <ion-label>{{ translate("Orders rejected") }}</ion-label>
                 <ion-label slot="end" color="danger">{{ facilityFulfillmentProgress?.ordersRejected ?? 0 }}</ion-label>
               </ion-item>
             </ion-list>
@@ -203,14 +197,14 @@
           <ion-card class="orders">
             <ion-item lines="none" class="title">
               <ion-label>
-                <p class="overline">Orders Pending Fulfillment</p>
+                <p class="overline">{{ translate("Orders Pending Fulfillment") }}</p>
               </ion-label>
             </ion-item>
             <div class="pending">
               <ion-item lines="none" style="width: 100%;">
                 <h1 slot="start" style="margin: 0 16px 0 0; font-size: 28px;">{{ facilityFulfillmentProgress?.totalPending ?? 0 }}</h1>
                 <ion-label>
-                  <p>Oldest order assigned</p>
+                  <p>{{ translate("Oldest order assigned") }}</p>
                   {{ oldestAssignedRelativeStr }}
                 </ion-label>
               </ion-item>
@@ -218,11 +212,11 @@
             <ion-list class="fulfill">
               <ion-item lines="full" :button="true" :detail="true" :router-link="workflowRoute('/open')">
                 <ion-icon :icon="mailUnreadOutline" slot="start" />
-                <ion-label>{{ facilityFulfillmentProgress?.openCount ?? 0 }} open</ion-label>
+                <ion-label>{{ facilityFulfillmentProgress?.openCount ?? 0 }} {{ translate("open") }}</ion-label>
               </ion-item>
               <ion-item lines="none" :button="true" :detail="true" :router-link="workflowRoute('/inflight')">
                 <ion-icon :icon="mailOpenOutline" slot="start" />
-                <ion-label>{{ facilityFulfillmentProgress?.inProgressCount ?? 0 }} in progress</ion-label>
+                <ion-label>{{ facilityFulfillmentProgress?.inProgressCount ?? 0 }} {{ translate("in progress") }}</ion-label>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -449,6 +443,7 @@
 
 <script setup lang="ts">
 import {
+  IonButton,
   IonCard,
   IonCardContent,
   IonCardHeader,
@@ -481,7 +476,8 @@ import {
   IonModal,
   IonFab,
   IonFabButton,
-  IonToggle
+  IonToggle,
+  onIonViewWillEnter
 } from '@ionic/vue';
 import { ref } from 'vue';
 import {
@@ -498,13 +494,14 @@ import {
   powerOutline
 } from 'ionicons/icons';
 import { computed, watch } from 'vue';
-import { translate, RadioFacetGroup, StatCard, Sparkline, commonUtil } from '@common';
+import { translate, StatCard, Sparkline, commonUtil } from '@common';
 import { useCustomerServiceStore } from '@/store/customerService';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 
 const store = useCustomerServiceStore();
 const productStore = useProductStore() as any;
+const seedStore = useSeedStore()
 
 const fulfillmentProgress = computed(() => store.getFulfillmentProgress);
 const openOrders = computed(() => store.getOpenOrders);
@@ -666,47 +663,18 @@ const queueSegments = computed(() => {
   return segments;
 });
 
-const selectedStoreId = ref('');
-const selectedFacilityId = ref('BROADWAY');
+const selectedStoreId = computed(() => productStore.currentProductStore.productStoreId);
+const selectedFacilityId = ref("");
 const hoveredSegmentId = ref<string | null>(null);
 const searchQuery = ref('');
 const selectedDimension = ref('volume');
 
 const oldestOpenOrderDateStr = computed(() => {
   const timestamp = openOrders.value.oldestOpenOrderDate;
-  return timestamp ? 'Oldest: ' + commonUtil.getDateAndTime(timestamp) : 'No open orders';
+  return timestamp ? translate('Oldest: ') + commonUtil.getDateAndTime(timestamp) : translate('No open orders');
 });
 
 const totalUnfillable = computed(() => unfillableTrend.value.reduce((sum, val) => sum + val, 0));
-
-const storeOptions = computed(() => {
-  return productStore.getProductStores.map((pStore: any) => ({
-    value: pStore.productStoreId,
-    primary: pStore.storeName
-  }));
-});
-
-watch(storeOptions, (newOptions) => {
-  if (newOptions.length > 0 && !selectedStoreId.value) {
-    selectedStoreId.value = newOptions[0].value;
-  }
-}, { immediate: true });
-
-watch(selectedStoreId, (newStoreId) => {
-  if (newStoreId) {
-    store.fetchFulfillmentProgress(newStoreId);
-    store.fetchOpenOrders(newStoreId);
-    store.fetchUnfillable(newStoreId);
-    store.fetchFacilityOrderVolume(newStoreId);
-    store.fetchFacilityFulfillmentVelocity(newStoreId);
-    store.fetchFacilityPartialFulfillments(newStoreId);
-    store.fetchHoldTasks(newStoreId);
-    if (selectedFacilityId.value) {
-      store.fetchFacilityFulfillmentProgress(selectedFacilityId.value, newStoreId);
-      store.fetchFulfillmentSyncData(selectedFacilityId.value, newStoreId);
-    }
-  }
-}, { immediate: true });
 
 watch(selectedFacilityId, (newFacilityId) => {
   if (newFacilityId && selectedStoreId.value) {
@@ -730,12 +698,21 @@ const fulfillmentStats = computed(() => {
   };
 });
 
-const selectedStoreName = computed(
-  () => storeOptions.value.find((s: any) => s.value === selectedStoreId.value)?.primary ?? ''
-);
+onIonViewWillEnter(() => {
+  store.fetchFulfillmentProgress(selectedStoreId.value);
+  store.fetchOpenOrders(selectedStoreId.value);
+  store.fetchUnfillable(selectedStoreId.value);
+  store.fetchFacilityOrderVolume(selectedStoreId.value);
+  store.fetchFacilityFulfillmentVelocity(selectedStoreId.value);
+  store.fetchFacilityPartialFulfillments(selectedStoreId.value);
+  store.fetchHoldTasks(selectedStoreId.value);
+  if(selectedFacilityId.value) {
+    store.fetchFacilityFulfillmentProgress(selectedFacilityId.value, selectedStoreId.value);
+    store.fetchFulfillmentSyncData(selectedFacilityId.value, selectedStoreId.value);
+  }
+})
 
 function getFacilityName(facilityId: string) {
-  const seedStore = useSeedStore()
   return seedStore.facilityName(facilityId);
 }
 
@@ -806,7 +783,7 @@ function workflowRoute(path: string) {
 
 const oldestAssignedRelativeStr = computed(() => {
   const timestamp = facilityFulfillmentProgress.value?.oldestAssignedTime;
-  return timestamp ? commonUtil.getRelativeTime(timestamp) : 'No pending orders';
+  return timestamp ? commonUtil.getRelativeTime(timestamp) : translate('No pending orders');
 });
 
 const progressPercent = computed(() => {
