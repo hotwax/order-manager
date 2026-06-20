@@ -426,8 +426,7 @@
           <div
             v-for="returnRow in returnRows"
             :key="returnRow.returnId"
-            class="list-item"
-            style="--columns-mobile: 2; --columns-tablet: 4; --columns-desktop: 4;"
+            class="list-item return-row"
             role="link"
             tabindex="0"
             @click="openReturnRow(returnRow)"
@@ -1041,6 +1040,12 @@ ion-card-header ion-card-title {
   gap: 16px;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   padding: 8px;
+}
+
+.return-row {
+  --columns-mobile: 2;
+  --columns-tablet: 4;
+  --columns-desktop: 4;
 }
 
 .segment-placeholder {
