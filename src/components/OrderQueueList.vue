@@ -197,7 +197,9 @@ const props = defineProps<{
   emptyMessage: string;
   globalActions?: QueueGlobalAction[];
 }>();
-
+const emit = defineEmits<{
+  (e: 'clearFilters'): void;
+}>();
 const orderDetailStore = useOrderDetailStore();
 const orderTaskStore = useOrderTaskStore();
 const productStore = useProductStore();
@@ -444,7 +446,6 @@ function isVirtualShipGroup(shipGroup: any) {
 
   return facilityTypeId === 'VIRTUAL_FACILITY' || parentTypeId === 'VIRTUAL_FACILITY';
 }
-
 function clearFilters() {
   searchQuery.value = '';
   selectedOrderIds.value = [];
@@ -454,6 +455,7 @@ function clearFilters() {
     dateFrom: '',
     dateThru: '',
   };
+  emit('clearFilters');
 }
 
 function exitSelectMode() {

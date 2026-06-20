@@ -5,6 +5,7 @@
     empty-title="No orders awaiting brokering"
     empty-message="Approved orders awaiting brokering and items rejected by a facility will appear here."
     :facility-ids="facilityIds"
+    @clearFilters="clearFacilityFilter"
   >
     <template #filters>
       <ion-select
@@ -73,7 +74,9 @@ function dedupeAndSort(values: string[]) {
     String(left).localeCompare(String(right))
   );
 }
-
+function clearFacilityFilter() {
+  selectedFacilityIds.value = [ALL_FACILITY_OPTION_ID];
+}
 function normalizeFacilitySelection(event?: any) {
   const emittedValues = Array.isArray(event)
     ? event
