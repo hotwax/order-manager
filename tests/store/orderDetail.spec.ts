@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
+import { api } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
+
+const orderDetailApi = vi.hoisted(() => ({
+  getOrder: vi.fn()
+}));
 
 vi.mock('@common', () => ({
   api: vi.fn(),
@@ -19,6 +24,10 @@ vi.mock('@common', () => ({
   }
 }));
 
+vi.mock('@/composables/useOrderDetail', () => ({
+  useOrderDetail: () => orderDetailApi
+}));
+
 vi.mock('@/services/productDb', () => ({
   getProductDb: () => ({
     products: {
@@ -31,6 +40,8 @@ vi.mock('@/services/productDb', () => ({
 describe('order detail store', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    orderDetailApi.getOrder.mockReset();
+    vi.mocked(api).mockReset();
   });
 
   it('groups item-scoped tax adjustments by comment in order totals', () => {
@@ -110,6 +121,41 @@ describe('order detail store', () => {
         SHIPPING_CHARGES: 5
       },
       total: 77
+    });
+  });
+
+  it('bulk cancels open items through each order item-cancel endpoint', async () => {
+    const store = useOrderDetailStore();
+    orderDetailApi.getOrder.mockResolvedValueOnce({
+      data: {
+        orderId: 'M104191',
+        shipGroups: [{
+          shipGroupSeqId: '00001',
+          items: [
+            { orderItemSeqId: '00001', statusId: 'ITEM_APPROVED' },
+            { orderItemSeqId: '00002', statusId: 'ITEM_CANCELLED' },
+            { orderItemSeqId: '00003', statusId: 'ITEM_COMPLETED' }
+          ]
+        }]
+      }
+    });
+    vi.mocked(api).mockResolvedValue({ data: {} });
+
+    await store.bulkCancelOrders(['M104191']);
+
+    expect(orderDetailApi.getOrder).toHaveBeenCalledWith('M104191');
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(api).toHaveBeenCalledWith({
+      url: 'oms/orders/M104191/items/cancel',
+      method: 'POST',
+      data: {
+        items: [{
+          orderItemSeqId: '00001',
+          shipGroupSeqId: '00001',
+          reason: 'NO_VARIANCE_LOG',
+          comment: ''
+        }]
+      }
     });
   });
 });

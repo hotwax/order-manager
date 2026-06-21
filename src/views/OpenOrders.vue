@@ -461,8 +461,12 @@ async function runAction(action: BulkActionDefinition) {
   }
 
   const count = selectedIds.value.size;
-  store.runBulkAction(bucket, action.id);
-  toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+  try {
+    await store.runBulkAction(bucket, action.id);
+    toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+  } catch {
+    toastMessage.value = translate('Failed to complete bulk action. Please try again.');
+  }
 }
 
 function formatChannel(channel: string) {
