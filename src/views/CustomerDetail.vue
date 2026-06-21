@@ -419,71 +419,59 @@
         <div class="section-header">
           <h2>Returns</h2>
         </div>
-        <div v-if="customerReturns.length" class="recent-orders-grid">
-          <ion-card v-for="ret in customerReturns" :key="ret.returnId">
-            <ion-item lines="full">
-              <ion-label>
-                <h2>{{ ret.externalId || ret.returnId }}</h2>
-                <p>{{ ret.itemCount }} {{ ret.itemCount === 1 ? 'item' : 'items' }} · {{ money(ret.returnTotal, ret.currencyUomId) }}</p>
+        <ion-list v-if="returnRows.length">
+          <ion-list-header>
+            <ion-label>{{ returnRows.length }} {{ returnRows.length === 1 ? 'RMA' : 'RMAs' }}</ion-label>
+          </ion-list-header>
+          <div
+            v-for="returnRow in returnRows"
+            :key="returnRow.returnId"
+            class="list-item return-row"
+            role="link"
+            tabindex="0"
+            @click="openReturnRow(returnRow)"
+            @keydown.enter.prevent="openReturnRow(returnRow)"
+            @keydown.space.prevent="openReturnRow(returnRow)"
+          >
+            <ion-item lines="none">
+              <ion-thumbnail v-if="returnRow.thumbnailProductId" slot="start">
+                <DxpShopifyImg :src="(productCache as any).getProduct(returnRow.thumbnailProductId)?.mainImageUrl" size="small" />
+              </ion-thumbnail>
+              <ion-label class="ion-text-wrap">
+                <p class="overline">{{ returnRow.dateLabel }}</p>
+                {{ returnRow.title }}
+                <p>{{ returnRow.itemSummary }}</p>
               </ion-label>
-              <ion-chip slot="end" :color="returnStatusColor(ret.statusId)" outline>
-                {{ seed.describe(ret.statusId) || ret.statusId }}
-              </ion-chip>
             </ion-item>
 
-            <ion-progress-bar :value="returnProgressValue(ret.statusId)" :color="returnStatusColor(ret.statusId)" />
+            <ion-label class="tablet ion-text-start">
+              {{ returnRow.orderLabel }}
+              <p v-if="returnRow.facilityLabel">{{ returnRow.facilityLabel }}</p>
+              <p v-if="returnRow.channelLabel">{{ returnRow.channelLabel }}</p>
+            </ion-label>
 
-            <ion-item lines="full">
-              <ion-label>
-                <p class="overline">Return date</p>
-                {{ formatLongDate(ret.entryDate) }}
-              </ion-label>
-              <ion-label v-if="ret.destinationFacilityId" slot="end">
-                <p class="overline">Facility</p>
-                {{ ret.destinationFacilityId }}
-              </ion-label>
-            </ion-item>
+            <ion-label class="tablet">
+              {{ returnRow.amount }}
+              <p>{{ returnRow.itemCountLabel }}</p>
+            </ion-label>
 
-            <ion-list lines="none">
-              <ion-list-header>
-                <ion-label>Items</ion-label>
-              </ion-list-header>
-              <ion-item v-for="item in ret.items" :key="item.returnItemSeqId">
-                <ion-thumbnail slot="start">
-                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId || '')?.mainImageUrl" size="small" />
-                </ion-thumbnail>
-                <ion-label>
-                  <h3>{{ item.productId || '—' }}</h3>
-                  <p>Qty {{ item.returnQuantity }}{{ item.receivedQuantity != null ? ` · Received ${item.receivedQuantity}` : '' }}</p>
-                  <ion-button v-if="item.returnReasonId" fill="clear" size="small" @click="showReturnReason(item.returnReasonId)">
-                    <ion-icon slot="icon-only" :icon="informationCircleOutline" />
-                  </ion-button>
-                </ion-label>
-                <ion-note slot="end">{{ money(item.returnPrice * item.returnQuantity, ret.currencyUomId) }}</ion-note>
-              </ion-item>
-            </ion-list>
-
-            <div class="card-actions">
-              <ion-button
-                v-if="ret.items[0]?.orderId"
-                fill="clear"
-                size="small"
-                :router-link="`/orders/${ret.items[0].orderId}`"
-              >
-                View order
-              </ion-button>
-            </div>
-          </ion-card>
-        </div>
+            <ion-label class="ion-text-end">
+              {{ returnRow.statusLabel }}
+              <p>Status</p>
+            </ion-label>
+          </div>
+        </ion-list>
+        <ErrorState
+          v-else-if="returnsStatus === 'error'"
+          title="Returns failed to load"
+          :message="returnsError"
+        />
         <EmptyState
           v-else-if="returnsStatus === 'loaded'"
           title="No returns"
           message="This customer has no returns on file."
         />
-        <div v-else-if="returnsStatus === 'idle'" class="ion-padding ion-text-center">
-          <ion-button fill="outline" @click="loadReturns()">Load returns</ion-button>
-        </div>
-        <div v-else-if="returnsStatus === 'loading'" class="ion-padding ion-text-center">
+        <div v-else class="ion-padding ion-text-center">
           <ion-spinner name="crescent" />
         </div>
       </div>
@@ -540,10 +528,12 @@
           title="No communications"
           message="No communication events found for this customer."
         />
-        <div v-else-if="commsStatus === 'idle'" class="ion-padding ion-text-center">
-          <ion-button fill="outline" @click="loadCommunications()">Load communications</ion-button>
-        </div>
-        <div v-else-if="commsStatus === 'loading'" class="ion-padding ion-text-center">
+        <ErrorState
+          v-else-if="commsStatus === 'error'"
+          title="Communications failed to load"
+          :message="commsError"
+        />
+        <div v-else class="ion-padding ion-text-center">
           <ion-spinner name="crescent" />
         </div>
       </div>
@@ -627,7 +617,7 @@ import { commonUtil, DxpShopifyImg } from '@common';
 import { useCustomerDetail } from '@/composables/useCustomerDetail';
 import { useProductCacheStore } from '@/store/productCache';
 import { useSeedStore } from '@/store/seed';
-import type { CustomerOrderSummary } from '@/types/customer';
+import type { CustomerOrderSummary, CustomerReturnSummary } from '@/types/customer';
 import AddContactModal from '@/components/AddContactModal.vue';
 import AddRelationshipModal from '@/components/AddRelationshipModal.vue';
 import RelationshipHistoryModal from '@/components/RelationshipHistoryModal.vue';
@@ -664,6 +654,8 @@ const {
   tasksStatus,
   returnsStatus,
   commsStatus,
+  returnsError,
+  commsError,
   lifetimeValue: lifetimeValueRaw,
   lifetimeCurrency,
   customerSince: customerSinceRaw,
@@ -725,6 +717,7 @@ const allOrders = computed(() => {
   return q ? mapped.filter((o) => matchesOrderQuery(o, q)) : mapped;
 });
 const unfillableOrders = computed(() => recentOrdersSource.value.filter((o: CustomerOrderSummary) => o.isUnfillable).map(mapOrder));
+const returnRows = computed(() => customerReturns.value.map(mapReturnRow));
 
 const segmentLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -844,34 +837,25 @@ async function onExpireRelationship(relationship: { keyFields: { partyIdFrom: st
   await expireRelationship(relationship.keyFields, DateTime.now().toMillis());
 }
 
-async function showReturnReason(returnReasonId: string) {
-  await commonUtil.showToast((seed as any).describe(returnReasonId));
+function loadSelectedSegment(segment = selectedSegment.value) {
+  if (segment === 'returns') return loadReturns();
+  if (segment === 'comms') return loadCommunications();
 }
 
-onMounted(() => load());
-watch(() => props.customerId, () => load());
+onMounted(() => {
+  void load();
+  void loadSelectedSegment();
+});
+watch(selectedSegment, (segment) => {
+  void loadSelectedSegment(segment);
+});
+watch(() => props.customerId, () => {
+  void load();
+  void loadSelectedSegment();
+});
 
 function money(value: number, currency = 'USD') {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(Number(value || 0));
-}
-
-const RETURN_PROGRESS: Record<string, number> = {
-  RETURN_REQUESTED: 0.2,
-  RETURN_ACCEPTED: 0.5,
-  RETURN_RECEIVED: 0.8,
-  RETURN_COMPLETED: 1,
-  RETURN_CANCELLED: 0
-};
-
-function returnProgressValue(statusId: string): number {
-  return RETURN_PROGRESS[statusId] ?? 0.4;
-}
-
-function returnStatusColor(statusId: string): string {
-  if (statusId === 'RETURN_COMPLETED') return 'success';
-  if (statusId === 'RETURN_CANCELLED') return 'danger';
-  if (statusId === 'RETURN_RECEIVED') return 'primary';
-  return 'warning';
 }
 
 function commStatusColor(statusId: string): string {
@@ -905,6 +889,34 @@ function formatLongDate(value?: string | number) {
 function formatTimestamp(value?: string | number) {
   const date = parseDate(value);
   return date?.isValid ? date.toFormat('h:mma d LLL yyyy') : '';
+}
+
+function mapReturnRow(returnRecord: CustomerReturnSummary) {
+  const primaryItem = returnRecord.items[0];
+  const orderId = returnRecord.items.find((item) => item.orderId)?.orderId || '';
+  const productLabel = primaryItem?.description || primaryItem?.productId || 'Return item';
+  const itemSummary = returnRecord.itemCount > 1
+    ? `${productLabel} + ${returnRecord.itemCount - 1} more`
+    : productLabel;
+
+  return {
+    returnId: returnRecord.returnId,
+    title: `RMA ${returnRecord.externalId || returnRecord.returnId}`,
+    dateLabel: formatLongDate(returnRecord.entryDate),
+    itemSummary,
+    amount: money(returnRecord.returnTotal, returnRecord.currencyUomId),
+    itemCountLabel: `${returnRecord.itemCount} ${returnRecord.itemCount === 1 ? 'item' : 'items'}`,
+    orderLabel: orderId ? `Order ${orderId}` : 'Order not linked',
+    facilityLabel: returnRecord.destinationFacilityId ? `Facility ${returnRecord.destinationFacilityId}` : '',
+    channelLabel: returnRecord.returnChannelEnumId ? seed.describe(returnRecord.returnChannelEnumId) || returnRecord.returnChannelEnumId : '',
+    thumbnailProductId: primaryItem?.productId || '',
+    returnRoute: `/returns/${returnRecord.returnId}`,
+    statusLabel: seed.describe(returnRecord.statusId) || returnRecord.statusId
+  };
+}
+
+function openReturnRow(returnRow: ReturnType<typeof mapReturnRow>) {
+  router.push(returnRow.returnRoute);
 }
 </script>
 
@@ -1028,6 +1040,12 @@ ion-card-header ion-card-title {
   gap: 16px;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   padding: 8px;
+}
+
+.return-row {
+  --columns-mobile: 2;
+  --columns-tablet: 4;
+  --columns-desktop: 4;
 }
 
 .segment-placeholder {
