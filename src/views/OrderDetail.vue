@@ -70,29 +70,26 @@
         <!-- details wrapper: child matching .order-detail-header-details -->
         <div class="order-detail-header-details">
           <ion-card>
-            <ion-card-header>
-              <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
-            </ion-card-header>
+            <ion-item lines="none">
+              <ion-card-header class="ion-no-padding">
+                <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
+              </ion-card-header>
+              <ion-button v-if="customerPartyId" slot="end" fill="outline" size="small" :router-link="`/customers/${customerPartyId}`">
+                {{ translate('View customer') }}
+              </ion-button>
+            </ion-item>
             <ion-list lines="none">
               <ion-item>
                 <ion-label>
                   <p>{{ translate('Email') }}</p>
                   {{ customer?.email || translate('Email not available') }}
                 </ion-label>
-                <ion-button v-if="customerPartyId" slot="end" fill="clear" size="small"
-                  @click="openCustomerContactModal('EMAIL_ADDRESS', 'ORDER_EMAIL', customer?.emailContact)">
-                  {{ customer?.email ? translate('Edit') : translate('Add') }}
-                </ion-button>
               </ion-item>
               <ion-item>
                 <ion-label>
                   <p>{{ translate('Phone') }}</p>
                   {{ customer?.phone || translate('Phone not available') }}
                 </ion-label>
-                <ion-button v-if="customerPartyId" slot="end" fill="clear" size="small"
-                  @click="openCustomerContactModal('TELECOM_NUMBER', 'PHONE_BILLING', customer?.phoneContact)">
-                  {{ customer?.phone ? translate('Edit') : translate('Add') }}
-                </ion-button>
               </ion-item>
               <ion-item>
                 <ion-label>
@@ -111,10 +108,6 @@
                   </template>
                   <div v-else>{{ translate('Billing address not available') }}</div>
                 </ion-label>
-                <ion-button v-if="customerPartyId" slot="end" fill="clear" size="small"
-                  @click="openCustomerContactModal('POSTAL_ADDRESS', 'BILLING_LOCATION', billingAddress?.mech)">
-                  {{ billingAddress?.lines?.length ? translate('Edit') : translate('Add') }}
-                </ion-button>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -974,7 +967,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
+import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
 import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
@@ -1103,33 +1096,26 @@ const order = computed(() => {
 
 const customerProfile = computed(() => customerPartyId.value ? customerStore.getCustomer(customerPartyId.value) : null);
 
-const localEditedContacts = ref<Record<string, any>>({});
-
 const customer = computed(() => {
   const raw = orderDetailStore.current;
   if (!raw) return undefined;
 
-  const emailContact = localEditedContacts.value['EMAIL_ADDRESS']
-    || findOrderContact('EMAIL_ADDRESS', ['ORDER_EMAIL'])
-    || findCustomerContact('EMAIL_ADDRESS', ['ORDER_EMAIL', 'PRIMARY_EMAIL']);
-  const phoneContact = localEditedContacts.value['TELECOM_NUMBER']
-    || findOrderContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE'])
-    || findCustomerContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE']);
+  const emailContact = findCustomerContact('EMAIL_ADDRESS', ['ORDER_EMAIL', 'PRIMARY_EMAIL'])
+    || findOrderContact('EMAIL_ADDRESS', ['ORDER_EMAIL']);
+  const phoneContact = findCustomerContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE'])
+    || findOrderContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE']);
 
   return {
     email: contactInfoString(emailContact),
-    emailContact,
-    phone: formatTelecomNumber(contactTelecomNumber(phoneContact)) || contactInfoString(phoneContact),
-    phoneContact
+    phone: formatTelecomNumber(contactTelecomNumber(phoneContact)) || contactInfoString(phoneContact)
   };
 });
 
 const billingAddress = computed(() => {
-  const mech = localEditedContacts.value['POSTAL_ADDRESS']
-    || findOrderContact('POSTAL_ADDRESS', ['BILLING_LOCATION'])
-    || findCustomerContact('POSTAL_ADDRESS', ['BILLING_LOCATION']);
+  const mech = findCustomerContact('POSTAL_ADDRESS', ['BILLING_LOCATION', 'PRIMARY_LOCATION'])
+    || findOrderContact('POSTAL_ADDRESS', ['BILLING_LOCATION']);
   const lines = addressLines(contactPostalAddress(mech));
-  return lines.length ? { lines, mech } : undefined;
+  return lines.length ? { lines } : undefined;
 });
 
 const orderTimeline = computed(() => {
@@ -1636,6 +1622,7 @@ function shipGroupProductIdentification(identificationPref: string, item: any): 
 }
 
 onMounted(() => loadOrder(props.orderId));
+onIonViewWillEnter(() => loadOrder(props.orderId, true));
 watch(() => props.orderId, (orderId) => loadOrder(orderId));
 
 async function loadOrder(orderId: string, force = false) {
@@ -1657,83 +1644,24 @@ async function loadOrder(orderId: string, force = false) {
   ]);
 }
 
-function normalizeContactForModal(contact: any, contactMechTypeId: string) {
-  if (!contact) return undefined;
-  const normalized: any = {
-    contactMechId: contact.contactMechId,
-    contactMechTypeId,
-  };
-  if (contactMechTypeId === 'EMAIL_ADDRESS') {
-    normalized.infoString = contactInfoString(contact);
-  } else if (contactMechTypeId === 'TELECOM_NUMBER') {
-    const telecom = contactTelecomNumber(contact);
-    normalized.telecomNumber = {
-      countryCode: telecom?.countryCode || '',
-      areaCode: telecom?.areaCode || '',
-      contactNumber: telecom?.contactNumber || contact.contactNumber || contact.phoneNumber || ''
-    };
-  } else if (contactMechTypeId === 'POSTAL_ADDRESS') {
-    const postal = contactPostalAddress(contact) || {};
-    normalized.postalAddress = {
-      address1: postal.address1 || '',
-      address2: postal.address2 || '',
-      city: postal.city || '',
-      stateProvinceGeoId: postal.stateProvinceGeoId || '',
-      postalCode: postal.postalCode || '',
-      countryGeoId: postal.countryGeoId || ''
-    };
-  }
-  return normalized;
-}
-
-async function openCustomerContactModal(contactMechTypeId: string, contactMechPurposeTypeId: string, existingContactMech?: any) {
+async function openCustomerContactModal(contactMechTypeId: string, contactMechPurposeTypeId: string) {
   const partyId = customerPartyId.value;
   if (!partyId) {
     await showToast(translate('Customer is not available for this order.'));
     return;
   }
 
-  const normalizedContact = normalizeContactForModal(existingContactMech, contactMechTypeId);
-
   const modal = await modalController.create({
     component: AddContactModal,
-    componentProps: { contactMechTypeId, contactMechPurposeTypeId, existingContact: normalizedContact },
+    componentProps: { contactMechTypeId, contactMechPurposeTypeId },
   });
   await modal.present();
   const { data, role } = await modal.onWillDismiss();
   if (role !== 'confirm' || !data) return;
 
   try {
-    let targetContactMechId = undefined;
-    const activeCustomerContact = findCustomerContact(contactMechTypeId, [contactMechPurposeTypeId]);
-    if (activeCustomerContact?.contactMechId) {
-      targetContactMechId = activeCustomerContact.contactMechId;
-    }
-
-    if (targetContactMechId) {
-      await (customerStore as any).updateContact(partyId, contactMechTypeId, targetContactMechId, data);
-    } else {
-      await (customerStore as any).addContact(partyId, contactMechTypeId, data);
-    }
-
-    localEditedContacts.value[contactMechTypeId] = {
-      contactMechTypeId,
-      infoString: data.infoString || '',
-      telecomNumber: data.contactNumber ? {
-        countryCode: data.countryCode || '',
-        areaCode: data.areaCode || '',
-        contactNumber: data.contactNumber || ''
-      } : undefined,
-      postalAddress: data.address1 ? {
-        address1: data.address1,
-        address2: data.address2,
-        city: data.city,
-        stateProvinceGeoId: data.stateProvinceGeoId,
-        postalCode: data.postalCode,
-        countryGeoId: data.countryGeoId
-      } : undefined
-    };
-
+    await (customerStore as any).addContact(partyId, contactMechTypeId, data);
+    if (order.value?.id) await loadOrder(order.value.id, true);
     await showToast(translate('Customer contact updated successfully.'));
   } catch {
     await showToast(translate('Failed to update customer contact. Please try again.'));
@@ -2290,11 +2218,18 @@ function isActiveCustomerContact(contact: CustomerContactMech) {
 }
 
 function findCustomerContact(contactMechTypeId: string, purposeTypeIds: string[]) {
-  return (customerProfile.value?.contactMechs || []).find((contact) =>
+  const matches = (customerProfile.value?.contactMechs || []).filter((contact) =>
     contact.contactMechTypeId === contactMechTypeId
     && isActiveCustomerContact(contact)
     && contactMatchesPurpose(contact, purposeTypeIds)
   );
+  if (!matches.length) return undefined;
+  
+  return matches.sort((a, b) => {
+    const aTime = timelineMillis(a.fromDate) || 0;
+    const bTime = timelineMillis(b.fromDate) || 0;
+    return bTime - aTime;
+  })[0];
 }
 
 function money(value: number, currency = 'USD') {
