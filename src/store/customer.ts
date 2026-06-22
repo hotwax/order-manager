@@ -392,7 +392,7 @@ export const useCustomerStore = defineStore('customerDetail', {
           total: result.lifetimeOrders
         };
         const orderProductIds = result.orders.flatMap((o) => o.items.map((item) => item.productId)).filter(Boolean);
-        if (orderProductIds.length) useProductMaster().prefetch(orderProductIds).catch(() => {});
+        if (orderProductIds.length) useProductMaster().prefetch(orderProductIds).catch(() => { });
         this.lifetimeByPartyId[partyId] = {
           orders: result.lifetimeOrders,
           value: result.lifetimeValue,
@@ -450,7 +450,7 @@ export const useCustomerStore = defineStore('customerDetail', {
           total: returns.length
         };
         const returnProductIds = returns.flatMap((r) => r.items.map((item) => item.productId)).filter(Boolean) as string[];
-        if (returnProductIds.length) useProductMaster().prefetch(returnProductIds).catch(() => {});
+        if (returnProductIds.length) useProductMaster().prefetch(returnProductIds).catch(() => { });
       } catch (error: any) {
         this.returnsByPartyId[partyId] = {
           payload: [],
@@ -611,27 +611,27 @@ export const useCustomerStore = defineStore('customerDetail', {
       triggerCustomerIndex(partyId);
 
       // Poll for fresh data in background
-      (async () => {
-        for (let i = 0; i < 5; i++) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          try {
-            const freshProfile = await getCustomerProfile(partyId);
-            const oldContact = freshProfile.contactMechs.find(c => c.contactMechId === contactMechId);
-            const isFresh = !oldContact || (oldContact.thruDate && Number(oldContact.thruDate) <= Date.now());
-            if (isFresh || i === 4) {
-              this.profilesById[partyId] = {
-                payload: freshProfile,
-                status: 'loaded',
-                loadedAt: new Date().toISOString(),
-                error: ''
-              };
-              break;
-            }
-          } catch (e) {
-            // ignore
-          }
-        }
-      })();
+      // (async () => {
+      //   for (let i = 0; i < 5; i++) {
+      //     await new Promise(resolve => setTimeout(resolve, 1000));
+      //     try {
+      //       const freshProfile = await getCustomerProfile(partyId);
+      //       const oldContact = freshProfile.contactMechs.find(c => c.contactMechId === contactMechId);
+      //       const isFresh = !oldContact || (oldContact.thruDate && Number(oldContact.thruDate) <= Date.now());
+      //       if (isFresh || i === 4) {
+      //         this.profilesById[partyId] = {
+      //           payload: freshProfile,
+      //           status: 'loaded',
+      //           loadedAt: new Date().toISOString(),
+      //           error: ''
+      //         };
+      //         break;
+      //       }
+      //     } catch (e) {
+      //       // ignore
+      //     }
+      //   }
+      // })();
     },
 
     async expireContact(partyId: string, contactMechId: string) {
