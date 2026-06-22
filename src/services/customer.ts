@@ -912,6 +912,12 @@ export async function getCustomerReturns(partyId: string): Promise<import('@/typ
   return asList(response.data).map(normalizeCustomerReturn);
 }
 
+export async function getCustomerReturn(returnId: string): Promise<import('@/types/customer').CustomerReturnSummary | undefined> {
+  const response = await api({ url: 'oms/returns', method: 'get', params: { returnId } });
+  const returnDocs = response.data?.returnId ? [response.data] : asList(response.data);
+  return returnDocs.map(normalizeCustomerReturn).find((returnRecord) => returnRecord.returnId === returnId);
+}
+
 export async function searchShopifyCustomers(shopId: string, searchText: string): Promise<Customer[]> {
   const response = await api({
     url: 'oms/shopify/customers',

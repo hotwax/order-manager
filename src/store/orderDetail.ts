@@ -28,6 +28,36 @@ const adjustmentUniqueKey = (adj: any, fallbackSeqId = "") =>
     Number(adj.amount || 0)
   ].join("|");
 
+const NON_CANCELLABLE_ITEM_STATUSES = new Set(["ITEM_CANCELLED", "ITEM_COMPLETED"]);
+
+function orderPayload(data: any) {
+  return Array.isArray(data) ? data[0] : data;
+}
+
+function cancellableOrderItems(order: any) {
+  return (order?.shipGroups || []).flatMap((shipGroup: any) => {
+    const shipGroupSeqId = String(shipGroup.shipGroupSeqId || "").trim();
+
+    return (shipGroup.items || [])
+      .map((item: any) => ({
+        orderItemSeqId: String(item.orderItemSeqId || "").trim(),
+        shipGroupSeqId,
+        statusId: String(item.statusId || "").trim(),
+      }))
+      .filter((item: any) =>
+        item.orderItemSeqId
+        && item.shipGroupSeqId
+        && !NON_CANCELLABLE_ITEM_STATUSES.has(item.statusId)
+      )
+      .map(({ orderItemSeqId, shipGroupSeqId }: any) => ({
+        orderItemSeqId,
+        shipGroupSeqId,
+        reason: "NO_VARIANCE_LOG",
+        comment: "",
+      }));
+  });
+}
+
 export const useOrderDetailStore = defineStore("orderDetail", {
   state: () => ({
     byOrderId: {} as Record<string, OrderEntry>,
@@ -412,8 +442,24 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       return api({ url: 'oms/orders/tasks', method: 'POST', data: payload });
     },
     async bulkCancelOrders(orderIds: string[]) {
-      const payload = orderIds.map((orderId) => ({ orderId }));
-      return api({ url: 'oms/orders/cancel', method: 'POST', data: payload });
+      const results = await Promise.all(orderIds.map(async (orderId) => {
+        const orderResponse = await useOrderDetail().getOrder(orderId);
+        if (commonUtil.hasError(orderResponse)) throw orderResponse.data;
+
+        const order = orderPayload(orderResponse.data);
+        const items = cancellableOrderItems(order);
+        if (!items.length) return { orderId, cancelledItems: 0 };
+
+        await api({
+          url: `oms/orders/${orderId}/items/cancel`,
+          method: 'POST',
+          data: { items },
+        });
+
+        return { orderId, cancelledItems: items.length };
+      }));
+
+      return results;
     },
     async bulkUpdateShippingMethods(orderIds: string[], carrierPartyId: string, shipmentMethodTypeId: string) {
       await Promise.allSettled(

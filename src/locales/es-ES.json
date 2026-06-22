@@ -159,6 +159,7 @@
   "Failed to add item. Insufficient inventory or invalid product.": "Failed to add item. Insufficient inventory or invalid product.",
   "Failed to delete attribute. Please try again.": "Failed to delete attribute. Please try again.",
   "Failed to broker the ship group. Please try again.": "Failed to broker the ship group. Please try again.",
+  "Failed to complete bulk action. Please try again.": "Failed to complete bulk action. Please try again.",
   "Failed to cancel orders. Please try again.": "Failed to cancel orders. Please try again.",
   "ATP": "ATP",
   "Allow brokering": "Allow brokering",

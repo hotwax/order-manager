@@ -29,6 +29,8 @@ export function useCustomerDetail(getPartyId: () => string) {
   const tasksStatus = computed(() => (store as any).sectionStatus(partyId.value, 'tasks'));
   const returnsStatus = computed(() => (store as any).sectionStatus(partyId.value, 'returns'));
   const commsStatus = computed(() => (store as any).sectionStatus(partyId.value, 'communications'));
+  const returnsError = computed(() => (store as any).sectionError(partyId.value, 'returns'));
+  const commsError = computed(() => (store as any).sectionError(partyId.value, 'communications'));
   const lifetimeValue = computed(() => store.lifetimeValue(partyId.value));
   const lifetimeOrders = computed(() => store.lifetimeOrders(partyId.value));
   const lifetimeCurrency = computed(() => store.lifetimeCurrency(partyId.value));
@@ -92,6 +94,8 @@ export function useCustomerDetail(getPartyId: () => string) {
     tasksStatus,
     returnsStatus,
     commsStatus,
+    returnsError,
+    commsError,
     lifetimeValue,
     lifetimeOrders,
     lifetimeCurrency,

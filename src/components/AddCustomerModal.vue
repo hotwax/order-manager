@@ -151,7 +151,7 @@ async function searchCustomers() {
   try {
     customers.value = await searchShopifyCustomers(props.shopId, query);
   } catch (err: any) {
-    showToast(translate("Failed to search customers: " + (err.message || err)));
+    showToast(`${translate("Failed to search customers:")} ${err.message || err}`);
   } finally {
     isLoading.value = false;
   }
@@ -178,7 +178,7 @@ async function handleCreateCustomer() {
     emitter.emit('dismissLoader');
 
     if (res.hasShopifyError === 'Y') {
-      showToast(translate("Shopify Error: " + res.shopifyErrorMessage));
+      showToast(`${translate("Shopify Error:")} ${res.shopifyErrorMessage}`);
       return;
     }
     if (!res.customerId) {
@@ -199,7 +199,7 @@ async function handleCreateCustomer() {
     showToast(translate("Customer created and selected successfully!"));
   } catch (err: any) {
     emitter.emit('dismissLoader');
-    showToast(translate("Failed to create customer: " + (err.message || err)));
+    showToast(`${translate("Failed to create customer:")} ${err.message || err}`);
   }
 }
 

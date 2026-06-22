@@ -15,6 +15,7 @@ import {
 } from '@/authorization/permissions';
 import OrderSearch from '@/views/OrderSearch.vue';
 import OrderDetail from '@/views/OrderDetail.vue';
+import ReturnDetail from '@/views/ReturnDetail.vue';
 import Customers from '@/views/Customers.vue';
 import CustomerDetail from '@/views/CustomerDetail.vue';
 import Settings from '@/views/Settings.vue';
@@ -72,6 +73,16 @@ const routes: RouteRecordRaw[] = [
     beforeEnter: authGuard,
     meta: {
       permissionId: ORDER_VIEW_PERMISSION
+    }
+  },
+  {
+    path: '/returns/:returnId',
+    name: 'ReturnDetail',
+    component: ReturnDetail,
+    props: true,
+    beforeEnter: authGuard,
+    meta: {
+      permissionId: `${ORDER_VIEW_PERMISSION} OR ${CUSTOMER_VIEW_PERMISSION}`
     }
   },
   {

@@ -222,7 +222,6 @@ import {
 } from '@ionic/vue';
 import { computed, onMounted, ref, watch } from 'vue';
 import { DateTime } from 'luxon';
-import { useRoute } from 'vue-router';
 import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useSeedStore } from '@/store/seed';
@@ -230,13 +229,14 @@ import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerServic
 import EmptyState from '@/components/common/EmptyState.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import { api, commonUtil, translate } from '@common';
+import router from '@/router';
 
 const bucket = 'open';
 const VIRTUAL_FACILITY_TYPE_ID = 'VIRTUAL_FACILITY';
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const seedStore = useSeedStore();
-const route = useRoute();
+const route = router.currentRoute.value;
 const ionRouter = useIonRouter();
 const toastMessage = ref('');
 
@@ -461,8 +461,12 @@ async function runAction(action: BulkActionDefinition) {
   }
 
   const count = selectedIds.value.size;
-  store.runBulkAction(bucket, action.id);
-  toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+  try {
+    await store.runBulkAction(bucket, action.id);
+    toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+  } catch {
+    toastMessage.value = translate('Failed to complete bulk action. Please try again.');
+  }
 }
 
 function formatChannel(channel: string) {

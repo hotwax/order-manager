@@ -12,6 +12,7 @@ import type {
 } from '@/types/customerService';
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
+import { useOrderDetailStore } from '@/store/orderDetail';
 
 
 function emptyFilters(): WorkflowFilters {
@@ -705,10 +706,17 @@ export const useCustomerServiceStore = defineStore('customerService', {
     clearSelection(bucket: WorkflowBucket) {
       this.selection[bucket] = [];
     },
-    runBulkAction(bucket: WorkflowBucket, actionId: string) {
-      // TODO: API-backed buckets (open/inflight/packed) need real endpoints to execute bulk actions
+    async runBulkAction(bucket: WorkflowBucket, actionId: string) {
       const selectedIds = new Set(this.selection[bucket]);
       if (selectedIds.size === 0) return;
+
+      if (bucket === 'open' && actionId === 'cancel') {
+        await useOrderDetailStore().bulkCancelOrders([...selectedIds]);
+        await useOrderStore().fetchWorkflowOrders(bucket, this.filters[bucket]);
+        this.lastAction = `${actionId} · ${selectedIds.size} order${selectedIds.size === 1 ? '' : 's'}`;
+        this.clearSelection(bucket);
+        return;
+      }
 
       this.orders = this.orders.map((order) => {
         if (!selectedIds.has(order.orderId)) return order;

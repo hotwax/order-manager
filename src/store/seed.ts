@@ -472,7 +472,7 @@ export const useSeedStore = defineStore("seed", {
       await this.loadDataset(this.shopifyShops, { url: "oms/shopifyShops/shops", method: "GET", params: { pageSize: 1000 } }, (shop) => shop.shopId);
     },
     async loadShopifyShopLocations() {
-      await this.loadDataset(this.shopifyShopLocations, { url: "oms/shopifyShops/locations", method: "GET", params: { pageSize: 1000 } }, (location) => compositeKey(location, ["shopId", "locationId"]));
+      await this.loadDataset(this.shopifyShopLocations, { url: "oms/shopifyShops/locations", method: "GET", params: { pageSize: 1000 } }, (location) => compositeKey(location, ["shopId", "facilityId"]));
     },
     async loadGeoAssocs(countryGeoId: string) {
       if (!countryGeoId) return;

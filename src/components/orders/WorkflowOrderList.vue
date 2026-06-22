@@ -61,8 +61,7 @@
           v-for="order in orders"
           :key="order.orderId"
           button
-          :router-link="selectMode ? undefined : orderDetailLink(order)"
-          @click="toggleOrderSelection(order.orderId)"
+          @click="handleOrderRowClick(order)"
         >
           <ion-checkbox
             v-if="selectMode"
@@ -159,7 +158,6 @@ import {
 } from '@ionic/vue';
 import { computed, onMounted, ref, watch } from 'vue';
 import { DateTime } from 'luxon';
-import { useRoute } from 'vue-router';
 import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useSeedStore } from '@/store/seed';
@@ -167,6 +165,7 @@ import type { BulkActionDefinition, WorkflowBucket, WorkflowOrder } from '@/type
 import EmptyState from '@/components/common/EmptyState.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import { commonUtil, translate } from '@common';
+import router from '@/router';
 
 const props = defineProps<{
   bucket: WorkflowBucket;
@@ -180,8 +179,16 @@ const props = defineProps<{
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const seedStore = useSeedStore();
-const route = useRoute();
+const route = router.currentRoute.value;
 const toastMessage = ref('');
+
+function handleOrderRowClick(order: WorkflowOrder) {
+  if (selectMode.value) {
+    toggleOrderSelection(order.orderId);
+  } else {
+    router.push(orderDetailLink(order));
+  }
+}
 
 const filters = computed({
   get: () => store.filters[props.bucket],
@@ -349,8 +356,12 @@ async function runAction(action: BulkActionDefinition) {
   }
 
   const count = selectedIds.value.size;
-  store.runBulkAction(props.bucket, action.id);
-  toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+  try {
+    await store.runBulkAction(props.bucket, action.id);
+    toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+  } catch {
+    toastMessage.value = translate('Failed to complete bulk action. Please try again.');
+  }
 }
 
 function formatChannel(channel: string) {

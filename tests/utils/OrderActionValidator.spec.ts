@@ -130,3 +130,72 @@ describe('getOrderFooterActions (unified footer)', () => {
     expect(actions.map((a) => a.id)).toContain('CLONE');
   });
 });
+
+describe('ship-group fulfillment approval gate', () => {
+  const createdOrder = { statusId: 'ORDER_CREATED' };
+  const approvedOrder = { statusId: 'ORDER_APPROVED' };
+  const virtualShipGroup = {
+    id: '00001',
+    facilityId: 'BROKERING_QUEUE',
+    facilityParentTypeId: 'VIRTUAL_FACILITY',
+  };
+  const selectedItems = [{ orderItemSeqId: '01', statusId: 'ITEM_CREATED' }];
+
+  it('blocks brokering and release actions until the order is approved', () => {
+    const broker = OrderActionValidator.validateShipGroupAction(
+      createdOrder,
+      virtualShipGroup,
+      'BROKER',
+      [],
+      { isVirtual: true }
+    );
+    expect(broker.allowed).toBe(false);
+    expect(broker.reason).toBe('Order must be approved before brokering.');
+
+    const release = OrderActionValidator.validateShipGroupAction(
+      createdOrder,
+      virtualShipGroup,
+      'RELEASE',
+      selectedItems,
+      { isVirtual: true }
+    );
+    expect(release.allowed).toBe(false);
+    expect(release.reason).toBe('Order must be approved before releasing items to a facility.');
+  });
+
+  it('allows brokering and release actions for approved orders that satisfy existing gates', () => {
+    expect(OrderActionValidator.validateShipGroupAction(
+      approvedOrder,
+      virtualShipGroup,
+      'BROKER',
+      [],
+      { isVirtual: true }
+    ).allowed).toBe(true);
+
+    expect(OrderActionValidator.validateShipGroupAction(
+      approvedOrder,
+      virtualShipGroup,
+      'RELEASE',
+      selectedItems,
+      { isVirtual: true }
+    ).allowed).toBe(true);
+  });
+
+  it('blocks the item facility chip release path until the order is approved', () => {
+    const createdValidation = OrderActionValidator.validateItemAction(
+      createdOrder,
+      selectedItems[0],
+      'REJECT_AND_RELEASE',
+      { isVirtual: false }
+    );
+    expect(createdValidation.allowed).toBe(false);
+    expect(createdValidation.reason).toBe('Order must be approved before releasing items to a facility.');
+
+    expect(OrderActionValidator.validateItemAction(
+      approvedOrder,
+      selectedItems[0],
+      'REJECT_AND_RELEASE',
+      { isVirtual: false }
+    ).allowed).toBe(true);
+  });
+});

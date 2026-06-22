@@ -18,6 +18,9 @@ describe('order detail ship group card', () => {
     expect(source).toContain('shipGroupHoldTask(shipGroup)');
     expect(source).toContain('shipGroupHoldTaskLabel(shipGroup)');
     expect(source).toContain("selectedSegment.value = 'holds'");
+    expect(source).toContain('function shipGroupShippingContactMech(shipGroup: any)');
+    expect(source).toContain('partyId,');
+    expect(source).toContain('contactMechId,');
     expect(source).toContain('warningOutline');
     expect(source).toContain('trashOutline');
     expect(source).toContain("translate('View details')");

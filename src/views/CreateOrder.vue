@@ -227,8 +227,8 @@
                   <DxpShopifyImg :src="lineItem.mainImageUrl" :key="lineItem.mainImageUrl"/>
                 </ion-thumbnail>
                 <ion-label>
-                  {{ getProduct(lineItem.productId)?.productId ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(lineItem.productId)) : lineItem.title }}
-                  <p v-if="commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(lineItem.productId)) !== 'null'">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(lineItem.productId)) }}</p>
+                  {{ lineItem.productId ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(lineItem.productId)) : lineItem.title }}
+                  <p v-if="lineItem.productId && commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(lineItem.productId)) !== 'null'">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(lineItem.productId)) }}</p>
                 </ion-label>
               </ion-item>
               <div class="tablet">
@@ -311,7 +311,26 @@ const isItemInOrder = computed(() => orderForm.value.lineItems.some((lineItem: a
 
 let timeoutId: any = null;
 const productSearchCount = ref(0);
-const facilities = ref([]) as any
+const facilities = computed(() => {
+  const productStoreId = useProductStore().getCurrentProductStore?.productStoreId;
+  if (!productStoreId) return [];
+
+  const storeFacilitiesMap = useSeedStore().productStoreFacilitiesByStoreId[productStoreId]?.byId;
+  if (!storeFacilitiesMap) return [];
+
+  const storeFacilities = Object.values(storeFacilitiesMap);
+
+  if (!orderForm.value.shopId) {
+    return storeFacilities;
+  }
+
+  const shopLocations = Object.values(useSeedStore().shopifyShopLocations?.byId || {});
+  const allowedFacilityIds = shopLocations
+    .filter((loc: any) => loc.shopId === orderForm.value.shopId)
+    .map((loc: any) => loc.facilityId);
+
+  return storeFacilities.filter((facility: any) => allowedFacilityIds.includes(facility.facilityId));
+});
 
 const getProduct = (productId: string) => useProductCacheStore().getProduct(productId);
 
@@ -368,6 +387,15 @@ watch(queryString, (value) => {
   }, 800);
 }, { deep: true });
 
+watch(() => orderForm.value.shopId, () => {
+  if (orderForm.value.facilityId) {
+    const isValid = facilities.value.some((f: any) => f.facilityId === orderForm.value.facilityId);
+    if (!isValid) {
+      orderForm.value.facilityId = '';
+    }
+  }
+});
+
 onMounted(async () => {
   fetchCurrencies();
   try {
@@ -375,9 +403,8 @@ onMounted(async () => {
     shopsList.value = await getShopifyShops({
       productStoreId
     });
-    facilities.value = Object.values(useSeedStore().productStoreFacilitiesByStoreId[productStoreId].byId)
   } catch (err: any) {
-    commonUtil.showToast(translate("Failed to load Shopify shops: " + (err.message || err)));
+    commonUtil.showToast(`${translate("Failed to load Shopify shops:")} ${err.message || err}`);
   }
 });
 
@@ -491,10 +518,19 @@ const orderResponseData = ref({
 async function openShippingAddressModal() {
   const addressModal = await modalController.create({
     component: AddressModal,
-    componentProps: orderForm.value.shippingAddress
+    componentProps: {
+      customerAddress: { ...orderForm.value.shippingAddress }
+    }
   })
 
   await addressModal.present()
+  const { data } = await addressModal.onWillDismiss();
+  if (data?.address) {
+    orderForm.value.shippingAddress = {
+      ...orderForm.value.shippingAddress,
+      ...data.address
+    };
+  }
 }
 
 async function openCustomLineModal() {
@@ -619,16 +655,16 @@ async function submitOrder() {
 
   for (let i = 0; i < form.lineItems.length; i++) {
     const item = form.lineItems[i];
-    if (!item.sku || !item.title) {
-      commonUtil.showToast(translate(`Line item ${i + 1} has missing SKU or Title.`));
+    if (!item.sku && !item.title) {
+      commonUtil.showToast(translate("Line item {index} has missing SKU or Title.", { index: i + 1 }));
       return;
     }
     if (item.quantity <= 0) {
-      commonUtil.showToast(translate(`Line item ${i + 1} must have a quantity greater than 0.`));
+      commonUtil.showToast(translate("Line item {index} must have a quantity greater than 0.", { index: i + 1 }));
       return;
     }
     if (item.price < 0) {
-      commonUtil.showToast(translate(`Line item ${i + 1} cannot have a negative price.`));
+      commonUtil.showToast(translate("Line item {index} cannot have a negative price.", { index: i + 1 }));
       return;
     }
   }
@@ -690,8 +726,8 @@ async function submitOrder() {
     }
   } catch (err: any) {
     emitter.emit('dismissLoader');
-    const errMsg = err?.message || 'Error occurred while creating Shopify order.';
-    await commonUtil.showToast(translate(errMsg));
+    const errMsg = err?.message || translate('Error occurred while creating Shopify order.');
+    await commonUtil.showToast(err?.message ? `${translate('Failed to create Shopify order:')} ${errMsg}` : errMsg);
   }
 }
 
