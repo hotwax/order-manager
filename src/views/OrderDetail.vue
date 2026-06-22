@@ -233,7 +233,7 @@
           <ion-item lines="full" class="order-items-toolbar">
             <ion-checkbox :checked="areAllSelected" justify="start" label-placement="end"
               @ionChange="toggleSelectAll($event.detail.checked)">{{ translate('Select all') }}</ion-checkbox>
-            <ion-button slot="end" fill="outline" color="medium" @click="openAddItemFromItemsSegment">
+            <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" slot="end" fill="outline" color="medium" @click="openAddItemFromItemsSegment">
               {{ translate('Add items') }}
             </ion-button>
           </ion-item>
@@ -713,7 +713,7 @@
                 :disabled="isShipGroupActionDisabled(shipGroup, 'RELEASE')" @click="releaseSelectedItems(shipGroup)">{{
                   translate('Release') }}</ion-button>
               <ion-button fill="clear" @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
-              <ion-button fill="clear" @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
+              <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" fill="clear" @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
             </div>
           <!-- Gift message modal -->
           <ion-modal :is-open="giftModalShipGroupId === shipGroup.id" @didDismiss="giftModalShipGroupId = null">
