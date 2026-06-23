@@ -57,33 +57,53 @@
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
-        <ion-item
+        <div
           v-for="order in orders"
           :key="order.orderId"
-          button
+          class="list-item packed-order-row"
+          :style="{ '--columns-desktop': showFacility ? 5 : 4, '--columns-tablet': showFacility ? 5 : 4 }"
+          :role="selectMode ? 'button' : 'link'"
+          tabindex="0"
           @click="handleOrderRowClick(order)"
+          @keydown.enter.prevent="handleOrderRowClick(order)"
+          @keydown.space.prevent="handleOrderRowClick(order)"
         >
-          <ion-checkbox
-            v-if="selectMode"
-            slot="start"
-            :checked="selectedIds.has(order.orderId)"
-            @click.stop
-            @ion-change="setOrderSelection(order.orderId, $event.detail.checked)"
-          />
-          <ion-label>
-            <h2>{{ order.orderName }} · {{ order.externalId }}</h2>
-            <p>{{ order.customerName }} · {{ order.productStoreName }} · {{ formatChannel(order.salesChannelEnumId) }}</p>
-            <p>
-              {{ formatDate(order.orderDate) }} · {{ order.itemCount }} item{{ order.itemCount === 1 ? '' : 's' }} ·
-              {{ order.shipmentMethodDesc }}
-              <template v-if="order.facilityName"> · {{ order.facilityName }}</template>
-            </p>
+          <ion-item lines="none">
+            <ion-checkbox
+              v-if="selectMode"
+              slot="start"
+              :checked="selectedIds.has(order.orderId)"
+              @click.stop
+              @keydown.stop
+              @ion-change="setOrderSelection(order.orderId, $event.detail.checked)"
+            />
+            <ion-label>
+              <p class="overline">{{ order.externalId || order.orderId }}</p>
+              {{ order.orderName || order.externalId || order.orderId }}
+            </ion-label>
+          </ion-item>
+
+          <ion-label class="tablet ion-text-start">
+            {{ order.customerName || translate('Customer') }}
+            <p>{{ order.productStoreName }}</p>
+            <p>{{ formatChannel(order.salesChannelEnumId) }}</p>
           </ion-label>
-          <ion-note slot="end">
-            <div>{{ order.priority }}</div>
-            <div>{{ formatCurrency(order.grandTotal, order.currencyUomId) }}</div>
-          </ion-note>
-        </ion-item>
+
+          <ion-label v-if="showFacility" class="tablet ion-text-start">
+            <p class="overline">{{ order.facilityName || '' }}</p>
+            {{ order.shipmentMethodDesc }}
+          </ion-label>
+
+          <ion-label class="tablet">
+            {{ formatDate(order.orderDate) }}
+            <p>{{ formatRelativeDate(order.orderDate) }}</p>
+          </ion-label>
+
+          <ion-label class="packed-order-total ion-text-end">
+            {{ formatCurrency(order.grandTotal, order.currencyUomId) }}
+            <p>{{ itemCountLabel(order) }}</p>
+          </ion-label>
+        </div>
       </ion-list>
 
       <div v-if="isLoading && !orders.length" class="ion-text-center ion-padding">
@@ -146,7 +166,6 @@ import {
   IonList,
   IonListHeader,
   IonMenuButton,
-  IonNote,
   IonPage,
   IonSelect,
   IonSelectOption,
@@ -379,8 +398,37 @@ function formatDate(iso: string) {
   return DateTime.fromMillis(Number(iso)).toFormat('LLL d, h:mma');
 }
 
+function formatRelativeDate(iso: string) {
+  if (!iso) return '';
+  return DateTime.fromMillis(Number(iso)).toRelative() || '';
+}
+
+function itemCountLabel(order: WorkflowOrder) {
+  return `${order.itemCount} ${order.itemCount === 1 ? translate('item') : translate('items')}`;
+}
+
 function formatCurrency(amount: number, currency: string) {
   return commonUtil.formatCurrency(amount, currency);
 }
 
 </script>
+
+<style scoped>
+.packed-order-row {
+  min-height: 5rem;
+  border-block-start: var(--border-medium);
+  padding-inline-end: var(--spacer-sm);
+}
+
+.packed-order-row > ion-label {
+  width: 100%;
+}
+
+.packed-order-row > ion-label.packed-order-total {
+  display: block;
+  justify-self: end;
+  max-width: 7rem;
+  min-width: 7rem;
+  width: 7rem;
+}
+</style>

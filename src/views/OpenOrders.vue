@@ -111,6 +111,7 @@
             lines="none"
           >
             <ion-checkbox
+              v-if="selectMode"
               slot="start"
               :checked="selectedIds.has(order.orderId)"
               @click.stop

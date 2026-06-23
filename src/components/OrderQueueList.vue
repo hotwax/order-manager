@@ -79,6 +79,7 @@
         >
           <ion-item lines="none">
             <ion-checkbox
+              v-if="selectMode"
               slot="start"
               :checked="selectedOrderIds.includes(order.id)"
               @click.stop
