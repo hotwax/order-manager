@@ -707,8 +707,17 @@ export const useCustomerServiceStore = defineStore('customerService', {
       this.selection[bucket] = [];
     },
     async runBulkAction(bucket: WorkflowBucket, actionId: string) {
+      // TODO: API-backed open/inflight buckets need real endpoints to execute bulk actions.
       const selectedIds = new Set(this.selection[bucket]);
       if (selectedIds.size === 0) return;
+
+      if (bucket === 'packed' && actionId === 'ship') {
+        const orderStore = useOrderStore();
+        await orderStore.shipPackedWorkflowOrders([...selectedIds]);
+        this.lastAction = `${actionId} · ${selectedIds.size} order${selectedIds.size === 1 ? '' : 's'}`;
+        this.clearSelection(bucket);
+        return;
+      }
 
       if (bucket === 'open' && actionId === 'cancel') {
         await useOrderDetailStore().bulkCancelOrders([...selectedIds]);

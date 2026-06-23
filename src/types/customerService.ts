@@ -15,6 +15,8 @@ export interface WorkflowOrder {
   currencyUomId: string;
   itemCount: number;
   shipGroupSeqId: string;
+  shipmentId?: string;
+  shipmentStatusId?: string;
   shippingMethodTypeId: string;
   shipmentMethodDesc: string;
   carrierPartyId?: string;

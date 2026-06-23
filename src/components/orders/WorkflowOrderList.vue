@@ -250,7 +250,7 @@ function applyRouteFilters() {
 watch(() => route.query.facilityId, applyRouteFilters, { immediate: true });
 
 function loadWorkflowOrders() {
-  orderStore.fetchWorkflowOrders(props.bucket as 'open' | 'inflight' | 'packed', filters.value);
+  return orderStore.fetchWorkflowOrders(props.bucket as 'open' | 'inflight' | 'packed', filters.value);
 }
 
 async function loadMore(event: any) {
@@ -358,6 +358,7 @@ async function runAction(action: BulkActionDefinition) {
   const count = selectedIds.value.size;
   try {
     await store.runBulkAction(props.bucket, action.id);
+    if (isApiBucket) await loadWorkflowOrders();
     toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
   } catch {
     toastMessage.value = translate('Failed to complete bulk action. Please try again.');
