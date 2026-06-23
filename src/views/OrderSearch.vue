@@ -471,11 +471,6 @@ function parseOrderDate(value: string) {
   padding-inline: var(--spacer-sm);
 }
 
-@media (min-width: 768px) {
-  .order-search-row {
-    grid-template-columns: 1fr 12rem 14rem max-content;
-  }
-}
 
 .order-search-row > ion-label {
   width: 100%;
