@@ -61,7 +61,7 @@
           v-for="order in orders"
           :key="order.orderId"
           class="list-item packed-order-row"
-          :style="{ '--columns-desktop': showFacility ? 5 : 4, '--columns-tablet': showFacility ? 5 : 4 }"
+          :class="{ 'has-facility': showFacility }"
           :role="selectMode ? 'button' : 'link'"
           tabindex="0"
           @click="handleOrderRowClick(order)"
@@ -415,9 +415,16 @@ function formatCurrency(amount: number, currency: string) {
 
 <style scoped>
 .packed-order-row {
+  --columns-desktop: 4;
+  --columns-tablet: 4;
   min-height: 5rem;
   border-block-start: var(--border-medium);
   padding-inline-end: var(--spacer-sm);
+}
+
+.packed-order-row.has-facility {
+  --columns-desktop: 5;
+  --columns-tablet: 5;
 }
 
 .packed-order-row > ion-label {
