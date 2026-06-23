@@ -2685,7 +2685,11 @@ async function startReturn() {
 async function runOrderStatusAction(action: any) {
   if (!order.value) return;
   const orderId = order.value.id;
-  // Destructive transitions (cancel/reject) confirm first; approve is direct.
+  if (action.id === 'ORDER_APPROVED') {
+    await approveOrder(orderId);
+    return;
+  }
+  // Destructive transitions (cancel/reject) confirm first.
   if (action.color === 'danger') {
     const alert = await alertController.create({
       header: translate(action.label),
@@ -2699,6 +2703,23 @@ async function runOrderStatusAction(action: any) {
     return;
   }
   await changeOrderStatus(orderId, action.toStatusId);
+}
+
+async function approveOrder(orderId: string) {
+  try {
+    const resp = await api({
+      url: `oms/orders/${orderId}/approve`,
+      method: 'POST'
+    });
+    if(resp?.data.approveOrder) {
+      await showToast(translate('Order approved successfully.'));
+      await loadOrder(orderId, true);
+    } else {
+      throw resp.data
+    }
+  } catch {
+    await showToast(translate('Failed to approve the order. Please try again.'));
+  }
 }
 
 async function changeOrderStatus(orderId: string, statusId: string) {
