@@ -276,7 +276,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
           url: `oms/facilities/facilityOrderCounts`,
           method: 'GET',
           params: {
-            facilityId: facilityId, 
+            facilityId: facilityId,
             entryDate: dateFilter
           }
         }).catch(err => {
@@ -320,11 +320,21 @@ export const useCustomerServiceStore = defineStore('customerService', {
           return { data: {} };
         });
 
-        const [facilityResp, allocationsResp, rejectionsResp, progressStatsResp] = await Promise.all([
+        const openOrdersPromise = api({
+          url: 'oms/orders/salesOrders/open',
+          method: 'GET',
+          params: { facilityId, productStoreId, pageSize: 0, pageIndex: 0 }
+        }).catch(err => {
+          console.error('Failed to fetch facility open orders', err);
+          return { data: { ordersCount: undefined } };
+        });
+
+        const [facilityResp, allocationsResp, rejectionsResp, progressStatsResp, openResp] = await Promise.all([
           facilityPromise,
           allocationsPromise,
           rejectionsPromise,
-          progressStatsPromise
+          progressStatsPromise,
+          openOrdersPromise
         ]);
 
         const facilityData = facilityResp.data || {};
@@ -347,10 +357,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
         const totalProcessed = ordersPacked + ordersRejected;
         const fillRate = totalProcessed > 0 ? (ordersPacked / totalProcessed) : 0;
 
-        const openCount = Number(progressData.brokeredShipGroupsCount || 0);
+        const openCount = openResp.data?.ordersCount !== undefined ? Number(openResp.data.ordersCount) : Number(progressData.brokeredShipGroupsCount || 0);
         const inProgressCount = Number(progressData.pickedShipGroupsCount || 0);
         const totalPending = openCount + inProgressCount;
-        
+
         let oldestAssignedTime: number | null = null;
         if (progressData.oldestShipGroupAssignedDatetime) {
           const parsed = DateTime.fromISO(String(progressData.oldestShipGroupAssignedDatetime));
