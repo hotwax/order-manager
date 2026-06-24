@@ -255,6 +255,8 @@ watch(searchResults, () => {
 function toSearchParams(page: number) {
   return {
     queryString: searchQuery.value,
+    status: ['ORDER_CREATED', 'ORDER_APPROVED'],
+    excludeStatuses: ['ORDER_CANCELLED', 'ORDER_COMPLETED'],
     channel: searchFilters.value.channel,
     shipmentMethodTypeId: searchFilters.value.shipmentMethodTypeId,
     productStoreId: selectedProductStoreId.value,

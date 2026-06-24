@@ -10,6 +10,7 @@ import {
 export interface OrderSearchParams {
   queryString?: string;
   status?: string | string[];
+  excludeStatuses?: string[];
   channel?: string;
   shipmentMethodTypeId?: string;
   productStoreId?: string;
@@ -114,6 +115,11 @@ export function buildOrderLookupPayload(params: OrderSearchParams = {}) {
 
   if (statusIds.length === 1) filters.push(`orderStatusId:${escapeSolrValue(statusIds[0])}`);
   if (statusIds.length > 1) filters.push(`orderStatusId:(${statusIds.map(escapeSolrValue).join(' OR ')})`);
+
+  const excludeIds = (params.excludeStatuses ?? []).filter(Boolean);
+  if (excludeIds.length === 1) filters.push(`-orderStatusId:${escapeSolrValue(excludeIds[0])}`);
+  if (excludeIds.length > 1) filters.push(`-orderStatusId:(${excludeIds.map(escapeSolrValue).join(' OR ')})`);
+
   if (params.channel && params.channel !== 'All') filters.push(`salesChannelEnumId:${escapeSolrValue(params.channel)}`);
   if (params.shipmentMethodTypeId && params.shipmentMethodTypeId !== 'All') filters.push(`shipmentMethodTypeId:${escapeSolrValue(params.shipmentMethodTypeId)}`);
   if (params.productStoreId && params.productStoreId !== 'All') filters.push(`productStoreId:${escapeSolrValue(params.productStoreId)}`);
