@@ -1,6 +1,6 @@
 import { DateTime, Settings } from "luxon";
 import { defineStore } from "pinia";
-import { api, commonUtil, logger, translate } from "@common";
+import { api, commonUtil, cookieHelper, logger, translate } from "@common";
 import { useAuth } from "@common/composables/useAuth";
 import { showToast } from "@/utils";
 import { useSeedStore } from "./seed";
@@ -147,6 +147,8 @@ export const useUserStore = defineStore("user", {
     async postLogin() {
       try {
         await this.fetchUserProfile();
+        // TODO: This should be set from the Login Component
+        this.oms = cookieHelper().get("oms") || '';
         await this.fetchPermissions();
         await useProductStore().fetchProductStores();
         await useProductStore().fetchProductStorePreference();
