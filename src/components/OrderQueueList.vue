@@ -171,6 +171,7 @@ import {
 import { api, translate } from '@common';
 import { DateTime } from 'luxon';
 import { computed, onMounted, ref, watch } from 'vue';
+import router from '@/router';
 import { searchOrders } from '@/services/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderTaskStore } from '@/store/orderTask';
@@ -206,6 +207,7 @@ const orderTaskStore = useOrderTaskStore();
 const productStore = useProductStore();
 const seedStore = useSeedStore();
 const ionRouter = useIonRouter();
+const initialDateFrom = router.currentRoute.value.query.dateFrom ? String(router.currentRoute.value.query.dateFrom) : '';
 
 const PAGE_SIZE = 50;
 
@@ -213,7 +215,7 @@ const searchQuery = ref('');
 const searchFilters = ref({
   channel: 'All',
   shipmentMethodTypeId: 'All',
-  dateFrom: '',
+  dateFrom: initialDateFrom,
   dateThru: '',
 });
 const searchResults = ref<Order[]>([]);
@@ -247,6 +249,13 @@ onMounted(runSearch);
 watch(searchQuery, scheduleSearch);
 watch(() => props.facilityIds, () => runSearch(), { deep: true });
 watch(searchFilters, () => runSearch(), { deep: true });
+watch(
+  () => router.currentRoute.value.query.dateFrom,
+  (newDateFrom) => {
+    searchFilters.value.dateFrom = newDateFrom ? String(newDateFrom) : '';
+  },
+  { immediate: true }
+);
 watch(searchResults, () => {
   const currentOrderIds = new Set(currentPageOrderIds.value);
   selectedOrderIds.value = selectedOrderIds.value.filter((orderId) => currentOrderIds.has(orderId));
