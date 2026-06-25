@@ -90,7 +90,7 @@ import router from '@/router';
 import { showToast } from '@/utils';
 import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
-import SelectAllResultsItem v-if="fraudTasks.length" v-model="selectAll" :count="fraudTasks.length" />
+import SelectAllResultsItem from '@/components/common/SelectAllResultsItem.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
