@@ -200,14 +200,51 @@ export const useCustomerServiceStore = defineStore('customerService', {
     },
     async fetchHoldTasks(productStoreId?: string) {
       try {
-        const params: any = {};
-        if (productStoreId) params.productStoreId = productStoreId;
-        const resp = await api({
-          url: 'oms/orders/funnelDashboard/holdTasks',
-          method: 'GET',
-          params
-        });
-        if (resp.data) this.holdTasks = resp.data;
+        const [swapResp, addressResp, fraudResp] = await Promise.all([
+          api({
+            url: 'oms/orders/tasks/shipGroupTasks',
+            method: 'GET',
+            params: {
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+              workEffortPurposeTypeId: 'NEG_RES_REVIEW',
+              productStoreId,
+              pageSize: 10000,
+            }
+          }),
+          api({
+            url: 'oms/orders/tasks/shipGroupTasks',
+            method: 'GET',
+            params: {
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+              workEffortPurposeTypeId: 'INVALID_ADDRESS',
+              productStoreId,
+              pageSize: 10000,
+            }
+          }),
+          api({
+            url: 'oms/orders/tasks',
+            method: 'GET',
+            params: {
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'REVIEW_RISK_ORDER',
+              productStoreId,
+              pageSize: 10000,
+            }
+          })
+        ]);
+
+        const swapCount = Number(swapResp.headers?.['x-total-count'] || (Array.isArray(swapResp.data) ? swapResp.data.length : 0));
+        const addressCount = Number(addressResp.headers?.['x-total-count'] || (Array.isArray(addressResp.data) ? addressResp.data.length : 0));
+        const fraudCount = Number(fraudResp.headers?.['x-total-count'] || (Array.isArray(fraudResp.data) ? fraudResp.data.length : 0));
+
+        this.holdTasks = {
+          holdSubstituteCount: swapCount,
+          holdBadAddressCount: addressCount,
+          holdFraudRiskCount: fraudCount,
+          holdTasksTotalCount: swapCount + addressCount + fraudCount
+        };
       } catch (error) {
         console.error('Failed to fetch hold task counts', error);
       }
@@ -253,6 +290,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
           method: 'GET',
           params
         });
+
         if (resp.data) {
           this.facilityPartialFulfillments = resp.data.facilities || [];
         }

@@ -89,7 +89,7 @@
         <StatCard title="Order Hold Tasks" :stat="holdTasks.holdTasksTotalCount || 0">
           <ion-list lines="none" class="hold-tasks-list">
             <!-- Substitute workefforts -->
-            <ion-item button :detail="true" router-link="/unfillable">
+            <ion-item button :detail="true" router-link="/swap">
               <ion-label>
                 Substitute
                 <!-- number of workefforts where purpose type is substitute -->
