@@ -308,6 +308,10 @@ ion-content {
 .facility-inventory-mobile-row > ion-item {
   width: 100%;
 }
+
+.facility-inventory-row ion-radio ion-label {
+  white-space: normal;
+}
 </style>
 
 <style>
