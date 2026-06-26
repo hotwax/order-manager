@@ -300,7 +300,8 @@ ion-content {
   --columns-desktop: 8;
   cursor: pointer;
   grid-template-columns: minmax(180px, 3fr) repeat(6, 1fr) max-content;
-  padding-inline: var(--spacer-sm);
+  padding-inline-end: var(--spacer-sm);
+  border-bottom: var(--border-medium);
 }
 
 .facility-inventory-row > ion-item,
