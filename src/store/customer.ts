@@ -218,6 +218,7 @@ export const useCustomerStore = defineStore('customerDetail', {
         contactMechTypeId: def.contactMechTypeId,
         values: contactMechs
           .filter((contactMech) => contactMech.contactMechTypeId === def.contactMechTypeId && isContactActive(contactMech.fromDate, contactMech.thruDate))
+          .sort((a, b) => (Number(b.fromDate) || 0) - (Number(a.fromDate) || 0))
           .map((contactMech) => ({
             display: contactDisplay(contactMech),
             contactMechId: contactMech.contactMechId,
@@ -391,7 +392,7 @@ export const useCustomerStore = defineStore('customerDetail', {
           total: result.lifetimeOrders
         };
         const orderProductIds = result.orders.flatMap((o) => o.items.map((item) => item.productId)).filter(Boolean);
-        if (orderProductIds.length) useProductMaster().prefetch(orderProductIds).catch(() => {});
+        if (orderProductIds.length) useProductMaster().prefetch(orderProductIds).catch(() => { });
         this.lifetimeByPartyId[partyId] = {
           orders: result.lifetimeOrders,
           value: result.lifetimeValue,
@@ -449,7 +450,7 @@ export const useCustomerStore = defineStore('customerDetail', {
           total: returns.length
         };
         const returnProductIds = returns.flatMap((r) => r.items.map((item) => item.productId)).filter(Boolean) as string[];
-        if (returnProductIds.length) useProductMaster().prefetch(returnProductIds).catch(() => {});
+        if (returnProductIds.length) useProductMaster().prefetch(returnProductIds).catch(() => { });
       } catch (error: any) {
         this.returnsByPartyId[partyId] = {
           payload: [],
@@ -528,6 +529,26 @@ export const useCustomerStore = defineStore('customerDetail', {
     },
 
     async addContact(partyId: string, contactMechTypeId: string, data: Record<string, string>) {
+      // Optimistic update
+      const profile = this.profilesById[partyId]?.payload;
+      let infoString = data.infoString || '';
+      if (profile) {
+        if (contactMechTypeId === 'EMAIL_ADDRESS') {
+          infoString = data.emailAddress || data.infoString;
+        } else if (contactMechTypeId === 'TELECOM_NUMBER') {
+          infoString = [data.countryCode ? `+${data.countryCode}` : '', data.areaCode, data.contactNumber].filter(Boolean).join(' ') || data.infoString;
+        }
+        profile.contactMechs.push({
+          partyId,
+          contactMechId: 'temp_' + Date.now(),
+          contactMechTypeId,
+          contactMechPurposeTypeId: data.contactMechPurposeTypeId || '',
+          purposeTypeIds: data.contactMechPurposeTypeId ? [data.contactMechPurposeTypeId] : [],
+          infoString,
+          fromDate: Date.now().toString()
+        });
+      }
+
       if (contactMechTypeId === 'EMAIL_ADDRESS') {
         await createPartyEmail(partyId, data as any);
       } else if (contactMechTypeId === 'TELECOM_NUMBER') {
@@ -535,11 +556,51 @@ export const useCustomerStore = defineStore('customerDetail', {
       } else if (contactMechTypeId === 'POSTAL_ADDRESS') {
         await createPartyPostalAddress(partyId, data as any);
       }
-      await this.loadCustomerProfile(partyId, true);
       triggerCustomerIndex(partyId);
+
+      // Poll for fresh data in background
+      (async () => {
+        for (let i = 0; i < 5; i++) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          try {
+            const freshProfile = await getCustomerProfile(partyId);
+            const hasNew = freshProfile.contactMechs.some(c => c.infoString === infoString);
+            if (hasNew || i === 4) {
+              this.profilesById[partyId] = {
+                payload: freshProfile,
+                status: 'loaded',
+                loadedAt: new Date().toISOString(),
+                error: ''
+              };
+              break;
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      })();
     },
 
     async updateContact(partyId: string, contactMechTypeId: string, contactMechId: string, data: Record<string, string>) {
+      // Optimistic update
+      const profile = this.profilesById[partyId]?.payload;
+      if (profile) {
+        const contact = profile.contactMechs.find(c => c.contactMechId === contactMechId);
+        if (contact) {
+          if (contactMechTypeId === 'EMAIL_ADDRESS') {
+            contact.infoString = data.emailAddress || data.infoString;
+          } else if (contactMechTypeId === 'TELECOM_NUMBER') {
+            const countryCode = data.countryCode || '';
+            const areaCode = data.areaCode || '';
+            const contactNumber = data.contactNumber || '';
+            contact.telecomNumber = { ...contact.telecomNumber, countryCode, areaCode, contactNumber };
+            contact.infoString = [countryCode ? `+${countryCode}` : '', areaCode, contactNumber].filter(Boolean).join(' ') || data.infoString;
+          } else if (contactMechTypeId === 'POSTAL_ADDRESS') {
+            contact.postalAddress = { ...contact.postalAddress, ...data } as any;
+          }
+        }
+      }
+
       if (contactMechTypeId === 'EMAIL_ADDRESS') {
         await updatePartyEmail(partyId, contactMechId, data as any);
       } else if (contactMechTypeId === 'TELECOM_NUMBER') {
@@ -547,14 +608,22 @@ export const useCustomerStore = defineStore('customerDetail', {
       } else if (contactMechTypeId === 'POSTAL_ADDRESS') {
         await updatePartyPostalAddress(partyId, contactMechId, data as any);
       }
-      await this.loadCustomerProfile(partyId, true);
       triggerCustomerIndex(partyId);
     },
 
     async expireContact(partyId: string, contactMechId: string) {
+      // Optimistic update
+      const profile = this.profilesById[partyId]?.payload;
+      if (profile) {
+        const contact = profile.contactMechs.find(c => c.contactMechId === contactMechId);
+        if (contact) {
+          contact.thruDate = Date.now().toString();
+        }
+      }
+
       await expirePartyContactMech(partyId, contactMechId);
-      await this.loadCustomerProfile(partyId, true);
       triggerCustomerIndex(partyId);
+
     },
 
     async createRelationship(input: { partyIdFrom: string; partyIdTo: string; partyRelationshipTypeId: string; roleTypeIdFrom: string; roleTypeIdTo: string; fromDate: number; comments?: string }) {

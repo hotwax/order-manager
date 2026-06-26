@@ -70,29 +70,26 @@
         <!-- details wrapper: child matching .order-detail-header-details -->
         <div class="order-detail-header-details">
           <ion-card>
-            <ion-card-header>
-              <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
-            </ion-card-header>
+            <ion-item lines="none">
+              <ion-card-header class="ion-no-padding">
+                <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
+              </ion-card-header>
+              <ion-button v-if="customerPartyId" slot="end" fill="outline" size="small" :router-link="`/customers/${customerPartyId}`">
+                {{ translate('View customer') }}
+              </ion-button>
+            </ion-item>
             <ion-list lines="none">
               <ion-item>
                 <ion-label>
                   <p>{{ translate('Email') }}</p>
                   {{ customer?.email || translate('Email not available') }}
                 </ion-label>
-                <ion-button v-if="!customer?.email && customerPartyId" slot="end" fill="clear" size="small"
-                  @click="openCustomerContactModal('EMAIL_ADDRESS', 'ORDER_EMAIL')">
-                  {{ translate('Add') }}
-                </ion-button>
               </ion-item>
               <ion-item>
                 <ion-label>
                   <p>{{ translate('Phone') }}</p>
                   {{ customer?.phone || translate('Phone not available') }}
                 </ion-label>
-                <ion-button v-if="!customer?.phone && customerPartyId" slot="end" fill="clear" size="small"
-                  @click="openCustomerContactModal('TELECOM_NUMBER', 'PHONE_BILLING')">
-                  {{ translate('Add') }}
-                </ion-button>
               </ion-item>
               <ion-item>
                 <ion-label>
@@ -111,10 +108,6 @@
                   </template>
                   <div v-else>{{ translate('Billing address not available') }}</div>
                 </ion-label>
-                <ion-button v-if="!billingAddress?.lines?.length && customerPartyId" slot="end" fill="clear" size="small"
-                  @click="openCustomerContactModal('POSTAL_ADDRESS', 'BILLING_LOCATION')">
-                  {{ translate('Add') }}
-                </ion-button>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -974,7 +967,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
+import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
 import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
@@ -1107,10 +1100,10 @@ const customer = computed(() => {
   const raw = orderDetailStore.current;
   if (!raw) return undefined;
 
-  const emailContact = findOrderContact('EMAIL_ADDRESS', ['ORDER_EMAIL'])
-    || findCustomerContact('EMAIL_ADDRESS', ['ORDER_EMAIL', 'PRIMARY_EMAIL']);
-  const phoneContact = findOrderContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE'])
-    || findCustomerContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE']);
+  const emailContact = findCustomerContact('EMAIL_ADDRESS', ['ORDER_EMAIL', 'PRIMARY_EMAIL'])
+    || findOrderContact('EMAIL_ADDRESS', ['ORDER_EMAIL']);
+  const phoneContact = findCustomerContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE'])
+    || findOrderContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE']);
 
   return {
     email: contactInfoString(emailContact),
@@ -1119,8 +1112,8 @@ const customer = computed(() => {
 });
 
 const billingAddress = computed(() => {
-  const mech = findOrderContact('POSTAL_ADDRESS', ['BILLING_LOCATION'])
-    || findCustomerContact('POSTAL_ADDRESS', ['BILLING_LOCATION']);
+  const mech = findCustomerContact('POSTAL_ADDRESS', ['BILLING_LOCATION', 'PRIMARY_LOCATION'])
+    || findOrderContact('POSTAL_ADDRESS', ['BILLING_LOCATION']);
   const lines = addressLines(contactPostalAddress(mech));
   return lines.length ? { lines } : undefined;
 });
@@ -2224,11 +2217,18 @@ function isActiveCustomerContact(contact: CustomerContactMech) {
 }
 
 function findCustomerContact(contactMechTypeId: string, purposeTypeIds: string[]) {
-  return (customerProfile.value?.contactMechs || []).find((contact) =>
+  const matches = (customerProfile.value?.contactMechs || []).filter((contact) =>
     contact.contactMechTypeId === contactMechTypeId
     && isActiveCustomerContact(contact)
     && contactMatchesPurpose(contact, purposeTypeIds)
   );
+  if (!matches.length) return undefined;
+  
+  return matches.sort((a, b) => {
+    const aTime = timelineMillis(a.fromDate) || 0;
+    const bTime = timelineMillis(b.fromDate) || 0;
+    return bTime - aTime;
+  })[0];
 }
 
 function money(value: number, currency = 'USD') {

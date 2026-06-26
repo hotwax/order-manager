@@ -156,12 +156,6 @@
         </ion-item>
       </template>
     </ion-list>
-    <ion-fab v-if="isEditMode" vertical="bottom" horizontal="start" slot="fixed">
-      <ion-fab-button color="danger" @click="expire()">
-        <ion-icon :icon="trashOutline" />
-      </ion-fab-button>
-    </ion-fab>
-
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
       <ion-fab-button :disabled="!isValid" @click="confirm()">
         <ion-icon :icon="saveOutline" />
