@@ -35,6 +35,7 @@
             type="tel"
             placeholder="1"
             v-model="form.countryCode"
+            @ionInput="sanitizeNumberInput('countryCode', $event)"
           />
         </ion-item>
         <ion-item>
@@ -44,6 +45,7 @@
             type="tel"
             placeholder="415"
             v-model="form.areaCode"
+            @ionInput="sanitizeNumberInput('areaCode', $event)"
           />
         </ion-item>
         <ion-item>
@@ -53,6 +55,7 @@
             type="tel"
             placeholder="5550100"
             v-model="form.contactNumber"
+            @ionInput="sanitizeNumberInput('contactNumber', $event)"
           />
         </ion-item>
       </template>
@@ -280,7 +283,14 @@ onMounted(async () => {
 
 const isValid = computed(() => {
   if (props.contactMechTypeId === 'EMAIL_ADDRESS') return form.infoString.trim().length > 0;
-  if (props.contactMechTypeId === 'TELECOM_NUMBER') return form.contactNumber.trim().length > 0;
+  if (props.contactMechTypeId === 'TELECOM_NUMBER') {
+    const isNum = (val: string) => /^\d+$/.test(val.trim());
+    const isOptionalNum = (val: string) => !val.trim() || /^\d+$/.test(val.trim());
+    return form.contactNumber.trim().length > 0 &&
+      isNum(form.contactNumber) &&
+      isOptionalNum(form.countryCode) &&
+      isOptionalNum(form.areaCode);
+  }
   if (props.contactMechTypeId === 'POSTAL_ADDRESS') {
     return form.address1.trim().length > 0
       && form.city.trim().length > 0
@@ -291,6 +301,11 @@ const isValid = computed(() => {
   }
   return false;
 });
+
+function sanitizeNumberInput(field: 'countryCode' | 'areaCode' | 'contactNumber', event: any) {
+  const value = event.target.value || '';
+  form[field] = value.replace(/[^\d]/g, '');
+}
 
 function dismiss() {
   modalController.dismiss(null, 'cancel');
