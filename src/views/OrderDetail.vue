@@ -2567,8 +2567,8 @@ async function rejectAndReleaseItem(item: any, productId: string) {
       url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/allocation`,
       method: 'POST',
       data: { facilityId,
-      orderFacilityChange:{
-      changeReasonEnumId:"RELEASED"
+       orderFacilityChange:{
+       changeReasonEnumId:"RELEASED"
       }
       },
     });
