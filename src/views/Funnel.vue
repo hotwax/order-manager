@@ -73,7 +73,7 @@
         <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard button router-link="/unfillable" :title="translate('Unfillable today')" :stat="totalUnfillable">
+        <StatCard button :router-link="`/unfillable?dateFrom=${todayDateStr}`" :title="translate('Unfillable today')" :stat="totalUnfillable">
           <Sparkline :points="unfillableTrend" color="danger" />
         </StatCard>
 
@@ -498,6 +498,7 @@ import { translate, StatCard, Sparkline, commonUtil } from '@common';
 import { useCustomerServiceStore } from '@/store/customerService';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
+import { DateTime } from 'luxon';
 
 const store = useCustomerServiceStore();
 const productStore = useProductStore() as any;
@@ -511,6 +512,7 @@ const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
 const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);
 const facilityPartialFulfillments = computed(() => store.getFacilityPartialFulfillments);
 const unfillableTrend = computed(() => store.unfillableTrend);
+const todayDateStr = computed(() => DateTime.now().toFormat('yyyy-MM-dd'));
 
 const fulfillmentSyncData = computed(() => store.getFulfillmentSyncData);
 
@@ -674,7 +676,7 @@ const oldestOpenOrderDateStr = computed(() => {
   return timestamp ? translate('Oldest: ') + commonUtil.getDateAndTime(timestamp) : translate('No open orders');
 });
 
-const totalUnfillable = computed(() => unfillableTrend.value.reduce((sum, val) => sum + val, 0));
+const totalUnfillable = computed(() => store.getUnfillable.totalCount || 0);
 
 watch(selectedFacilityId, (newFacilityId) => {
   if (newFacilityId && selectedStoreId.value) {

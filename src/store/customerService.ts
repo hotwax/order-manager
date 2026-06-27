@@ -13,6 +13,7 @@ import type {
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
+import { searchOrders } from '@/services/order';
 
 
 function emptyFilters(): WorkflowFilters {
@@ -72,7 +73,8 @@ export const useCustomerServiceStore = defineStore('customerService', {
       oldestOpenOrderDate: null as number | null
     },
     unfillable: {
-      unfillableHourlyCounts: [] as { shipGroupDateHour: string; shipGroupCount: number }[]
+      unfillableHourlyCounts: [] as { shipGroupDateHour: string; shipGroupCount: number }[],
+      totalCount: 0
     },
     holdTasks: {
       holdTasksTotalCount: 0,
@@ -183,14 +185,30 @@ export const useCustomerServiceStore = defineStore('customerService', {
     },
     async fetchUnfillable(productStoreId?: string) {
       try {
-        const params: any = {};
+        const todayStr = DateTime.now().toFormat('yyyy-MM-dd');
+        const params: any = { dateFilter: todayStr };
         if (productStoreId) params.productStoreId = productStoreId;
         const resp = await api({
           url: 'oms/orders/funnelDashboard/unfillable',
           method: 'GET',
           params
         });
-        if (resp.data) this.unfillable = resp.data;
+        if (resp.data) {
+          this.unfillable.unfillableHourlyCounts = resp.data.unfillableHourlyCounts || [];
+        }
+
+        const solrParams: any = {
+          facilityIds: ['UNFILLABLE_PARKING'],
+          status: ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD'],
+          dateFrom: todayStr,
+          pageSize: 0
+        };
+        if (productStoreId && productStoreId !== 'All') {
+          solrParams.productStoreId = productStoreId;
+        }
+
+        const solrResult = await searchOrders(solrParams);
+        this.unfillable.totalCount = solrResult.total || 0;
       } catch (error) {
         console.error('Failed to fetch unfillable stats', error);
       }
