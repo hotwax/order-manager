@@ -315,6 +315,9 @@
             </ion-list>
           </ion-card>
           <ion-card class="totals">
+            <ion-card-header>
+              <ion-card-title>{{ translate('Total') }}</ion-card-title>
+            </ion-card-header>
             <ion-list lines="full">
               <ion-item>
                 <ion-label>{{ translate('Subtotal') }}</ion-label>
