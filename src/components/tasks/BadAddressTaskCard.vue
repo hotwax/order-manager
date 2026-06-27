@@ -40,11 +40,15 @@
             <ion-select-option v-for="state in originalStates" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
           </ion-select>
         </ion-item>
-        <ion-item>
-          <ion-select :label="translate('Country')" label-placement="stacked" v-model="addressState.original.countryGeoId" interface="popover" @ionChange="onCountryChange(addressState.original, $event)">
-            <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
-          </ion-select>
-        </ion-item>
+        <InlineSearchableSelect
+          :label="translate('Country')"
+          :model-value="addressState.original.countryGeoId"
+          :options="countryOptions"
+          :placeholder="translate('Select')"
+          :search-placeholder="translate('Search countries')"
+          :empty-text="translate('No countries found')"
+          @update:model-value="onCountrySelect(addressState.original, $event)"
+        />
       </ion-list>
 
       <ion-list class="ion-no-padding" lines="full">
@@ -69,11 +73,15 @@
             <ion-select-option v-for="state in suggestedStates" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
           </ion-select>
         </ion-item>
-        <ion-item>
-          <ion-select :label="translate('Country')" label-placement="stacked" v-model="addressState.suggested.countryGeoId" interface="popover" @ionChange="onCountryChange(addressState.suggested, $event)">
-            <ion-select-option v-for="country in countries" :key="country.geoId" :value="country.geoId">{{ country.geoName }}</ion-select-option>
-          </ion-select>
-        </ion-item>
+        <InlineSearchableSelect
+          :label="translate('Country')"
+          :model-value="addressState.suggested.countryGeoId"
+          :options="countryOptions"
+          :placeholder="translate('Select')"
+          :search-placeholder="translate('Search countries')"
+          :empty-text="translate('No countries found')"
+          @update:model-value="onCountrySelect(addressState.suggested, $event)"
+        />
       </ion-list>
     </ion-radio-group>
 
@@ -105,6 +113,7 @@ import {
 import { commonUtil, translate } from '@common';
 import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
+import InlineSearchableSelect from '@/components/common/InlineSearchableSelect.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
@@ -134,10 +143,13 @@ const seedStore = useSeedStore();
 
 const originalStates = computed(() => seedStore.getStatesForCountry(props.addressState.original.countryGeoId));
 const suggestedStates = computed(() => seedStore.getStatesForCountry(props.addressState.suggested.countryGeoId));
+const countryOptions = computed(() => props.countries.map((country: any) => ({ value: country.geoId, label: country.geoName })));
 
-function onCountryChange(address: AddressState['original'], event: any) {
+function onCountrySelect(address: AddressState['original'], countryGeoId: string) {
+  address.countryGeoId = countryGeoId;
+  // Clear the dependent state and load the new country's regions, matching the
+  // previous ion-select behavior.
   address.stateProvinceGeoId = '';
-  const countryGeoId = event.detail?.value;
   if (countryGeoId) seedStore.loadGeoAssocs(countryGeoId);
 }
 
