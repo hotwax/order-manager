@@ -30,11 +30,12 @@
         </FilterSelect>
       </SearchFilterCard>
 
+      <ion-progress-bar v-if="isRefetching" type="indeterminate" />
+
       <SelectAllResultsItem v-if="heldTasks.length" v-model="selectAll" :count="heldTasks.length" />
 
       <div class="hold-orders-list">
         <HoldTaskCard
-          v-if="heldTasks.length"
           v-for="task in heldTasks"
           :key="task.workEffortId"
           :ref="(el) => setCardRef(task.workEffortId, el)"
@@ -45,7 +46,22 @@
           @update:selected="val => selectedOrders[task.workEffortId] = val"
           @completed="fetchHoldTasks()"
         />
-        <div class="empty-state" v-if="!heldTasks.length">
+
+        <div v-if="isFirstLoad" class="ion-text-center ion-padding">
+          <ion-spinner name="crescent" />
+        </div>
+
+        <template v-else-if="isError">
+          <ErrorState
+            :title="translate('Unable to load hold tasks')"
+            :message="holdError"
+          />
+          <div class="ion-text-center ion-padding">
+            <ion-button fill="outline" @click="fetchHoldTasks()">{{ translate('Retry') }}</ion-button>
+          </div>
+        </template>
+
+        <div class="empty-state" v-else-if="isEmpty">
           <p v-html="getEmptyMessage()"></p>
         </div>
       </div>
@@ -84,7 +100,9 @@ import {
   IonTitle,
   IonToolbar,
   IonButton,
+  IonProgressBar,
   IonSelectOption,
+  IonSpinner,
   alertController,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
@@ -93,6 +111,7 @@ import {
 import { translate } from '@common';
 import router from '@/router';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
+import ErrorState from '@/components/common/ErrorState.vue';
 import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import SelectAllResultsItem from '@/components/common/SelectAllResultsItem.vue';
@@ -128,8 +147,19 @@ function setCardRef(workEffortId: string, el: any) {
 
 const heldTasks = computed(() => orderTaskStore.getHoldTasks);
 const isScrollable = computed(() => orderTaskStore.isHoldTasksScrollable);
+const holdStatus = computed(() => orderTaskStore.getHoldStatus);
+const holdError = computed(() => orderTaskStore.getHoldError);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
 const hasFilters = computed(() => !!(searchQuery.value || assignee.value || dateAfter.value || dateBefore.value || orderChannel.value));
+
+// First-load spinner: loading the initial page with nothing on screen yet.
+const isFirstLoad = computed(() => holdStatus.value === 'loading' && !heldTasks.value.length);
+// Progress bar: a first-page refetch while rows are still shown (filter change / refresh).
+const isRefetching = computed(() => holdStatus.value === 'loading' && heldTasks.value.length > 0);
+// Error state only when nothing is on screen to show instead.
+const isError = computed(() => holdStatus.value === 'error' && !heldTasks.value.length);
+// True empty state only after a successful zero-row response.
+const isEmpty = computed(() => holdStatus.value === 'success' && !heldTasks.value.length);
 
 function getEmptyMessage() {
   return hasFilters.value
@@ -191,15 +221,21 @@ async function resolveSelectedTasks() {
 
 
 const fetchHoldTasks = async (pageSize?: any, pageIndex?: any) => {
-  await orderTaskStore.fetchHoldTasks({
-    pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
-    pageIndex: pageIndex ?? 0,
-    ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
-    ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
-    ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
-    ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
-    ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
-  });
+  // The store owns the loading/error status; swallow here so a failed fetch
+  // surfaces as the error state instead of an unhandled rejection.
+  try {
+    await orderTaskStore.fetchHoldTasks({
+      pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
+      pageIndex: pageIndex ?? 0,
+      ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
+      ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
+      ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
+      ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
+      ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
+    });
+  } catch {
+    // Status/error already recorded in the store.
+  }
 };
 
 async function loadMoreHoldTasks(event: any) {
