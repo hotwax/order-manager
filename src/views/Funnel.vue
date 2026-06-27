@@ -676,7 +676,7 @@ const oldestOpenOrderDateStr = computed(() => {
   return timestamp ? translate('Oldest: ') + commonUtil.getDateAndTime(timestamp) : translate('No open orders');
 });
 
-const totalUnfillable = computed(() => unfillableTrend.value.reduce((sum, val) => sum + val, 0));
+const totalUnfillable = computed(() => store.getUnfillable.totalCount || 0);
 
 watch(selectedFacilityId, (newFacilityId) => {
   if (newFacilityId && selectedStoreId.value) {

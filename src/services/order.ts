@@ -1,4 +1,5 @@
 import { api, commonUtil, useSolrSearch } from '@common';
+import type { Order } from '@/types/order';
 import {
   allDocs,
   normalizeOrderDoc,
@@ -163,18 +164,20 @@ export async function searchOrders(params: OrderSearchParams = {}): Promise<Orde
 function normalizeOrderSolrResponse(data: any): OrderSearchResult {
   const groupedOrders = data?.grouped?.orderId;
 
-  if (groupedOrders?.groups?.length) {
+  if (groupedOrders) {
     return {
-      orders: groupedOrders.groups
+      orders: (groupedOrders.groups || [])
         .map(normalizeGroupedOrder)
         .filter(Boolean),
-      total: Number(groupedOrders.ngroups ?? groupedOrders.matches ?? groupedOrders.groups.length)
+      total: Number(groupedOrders.ngroups ?? groupedOrders.matches ?? (groupedOrders.groups?.length || 0))
     };
   }
 
   const docs = allDocs(data);
   return {
-    orders: docs.map((doc: any) => normalizeOrderWithParkingUnits([doc])),
+    orders: docs
+      .map((doc: any) => normalizeOrderWithParkingUnits([doc]))
+      .filter(Boolean) as Order[],
     total: Number(data?.response?.numFound ?? docs.length)
   };
 }
