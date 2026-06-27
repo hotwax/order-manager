@@ -11,12 +11,6 @@
     :selected="selected"
     @update:selected="emit('update:selected', $event)"
   >
-    <template #content-start>
-      <ion-item v-if="task.description">
-        <ion-label>{{ task.description }}</ion-label>
-      </ion-item>
-    </template>
-
     <ion-radio-group v-if="addressState" v-model="addressState.selectedAddressType" class="address-task-addresses">
       <ion-list class="ion-no-padding" lines="full">
         <ion-list-header>
