@@ -84,28 +84,56 @@
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
-        <ion-item
+        <div
           v-for="order in searchResults"
           :key="order.id"
-          button
+          class="list-item queue-order-row"
+          :role="selectMode ? 'button' : 'link'"
+          tabindex="0"
           @click="handleOrderRowClick(order, $event)"
+          @keydown.enter.prevent="handleOrderRowClick(order, $event)"
+          @keydown.space.prevent="handleOrderRowClick(order, $event)"
         >
-          <ion-checkbox
-            v-if="selectMode"
-            slot="start"
-            :checked="selectedOrderIds.includes(order.id)"
-            @click.stop
-            @ionChange="setOrderSelection(order.id, $event.detail.checked)"
-          />
-          <ion-label>
-            <h2>{{ order.externalId || order.id }}</h2>
-            <p>{{ order.id }} · {{ order.customerName || order.customerId || translate('Unknown customer') }}</p>
-            <p>{{ createdDateLabel(order.orderDate) }} · {{ translate('Ship') }} {{ shipTimeLeftLabel(order.orderDate) }}</p>
+          <ion-item lines="none">
+            <ion-checkbox
+              v-if="selectMode"
+              slot="start"
+              :checked="selectedOrderIds.includes(order.id)"
+              @click.stop
+              @keydown.stop
+              @ionChange="setOrderSelection(order.id, $event.detail.checked)"
+            />
+            <ion-label>
+              <p class="overline">{{ order.id }}</p>
+              {{ order.externalId || order.orderName || order.id }}
+              <p>
+                <ion-badge :color="statusColor(order.status)">{{ statusDescription(order.status) }}</ion-badge>
+              </p>
+            </ion-label>
+          </ion-item>
+
+          <ion-label class="tablet ion-text-start">
+            {{ order.customerName || order.customerId || translate('Unknown customer') }}
+            <p>{{ customerAddressLine(order) }}</p>
+            <p v-if="customerAddressTrailingLine(order)">{{ customerAddressTrailingLine(order) }}</p>
           </ion-label>
-          <ion-badge :color="statusColor(order.status)" slot="end">
-            {{ statusDescription(order.status) }}
-          </ion-badge>
-        </ion-item>
+
+          <ion-label class="tablet ion-text-start">
+            {{ createdDateLabel(order.orderDate) }}
+            <p>{{ translate('Ship') }} {{ shipTimeLeftLabel(order.orderDate) }}</p>
+          </ion-label>
+
+          <ion-label class="tablet">
+            {{ formatDateTime(order.orderDate) }}
+            <p>{{ orderedRelativeLabel(order.orderDate) }}</p>
+          </ion-label>
+
+          <ion-label class="queue-delivery ion-text-end">
+            {{ estimatedDeliveryDateLabel(order) }}
+            <p>{{ translate('Estimated delivery date') }}</p>
+            <p v-if="estimatedDeliveryRelativeLabel(order)">{{ estimatedDeliveryRelativeLabel(order) }}</p>
+          </ion-label>
+        </div>
       </ion-list>
 
       <EmptyState
@@ -427,6 +455,63 @@ function parseOrderDate(value: string) {
 
   return DateTime.fromISO(value);
 }
+
+function customerAddressLine(order: any) {
+  return order.shippingAddress1 || order.customerId || order.externalId || '';
+}
+
+function customerAddressTrailingLine(order: any) {
+  const parts = [
+    order.shippingCity,
+    order.shippingStateProvinceGeoId,
+    order.shippingPostalCode,
+    order.shippingCountryGeoId
+  ].filter(Boolean);
+
+  if (parts.length) return parts.join(' ');
+  return order.shippingAddress1 ? '' : order.externalId;
+}
+
+function estimatedDeliveryValue(order: any) {
+  return order.estimatedDeliveryDate || order.shipBeforeDate || order.shipByDate || '';
+}
+
+function estimatedDeliveryDateLabel(order: any) {
+  const date = dateFromValue(estimatedDeliveryValue(order));
+  return date ? date.toFormat('MM-dd-yyyy') : translate('No delivery date');
+}
+
+function estimatedDeliveryRelativeLabel(order: any) {
+  const date = dateFromValue(estimatedDeliveryValue(order));
+  return date?.toRelative() || '';
+}
+
+function orderedRelativeLabel(orderDateValue: string) {
+  const date = dateFromValue(orderDateValue);
+  const relativeDate = date?.toRelative();
+  return relativeDate ? `${translate('Ordered')} ${relativeDate}` : '';
+}
+
+function formatDateTime(value: string) {
+  const date = dateFromValue(value);
+  return date ? date.toFormat('MM-dd-yyyy hh:mm a') : '';
+}
+
+function dateFromValue(value?: string | null) {
+  if (!value) return undefined;
+
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue) && numericValue > 0) {
+    const numericDate = DateTime.fromMillis(value.length <= 10 ? numericValue * 1000 : numericValue);
+    if (numericDate.isValid) return numericDate;
+  }
+
+  const sqlDate = DateTime.fromSQL(value);
+  if (sqlDate.isValid) return sqlDate;
+
+  const isoDate = DateTime.fromISO(value);
+  return isoDate.isValid ? isoDate : undefined;
+}
 </script>
 
 <style scoped>
@@ -443,5 +528,25 @@ function parseOrderDate(value: string) {
 
 .bulk-action-buttons {
   overflow-x: auto;
+}
+
+.queue-order-row {
+  --columns-desktop: 5;
+  --columns-tablet: 5;
+  min-height: 5rem;
+  border-block-start: var(--border-medium);
+  padding-inline-end: var(--spacer-sm);
+}
+
+.queue-order-row > ion-label {
+  width: 100%;
+}
+
+.queue-order-row > ion-label.queue-delivery {
+  display: block;
+  justify-self: end;
+  max-width: 10rem;
+  min-width: 10rem;
+  width: 10rem;
 }
 </style>
