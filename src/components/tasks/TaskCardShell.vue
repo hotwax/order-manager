@@ -183,7 +183,8 @@ async function copyChipLabel() {
 }
 
 .task-card-actions-end {
-  flex: 1 1 260px;
+  flex: 0 1 360px;
+  margin-inline-start: auto;
   max-width: 360px;
 }
 
