@@ -537,6 +537,7 @@
   "Failed to create customer:": "No se pudo crear el cliente:",
   "Failed to create Shopify order:": "No se pudo crear el pedido de Shopify:",
   "Failed to fetch user profile information": "No se pudo obtener la información del perfil de usuario",
+  "Failed to load hold tasks. Please try again.": "No se pudieron cargar las tareas en espera. Inténtalo de nuevo.",
   "Failed to load orders": "No se pudieron cargar los pedidos",
   "Failed to load Shopify shops:": "No se pudieron cargar las tiendas de Shopify:",
   "Failed to park one or more orders. Please try again.": "No se pudieron mover uno o más pedidos a estacionamiento. Inténtalo de nuevo.",

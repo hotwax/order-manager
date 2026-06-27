@@ -51,15 +51,13 @@
           <ion-spinner name="crescent" />
         </div>
 
-        <template v-else-if="isError">
-          <ErrorState
-            :title="translate('Unable to load hold tasks')"
-            :message="holdError"
-          />
-          <div class="ion-text-center ion-padding">
-            <ion-button fill="outline" @click="fetchHoldTasks()">{{ translate('Retry') }}</ion-button>
-          </div>
-        </template>
+        <ErrorState
+          v-else-if="isError"
+          :title="translate('Unable to load hold tasks')"
+          :message="translate(holdError)"
+          retryable
+          @retry="fetchHoldTasks()"
+        />
 
         <div class="empty-state" v-else-if="isEmpty">
           <p v-html="getEmptyMessage()"></p>

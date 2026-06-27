@@ -534,6 +534,7 @@
   "Enter product name": "Enter product name",
   "Enter quantity": "Enter quantity",
   "Failed to fetch user profile information": "Failed to fetch user profile information",
+  "Failed to load hold tasks. Please try again.": "Failed to load hold tasks. Please try again.",
   "Failed to load orders": "Failed to load orders",
   "Failed to park one or more orders. Please try again.": "Failed to park one or more orders. Please try again.",
   "Failed to resolve some tasks. Please try again.": "Failed to resolve some tasks. Please try again.",

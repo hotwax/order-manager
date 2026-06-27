@@ -208,7 +208,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         console.error('Failed to fetch the hold tasks', err);
         if (isFirstPage) {
           this.holdStatus = 'error';
-          this.holdError = err?.message || 'Failed to load hold tasks';
+          this.holdError = 'Failed to load hold tasks. Please try again.';
         }
         throw err;
       }
