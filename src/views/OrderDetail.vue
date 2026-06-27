@@ -69,9 +69,12 @@
 
         <!-- details wrapper: child matching .order-detail-header-details -->
         <div class="order-detail-header-details">
-          <ion-card>
+          <ion-card class="customer-summary-card">
             <ion-card-header>
               <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
+              <ion-button v-if="customerPartyId" fill="clear" size="small" :router-link="'/customers/' + customerPartyId">
+                {{ translate('View details') }}
+              </ion-button>
             </ion-card-header>
             <ion-list lines="none">
               <ion-item>
@@ -3004,5 +3007,11 @@ ion-card-header ion-buttons {
   .order-items .order-summary {
     grid-template-columns: 1fr;
   }
+}
+.customer-summary-card ion-card-header {
+  align-items: center;
+  display: flex;
+  gap: var(--spacer-xs);
+  justify-content: space-between;
 }
 </style>
