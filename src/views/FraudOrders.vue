@@ -150,7 +150,9 @@ const isScrollable = computed(() => orderTaskStore.isFraudTasksScrollable);
 const isFirstLoad = computed(() => fraudStatus.value === 'loading' && !fraudTasks.value.length);
 // Refetch: reload running while cards already exist (keeps list visible, shows a bar).
 const isRefetching = computed(() => fraudStatus.value === 'loading' && fraudTasks.value.length > 0);
-const hasError = computed(() => fraudStatus.value === 'error');
+// Only take over the page when there's nothing to show; a failed refetch with
+// cards on screen keeps the existing rows instead of blanking the queue.
+const hasError = computed(() => fraudStatus.value === 'error' && !fraudTasks.value.length);
 // Empty copy only after a settled, successful, zero-row first-page response.
 const showEmptyState = computed(() => fraudStatus.value === 'success' && !fraudTasks.value.length);
 const selectedTaskCount = computed(() => Object.values(selectedOrders.value).filter(Boolean).length as number);
