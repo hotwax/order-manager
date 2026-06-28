@@ -28,6 +28,15 @@ vi.mock('@/composables/useOrderDetail', () => ({
   useOrderDetail: () => orderDetailApi
 }));
 
+vi.mock('@/services/productDb', () => ({
+  getProductDb: () => ({
+    products: {
+      bulkPut: vi.fn(),
+      toArray: vi.fn()
+    }
+  })
+}));
+
 describe('order detail store', () => {
   beforeEach(() => {
     setActivePinia(createPinia());

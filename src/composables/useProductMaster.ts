@@ -3,11 +3,11 @@ import { useSolrSearch, commonUtil, logger} from "@common";
 import { useProductCacheStore, type CachedProduct, type ProductIdentification } from "@/store/productCache";
 
 /**
- * Product master — fetch rich product data (name, SKU, image) from Solr, cached per
- * productId and NEVER refetched once cached. The order detail page is the first consumer.
+ * Product master — fetch rich product data (name, SKU, image) from Solr, cache it per
+ * productId, and refresh persisted entries after the configured stale window.
  *
- * This mirrors inventory-count/src/composables/useProductMaster.ts. Same public API;
- * the storage backend is the in-memory productCache store. Consumers never touch the
+ * This mirrors inventory-count/src/composables/useProductMaster.ts. Same public API; the
+ * storage backend is the Dexie-backed productCache store. Consumers never touch the
  * store directly.
  */
 
@@ -54,6 +54,12 @@ function mapDocToProduct(doc: any): CachedProduct {
   };
 }
 
+function isProductFresh(product?: CachedProduct) {
+  if (!product) return false;
+  if (!product.updatedAt) return false;
+  return Date.now() - product.updatedAt < staleMs.value;
+}
+
 function buildProductQuery(productIds: string[]) {
   return {
     json: {
@@ -92,11 +98,11 @@ async function getByIds(productIds: string[]): Promise<CachedProduct[]> {
   return products;
 }
 
-/** Fetch only the productIds not already cached, then store them. The never-refetch path. */
+/** Fetch only missing or stale productIds, then store them. */
 async function prefetch(productIds: string[]) {
   const cache = useProductCacheStore();
-  await cache.ensureHydrated();
-  const idsToFetch = [...new Set(productIds.filter(Boolean))].filter((id) => !cache.has(id));
+  await cache.ensureHydrated(); // pull this OMS's persisted products from Dexie first
+  const idsToFetch = [...new Set(productIds.filter(Boolean))].filter((id) => !isProductFresh(cache.getProduct(id)));
   if (!idsToFetch.length) return;
 
   const products = await getByIds(idsToFetch);
@@ -108,7 +114,7 @@ async function getById(productId: string, opts?: { refresh?: boolean }) {
   const cache = useProductCacheStore();
   await cache.ensureHydrated();
   const existing = cache.getProduct(productId);
-  if (existing && !opts?.refresh) return { product: existing, status: "hit" as const };
+  if (existing && !opts?.refresh && isProductFresh(existing)) return { product: existing, status: "hit" as const };
 
   const products = await getByIds([productId]);
   if (products.length) {

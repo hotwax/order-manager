@@ -1,50 +1,65 @@
 import { defineStore } from "pinia";
-export interface ProductIdentification {
-  type: string;
-  value: string;
-}
+import { cookieHelper, logger } from "@common";
+import { getProductDb, type CachedProduct, type ProductIdentification } from "@/services/productDb";
 
-export interface CachedProduct {
-  productId: string;
-  productName: string;
-  sku: string;
-  parentProductName: string;
-  internalName: string;
-  mainImageUrl: string;
-  goodIdentifications: ProductIdentification[];
-  productTypeId?: string;
-  updatedAt: number;
-}
+export type { CachedProduct, ProductIdentification };
+
+const omsInstance = () => cookieHelper().get("oms") || "";
 
 /**
  * Product cache — the app's single source of rich product data.
  *
- * This store is intentionally in-memory only. The UI can read products synchronously
- * and re-render reactively, while useProductMaster owns fetching missing products.
+ * Two layers:
+ *  - a reactive in-memory mirror (`byId`) so the UI can read products synchronously and
+ *    re-render reactively;
+ *  - a multi-tenant Dexie DB (`${oms}-CommonDB`, see services/productDb.ts) that persists
+ *    the cache per OMS across sessions. useProductMaster refreshes stale products by
+ *    comparing each record's updatedAt to its configured stale window.
+ *
+ * The mirror is hydrated from Dexie once per OMS and is the source for synchronous reads.
  * Consumers go through useProductMaster, not this store directly.
  */
 export const useProductCacheStore = defineStore("productCache", {
   state: () => ({
-    byId: {} as Record<string, CachedProduct>
+    byId: {} as Record<string, CachedProduct>,
+    hydratedOms: ""
   }),
   getters: {
     getProduct: (state) => (productId: string) => state.byId[productId],
     has: (state) => (productId: string) => Boolean(state.byId[productId])
   },
   actions: {
-    /** Compatibility no-op for callers that still wait for cache readiness. */
+    /** Load this OMS's cached products from Dexie into the reactive mirror (once per OMS). */
     async ensureHydrated() {
-      return;
+      const oms = omsInstance();
+      if (!oms || this.hydratedOms === oms) return;
+      try {
+        const records = await getProductDb(oms).products.toArray();
+        records.forEach((record) => {
+          this.byId[record.productId] = record;
+        });
+        this.hydratedOms = oms;
+      } catch (error) {
+        logger.error("Failed to hydrate product cache from Dexie", error);
+      }
     },
-    /** Update the reactive mirror synchronously for the UI. */
+    /** Update the reactive mirror (synchronously, for the UI) and persist to Dexie. */
     async upsert(products: CachedProduct[]) {
       products.forEach((product) => {
         if (product.productId) this.byId[product.productId] = product;
       });
+      const oms = omsInstance();
+      if (!oms) return;
+      try {
+        await getProductDb(oms).products.bulkPut(products.filter((product) => product.productId));
+      } catch (error) {
+        logger.error("Failed to persist products to Dexie", error);
+      }
     },
-    /** Logout: clear the in-memory mirror. */
+    /** Logout: clear the in-memory mirror only. Dexie data persists (multi-tenant). */
     reset() {
       this.byId = {};
+      this.hydratedOms = "";
     }
   },
   persist: false
