@@ -13,7 +13,8 @@ const omsInstance = () => cookieHelper().get("oms") || "";
  *  - a reactive in-memory mirror (`byId`) so the UI can read products synchronously and
  *    re-render reactively;
  *  - a multi-tenant Dexie DB (`${oms}-CommonDB`, see services/productDb.ts) that persists
- *    the cache per OMS across sessions, so a product is never fetched twice.
+ *    the cache per OMS across sessions. useProductMaster refreshes stale products by
+ *    comparing each record's updatedAt to its configured stale window.
  *
  * The mirror is hydrated from Dexie once per OMS and is the source for synchronous reads.
  * Consumers go through useProductMaster, not this store directly.
