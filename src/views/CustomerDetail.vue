@@ -55,7 +55,7 @@
                   </ion-item>
                   <ion-item v-for="value in section.values" :key="value.contactMechId">
                     <ion-label>{{ value.display }}</ion-label>
-                    <ion-note slot="end">{{ seed.describe(value.contactMechPurposeTypeId) }}</ion-note>
+                    <ion-note slot="end">{{ seedDescribe(value.contactMechPurposeTypeId) }}</ion-note>
                   </ion-item>
                   <ion-item v-if="!section.values.length" lines="none">
                     <ion-label color="medium"><em>None on file</em></ion-label>
@@ -73,7 +73,7 @@
                 <ion-list lines="none">
                   <ion-item v-for="relationship in personalRelationships" :key="relationship.key">
                     <ion-label>
-                      <p class="overline">{{ seed.describe(relationship.partyRelationshipTypeId) }}</p>
+                      <p class="overline">{{ seedDescribe(relationship.partyRelationshipTypeId) }}</p>
                       <h3>{{ relationship.relatedPartyName }}</h3>
                       <p>{{ relationship.relatedPartyId }}</p>
                     </ion-label>
@@ -182,10 +182,10 @@
 
       <!-- ===== Dashboard ===== -->
       <div v-if="selectedSegment === 'dashboard'">
-        <!-- Open tasks (placeholder until GET /oms/parties/{partyId}/tasks lands) -->
+        <!-- Open tasks — first page only; Load more is in the Tasks segment -->
         <div class="section-header">
           <h2>Open tasks</h2>
-          <ion-button fill="outline" size="small">View all</ion-button>
+          <ion-button fill="outline" size="small" @click="selectedSegment = 'tasks'">View all</ion-button>
         </div>
 
         <ion-card v-for="task in openTasks" :key="task.workEffortId" class="task-card">
@@ -196,24 +196,32 @@
               <p v-if="task.orderDate">{{ formatLongDate(task.orderDate) }}</p>
             </ion-label>
             <ion-chip slot="end" outline>{{ task.workEffortId }}</ion-chip>
-            <ion-note v-if="task.orderTotal != null" slot="end">{{ money(task.orderTotal) }}</ion-note>
+            <ion-note v-if="task.grandTotal != null" slot="end">{{ money(task.grandTotal) }}</ion-note>
           </ion-item>
 
           <div class="task-grid">
             <div>
               <p class="overline">Task</p>
               <h3>{{ task.workEffortName }}</h3>
-              <p>{{ seed.describe(task.purposeTypeId || task.workEffortTypeId) }}</p>
-              <p class="muted" v-if="task.dueDate">Due {{ formatLongDate(task.dueDate) }}</p>
+              <p>{{ seedDescribe(task.workEffortPurposeTypeId || task.workEffortTypeId) }}</p>
+            </div>
+            <div>
+              <p class="overline">Status</p>
+              <h3>{{ seedDescribe(task.taskStatusId) || task.taskStatusId }}</h3>
+            </div>
+            <div v-if="task.dueDate">
+              <p class="overline">Due date</p>
+              <h3>{{ formatLongDate(task.dueDate) }}</h3>
             </div>
             <div>
               <p class="overline">Assignee</p>
-              <h3>{{ task.assignee?.name || 'Unassigned' }}</h3>
-              <p class="muted" v-if="task.assignee?.fromDate">{{ formatLongDate(task.assignee.fromDate) }}</p>
+              <h3>{{ task.assigneeName || 'Unassigned' }}</h3>
+              <p class="muted" v-if="task.assigneeSince">{{ formatLongDate(task.assigneeSince) }}</p>
             </div>
             <div>
               <p class="overline">Reporter</p>
-              <h3>{{ task.reporter?.name || '—' }}</h3>
+              <h3>{{ task.reporterName || '—' }}</h3>
+              <p class="muted" v-if="task.reporterSince">{{ formatLongDate(task.reporterSince) }}</p>
             </div>
           </div>
 
@@ -225,7 +233,7 @@
           </div>
 
           <div class="card-actions">
-            <ion-button fill="clear" size="small">Resolve task</ion-button>
+            <ion-button v-if="task.taskStatusId !== 'TASK_COMPLETED' && task.taskStatusId !== 'TASK_CANCELLED'" fill="clear" size="small" @click="resolveTask(task)">Resolve task</ion-button>
             <ion-button v-if="task.orderId" fill="clear" size="small" :router-link="`/orders/${task.orderId}`">
               View order
             </ion-button>
@@ -442,6 +450,9 @@
                 {{ returnRow.title }}
                 <p>{{ returnRow.itemSummary }}</p>
               </ion-label>
+              <ion-chip slot="end" :color="returnStatusColor(ret.statusId)" outline>
+                {{ seedDescribe(ret.statusId) || ret.statusId }}
+              </ion-chip>
             </ion-item>
 
             <ion-label class="tablet ion-text-start">
@@ -486,10 +497,10 @@
             <ion-item lines="full">
               <ion-label>
                 <h2>{{ comm.subject || '(No subject)' }}</h2>
-                <p>{{ (seed as any).describe(comm.communicationEventTypeId) || comm.communicationEventTypeId }}</p>
+                <p>{{ seedDescribe(comm.communicationEventTypeId) || comm.communicationEventTypeId }}</p>
               </ion-label>
               <ion-chip slot="end" :color="commStatusColor(comm.statusId)" outline>
-                {{ (seed as any).describe(comm.statusId) || comm.statusId }}
+                {{ seedDescribe(comm.statusId) || comm.statusId }}
               </ion-chip>
             </ion-item>
 
@@ -535,6 +546,76 @@
         />
         <div v-else class="ion-padding ion-text-center">
           <ion-spinner name="crescent" />
+        </div>
+      </div>
+
+      <!-- ===== Tasks segment ===== -->
+      <div v-else-if="selectedSegment === 'tasks'">
+        <div class="section-header">
+          <h2>Open tasks</h2>
+        </div>
+
+        <ion-card v-for="task in openTasks" :key="task.workEffortId" class="task-card">
+          <ion-item lines="full">
+            <ion-checkbox slot="start" />
+            <ion-label>
+              <h2>{{ task.orderName || task.orderId || task.workEffortName }}</h2>
+              <p v-if="task.orderDate">{{ formatLongDate(task.orderDate) }}</p>
+            </ion-label>
+            <ion-chip slot="end" outline>{{ task.workEffortId }}</ion-chip>
+            <ion-note v-if="task.grandTotal != null" slot="end">{{ money(task.grandTotal) }}</ion-note>
+          </ion-item>
+
+          <div class="task-grid">
+            <div>
+              <p class="overline">Task</p>
+              <h3>{{ task.workEffortName }}</h3>
+              <p>{{ seedDescribe(task.workEffortPurposeTypeId || task.workEffortTypeId) }}</p>
+            </div>
+            <div>
+              <p class="overline">Status</p>
+              <h3>{{ seedDescribe(task.taskStatusId) || task.taskStatusId }}</h3>
+            </div>
+            <div v-if="task.dueDate">
+              <p class="overline">Due date</p>
+              <h3>{{ formatLongDate(task.dueDate) }}</h3>
+            </div>
+            <div>
+              <p class="overline">Assignee</p>
+              <h3>{{ task.assigneeName || 'Unassigned' }}</h3>
+              <p class="muted" v-if="task.assigneeSince">{{ formatLongDate(task.assigneeSince) }}</p>
+            </div>
+            <div>
+              <p class="overline">Reporter</p>
+              <h3>{{ task.reporterName || '—' }}</h3>
+              <p class="muted" v-if="task.reporterSince">{{ formatLongDate(task.reporterSince) }}</p>
+            </div>
+          </div>
+
+          <div class="task-grid" v-if="task.notes">
+            <div>
+              <p class="overline">Notes</p>
+              <p>{{ task.notes }}</p>
+            </div>
+          </div>
+
+          <div class="card-actions">
+            <ion-button v-if="task.taskStatusId !== 'TASK_COMPLETED' && task.taskStatusId !== 'TASK_CANCELLED'" fill="clear" size="small" @click="resolveTask(task)">Resolve task</ion-button>
+            <ion-button v-if="task.orderId" fill="clear" size="small" :router-link="`/orders/${task.orderId}`">
+              View order
+            </ion-button>
+          </div>
+        </ion-card>
+
+        <EmptyState
+          v-if="tasksStatus === 'loaded' && !openTasks.length"
+          title="No open tasks"
+          message="This customer has no open tasks."
+        />
+        <div v-if="tasksHasMore" class="ion-text-center ion-padding">
+          <ion-button fill="outline" size="small" :disabled="tasksStatus === 'loading'" @click="loadMoreTasks">
+            {{ tasksStatus === 'loading' ? 'Loading...' : 'Load more' }}
+          </ion-button>
         </div>
       </div>
 
@@ -625,6 +706,7 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import router from '@/router';
 import { deleteCustomerDetails, indexCustomer } from '@/services/customer';
+import { useOrderTaskStore } from '@/store/orderTask';
 
 const props = defineProps<{
   customerId: string;
@@ -632,6 +714,7 @@ const props = defineProps<{
 
 const selectedSegment = ref('dashboard');
 const seed = useSeedStore();
+const orderTaskStore = useOrderTaskStore();
 const productCache = useProductCacheStore();
 const recentOrdersQuery = ref('');
 const allOrdersQuery = ref('');
@@ -648,6 +731,7 @@ const {
   timeline,
   recentOrders: recentOrdersSource,
   openTasks,
+  tasksHasMore,
   customerReturns: customerReturnsSource,
   customerCommunications: customerCommunicationsSource,
   ordersStatus,
@@ -660,8 +744,10 @@ const {
   lifetimeCurrency,
   customerSince: customerSinceRaw,
   load,
+  refresh,
   loadReturns,
   loadCommunications,
+  loadMoreTasks,
   expireRelationship,
   mergeContact,
   createRelationship,
@@ -729,6 +815,58 @@ const segmentLabel = computed(() => {
   };
   return labels[selectedSegment.value] || 'Dashboard';
 });
+
+async function resolveTask(task: any) {
+  const statusId: string = task.taskStatusId;
+  const canComplete = statusId === 'TASK_IN_PROGRESS';
+  const canCancel = statusId === 'TASK_CREATED' || statusId === 'TASK_IN_PROGRESS' || statusId === 'TASK_ON_HOLD';
+
+  const buttons: any[] = [];
+
+  if (canComplete) {
+    buttons.push({
+      text: 'Complete task',
+      handler: () => {
+        void (async () => {
+          try {
+            await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_COMPLETED');
+            await commonUtil.showToast('Task marked as completed.');
+            await refresh();
+          } catch {
+            await commonUtil.showToast('Failed to complete task. Please try again.');
+          }
+        })();
+      }
+    });
+  }
+
+  if (canCancel) {
+    buttons.push({
+      text: 'Cancel task',
+      role: 'destructive',
+      handler: () => {
+        void (async () => {
+          try {
+            await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED');
+            await commonUtil.showToast('Task cancelled.');
+            await refresh();
+          } catch {
+            await commonUtil.showToast('Failed to cancel task. Please try again.');
+          }
+        })();
+      }
+    });
+  }
+
+  buttons.push({ text: 'Dismiss', role: 'cancel' });
+
+  const alert = await alertController.create({
+    header: 'Resolve task',
+    message: 'Choose how to resolve this task. Completing marks the work as done. Cancelling discards the task without taking further action.',
+    buttons,
+  });
+  await alert.present();
+}
 
 async function onDeleteCustomer() {
   const alert = await alertController.create({
@@ -853,6 +991,10 @@ watch(() => props.customerId, () => {
   void load();
   void loadSelectedSegment();
 });
+
+function seedDescribe(id?: string): string {
+  return (seed as any).describe(id) || '';
+}
 
 function money(value: number, currency = 'USD') {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(Number(value || 0));

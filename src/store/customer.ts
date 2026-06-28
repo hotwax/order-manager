@@ -301,6 +301,8 @@ export const useCustomerStore = defineStore('customerDetail', {
       state.recentOrdersByPartyId[partyId]?.payload || [],
     openTasks: (state) => (partyId: string): CustomerTaskSummary[] =>
       state.tasksByPartyId[partyId]?.payload || [],
+    openTasksHasMore: (state) => (partyId: string): boolean =>
+      state.tasksByPartyId[partyId]?.hasMore ?? false,
     unfillableOrders: (state) => (partyId: string): CustomerOrderSummary[] =>
       state.unfillableByPartyId[partyId]?.payload || [],
     returns: (state) => (partyId: string): CustomerReturnSummary[] =>
@@ -413,15 +415,18 @@ export const useCustomerStore = defineStore('customerDetail', {
       const existing = this.tasksByPartyId[partyId];
       if (existing?.status === 'loaded' && !force) return;
 
+      const pageSize = Number(import.meta.env.VITE_VIEW_SIZE) || 10;
       this.tasksByPartyId[partyId] = { ...(existing || newSource<CustomerTaskSummary[]>([])), status: 'loading', error: '' };
       try {
-        const tasks = await getCustomerTasks(partyId, { statusId: 'ORD_HOLD_OPEN' });
+        const tasks = await getCustomerTasks(partyId, { taskStatusId: 'TASK_CREATED', pageSize, pageIndex: 0 });
         this.tasksByPartyId[partyId] = {
           payload: tasks,
           status: 'loaded',
           loadedAt: new Date().toISOString(),
           error: '',
-          total: tasks.length
+          pageIndex: 0,
+          pageSize,
+          hasMore: tasks.length >= pageSize
         };
       } catch (error: any) {
         this.tasksByPartyId[partyId] = {
@@ -430,6 +435,30 @@ export const useCustomerStore = defineStore('customerDetail', {
           loadedAt: '',
           error: error?.message || 'Failed to load tasks'
         };
+      }
+    },
+
+    async loadMoreCustomerTasks(partyId: string) {
+      if (!partyId) return;
+      const existing = this.tasksByPartyId[partyId];
+      if (!existing?.hasMore || existing.status === 'loading') return;
+
+      const pageSize = existing.pageSize ?? (Number(import.meta.env.VITE_VIEW_SIZE) || 10);
+      const nextPage = (existing.pageIndex ?? 0) + 1;
+      this.tasksByPartyId[partyId] = { ...existing, status: 'loading', error: '' };
+      try {
+        const more = await getCustomerTasks(partyId, { taskStatusId: 'TASK_CREATED', pageSize, pageIndex: nextPage });
+        this.tasksByPartyId[partyId] = {
+          payload: [...(existing.payload || []), ...more],
+          status: 'loaded',
+          loadedAt: new Date().toISOString(),
+          error: '',
+          pageIndex: nextPage,
+          pageSize,
+          hasMore: more.length >= pageSize
+        };
+      } catch (error: any) {
+        this.tasksByPartyId[partyId] = { ...existing, status: 'error', error: error?.message || 'Failed to load more tasks' };
       }
     },
 
