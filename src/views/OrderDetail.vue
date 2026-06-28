@@ -69,9 +69,12 @@
 
         <!-- details wrapper: child matching .order-detail-header-details -->
         <div class="order-detail-header-details">
-          <ion-card>
+          <ion-card class="customer-summary-card">
             <ion-card-header>
               <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
+              <ion-button v-if="customerPartyId" fill="clear" size="small" :router-link="'/customers/' + customerPartyId">
+                {{ translate('View details') }}
+              </ion-button>
             </ion-card-header>
             <ion-list lines="none">
               <ion-item>
@@ -166,6 +169,12 @@
                 <ion-label>
                   <p>{{ translate('Channel') }}</p>
                   {{ order.channel || translate('Channel') }}
+                </ion-label>
+              </ion-item>
+              <ion-item v-if="order.originFacilityId">
+                <ion-label>
+                  <p>{{ translate('Placed at') }}</p>
+                  {{ order.originFacilityName }}
                 </ion-label>
               </ion-item>
             </ion-list>
@@ -315,6 +324,9 @@
             </ion-list>
           </ion-card>
           <ion-card class="totals">
+            <ion-card-header>
+              <ion-card-title>{{ translate('Total') }}</ion-card-title>
+            </ion-card-header>
             <ion-list lines="full">
               <ion-item>
                 <ion-label>{{ translate('Subtotal') }}</ion-label>
@@ -825,6 +837,7 @@
       <div v-if="selectedSegment === 'holds'">
         <template v-if="hasOrderHoldTasks">
           <BadAddressTaskCard v-for="task in orderAddressValidationTasks" :key="task.workEffortId" :task="task"
+            :countries="seed.getCountries"
             @completed="reloadHoldTasks" />
           <SwapTaskCard v-for="task in orderSwapTasks" :key="task.workEffortId" :task="task"
             @completed="reloadHoldTasks" />
@@ -1039,6 +1052,15 @@ const order = computed(() => {
     statusId: raw.statusId,
     channel: seed.enumDescription(raw.salesChannelEnumId),
     productStoreName: seed.productStoreName(raw.productStoreId),
+    // Origin/placed-at facility from the order header (set by the OMS order import for
+    // POS/retail-location orders). Prefer a name from the payload, then the seed facility
+    // lookup, falling back to the raw id. Empty when the order has no origin facility.
+    // '_NA_' is the OMS "no origin facility" sentinel (common on non-POS orders) and
+    // resolves to a virtual "Brokering Queue" facility — treat it (and blanks) as no origin.
+    originFacilityId: raw.originFacilityId && raw.originFacilityId !== '_NA_' ? raw.originFacilityId : '',
+    originFacilityName: raw.originFacilityId && raw.originFacilityId !== '_NA_'
+      ? (raw.originFacilityName || seed.facility(raw.originFacilityId)?.facilityName || raw.originFacilityId)
+      : '',
     currency: raw.currencyUom,
     localeString: raw.localeString || raw.locale,
     riskRecommendationEnumId: raw.riskRecommendationEnumId,
@@ -3004,5 +3026,11 @@ ion-card-header ion-buttons {
   .order-items .order-summary {
     grid-template-columns: 1fr;
   }
+}
+.customer-summary-card ion-card-header {
+  align-items: center;
+  display: flex;
+  gap: var(--spacer-xs);
+  justify-content: space-between;
 }
 </style>
