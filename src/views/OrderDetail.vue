@@ -276,7 +276,6 @@
                     :facility-label="item.facilityName"
                     :facility-disabled="isItemFacilityActionDisabled(item)"
                     :attributes-label="attributeChipLabel(item.attributeCount)"
-                    :attributes-disabled="!item.attributeCount"
                     :status-label="item.status"
                     :status-color="commonUtil.getStatusColor(item.statusId)"
                     :status-detail="itemStatusDetail(item)"
@@ -2495,6 +2494,8 @@ async function openItemAttributesModal(item: any) {
     }
   });
   await modal.present();
+  await modal.onDidDismiss();
+  if (order.value?.id) await loadOrder(order.value.id, true);
 }
 
 async function brokerShipGroup(shipGroupSeqId: string) {

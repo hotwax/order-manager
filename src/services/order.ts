@@ -29,6 +29,17 @@ export interface OrderSearchParams {
   pageIndex?: number;
 }
 
+export interface VirtualLocationCountParams {
+  productStoreId?: string;
+  facilityIds: string[];
+  status?: string | string[];
+}
+
+export interface VirtualLocationOrderCount {
+  facilityId: string;
+  count: number;
+}
+
 const orderSolrFields = [
   'orderId',
   'orderName',
@@ -164,6 +175,65 @@ export async function searchOrders(params: OrderSearchParams = {}): Promise<Orde
   if (commonUtil.hasError(response)) return Promise.reject(response.data);
 
   return normalizeOrderSolrResponse(response.data);
+}
+
+export function buildVirtualLocationCountsPayload(params: VirtualLocationCountParams) {
+  const filters = ['docType: ORDER', 'orderTypeId: SALES_ORDER'];
+  const statusIds = selectedStatuses(params.status ?? ['ORDER_CREATED', 'ORDER_APPROVED']);
+
+  if (statusIds.length === 1) filters.push(`orderStatusId:${escapeSolrValue(statusIds[0])}`);
+  if (statusIds.length > 1) filters.push(`orderStatusId:(${statusIds.map(escapeSolrValue).join(' OR ')})`);
+  if (params.productStoreId && params.productStoreId !== 'All') filters.push(`productStoreId:${escapeSolrValue(params.productStoreId)}`);
+
+  const facilityIds = [...new Set((params.facilityIds ?? []).filter((facilityId) => facilityId && facilityId !== 'All'))];
+  const facilityFilter = buildShipGroupFacilityFilter(facilityIds);
+  if (facilityFilter) filters.push(facilityFilter);
+
+  return {
+    json: {
+      params: {
+        rows: 0,
+        start: 0,
+        'q.op': 'AND'
+      },
+      query: '*:*',
+      filter: filters,
+      facet: {
+        facilityCounts: {
+          type: 'terms',
+          field: 'facilityId',
+          mincount: 1,
+          limit: -1,
+          facet: {
+            orders: 'unique(orderId)'
+          }
+        }
+      }
+    }
+  };
+}
+
+export async function fetchVirtualLocationOrderCounts(params: VirtualLocationCountParams): Promise<VirtualLocationOrderCount[]> {
+  if (!params.facilityIds.length) return [];
+
+  const response = await useSolrSearch().runSolrQuery(buildVirtualLocationCountsPayload(params));
+
+  if (commonUtil.hasError(response)) return Promise.reject(response.data);
+
+  return normalizeVirtualLocationCountResponse(response.data);
+}
+
+function normalizeVirtualLocationCountResponse(data: any): VirtualLocationOrderCount[] {
+  const buckets = data?.facets?.facilityCounts?.buckets
+    || data?.response?.facets?.facilityCounts?.buckets
+    || [];
+
+  return buckets
+    .map((bucket: any) => ({
+      facilityId: toStringValue(bucket.val ?? bucket.value),
+      count: toNumberValue(bucket.orders ?? bucket.count)
+    }))
+    .filter((row: VirtualLocationOrderCount) => row.facilityId);
 }
 
 function normalizeOrderSolrResponse(data: any): OrderSearchResult {

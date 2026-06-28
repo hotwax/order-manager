@@ -216,6 +216,7 @@ import { storeToRefs } from 'pinia';
 import { useOrderStore } from '@/store/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
+import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import router from '@/router';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
@@ -233,6 +234,7 @@ import {
 const orderStore = useOrderStore();
 const orderDetailStore = useOrderDetailStore();
 const userStore = useUserStore();
+const productStore = useProductStore();
 const seedStore = useSeedStore();
 const { searchQuery, searchFilters, searchSort, searchResults, searchTotal, loading, error, hasMore } = storeToRefs(orderStore);
 
@@ -249,7 +251,7 @@ const selectedOrderIds = ref<string[]>([]);
 
 const orderStatuses = computed(() => seedStore.getStatusItemsByType('ORDER_STATUS'));
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
-const selectedProductStoreId = computed(() => userStore.currentProductStore?.productStoreId || 'All');
+const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const selectedStatusIds = computed(() => {
   const status = searchFilters.value.status as string[] | string;
   if (Array.isArray(status)) return status;
@@ -277,6 +279,10 @@ const canUseBulkActions = computed(() => canCancelOrders.value || canUpdateOrder
 onMounted(async () => {
   orderStore.searchFilters.productStoreId = selectedProductStoreId.value;
   await orderStore.runSearch();
+});
+
+watch(selectedProductStoreId, () => {
+  orderStore.searchFilters.productStoreId = selectedProductStoreId.value;
 });
 
 watch(searchQuery, () => {

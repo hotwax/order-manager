@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { commonUtil, useSolrSearch } from '@common';
-import { buildOrderLookupPayload, searchOrders } from '@/services/order';
+import {
+  buildOrderLookupPayload,
+  buildVirtualLocationCountsPayload,
+  fetchVirtualLocationOrderCounts,
+  searchOrders
+} from '@/services/order';
 
 vi.mock('@common', () => ({
   api: vi.fn(),
@@ -261,5 +266,47 @@ describe('buildOrderLookupPayload facility filtering', () => {
       brokeredItemCount: 0,
       totalItemCount: 4
     });
+  });
+});
+
+describe('virtual location count payload', () => {
+  function virtualLocationFiltersOf(params: Parameters<typeof buildVirtualLocationCountsPayload>[0]) {
+    return buildVirtualLocationCountsPayload(params).json.filter as string[];
+  }
+
+  it('counts created and approved orders by virtual facility for the selected product store', () => {
+    const filters = virtualLocationFiltersOf({
+      productStoreId: 'STORE',
+      facilityIds: ['_NA_', 'REJECTED_ITM_PARKING', 'UNFILLABLE_PARKING']
+    });
+
+    expect(filters).toContain('docType: ORDER');
+    expect(filters).toContain('orderTypeId: SALES_ORDER');
+    expect(filters).toContain('orderStatusId:(ORDER_CREATED OR ORDER_APPROVED)');
+    expect(filters).toContain('productStoreId:STORE');
+    expect(filters).toContain('facilityId:(_NA_ OR REJECTED_ITM_PARKING OR UNFILLABLE_PARKING)');
+  });
+
+  it('normalizes Solr facet buckets into facility order counts', async () => {
+    mockSolrResponse({
+      facets: {
+        facilityCounts: {
+          buckets: [
+            { val: '_NA_', count: 3, orders: 2 },
+            { val: 'UNFILLABLE_PARKING', count: 5, orders: '4' }
+          ]
+        }
+      }
+    });
+
+    const counts = await fetchVirtualLocationOrderCounts({
+      productStoreId: 'STORE',
+      facilityIds: ['_NA_', 'UNFILLABLE_PARKING']
+    });
+
+    expect(counts).toEqual([
+      { facilityId: '_NA_', count: 2 },
+      { facilityId: 'UNFILLABLE_PARKING', count: 4 }
+    ]);
   });
 });
