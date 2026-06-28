@@ -122,12 +122,12 @@
             </ion-label>
           </ion-item>
 
-          <ion-label class="tablet ion-text-start">
+          <ion-label class="tablet">
             {{ order.customerName || translate('Unknown customer') }}
             <p v-if="order.customerId">{{ order.customerId }}</p>
           </ion-label>
 
-          <ion-label class="tablet ion-text-start">
+          <ion-label class="tablet">
             <template v-if="locationChipName(order)">
               <ion-chip class="brokered-facility-chip" outline>
                 <ion-label>{{ locationChipLabel(order) }}</ion-label>
@@ -139,7 +139,7 @@
             </template>
           </ion-label>
 
-          <ion-label class="tablet ion-text-start">
+          <ion-label class="tablet">
             <p class="overline">{{ translate('Ordered') }}</p>
             {{ formatDateTime(order.orderDate) }}
             <p v-if="orderedRelativeLabel(order.orderDate)">{{ orderedRelativeLabel(order.orderDate) }}</p>

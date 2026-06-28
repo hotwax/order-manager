@@ -93,13 +93,13 @@
             </ion-label>
           </ion-item>
 
-          <ion-label class="tablet ion-text-start">
+          <ion-label class="tablet">
             {{ order.customerName || order.customerId || translate('Unknown customer') }}
             <p>{{ customerAddressLine(order) }}</p>
             <p v-if="customerAddressTrailingLine(order)">{{ customerAddressTrailingLine(order) }}</p>
           </ion-label>
 
-          <ion-label class="tablet ion-text-start">
+          <ion-label class="tablet">
             {{ queueReasonLabel(order) }}
             <p>{{ queueRuleLabel(order) }}</p>
           </ion-label>
@@ -523,7 +523,7 @@ function parkingUnitCountLabel(order: Order) {
 }
 
 function customerAddressLine(order: Order) {
-  return order.shippingAddress1 || order.customerId || order.externalId || '';
+  return order.shippingAddress1 || order.customerId || '';
 }
 
 function customerAddressTrailingLine(order: Order) {
@@ -535,7 +535,7 @@ function customerAddressTrailingLine(order: Order) {
   ].filter(Boolean);
 
   if (parts.length) return parts.join(' ');
-  return order.shippingAddress1 ? '' : order.externalId;
+  return '';
 }
 
 function queueReasonLabel(order: Order) {
