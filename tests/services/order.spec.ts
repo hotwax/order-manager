@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 import { commonUtil, useSolrSearch } from '@common';
 import {
+  buildActivePhysicalFacilityOrderVolumePayload,
   buildOrderLookupPayload,
+  getActivePhysicalFacilityOrderVolume,
   buildVirtualLocationCountsPayload,
   fetchVirtualLocationOrderCounts,
   searchOrders
@@ -19,6 +21,10 @@ function filtersOf(params: Parameters<typeof buildOrderLookupPayload>[0]) {
 
 function fieldsOf(params: Parameters<typeof buildOrderLookupPayload>[0] = {}) {
   return String(buildOrderLookupPayload(params).json.params.fl).split(' ');
+}
+
+function activeFacilityFiltersOf(params: Parameters<typeof buildActivePhysicalFacilityOrderVolumePayload>[0] = {}) {
+  return buildActivePhysicalFacilityOrderVolumePayload(params).json.filter as string[];
 }
 
 function mockSolrResponse(data: any) {
@@ -151,6 +157,63 @@ describe('buildOrderLookupPayload facility filtering', () => {
       queueReason: 'Inventory not available',
       ruleName: 'Rule name'
     });
+  });
+
+  it('builds a current physical facility volume query from indexed ORDER fields', () => {
+    const payload = buildActivePhysicalFacilityOrderVolumePayload({ productStoreId: 'STORE_1' });
+    const filters = activeFacilityFiltersOf({ productStoreId: 'STORE_1' });
+
+    expect(filters).toContain('docType: ORDER');
+    expect(filters).toContain('orderTypeId: SALES_ORDER');
+    expect(filters).toContain('facilityId:[* TO *]');
+    expect(filters).toContain('-facilityTypeId:VIRTUAL_FACILITY');
+    expect(filters).toContain('-facilityId:(_NA_ OR REJECTED_ITM_PARKING OR REJECTED_PARKING OR UNFILLABLE_PARKING OR GENERAL_OPS_PARKING)');
+    expect(filters).toContain('-orderStatusId:(ORDER_COMPLETED OR ORDER_CANCELLED)');
+    expect(filters).toContain('productStoreId:STORE_1');
+    expect(payload.json.facet.physicalFacilities).toMatchObject({
+      type: 'terms',
+      field: 'facilityId',
+      sort: 'orderCount desc'
+    });
+  });
+
+  it('normalizes active physical facility volume buckets', async () => {
+    mockSolrResponse({
+      facets: {
+        physicalFacilities: {
+          buckets: [{
+            val: 'BROADWAY',
+            count: 4,
+            orderCount: 2,
+            itemQuantity: 6,
+            facilityNames: { buckets: [{ val: 'Broadway' }] }
+          }, {
+            val: 'GARDEN_CITY',
+            count: 1,
+            orderCount: 1,
+            itemQuantity: 1,
+            facilityNames: { buckets: [{ val: 'Garden City' }] }
+          }, {
+            val: 'EMPTY_STORE',
+            count: 0,
+            orderCount: 0,
+            itemQuantity: 0
+          }]
+        }
+      }
+    });
+
+    await expect(getActivePhysicalFacilityOrderVolume()).resolves.toEqual([{
+      facilityId: 'BROADWAY',
+      facilityName: 'Broadway',
+      lastOrderCount: 2,
+      assignedItemQuantity: 6
+    }, {
+      facilityId: 'GARDEN_CITY',
+      facilityName: 'Garden City',
+      lastOrderCount: 1,
+      assignedItemQuantity: 1
+    }]);
   });
 
   it('summarizes brokered facilities from physical facility docs only', async () => {
