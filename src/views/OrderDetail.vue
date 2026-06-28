@@ -69,9 +69,12 @@
 
         <!-- details wrapper: child matching .order-detail-header-details -->
         <div class="order-detail-header-details">
-          <ion-card>
+          <ion-card class="customer-summary-card">
             <ion-card-header>
               <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
+              <ion-button v-if="customerPartyId" fill="clear" size="small" :router-link="'/customers/' + customerPartyId">
+                {{ translate('View details') }}
+              </ion-button>
             </ion-card-header>
             <ion-list lines="none">
               <ion-item>
@@ -166,6 +169,12 @@
                 <ion-label>
                   <p>{{ translate('Channel') }}</p>
                   {{ order.channel || translate('Channel') }}
+                </ion-label>
+              </ion-item>
+              <ion-item v-if="order.originFacilityId">
+                <ion-label>
+                  <p>{{ translate('Placed at') }}</p>
+                  {{ order.originFacilityName }}
                 </ion-label>
               </ion-item>
             </ion-list>
@@ -315,6 +324,9 @@
             </ion-list>
           </ion-card>
           <ion-card class="totals">
+            <ion-card-header>
+              <ion-card-title>{{ translate('Total') }}</ion-card-title>
+            </ion-card-header>
             <ion-list lines="full">
               <ion-item>
                 <ion-label>{{ translate('Subtotal') }}</ion-label>
@@ -825,6 +837,7 @@
       <div v-if="selectedSegment === 'holds'">
         <template v-if="hasOrderHoldTasks">
           <BadAddressTaskCard v-for="task in orderAddressValidationTasks" :key="task.workEffortId" :task="task"
+            :countries="seed.getCountries"
             @completed="reloadHoldTasks" />
           <SwapTaskCard v-for="task in orderSwapTasks" :key="task.workEffortId" :task="task"
             @completed="reloadHoldTasks" />
@@ -833,7 +846,12 @@
           <HoldTaskCard v-for="task in orderHoldTasks" :key="task.workEffortId" :task="task"
             @completed="reloadHoldTasks" />
         </template>
-        <EmptyState v-else :title="translate('No holds')" :message="translate('No holds on this order')" />
+        <template v-else>
+          <EmptyState :title="translate('No holds')" :message="translate('No holds on this order')" />
+          <div class="ion-text-center ion-padding">
+            <ion-button fill="outline" @click="openCreateHoldTaskModal()">{{ translate('Create hold task') }}</ion-button>
+          </div>
+        </template>
       </div>
 
       <div v-if="selectedSegment === 'risk'">
@@ -969,6 +987,14 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
+
+    <ion-footer v-if="order && selectedSegment === 'holds' && hasOrderHoldTasks">
+      <ion-toolbar>
+        <ion-buttons slot="end">
+          <ion-button @click="openCreateHoldTaskModal()">{{ translate('Create hold task') }}</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-footer>
   </ion-page>
 </template>
 
@@ -1039,6 +1065,15 @@ const order = computed(() => {
     statusId: raw.statusId,
     channel: seed.enumDescription(raw.salesChannelEnumId),
     productStoreName: seed.productStoreName(raw.productStoreId),
+    // Origin/placed-at facility from the order header (set by the OMS order import for
+    // POS/retail-location orders). Prefer a name from the payload, then the seed facility
+    // lookup, falling back to the raw id. Empty when the order has no origin facility.
+    // '_NA_' is the OMS "no origin facility" sentinel (common on non-POS orders) and
+    // resolves to a virtual "Brokering Queue" facility — treat it (and blanks) as no origin.
+    originFacilityId: raw.originFacilityId && raw.originFacilityId !== '_NA_' ? raw.originFacilityId : '',
+    originFacilityName: raw.originFacilityId && raw.originFacilityId !== '_NA_'
+      ? (raw.originFacilityName || seed.facility(raw.originFacilityId)?.facilityName || raw.originFacilityId)
+      : '',
     currency: raw.currencyUom,
     localeString: raw.localeString || raw.locale,
     riskRecommendationEnumId: raw.riskRecommendationEnumId,
@@ -2777,6 +2812,63 @@ async function openAddTaskModal(shipGroup: any) {
   }
 }
 
+// Create one or more hold tasks for the current order directly from the Holds
+// tab. Single-ship-group orders default automatically; multi-ship-group orders
+// let the user pick which ship groups to add the task to.
+async function openCreateHoldTaskModal() {
+  const currentOrder = order.value;
+  if (!currentOrder) return;
+
+  const shipGroups = (currentOrder.shipGroups ?? []).map((shipGroup: any) => ({
+    id: shipGroup.id,
+    label: shipGroup.facilityName ? `${shipGroup.id} · ${shipGroup.facilityName}` : shipGroup.id,
+  }));
+  if (!shipGroups.length) {
+    await showToast(translate('This order has no ship groups to add a task to.'));
+    return;
+  }
+
+  const modal = await modalController.create({
+    component: AddOrderTaskModal,
+    componentProps: {
+      shipGroups,
+      title: translate('Create hold task'),
+      autoGenerateTaskName: true,
+      defaultOrderName: currentOrder.orderName || currentOrder.id,
+      defaultWorkEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+      defaultWorkEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+    },
+  });
+  await modal.present();
+  const { data, role } = await modal.onWillDismiss();
+  if (role !== 'confirm' || !data) return;
+
+  const shipGroupSeqIds: string[] = data.shipGroupSeqIds?.length
+    ? data.shipGroupSeqIds
+    : shipGroups.map((shipGroup) => shipGroup.id);
+  const orderId = currentOrder.id;
+  try {
+    await api({
+      url: 'oms/orders/tasks',
+      method: 'POST',
+      data: shipGroupSeqIds.map((shipGroupSeqId) => ({
+        orderId,
+        shipGroupSeqId,
+        workEffortName: data.workEffortName,
+        workEffortTypeId: data.workEffortTypeId,
+        workEffortPurposeTypeId: data.workEffortPurposeTypeId,
+        description: data.description,
+        statusId: 'TASK_CREATED',
+      })),
+    });
+    await showToast(translate('Tasks created successfully.'));
+    selectedSegment.value = 'holds';
+    await reloadHoldTasks();
+  } catch {
+    await showToast(translate('Failed to create tasks. Please try again.'));
+  }
+}
+
 async function openAddItemModal(shipGroup: any) {
   const modal = await modalController.create({
     component: AddItemToOrderModal,
@@ -3004,5 +3096,11 @@ ion-card-header ion-buttons {
   .order-items .order-summary {
     grid-template-columns: 1fr;
   }
+}
+.customer-summary-card ion-card-header {
+  align-items: center;
+  display: flex;
+  gap: var(--spacer-xs);
+  justify-content: space-between;
 }
 </style>

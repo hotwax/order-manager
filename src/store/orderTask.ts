@@ -217,8 +217,10 @@ export const useOrderTaskStore = defineStore('orderTask', {
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
         this.addressValidationTasks = payload.pageIndex > 0 ? [...this.addressValidationTasks, ...detailedTasks] : detailedTasks;
+        return true;
       } catch (err) {
         console.error('Failed to fetch the address validation tasks', err);
+        return false;
       }
     },
     async fetchSwapTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; swappable?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
