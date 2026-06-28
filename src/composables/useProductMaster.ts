@@ -6,9 +6,9 @@ import { useProductCacheStore, type CachedProduct, type ProductIdentification } 
  * Product master — fetch rich product data (name, SKU, image) from Solr, cached per
  * productId and NEVER refetched once cached. The order detail page is the first consumer.
  *
- * This mirrors inventory-count/src/composables/useProductMaster.ts. Same public API; the
- * storage backend is currently the in-memory productCache store (Dexie deferred — see
- * docs/ProductData.md and docs/Compromises.md). Consumers never touch the store directly.
+ * This mirrors inventory-count/src/composables/useProductMaster.ts. Same public API;
+ * the storage backend is the in-memory productCache store. Consumers never touch the
+ * store directly.
  */
 
 const PRODUCT_FIELDS = "productId productName parentProductName internalName goodIdentifications mainImageUrl";
@@ -95,7 +95,7 @@ async function getByIds(productIds: string[]): Promise<CachedProduct[]> {
 /** Fetch only the productIds not already cached, then store them. The never-refetch path. */
 async function prefetch(productIds: string[]) {
   const cache = useProductCacheStore();
-  await cache.ensureHydrated(); // pull this OMS's persisted products from Dexie first
+  await cache.ensureHydrated();
   const idsToFetch = [...new Set(productIds.filter(Boolean))].filter((id) => !cache.has(id));
   if (!idsToFetch.length) return;
 

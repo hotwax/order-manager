@@ -25,7 +25,6 @@
     "boon-js": "^2.0.3",
     "cron-parser": "catalog:",
     "cronstrue": "catalog:",
-    "dexie": "^4.4.3",
     "file-saver": "catalog:",
     "ionicons": "catalog:",
     "luxon": "catalog:",
