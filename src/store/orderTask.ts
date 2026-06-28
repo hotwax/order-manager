@@ -129,6 +129,11 @@ async function prefetchFraudTaskAssets(tasks: any[]) {
   }
 }
 
+// Load status for a task-list queue. `idle` before the first fetch, `loading`
+// while the first page (list + enrichment) is in flight, `success` once cards
+// can render stably, `error` when the fetch or enrichment failed.
+type TaskLoadStatus = 'idle' | 'loading' | 'success' | 'error';
+
 export const useOrderTaskStore = defineStore('orderTask', {
   state: () => ({
     holdTasks: [] as any[],
@@ -139,6 +144,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
     orderAddressValidationTasks: [] as any[],
     orderSwapTasks: [] as any[],
     orderFraudTasks: [] as any[],
+    swapStatus: 'idle' as TaskLoadStatus,
+    swapError: '' as string,
   }),
   getters: {
     getHoldTasks: (state) => state.holdTasks,
@@ -162,6 +169,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
         (state.swapTasks?.length % Number(import.meta.env.VITE_VIEW_SIZE) === 0)
       );
     },
+    getSwapStatus: (state) => state.swapStatus,
+    getSwapError: (state) => state.swapError,
     getFraudTasks: (state) => state.fraudTasks,
     isFraudTasksScrollable: (state): boolean => {
       return (
@@ -220,6 +229,14 @@ export const useOrderTaskStore = defineStore('orderTask', {
       }
     },
     async fetchSwapTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; swappable?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
+      // First-page fetches drive the page-level loading/error state. Pagination
+      // (pageIndex > 0) keeps the already-rendered cards visible and is handled
+      // by the infinite-scroll spinner instead, so it never flips swapStatus.
+      const isFirstPage = !(payload.pageIndex > 0);
+      if (isFirstPage) {
+        this.swapStatus = 'loading';
+        this.swapError = '';
+      }
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({
@@ -235,9 +252,17 @@ export const useOrderTaskStore = defineStore('orderTask', {
         });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
-        this.swapTasks = payload.pageIndex > 0 ? [...this.swapTasks, ...detailedTasks] : detailedTasks;
+        this.swapTasks = isFirstPage ? detailedTasks : [...this.swapTasks, ...detailedTasks];
+        // Only mark success once product master + stock enrichment have settled so
+        // the cards render their images/stock without flashing partial content.
+        await prefetchSwapTaskAssets(detailedTasks);
+        if (isFirstPage) this.swapStatus = 'success';
       } catch (err) {
         console.error('Failed to fetch the swap tasks', err);
+        if (isFirstPage) {
+          this.swapStatus = 'error';
+          this.swapError = 'Failed to load swap tasks. Please try again.';
+        }
       }
     },
     async fetchFraudTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string; riskRecommendationEnumId?: string; riskLevelEnumId?: string } = {}) {
