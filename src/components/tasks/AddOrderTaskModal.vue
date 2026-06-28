@@ -37,7 +37,10 @@
           @ionInput="handleTaskNameInput($event.detail.value)"
         />
       </ion-item>
-      <ion-item>
+      <!-- Task type is internal to the hold-task flow: when the caller supplies a
+           default type (e.g. RESOLVE_ONHOLD_ORDER), hide the selector and submit it
+           internally. The generic bulk "Add task" flow (no default) still shows it. -->
+      <ion-item v-if="!props.defaultWorkEffortTypeId">
         <ion-select
           :label="requiredLabel('Task Type')"
           label-placement="stacked"
