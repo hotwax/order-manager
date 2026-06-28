@@ -11,10 +11,10 @@ describe('order detail ship group card', () => {
     expect(source).toContain('v-collapsible class="ship-group-summary-container"');
     expect(source).toContain('v-collapsible class="ship-group-card-details"');
     expect(source).toContain('--ship-group-collapsible-height');
-    expect(source).toContain('box-sizing: content-box;');
-    expect(source).toContain('transition: max-height 180ms ease, opacity 160ms ease, padding-block 180ms ease;');
-    expect(source).toContain('padding-block: 0;');
-    expect(source).toContain('padding-block: var(--spacer-base);');
+    expect(source).toContain('new ResizeObserver(() => updateCollapsibleHeight(el))');
+    expect(source).toContain('observer.observe(el);');
+    expect(source).toContain('Array.from(el.children).forEach((child) => observer.observe(child));');
+    expect(source).toContain('collapsibleObservers.get(el)?.disconnect();');
     expect(source).toContain('shipGroupHoldTask(shipGroup)');
     expect(source).toContain('shipGroupHoldTaskLabel(shipGroup)');
     expect(source).toContain("selectedSegment.value = 'holds'");
@@ -28,6 +28,11 @@ describe('order detail ship group card', () => {
     expect(source).toContain('@click.stop="clearGiftMessage(shipGroup)"');
     expect(source).toContain('await updateShipGroup(shipGroup.id, { giftMessage: null });');
     expect(source).toContain("`${translate('Hold task')}: ${taskName}`");
+    expect(source).toContain("defaultItemStatusId: defaultAddedItemStatusId(shipGroup)");
+    expect(source).toContain("requiresFulfillmentReview: requiresAddItemFulfillmentReview(shipGroup)");
+    expect(source).toContain("statusId: 'ITEM_APPROVED'");
+    expect(source).toContain("url: `oms/orders/${raw.orderId}/items/${item.orderItemSeqId}/status`");
+    expect(source).toContain("translate('Approve')");
     expect(source).not.toContain('transition: grid-template-rows');
     expect(source).not.toContain('grid-template-rows: 0fr');
     expect(source).not.toContain('grid-template-rows: 1fr');
