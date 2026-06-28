@@ -111,6 +111,7 @@
             lines="none"
           >
             <ion-checkbox
+              v-if="selectMode"
               slot="start"
               :checked="selectedIds.has(order.orderId)"
               @click.stop
@@ -430,13 +431,11 @@ function setOrderSelection(orderId: string, checked: boolean) {
 
   if (checked) {
     currentSelection.add(orderId);
-    selectMode.value = true;
   } else {
     currentSelection.delete(orderId);
   }
 
   store.setSelection(bucket, [...currentSelection]);
-  if (!currentSelection.size) selectMode.value = false;
 }
 
 function orderDetailLink(order: WorkflowOrder) {
