@@ -45,12 +45,12 @@
             {{ customer.fullName || customer.partyId }}
           </ion-label>
           <ion-label class="tablet ion-text-start">
-            {{ customerContactLabel(customer) }}
-            <p>{{ translate('Contact') }}</p>
+            {{ customer.emailAddress || translate('No email') }}
+            <p>{{ translate('Email') }}</p>
           </ion-label>
           <ion-label class="tablet ion-text-end">
-            {{ partyTypes[customer.partyTypeId] ?? customer.partyTypeId ?? translate('Unknown') }}
-            <p>{{ translate('Type') }}</p>
+            {{ customer.phoneNumber || translate('No phone') }}
+            <p>{{ translate('Phone') }}</p>
           </ion-label>
         </div>
       </ion-list>
@@ -71,7 +71,7 @@
 <script setup lang="ts">
 import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonProgressBar, IonSearchbar, IonTitle, IonToolbar, useIonRouter } from '@ionic/vue';
 import { computed, onMounted, ref, watch } from 'vue';
-import { partyTypes, searchCustomers } from '@/services/customer';
+import { searchCustomers } from '@/services/customer';
 import type { Customer } from '@/types/order';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
@@ -136,10 +136,6 @@ async function loadMore(event: CustomEvent) {
   } finally {
     (event.target as HTMLIonInfiniteScrollElement).complete();
   }
-}
-
-function customerContactLabel(customer: Customer): string {
-  return customer.emailAddress || customer.phoneNumber || translate('No contact info');
 }
 
 function goToCustomer(customer: Customer) {
