@@ -135,7 +135,7 @@
               <p>{{ brokeredProgressLabel(order) }}</p>
             </template>
             <template v-else>
-              <ion-note class="brokered-empty">{{ translate('Not brokered') }}</ion-note>
+              <ion-note>{{ translate('Not brokered') }}</ion-note>
             </template>
           </ion-label>
 
@@ -148,10 +148,7 @@
           <ion-label class="queue-delivery ion-text-end">
             <p class="overline">{{ translate('Estimated delivery date') }}</p>
             {{ estimatedDeliveryDateLabel(order) }}
-            <p
-              v-if="estimatedDeliveryRelativeLabel(order)"
-              :class="{ 'delivery-overdue': isDeliveryOverdue(order) }"
-            >
+            <p v-if="estimatedDeliveryRelativeLabel(order)">
               {{ isDeliveryOverdue(order) ? translate('Overdue') : '' }} {{ estimatedDeliveryRelativeLabel(order) }}
             </p>
           </ion-label>
@@ -554,12 +551,4 @@ function dateFromValue(value?: string | null) {
   max-width: 100%;
 }
 
-.brokered-empty {
-  font-size: 0.85em;
-}
-
-.delivery-overdue {
-  color: var(--ion-color-danger);
-  font-weight: 600;
-}
 </style>
