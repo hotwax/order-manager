@@ -16,6 +16,7 @@ import Menu from '@/components/layout/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';
 import { useSeedStore } from '@/store/seed';
+import { useAuth } from '@common/composables/useAuth';
 
 const loader = ref<HTMLIonLoadingElement | null>(null);
 const userStore = useUserStore();
@@ -63,6 +64,15 @@ onMounted(async () => {
     .filter(Boolean);
   if (productStoreIds.length) {
     useSeedStore().loadInitialSeedData(productStoreIds).catch(() => undefined);
+  }
+
+  // Permissions are persisted, and postLogin (which fetches them) only fires on a login
+  // transition. An authenticated reload restores the session straight from the persisted
+  // store, so without this it would keep a stale permission set — e.g. an empty list
+  // captured before the user was granted access — silently hiding screens they can now
+  // reach. Refresh permissions on an authenticated boot so server-side grants take effect.
+  if (useAuth().isAuthenticated.value) {
+    userStore.fetchPermissions().catch(() => undefined);
   }
 });
 

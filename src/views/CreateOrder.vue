@@ -104,10 +104,10 @@
                 <div>
                   <h5 class="ion-margin-horizontal">{{ translate("Add items") }}</h5>
                   <ion-segment v-model="mode" @ionChange="segmentChange($event.target.value as string)">
-                    <ion-segment-button value="scan" content-id="scan">
+                    <ion-segment-button value="scan">
                       <ion-icon :icon="barcodeOutline" />
                     </ion-segment-button>
-                    <ion-segment-button value="search" content-id="search">
+                    <ion-segment-button value="search">
                       <ion-icon :icon="searchOutline" />
                     </ion-segment-button>
                   </ion-segment>

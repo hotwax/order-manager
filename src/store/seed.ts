@@ -136,6 +136,12 @@ export const useSeedStore = defineStore("seed", {
     },
     productStore: (state) => (productStoreId: string) => state.productStores.byId[productStoreId],
     productStoreName: (state) => (productStoreId: string) => itemDescription(state.productStores.byId[productStoreId], productStoreId, ["storeName", "companyName"]),
+    shopifyShopByProductStore: (state) => (productStoreId: string) => {
+      if (!productStoreId) return null;
+      return state.shopifyShops.ids
+        .map((id) => state.shopifyShops.byId[id])
+        .find((shop: any) => shop?.productStoreId === productStoreId) || null;
+    },
     status: (state) => (statusId: string) => findStatus(state, statusId),
     // StatusItem.statusAge - a 0..~100 lifecycle position (created low, completed/cancelled ~100).
     // Used to compute order/ship-group progress; 0 if unknown.

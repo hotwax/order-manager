@@ -150,6 +150,17 @@
                   <p>{{ id.typeLabel }}</p>
                   {{ id.idValue }}
                 </ion-label>
+                <a
+                  v-if="id.shopifyAdminUrl"
+                  slot="end"
+                  :href="id.shopifyAdminUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  :aria-label="translate('View in Shopify')"
+                  :title="translate('View in Shopify')"
+                >
+                  <ion-icon :icon="openOutline" />
+                </a>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -1000,7 +1011,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
+import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
@@ -1026,6 +1037,7 @@ import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
 import { api, commonUtil, DxpShopifyImg, translate, useSolrSearch } from '@common';
 import { showToast, isKit, riskLevelColor } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
+import { shopifyAdminOrderUrl } from '@/utils/shopifyAdmin';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
@@ -1083,11 +1095,22 @@ const order = computed(() => {
       changeReason: entry.changeReason || '',
       at: entry.statusDatetime
     })),
-    identifications: (raw.identifications || []).map((identification: any) => ({
-      orderIdentificationTypeId: identification.orderIdentificationTypeId,
-      typeLabel: seed.orderIdentificationTypeDescription(identification.orderIdentificationTypeId),
-      idValue: identification.idValue
-    })),
+    identifications: (raw.identifications || []).map((identification: any) => {
+      // The SHOPIFY_ORD_ID identification value is the Shopify order id; pair it with
+      // the shop's myshopify domain (matched by product store) to deep-link into the
+      // Shopify Admin order screen. Mirrors the Moqui OMS get#OrderShopifyUrl service.
+      const shop = identification.orderIdentificationTypeId === 'SHOPIFY_ORD_ID'
+        ? seed.shopifyShopByProductStore(raw.productStoreId)
+        : null;
+      return {
+        orderIdentificationTypeId: identification.orderIdentificationTypeId,
+        typeLabel: seed.orderIdentificationTypeDescription(identification.orderIdentificationTypeId),
+        idValue: identification.idValue,
+        shopifyAdminUrl: shop
+          ? shopifyAdminOrderUrl(shop.myshopifyDomain || shop.domain, identification.idValue)
+          : ''
+      };
+    }),
     payments: (raw.paymentPreferences || []).map((payment: any) => ({
       id: payment.orderPaymentPreferenceId,
       paymentMethodTypeId: payment.paymentMethodTypeId,
