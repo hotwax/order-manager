@@ -1,4 +1,5 @@
 import { api, commonUtil, useSolrSearch } from '@common';
+import { getActivePinia } from 'pinia';
 import { useSeedStore } from '@/store/seed';
 import {
   allDocs,
@@ -63,16 +64,6 @@ const orderSolrFields = [
   'shipBeforeDate',
   'shipByDate',
   'promisedDatetime',
-  'address1',
-  'shippingAddress1',
-  'city',
-  'shippingCity',
-  'stateProvinceGeoId',
-  'shippingStateProvinceGeoId',
-  'postalCode',
-  'shippingPostalCode',
-  'countryGeoId',
-  'shippingCountryGeoId',
   'facilityId',
   'reservationFacilityId',
   'facilityTypeId',
@@ -252,6 +243,9 @@ function isVirtualFacilityDoc(doc: any) {
   const facilityTypeId = toStringValue(doc.facilityTypeId);
   if (facilityTypeId === 'VIRTUAL_FACILITY') return true;
 
+  // The parent-type check needs the seed store; guard it so this service stays callable
+  // outside an active Pinia (e.g. unit tests), falling back to the direct type check.
+  if (!facilityTypeId || !getActivePinia()) return false;
   const parentTypeId = useSeedStore().facilityType(facilityTypeId)?.parentTypeId;
   return parentTypeId === 'VIRTUAL_FACILITY';
 }

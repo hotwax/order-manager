@@ -80,14 +80,9 @@ describe('buildOrderLookupPayload facility filtering', () => {
     ]));
   });
 
-  it('requests the address, reason, and delivery fields used by queue list rows', () => {
+  it('requests the reason and delivery fields used by queue list rows', () => {
     const fields = fieldsOf();
     expect(fields).toEqual(expect.arrayContaining([
-      'address1',
-      'city',
-      'stateProvinceGeoId',
-      'postalCode',
-      'countryGeoId',
       'estimatedDeliveryDate',
       'shipBeforeDate',
       'rejectionReason',
