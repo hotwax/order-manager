@@ -30,54 +30,66 @@
         </FilterSelect>
       </SearchFilterCard>
 
-      <ion-list v-if="addressValidationTasks.length" lines="none">
-        <ion-list-header class="order-results-header">
-          <span class="order-results-header-start">
-            <ion-checkbox
-              v-if="selectMode"
-              :checked="allCurrentPageSelected"
-              :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
-              @ionChange="toggleCurrentPageSelection($event.detail.checked)"
-            />
-          </span>
-          <ion-label>
-            {{ addressValidationTasks.length }} {{ addressValidationTasks.length === 1 ? translate('bad address task') : translate('bad address tasks') }}
-          </ion-label>
-          <ion-button fill="clear" size="small" @click="toggleSelectMode">
-            {{ selectMode ? translate('Done') : translate('Select') }}
-          </ion-button>
-        </ion-list-header>
-      </ion-list>
-
-      <div class="bad-address-list">
-        <BadAddressTaskCard
-          v-for="task in addressValidationTasks"
-          :key="task.workEffortId"
-          :task="task"
-          :address-state="addressStateMap[task.workEffortId]"
-          :countries="countries"
-          :selectable="selectMode"
-          :selected="!!selectedOrders[task.workEffortId]"
-          show-view-order-action
-          @update:selected="val => selectedOrders[task.workEffortId] = val"
-          @completed="fetchAddressValidationTasks()"
-          :ref="setCardRef"
-        />
-        <div class="empty-state" v-if="!addressValidationTasks.length">
-          <p v-html="getEmptyMessage()"></p>
-        </div>
+      <div v-if="loading" class="ion-text-center ion-padding">
+        <ion-spinner name="crescent" />
       </div>
 
-      <ion-infinite-scroll
-        @ionInfinite="loadMoreAddressValidationTasks($event)"
-        threshold="100px"
-        v-if="isScrollable"
-      >
-        <ion-infinite-scroll-content
-          loading-spinner="crescent"
-          :loading-text="translate('Loading')"
-        />
-      </ion-infinite-scroll>
+      <template v-else-if="error">
+        <ErrorState :title="translate('Could not load bad address tasks')" :message="error" />
+        <div class="ion-text-center ion-padding">
+          <ion-button fill="outline" @click="fetchAddressValidationTasks()">{{ translate('Retry') }}</ion-button>
+        </div>
+      </template>
+
+      <template v-else>
+        <ion-list v-if="addressValidationTasks.length" lines="none">
+          <ion-list-header class="order-results-header">
+            <span class="order-results-header-start">
+              <ion-checkbox
+                v-if="selectMode"
+                :checked="allCurrentPageSelected"
+                :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
+                @ionChange="toggleCurrentPageSelection($event.detail.checked)"
+              />
+            </span>
+            <ion-label>
+              {{ addressValidationTasks.length }} {{ addressValidationTasks.length === 1 ? translate('bad address task') : translate('bad address tasks') }}
+            </ion-label>
+            <ion-button fill="clear" size="small" @click="toggleSelectMode">
+              {{ selectMode ? translate('Done') : translate('Select') }}
+            </ion-button>
+          </ion-list-header>
+        </ion-list>
+
+        <div class="bad-address-list">
+          <BadAddressTaskCard
+            v-for="task in addressValidationTasks"
+            :key="task.workEffortId"
+            :task="task"
+            :countries="countries"
+            :selectable="selectMode"
+            :selected="!!selectedOrders[task.workEffortId]"
+            show-view-order-action
+            @update:selected="val => selectedOrders[task.workEffortId] = val"
+            @completed="fetchAddressValidationTasks()"
+            :ref="setCardRef"
+          />
+          <div class="empty-state" v-if="!addressValidationTasks.length">
+            <p v-html="getEmptyMessage()"></p>
+          </div>
+        </div>
+
+        <ion-infinite-scroll
+          @ionInfinite="loadMoreAddressValidationTasks($event)"
+          threshold="100px"
+          v-if="isScrollable"
+        >
+          <ion-infinite-scroll-content
+            loading-spinner="crescent"
+            :loading-text="translate('Loading')"
+          />
+        </ion-infinite-scroll>
+      </template>
     </ion-content>
 
     <ion-footer v-if="selectMode">
@@ -94,11 +106,12 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUpdate } from 'vue';
-import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonSelectOption, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
+import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonSelectOption, IonSpinner, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
 import router from '@/router';
 import { showToast } from '@/utils';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
+import ErrorState from '@/components/common/ErrorState.vue';
 import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
@@ -106,7 +119,6 @@ import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
-import type { AddressForm, AddressState } from '@/types/order';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
@@ -117,53 +129,6 @@ const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANN
 const countries = computed(() => seedStore.getCountries);
 const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
 
-// Address state map — keyed by workEffortId, populated when tasks load.
-// Cards read/mutate their slice directly; no per-card watcher or local state needed.
-const addressStateMap = ref<Record<string, AddressState>>({});
-
-function buildAddressForm(src: any, task: any): AddressForm {
-  return {
-    address1: src?.address1 ?? '',
-    address2: src?.address2 ?? '',
-    city: src?.city ?? '',
-    postalCode: src?.postalCode ?? '',
-    stateProvinceGeoId: src?.stateProvinceGeoId ?? '',
-    countryGeoId: src?.countryGeoId ?? '',
-    contactMechId: task?.shippingAddress?.contactMechId ?? '',
-    contactMechPurposeTypeId: task?.shippingAddress?.contactMechPurposeTypeId || 'SHIPPING_LOCATION',
-    partyId: task?.customer?.partyId ?? '',
-    isEdited: true,
-  };
-}
-
-function buildSuggestedForm(task: any): AddressForm {
-  let parsed: any = {};
-  try { parsed = task.locationDesc ? JSON.parse(task.locationDesc) : {}; } catch { parsed = {}; }
-  return {
-    address1: parsed.address1 ?? '',
-    address2: parsed.address2 ?? '',
-    city: parsed.city ?? '',
-    postalCode: parsed.postalCode ?? '',
-    stateProvinceGeoId: seedStore.getGeoIdByCode(parsed.stateOrProvinceCode ?? ''),
-    countryGeoId: seedStore.getGeoIdByCode(parsed.countryCode ?? ''),
-    contactMechId: task?.shippingAddress?.contactMechId ?? '',
-    contactMechPurposeTypeId: task?.shippingAddress?.contactMechPurposeTypeId || 'SHIPPING_LOCATION',
-    partyId: task?.customer?.partyId ?? '',
-    isEdited: true,
-  };
-}
-
-function buildAddressState(task: any): AddressState {
-  const suggested = buildSuggestedForm(task);
-  const hasSuggested = [suggested.address1, suggested.address2, suggested.city, suggested.postalCode, suggested.stateProvinceGeoId, suggested.countryGeoId].some(Boolean);
-  const original = buildAddressForm(task.shippingAddress, task);
-  return {
-    selectedAddressType: hasSuggested ? 'suggested' : 'original',
-    original,
-    suggested,
-  };
-}
-
 const searchQuery = ref('');
 const assignee = ref('');
 const dateAfter = ref('');
@@ -171,6 +136,10 @@ const dateBefore = ref('');
 const orderChannel = ref('');
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
+// Initial-load state — covers the first task-list fetch. Cards then render their
+// own skeleton while each hydrates its address form lazily.
+const loading = ref(false);
+const error = ref('');
 
 const cardRefs = ref<any[]>([]);
 const setCardRef = (el: any) => {
@@ -194,27 +163,10 @@ function getEmptyMessage() {
     : translate('No records found.');
 }
 
+// Each card builds its own address form lazily (see BadAddressTaskCard); the view
+// only prunes selections for tasks that drop out of the list on refresh.
 watch(addressValidationTasks, (tasks) => {
   const incoming = new Set(tasks.map((t: any) => t.workEffortId));
-
-  // Collect unique country IDs only from newly loaded tasks, then load assocs once per country.
-  const countriesToLoad = new Set<string>();
-  tasks.forEach((task: any) => {
-    if (!addressStateMap.value[task.workEffortId]) {
-      addressStateMap.value[task.workEffortId] = buildAddressState(task);
-      const { original, suggested } = addressStateMap.value[task.workEffortId];
-      if (original.countryGeoId) countriesToLoad.add(original.countryGeoId);
-      if (suggested.countryGeoId) countriesToLoad.add(suggested.countryGeoId);
-    }
-  });
-  countriesToLoad.forEach(countryGeoId => seedStore.loadGeoAssocs(countryGeoId));
-
-  // Remove entries for tasks no longer in the list (after a filter/refresh).
-  Object.keys(addressStateMap.value).forEach(id => {
-    if (!incoming.has(id)) delete addressStateMap.value[id];
-  });
-
-  // Prune selections for tasks no longer present, without changing select mode.
   Object.keys(selectedOrders.value).forEach(id => {
     if (!incoming.has(id)) delete selectedOrders.value[id];
   });
@@ -250,15 +202,31 @@ function clearFilters() {
 }
 
 const fetchAddressValidationTasks = async (pageSize?: any, pageIndex?: any) => {
-  await orderTaskStore.fetchAddressValidationTasks({
-    pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
-    pageIndex: pageIndex ?? 0,
-    ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
-    ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
-    ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
-    ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
-    ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
-  });
+  // Show the full-page loading/error state only when there is nothing to show yet
+  // (first open of the route). Infinite-scroll pages and reloads after an action
+  // keep the existing, already-hydrated cards visible while they refresh.
+  const showFullLoading = !pageIndex && !addressValidationTasks.value.length;
+  if (showFullLoading) {
+    loading.value = true;
+    error.value = '';
+  }
+  try {
+    const ok = await orderTaskStore.fetchAddressValidationTasks({
+      pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
+      pageIndex: pageIndex ?? 0,
+      ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
+      ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
+      ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
+      ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
+      ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
+    });
+    if (!ok) {
+      if (showFullLoading) error.value = translate('Failed to load bad address tasks. Please try again.');
+      return;
+    }
+  } finally {
+    if (showFullLoading) loading.value = false;
+  }
 };
 
 function getSelectedCards() {
