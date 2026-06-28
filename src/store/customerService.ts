@@ -287,20 +287,12 @@ export const useCustomerServiceStore = defineStore('customerService', {
 
         // 3. Fetch Rejections today
         const rejectionsPromise = api({
-          url: 'oms/dataDocumentView',
-          method: 'POST',
-          data: {
-            dataDocumentId: 'ORDER_FACILITY_CHANGE',
-            customParametersMap: {
-              fromFacilityId: facilityId,
-              facilityId: 'REJECTED_ITM_PARKING',
-              productStoreId,
-              pageNoLimit: true,
-              changeDatetime_from: startOfDayStr,
-              changeDatetime_thru: endOfDayStr
-            },
-            fieldsToSelect: 'orderId,shipGroupSeqId',
-            distinct: true
+          url: `oms/facilities/${facilityId}/facilityRejections`,
+          method: 'GET',
+          params: {
+            productStoreId,
+            changeDatetime_from: startOfDayStr,
+            changeDatetime_thru: endOfDayStr
           }
         }).catch(err => {
           console.error('Failed to fetch rejections', err);

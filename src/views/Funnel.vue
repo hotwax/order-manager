@@ -494,6 +494,7 @@ import {
   powerOutline
 } from 'ionicons/icons';
 import { computed, watch } from 'vue';
+import { DateTime } from 'luxon';
 import { translate, StatCard, Sparkline, commonUtil } from '@common';
 import { useCustomerServiceStore } from '@/store/customerService';
 import { useProductStore } from '@/store/productStore';
@@ -671,7 +672,12 @@ const selectedDimension = ref('volume');
 
 const oldestOpenOrderDateStr = computed(() => {
   const timestamp = openOrders.value.oldestOpenOrderDate;
-  return timestamp ? translate('Oldest: ') + commonUtil.getDateAndTime(timestamp) : translate('No open orders');
+  if (!timestamp) return translate('No open orders');
+  // Backend returns a SQL timestamp string like "2026-03-20 05:40:00.0" — convert to millis
+  const millis = typeof timestamp === 'number'
+    ? timestamp
+    : DateTime.fromSQL(String(timestamp).replace(/\.\d+$/, '')).toMillis();
+  return isNaN(millis) ? translate('No open orders') : translate('Oldest: ') + commonUtil.getDateAndTime(millis);
 });
 
 const totalUnfillable = computed(() => unfillableTrend.value.reduce((sum, val) => sum + val, 0));

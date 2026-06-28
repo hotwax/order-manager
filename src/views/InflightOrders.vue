@@ -304,14 +304,14 @@ function normalizeDateFilterValue(value: string | string[] | null | undefined) {
 }
 
 function applyRouteFilters() {
-  const facilityId = route.query.facilityId;
+  const facilityId = route.value.query.facilityId;
 
   if (typeof facilityId === 'string' && facilityId) {
     filters.value.facilityId = facilityId;
   }
 }
 
-watch(() => route.query.facilityId, applyRouteFilters, { immediate: true });
+watch(() => route.value.query.facilityId, applyRouteFilters, { immediate: true });
 
 function loadWorkflowOrders() {
   orderStore.fetchWorkflowOrders(bucket, filters.value);
