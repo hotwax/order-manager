@@ -39,7 +39,7 @@ describe('order detail header', () => {
     expect(detailsEnd).toBeGreaterThan(detailsStart);
     expect(detailsSource).toContain("<ion-card-title>{{ translate('Attributes') }}</ion-card-title>");
     expect(detailsSource).toContain('v-for="attribute in order.attributes"');
-    expect(detailsSource).toContain("{{ attribute.value || translate('Value not available') }}");
+    expect(detailsSource).toContain(':value="attribute.value"');
     expect(detailsSource).toContain("{{ translate('No order attributes') }}");
     expect(source).toContain('attributes: orderAttributeRows(raw)');
     expect(source).toContain('raw?.attributes || raw?.orderAttributes || raw?.orderAttributeList');
