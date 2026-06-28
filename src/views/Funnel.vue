@@ -20,7 +20,21 @@
 
       <!-- Global Stat Card -->
       <ion-card class="global-stat">
-        <ion-card-content>
+        <!-- Error state: surface failure + retry instead of false zeros -->
+        <ion-card-content v-if="fulfillmentProgressError" class="section-error">
+          <p>{{ translate("Couldn't load this section") }}</p>
+          <ion-button fill="outline" size="small" @click="retryFulfillmentProgress">
+            <ion-icon slot="start" :icon="refreshOutline" />
+            {{ translate("Retry") }}
+          </ion-button>
+        </ion-card-content>
+
+        <!-- Loading state: spinner instead of default zeros -->
+        <ion-card-content v-else-if="fulfillmentProgressLoading" class="section-loading">
+          <ion-spinner name="crescent" />
+        </ion-card-content>
+
+        <ion-card-content v-else>
           <div class="total-orders">
             <!-- Date Today -->
             <p class="overline">{{ translate("Today") }}</p>
@@ -62,8 +76,11 @@
           </ion-list>
         </StatCard>
 
-        <StatCard :title="translate('Brokered')" :stat="fulfillmentStats.brokeredShipGroups">
-          <ion-list lines="none" class="hold-tasks-list">
+        <StatCard v-if="!fulfillmentProgressError" :title="translate('Brokered')" :stat="fulfillmentProgressLoading ? '' : fulfillmentStats.brokeredShipGroups">
+          <template v-if="fulfillmentProgressLoading" #stat>
+            <ion-spinner name="crescent" />
+          </template>
+          <ion-list v-if="!fulfillmentProgressLoading" lines="none" class="hold-tasks-list">
             <ion-item button :detail="true" router-link="/open">
               <ion-label>{{ translate("Open") }}</ion-label>
               <p slot="end">{{ formatCount(fulfillmentStats.brokeredOpenShipGroups) }} {{ translate("ship groups") }}</p>
@@ -78,19 +95,49 @@
             </ion-item>
           </ion-list>
         </StatCard>
+        <StatCard v-else :title="translate('Brokered')">
+          <template #stat>
+            <ion-icon :icon="alertCircleOutline" color="danger" />
+          </template>
+          <div class="card-error">
+            <p>{{ translate("Couldn't load this section") }}</p>
+            <ion-button fill="outline" size="small" @click="retryFulfillmentProgress">
+              <ion-icon slot="start" :icon="refreshOutline" />
+              {{ translate("Retry") }}
+            </ion-button>
+          </div>
+        </StatCard>
 
         <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard button router-link="/unfillable" :title="translate('Unfillable today')" :stat="totalUnfillable">
-          <Sparkline :points="unfillableTrend" color="danger" />
+        <StatCard v-if="!unfillableError" button router-link="/unfillable" :title="translate('Unfillable today')" :stat="unfillableLoading ? '' : totalUnfillable">
+          <template v-if="unfillableLoading" #stat>
+            <ion-spinner name="crescent" />
+          </template>
+          <Sparkline v-if="!unfillableLoading" :points="unfillableTrend" color="danger" />
+        </StatCard>
+        <StatCard v-else :title="translate('Unfillable today')">
+          <template #stat>
+            <ion-icon :icon="alertCircleOutline" color="danger" />
+          </template>
+          <div class="card-error">
+            <p>{{ translate("Couldn't load this section") }}</p>
+            <ion-button fill="outline" size="small" @click="retryUnfillable">
+              <ion-icon slot="start" :icon="refreshOutline" />
+              {{ translate("Retry") }}
+            </ion-button>
+          </div>
         </StatCard>
 
         <!-- Card 3: Order Hold Tasks — drilldown follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Display list of tasks requiring resolution -->
         <!-- stat: number of orders with hold tasks -->
-        <StatCard :title="translate('Order Hold Tasks')" :stat="holdTasks.holdTasksTotalCount || 0">
-          <ion-list lines="none" class="hold-tasks-list">
+        <StatCard v-if="!holdTasksError" :title="translate('Order Hold Tasks')" :stat="holdTasksLoading ? '' : (holdTasks.holdTasksTotalCount || 0)">
+          <template v-if="holdTasksLoading" #stat>
+            <ion-spinner name="crescent" />
+          </template>
+          <ion-list v-if="!holdTasksLoading" lines="none" class="hold-tasks-list">
             <!-- Substitute workefforts -->
             <ion-item button :detail="true" router-link="/swap">
               <ion-label>
@@ -118,6 +165,18 @@
               <p slot="end">{{ holdTasks.holdFraudRiskCount || 0 }} {{ translate("tasks") }}</p>
             </ion-item>
           </ion-list>
+        </StatCard>
+        <StatCard v-else :title="translate('Order Hold Tasks')">
+          <template #stat>
+            <ion-icon :icon="alertCircleOutline" color="danger" />
+          </template>
+          <div class="card-error">
+            <p>{{ translate("Couldn't load this section") }}</p>
+            <ion-button fill="outline" size="small" @click="retryHoldTasks">
+              <ion-icon slot="start" :icon="refreshOutline" />
+              {{ translate("Retry") }}
+            </ion-button>
+          </div>
         </StatCard>
       </section>
 
@@ -156,7 +215,24 @@
           <ion-label>{{ translate("Top 10 facilities by") }} {{ selectedDimension }} {{ searchQuery && translate("or") }} {{ searchQuery }}</ion-label>
         </ion-list-header>
 
-        <ion-radio-group v-model="selectedFacilityId">
+        <!-- Error state: surface failure + retry instead of "No facilities found" -->
+        <ion-item v-if="facilityMetricsError" lines="none" class="facility-section-error">
+          <ion-label>
+            <p>{{ translate("Couldn't load facilities") }}</p>
+          </ion-label>
+          <ion-button slot="end" fill="outline" size="small" @click="retryFacilityMetrics">
+            <ion-icon slot="start" :icon="refreshOutline" />
+            {{ translate("Retry") }}
+          </ion-button>
+        </ion-item>
+
+        <!-- Loading state: spinner instead of "No facilities found" -->
+        <ion-item v-else-if="facilityMetricsLoading && !filteredFacilities.length" lines="none" class="facility-section-loading">
+          <ion-spinner slot="start" name="crescent" />
+          <ion-label>{{ translate("Loading") }}</ion-label>
+        </ion-item>
+
+        <ion-radio-group v-else v-model="selectedFacilityId">
           <ion-item v-for="item in filteredFacilities" :key="item.facilityId" lines="none" class="facility-radio-item">
             <ion-radio slot="start" :value="item.facilityId" />
             <div class="facility-metric">
@@ -177,8 +253,22 @@
       <div v-if="selectedFacilityId" class="fulfillment-dashboard-section ion-padding">
         <h1 class="section-title">{{ translate("Fill rate at") }} {{ selectedFacilityName }}</h1>
 
+        <!-- Error state: surface failure + retry instead of false zeros -->
+        <div v-if="facilityProgressError" class="section-error ion-padding">
+          <p>{{ translate("Couldn't load this section") }}</p>
+          <ion-button fill="outline" size="small" @click="retryFacilityProgress">
+            <ion-icon slot="start" :icon="refreshOutline" />
+            {{ translate("Retry") }}
+          </ion-button>
+        </div>
+
+        <!-- Loading state: spinner instead of default zeros -->
+        <div v-else-if="facilityProgressLoading && !facilityFulfillmentProgress" class="section-loading ion-padding">
+          <ion-spinner name="crescent" />
+        </div>
+
         <!-- Copied exactly from Dashboard.vue -->
-        <div class="fulfillment">
+        <div v-else class="fulfillment">
           <!-- Fill Rate Card -->
           <ion-card class="fill-rate">
             <ion-item lines="none">
@@ -243,8 +333,22 @@
           </div>
         </div>
 
+        <!-- Sync error state: surface failure + retry instead of empty/default copy -->
+        <div v-if="syncDataError" class="section-error ion-padding">
+          <p>{{ translate("Couldn't load this section") }}</p>
+          <ion-button fill="outline" size="small" @click="retrySyncData">
+            <ion-icon slot="start" :icon="refreshOutline" />
+            {{ translate("Retry") }}
+          </ion-button>
+        </div>
+
+        <!-- Sync loading state: spinner instead of empty/default copy -->
+        <div v-else-if="syncDataLoading && !fulfillmentSyncData" class="section-loading ion-padding">
+          <ion-spinner name="crescent" />
+        </div>
+
         <!-- Fulfillment Sync Settings & Queue Section -->
-        <div class="fulfillment-sync ion-margin-top" v-if="fulfillmentSyncData">
+        <div class="fulfillment-sync ion-margin-top" v-else-if="fulfillmentSyncData">
           <!-- Left Card: Fulfillment Sync Settings & Rate Limiting -->
           <ion-card class="ion-no-margin">
             <ion-card-header>
@@ -486,6 +590,7 @@ import {
   IonFab,
   IonFabButton,
   IonToggle,
+  IonSpinner,
   onIonViewWillEnter
 } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
@@ -500,16 +605,34 @@ import {
   timeOutline,
   refreshOutline,
   saveOutline,
-  powerOutline
+  powerOutline,
+  alertCircleOutline
 } from 'ionicons/icons';
 import { translate, StatCard, Sparkline, commonUtil } from '@common';
-import { useCustomerServiceStore } from '@/store/customerService';
+import { useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 
 const store = useCustomerServiceStore();
 const productStore = useProductStore() as any;
 const seedStore = useSeedStore();
+
+// Per-section load status helpers. These drive loading affordances and error
+// states so the dashboard never renders default zeros/empty copy while a group
+// is still loading or after a group has failed.
+const isLoading = (key: DashboardStatusKey) => computed(() => store.isDashboardGroupLoading(key));
+const isError = (key: DashboardStatusKey) => computed(() => store.isDashboardGroupError(key));
+
+const fulfillmentProgressLoading = isLoading('fulfillmentProgress');
+const fulfillmentProgressError = isError('fulfillmentProgress');
+const unfillableLoading = isLoading('unfillable');
+const unfillableError = isError('unfillable');
+const holdTasksLoading = isLoading('holdTasks');
+const holdTasksError = isError('holdTasks');
+const facilityProgressLoading = isLoading('facilityFulfillmentProgress');
+const facilityProgressError = isError('facilityFulfillmentProgress');
+const syncDataLoading = isLoading('fulfillmentSyncData');
+const syncDataError = isError('fulfillmentSyncData');
 
 const fulfillmentProgress = computed(() => store.getFulfillmentProgress);
 const holdTasks = computed(() => store.getHoldTasks);
@@ -681,6 +804,16 @@ const selectedStoreName = computed(
   () => currentProductStore.value.storeName || currentProductStore.value.productStoreId || ''
 );
 
+// Map the active facility-list dimension to its dashboard status group so the
+// facility list shows the loading/error/empty state for the selected segment.
+const facilityMetricKey = computed<DashboardStatusKey>(() => {
+  if (selectedDimension.value === 'velocity') return 'facilityFulfillmentVelocity';
+  if (selectedDimension.value === 'partial') return 'facilityPartialFulfillments';
+  return 'facilityOrderVolume';
+});
+const facilityMetricsLoading = computed(() => store.isDashboardGroupLoading(facilityMetricKey.value));
+const facilityMetricsError = computed(() => store.isDashboardGroupError(facilityMetricKey.value));
+
 const totalUnfillable = computed(() => unfillableTrend.value.reduce((sum, val) => sum + val, 0));
 const virtualLocationWorkTotal = computed(() => virtualLocationWorkRows.value.reduce((sum, row) => sum + row.count, 0));
 
@@ -818,6 +951,28 @@ const fulfillmentStageMetrics = computed(() => {
 onIonViewWillEnter(() => {
   refreshDashboardData();
 });
+
+// Per-section retry handlers for failed dashboard groups.
+function retryFulfillmentProgress() {
+  store.fetchFulfillmentProgress(selectedProductStoreId.value);
+}
+function retryUnfillable() {
+  store.fetchUnfillable(selectedProductStoreId.value);
+}
+function retryHoldTasks() {
+  store.fetchHoldTasks(selectedProductStoreId.value);
+}
+function retryFacilityMetrics() {
+  if (selectedDimension.value === 'velocity') store.fetchFacilityFulfillmentVelocity(selectedProductStoreId.value);
+  else if (selectedDimension.value === 'partial') store.fetchFacilityPartialFulfillments(selectedProductStoreId.value);
+  else store.fetchFacilityOrderVolume(selectedProductStoreId.value);
+}
+function retryFacilityProgress() {
+  if (selectedFacilityId.value) store.fetchFacilityFulfillmentProgress(selectedFacilityId.value, selectedProductStoreId.value);
+}
+function retrySyncData() {
+  if (selectedFacilityId.value) store.fetchFulfillmentSyncData(selectedFacilityId.value, selectedProductStoreId.value);
+}
 
 function getFacilityName(facilityId: string) {
   return seedStore.facilityName(facilityId);
@@ -1462,5 +1617,44 @@ function handleBatchSizeChange(event: any) {
   color: var(--ion-color-step-500, #808080);
   font-size: 14px;
   margin: 0;
+}
+
+/* Loading / error affordances for dashboard sections */
+.section-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+}
+
+.section-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacer-sm);
+  min-height: 120px;
+  text-align: center;
+}
+
+.section-error p {
+  margin: 0;
+  color: var(--ion-color-step-600, #666666);
+}
+
+.card-error {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-xs);
+}
+
+.card-error p {
+  margin: 0;
+  color: var(--ion-color-step-600, #666666);
+}
+
+.facility-section-error p,
+.facility-section-loading ion-label {
+  color: var(--ion-color-step-600, #666666);
 }
 </style>

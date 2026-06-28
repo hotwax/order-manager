@@ -836,6 +836,7 @@
       <div v-if="selectedSegment === 'holds'">
         <template v-if="hasOrderHoldTasks">
           <BadAddressTaskCard v-for="task in orderAddressValidationTasks" :key="task.workEffortId" :task="task"
+            :countries="seed.getCountries"
             @completed="reloadHoldTasks" />
           <SwapTaskCard v-for="task in orderSwapTasks" :key="task.workEffortId" :task="task"
             @completed="reloadHoldTasks" />
@@ -844,7 +845,12 @@
           <HoldTaskCard v-for="task in orderHoldTasks" :key="task.workEffortId" :task="task"
             @completed="reloadHoldTasks" />
         </template>
-        <EmptyState v-else :title="translate('No holds')" :message="translate('No holds on this order')" />
+        <template v-else>
+          <EmptyState :title="translate('No holds')" :message="translate('No holds on this order')" />
+          <div class="ion-text-center ion-padding">
+            <ion-button fill="outline" @click="openCreateHoldTaskModal()">{{ translate('Create hold task') }}</ion-button>
+          </div>
+        </template>
       </div>
 
       <div v-if="selectedSegment === 'risk'">
@@ -977,6 +983,14 @@
             :color="action.color" :fill="action.fill" @click="runFooterAction(action)">
             {{ footerActionLabel(action) }}
           </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-footer>
+
+    <ion-footer v-if="order && selectedSegment === 'holds' && hasOrderHoldTasks">
+      <ion-toolbar>
+        <ion-buttons slot="end">
+          <ion-button @click="openCreateHoldTaskModal()">{{ translate('Create hold task') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
@@ -2794,6 +2808,63 @@ async function openAddTaskModal(shipGroup: any) {
       }]
     });
     await showToast(translate('Tasks created successfully.'));
+  } catch {
+    await showToast(translate('Failed to create tasks. Please try again.'));
+  }
+}
+
+// Create one or more hold tasks for the current order directly from the Holds
+// tab. Single-ship-group orders default automatically; multi-ship-group orders
+// let the user pick which ship groups to add the task to.
+async function openCreateHoldTaskModal() {
+  const currentOrder = order.value;
+  if (!currentOrder) return;
+
+  const shipGroups = (currentOrder.shipGroups ?? []).map((shipGroup: any) => ({
+    id: shipGroup.id,
+    label: shipGroup.facilityName ? `${shipGroup.id} · ${shipGroup.facilityName}` : shipGroup.id,
+  }));
+  if (!shipGroups.length) {
+    await showToast(translate('This order has no ship groups to add a task to.'));
+    return;
+  }
+
+  const modal = await modalController.create({
+    component: AddOrderTaskModal,
+    componentProps: {
+      shipGroups,
+      title: translate('Create hold task'),
+      autoGenerateTaskName: true,
+      defaultOrderName: currentOrder.orderName || currentOrder.id,
+      defaultWorkEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+      defaultWorkEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+    },
+  });
+  await modal.present();
+  const { data, role } = await modal.onWillDismiss();
+  if (role !== 'confirm' || !data) return;
+
+  const shipGroupSeqIds: string[] = data.shipGroupSeqIds?.length
+    ? data.shipGroupSeqIds
+    : shipGroups.map((shipGroup) => shipGroup.id);
+  const orderId = currentOrder.id;
+  try {
+    await api({
+      url: 'oms/orders/tasks',
+      method: 'POST',
+      data: shipGroupSeqIds.map((shipGroupSeqId) => ({
+        orderId,
+        shipGroupSeqId,
+        workEffortName: data.workEffortName,
+        workEffortTypeId: data.workEffortTypeId,
+        workEffortPurposeTypeId: data.workEffortPurposeTypeId,
+        description: data.description,
+        statusId: 'TASK_CREATED',
+      })),
+    });
+    await showToast(translate('Tasks created successfully.'));
+    selectedSegment.value = 'holds';
+    await reloadHoldTasks();
   } catch {
     await showToast(translate('Failed to create tasks. Please try again.'));
   }

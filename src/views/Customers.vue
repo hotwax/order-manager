@@ -10,16 +10,13 @@
     </ion-header>
 
     <ion-content>
-      <SearchFilterCard
-        v-model="searchQuery"
+      <ion-searchbar
+        class="customer-searchbar"
+        :value="searchQuery"
+        :debounce="0"
         :placeholder="translate('Name, party ID, email, or phone')"
-        @clear="clearFilters"
-      >
-        <ion-select v-model="partyTypeId" :label="translate('Type')" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">{{ translate("All types") }}</ion-select-option>
-          <ion-select-option v-for="(label, id) in partyTypes" :key="id" :value="id">{{ label }}</ion-select-option>
-        </ion-select>
-      </SearchFilterCard>
+        @ionInput="searchQuery = $event.detail.value || ''"
+      />
 
       <ion-progress-bar v-if="loading" type="indeterminate" />
 
@@ -33,17 +30,29 @@
         <ion-list-header>
           <ion-label>{{ translate("{loaded} of {total} customers", { loaded: customers.length, total }) }}</ion-label>
         </ion-list-header>
-        <ion-item
+        <div
           v-for="customer in customers"
           :key="customer.partyId"
-          :router-link="`/customers/${customer.partyId}`"
+          class="list-item customer-result-row"
+          role="link"
+          tabindex="0"
+          @click="goToCustomer(customer)"
+          @keydown.enter.prevent="goToCustomer(customer)"
+          @keydown.space.prevent="goToCustomer(customer)"
         >
           <ion-label>
-            <h2>{{ customer.fullName || customer.partyId }}</h2>
-            <p>{{ customer.partyId }}<template v-if="customer.emailAddress || customer.phoneNumber"> · {{ customer.emailAddress || customer.phoneNumber }}</template></p>
+            <p class="overline">{{ customer.partyId }}</p>
+            {{ customer.fullName || customer.partyId }}
           </ion-label>
-          <ion-note slot="end">{{ partyTypes[customer.partyTypeId] ?? customer.partyTypeId }}</ion-note>
-        </ion-item>
+          <ion-label class="tablet ion-text-start">
+            {{ customer.emailAddress || translate('No email') }}
+            <p>{{ translate('Email') }}</p>
+          </ion-label>
+          <ion-label class="tablet ion-text-end">
+            {{ customer.phoneNumber || translate('No phone') }}
+            <p>{{ translate('Phone') }}</p>
+          </ion-label>
+        </div>
       </ion-list>
 
       <ion-infinite-scroll :disabled="!hasMore" @ionInfinite="loadMore">
@@ -60,17 +69,17 @@
 </template>
 
 <script setup lang="ts">
-import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonNote, IonPage, IonProgressBar, IonSelect, IonSelectOption, IonTitle, IonToolbar } from '@ionic/vue';
+import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonProgressBar, IonSearchbar, IonTitle, IonToolbar, useIonRouter } from '@ionic/vue';
 import { computed, onMounted, ref, watch } from 'vue';
-import { partyTypes, searchCustomers } from '@/services/customer';
+import { searchCustomers } from '@/services/customer';
 import type { Customer } from '@/types/order';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import { translate } from '@common'
 
+const ionRouter = useIonRouter();
+
 const searchQuery = ref('');
-const partyTypeId = ref('All');
 const customers = ref<Customer[]>([]);
 const total = ref(0);
 const pageIndex = ref(0);
@@ -83,7 +92,6 @@ const hasMore = computed(() => customers.value.length < total.value);
 onMounted(runSearch);
 
 watch(searchQuery, () => scheduleSearch());
-watch(partyTypeId, () => runSearch());
 
 function scheduleSearch() {
   if (debounceTimer.value) clearTimeout(debounceTimer.value);
@@ -97,7 +105,7 @@ async function runSearch() {
   try {
     const result = await searchCustomers({
       queryString: searchQuery.value,
-      partyTypeId: partyTypeId.value,
+      partyTypeId: 'All',
       pageSize: 50,
       pageIndex: 0
     });
@@ -117,7 +125,7 @@ async function loadMore(event: CustomEvent) {
   try {
     const result = await searchCustomers({
       queryString: searchQuery.value,
-      partyTypeId: partyTypeId.value,
+      partyTypeId: 'All',
       pageSize: 50,
       pageIndex: pageIndex.value
     });
@@ -130,9 +138,21 @@ async function loadMore(event: CustomEvent) {
   }
 }
 
-function clearFilters() {
-  searchQuery.value = '';
-  partyTypeId.value = 'All';
-  runSearch();
+function goToCustomer(customer: Customer) {
+  ionRouter.push(`/customers/${customer.partyId}`);
 }
 </script>
+
+<style scoped>
+.customer-result-row {
+  --columns-desktop: 3;
+  --columns-tablet: 3;
+  min-height: 4rem;
+  border-block-start: var(--border-medium);
+  padding-inline: var(--spacer-sm);
+}
+
+.customer-result-row > ion-label {
+  width: 100%;
+}
+</style>

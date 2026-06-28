@@ -52,7 +52,7 @@
             :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
             @ion-change="toggleCurrentPageSelection($event.detail.checked)"
           />
-          <ion-label>{{ orderTotal }} {{ orderTotal === 1 ? translate('order') : translate('orders') }}</ion-label>
+          <ion-label>{{ orderCountLabel }}</ion-label>
           <ion-button fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
@@ -236,6 +236,16 @@ const isLoading = computed(() => isApiBucket && orderStore.workflowOrdersLoading
 const orderTotal = computed(() =>
   isApiBucket ? orderStore.workflowOrdersTotal[apiBucket] : orders.value.length
 );
+const orderCountLabel = computed(() => {
+  if (isApiBucket) {
+    return translate('{loaded} of {total} orders', {
+      loaded: orders.value.length,
+      total: orderTotal.value
+    });
+  }
+
+  return `${orderTotal.value} ${orderTotal.value === 1 ? translate('order') : translate('orders')}`;
+});
 
 const hasMore = computed(() =>
   isApiBucket && orderStore.workflowOrders[apiBucket].length < orderStore.workflowOrdersTotal[apiBucket]
