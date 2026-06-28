@@ -40,7 +40,7 @@
             <p>{{ translate('SKU') }}: {{ getProduct(product.productId)?.internalName || product.internalName }}</p>
             <p>{{ money(product.price) }}</p>
           </ion-label>
-          <ion-note slot="end">{{ getSubstituteStock(product.productId)?.computedAtp ?? 0 }}</ion-note>
+          <ion-note slot="end">{{ facilityStockLabel(getSubstituteStock(product.productId)?.computedAtp) }}</ion-note>
         </ion-item>
       </ion-radio-group>
     </ion-list>
@@ -80,7 +80,7 @@
               <p>{{ product.productName }}</p>
               <p>{{ translate('SKU') }}: {{ product.internalName || product.sku }}</p>
             </ion-label>
-            <ion-note slot="end">{{ product.inventoryConfig?.computedLastInventoryCount ?? 0 }}</ion-note>
+            <ion-note slot="end">{{ facilityStockLabel(product.inventoryConfig?.computedLastInventoryCount) }}</ion-note>
             <ion-icon v-if="selectedProductId === product.productId" slot="end" :icon="checkmarkCircle" color="primary" />
           </ion-item>
         </template>
@@ -111,6 +111,7 @@ import { api, DxpShopifyImg, translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
+import { useSeedStore } from '@/store/seed';
 
 const props = defineProps<{
   substituteProducts: any[];
@@ -132,10 +133,13 @@ const searchResults = ref<any[]>([]);
 const isSearching = ref(false);
 const searchPageIndex = ref(0);
 const searchTotalCount = ref(0);
+const seedStore = useSeedStore();
 
 const isSearchScrollable = computed(() =>
   searchResults.value.length > 0 && searchResults.value.length < searchTotalCount.value
 );
+
+const facilityLabel = computed(() => seedStore.facilityName(props.facilityId) || props.facilityId);
 
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);
@@ -151,6 +155,16 @@ function hasSubstituteStock(productId: string): boolean {
 
 function hasSearchStock(product: any): boolean {
   return (product.inventoryConfig?.computedLastInventoryCount ?? 0) > 0;
+}
+
+function facilityStockLabel(count?: number | string | null) {
+  const quantity = Number(count ?? 0);
+  if (!facilityLabel.value) return translate('Available: {count}', { count: quantity });
+
+  return translate('Available at {facility}: {count}', {
+    facility: facilityLabel.value,
+    count: quantity,
+  });
 }
 
 function money(value: number) {

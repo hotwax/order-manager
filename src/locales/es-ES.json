@@ -679,6 +679,8 @@
   "Zipcode": "Código postal",
   "Approve order": "Aprobar pedido",
   "Approved for fulfillment": "Aprobado para cumplimiento",
+  "Available at {facility}: {count}": "Disponible en {facility}: {count}",
+  "Available: {count}": "Disponible: {count}",
   "Complete order": "Completar pedido",
   "Created in Shopify": "Creado en Shopify",
   "First Brokered": "Primera asignación",

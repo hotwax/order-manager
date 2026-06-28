@@ -681,6 +681,8 @@
   "Failed to remove sort rule.": "Failed to remove sort rule.",
   "Failed to reorder sort rules.": "Failed to reorder sort rules.",
   "Failed to search customers:": "Failed to search customers:",
+  "Available at {facility}: {count}": "Available at {facility}: {count}",
+  "Available: {count}": "Available: {count}",
   "Failed to update batch size.": "Failed to update batch size.",
   "Failed to update customer contact. Please try again.": "Failed to update customer contact. Please try again.",
   "Failed to update fulfillment sync schedule.": "Failed to update fulfillment sync schedule.",
