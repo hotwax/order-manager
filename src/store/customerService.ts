@@ -14,6 +14,35 @@ import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
 
+// Load-status keys for the funnel dashboard metric groups. Each group's fetch
+// transitions its status loading -> success/error so the Funnel view can show
+// per-section loading affordances and surface errors instead of false zeros.
+export type DashboardStatusKey =
+  | 'fulfillmentProgress'
+  | 'openOrders'
+  | 'unfillable'
+  | 'holdTasks'
+  | 'facilityOrderVolume'
+  | 'facilityFulfillmentVelocity'
+  | 'facilityPartialFulfillments'
+  | 'facilityFulfillmentProgress'
+  | 'fulfillmentSyncData';
+
+export type LoadStatus = 'idle' | 'loading' | 'success' | 'error';
+
+function emptyDashboardStatus(): Record<DashboardStatusKey, LoadStatus> {
+  return {
+    fulfillmentProgress: 'idle',
+    openOrders: 'idle',
+    unfillable: 'idle',
+    holdTasks: 'idle',
+    facilityOrderVolume: 'idle',
+    facilityFulfillmentVelocity: 'idle',
+    facilityPartialFulfillments: 'idle',
+    facilityFulfillmentProgress: 'idle',
+    fulfillmentSyncData: 'idle'
+  };
+}
 
 function emptyFilters(): WorkflowFilters {
   return {
@@ -101,7 +130,9 @@ export const useCustomerServiceStore = defineStore('customerService', {
       packed: [] as string[]
     } as Record<WorkflowBucket, string[]>,
     lastAction: '' as string,
-    fulfillmentSyncData: null as any
+    fulfillmentSyncData: null as any,
+    // Per-group load status for the funnel dashboard metric groups.
+    dashboardStatus: emptyDashboardStatus()
   }),
   getters: {
     priorities: () => ['HIGH', 'NORMAL', 'LOW'],
@@ -147,10 +178,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
     getFacilityFulfillmentVelocity: (state) => state.facilityFulfillmentVelocity,
     getFacilityPartialFulfillments: (state) => state.facilityPartialFulfillments,
     getFacilityFulfillmentProgress: (state) => state.facilityFulfillmentProgress,
-    getFulfillmentSyncData: (state) => state.fulfillmentSyncData
+    getFulfillmentSyncData: (state) => state.fulfillmentSyncData,
+    getDashboardStatus: (state) => (key: DashboardStatusKey) => state.dashboardStatus[key],
+    isDashboardGroupLoading: (state) => (key: DashboardStatusKey) => state.dashboardStatus[key] === 'loading',
+    isDashboardGroupError: (state) => (key: DashboardStatusKey) => state.dashboardStatus[key] === 'error'
   },
   actions: {
     async fetchFulfillmentProgress(productStoreId?: string) {
+      this.dashboardStatus.fulfillmentProgress = 'loading';
       try {
         const resp = await api({
           url: 'oms/orders/funnelDashboard/fulfillmentProgress',
@@ -163,11 +198,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
         if (resp.data) {
           this.fulfillmentProgress = resp.data;
         }
+        this.dashboardStatus.fulfillmentProgress = 'success';
       } catch (error) {
         console.error('Failed to fetch fulfillment progress', error);
+        this.dashboardStatus.fulfillmentProgress = 'error';
       }
     },
     async fetchOpenOrders(productStoreId?: string) {
+      this.dashboardStatus.openOrders = 'loading';
       try {
         const params: any = {};
         if (productStoreId) params.productStoreId = productStoreId;
@@ -177,11 +215,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
           params
         });
         if (resp.data) this.openOrders = resp.data;
+        this.dashboardStatus.openOrders = 'success';
       } catch (error) {
         console.error('Failed to fetch open orders', error);
+        this.dashboardStatus.openOrders = 'error';
       }
     },
     async fetchUnfillable(productStoreId?: string) {
+      this.dashboardStatus.unfillable = 'loading';
       try {
         const params: any = {};
         if (productStoreId) params.productStoreId = productStoreId;
@@ -191,11 +232,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
           params
         });
         if (resp.data) this.unfillable = resp.data;
+        this.dashboardStatus.unfillable = 'success';
       } catch (error) {
         console.error('Failed to fetch unfillable stats', error);
+        this.dashboardStatus.unfillable = 'error';
       }
     },
     async fetchHoldTasks(productStoreId?: string) {
+      this.dashboardStatus.holdTasks = 'loading';
       try {
         const params: any = {};
         if (productStoreId) params.productStoreId = productStoreId;
@@ -205,11 +249,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
           params
         });
         if (resp.data) this.holdTasks = resp.data;
+        this.dashboardStatus.holdTasks = 'success';
       } catch (error) {
         console.error('Failed to fetch hold task counts', error);
+        this.dashboardStatus.holdTasks = 'error';
       }
     },
     async fetchFacilityOrderVolume(productStoreId?: string) {
+      this.dashboardStatus.facilityOrderVolume = 'loading';
       try {
         const params: any = { dateFilter: DateTime.now().toFormat('yyyy-MM-dd') };
         if (productStoreId) params.productStoreId = productStoreId;
@@ -221,11 +268,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
         if (resp.data) {
           this.facilityOrderVolume = resp.data.facilities || [];
         }
+        this.dashboardStatus.facilityOrderVolume = 'success';
       } catch (error) {
         console.error('Failed to fetch facility order volume', error);
+        this.dashboardStatus.facilityOrderVolume = 'error';
       }
     },
     async fetchFacilityFulfillmentVelocity(productStoreId?: string) {
+      this.dashboardStatus.facilityFulfillmentVelocity = 'loading';
       try {
         const params: any = { dateFilter: DateTime.now().toFormat('yyyy-MM-dd') };
         if (productStoreId) params.productStoreId = productStoreId;
@@ -237,11 +287,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
         if (resp.data) {
           this.facilityFulfillmentVelocity = resp.data.facilities || [];
         }
+        this.dashboardStatus.facilityFulfillmentVelocity = 'success';
       } catch (error) {
         console.error('Failed to fetch facility fulfillment velocity', error);
+        this.dashboardStatus.facilityFulfillmentVelocity = 'error';
       }
     },
     async fetchFacilityPartialFulfillments(productStoreId?: string) {
+      this.dashboardStatus.facilityPartialFulfillments = 'loading';
       try {
         const params: any = { dateFilter: DateTime.now().toFormat('yyyy-MM-dd') };
         if (productStoreId) params.productStoreId = productStoreId;
@@ -253,11 +306,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
         if (resp.data) {
           this.facilityPartialFulfillments = resp.data.facilities || [];
         }
+        this.dashboardStatus.facilityPartialFulfillments = 'success';
       } catch (error) {
         console.error('Failed to fetch facility partial fulfillments', error);
+        this.dashboardStatus.facilityPartialFulfillments = 'error';
       }
     },
     async fetchFacilityFulfillmentProgress(facilityId: string, productStoreId?: string) {
+      this.dashboardStatus.facilityFulfillmentProgress = 'loading';
       try {
         const dateFilter = DateTime.now().toFormat('yyyy-MM-dd'); // Default / demo date filter
         const startOfDayStr = DateTime.fromISO(dateFilter).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss');
@@ -380,9 +436,11 @@ export const useCustomerServiceStore = defineStore('customerService', {
           facilityTimeZone,
           carrierPickupTime
         };
+        this.dashboardStatus.facilityFulfillmentProgress = 'success';
 
       } catch (error) {
         console.error('Failed to fetch facility fulfillment progress', error);
+        this.dashboardStatus.facilityFulfillmentProgress = 'error';
       }
     },
     async fetchPickProfileGroups(facilityId?: string) {
@@ -542,6 +600,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
       }
     },
     async fetchFulfillmentSyncData(facilityId: string, productStoreId: string) {
+      this.dashboardStatus.fulfillmentSyncData = 'loading';
       try {
         const params: any = {};
         if (facilityId) params.facilityId = facilityId;
@@ -550,12 +609,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
         const group = this.pickProfileGroups.find((g: any) => g.facilityId === facilityId);
         if (!group) {
           this.fulfillmentSyncData = null;
+          this.dashboardStatus.fulfillmentSyncData = 'success';
           return;
         }
 
         const activeProfileBasic = group.profiles?.find((p: any) => p.statusId === 'PICK_PROF_ACTIVE');
         if (!activeProfileBasic) {
           this.fulfillmentSyncData = null;
+          this.dashboardStatus.fulfillmentSyncData = 'success';
           return;
         }
 
@@ -652,8 +713,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
           },
           rawOrderCountRecords: records
         };
+        this.dashboardStatus.fulfillmentSyncData = 'success';
       } catch (error) {
         console.error('Failed to fetch fulfillment sync data', error);
+        this.dashboardStatus.fulfillmentSyncData = 'error';
       }
     },
     async updateServiceJob(jobName: string, cronExpression: string, paused: string, facilityId: string, productStoreId: string) {

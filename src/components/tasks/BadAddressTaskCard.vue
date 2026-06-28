@@ -11,12 +11,6 @@
     :selected="selected"
     @update:selected="emit('update:selected', $event)"
   >
-    <template #content-start>
-      <ion-item v-if="task.description">
-        <ion-label>{{ task.description }}</ion-label>
-      </ion-item>
-    </template>
-
     <ion-radio-group v-if="addressState" v-model="addressState.selectedAddressType" class="address-task-addresses">
       <ion-list class="ion-no-padding" lines="full">
         <ion-list-header>
@@ -35,10 +29,12 @@
         <ion-item>
           <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="addressState.original.postalCode" />
         </ion-item>
-        <ion-item>
-          <ion-select :label="translate('State')" label-placement="stacked" v-model="addressState.original.stateProvinceGeoId" interface="popover">
-            <ion-select-option v-for="state in originalStates" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
-          </ion-select>
+        <ion-item button :detail="false" :disabled="!addressState.original.countryGeoId" @click="openStatePicker(addressState.original)">
+          <ion-label class="geo-picker-field">
+            <span class="geo-picker-label">{{ translate('State') }}</span>
+            <span :class="{ 'geo-picker-placeholder': !stateName(addressState.original) }">{{ stateName(addressState.original) || (addressState.original.countryGeoId ? translate('Select') : translate('Select country first')) }}</span>
+          </ion-label>
+          <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
         </ion-item>
         <InlineSearchableSelect
           :label="translate('Country')"
@@ -68,10 +64,12 @@
         <ion-item>
           <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="addressState.suggested.postalCode" />
         </ion-item>
-        <ion-item>
-          <ion-select :label="translate('State')" label-placement="stacked" v-model="addressState.suggested.stateProvinceGeoId" interface="popover">
-            <ion-select-option v-for="state in suggestedStates" :key="state.geoId" :value="state.geoId">{{ state.geoName }}</ion-select-option>
-          </ion-select>
+        <ion-item button :detail="false" :disabled="!addressState.suggested.countryGeoId" @click="openStatePicker(addressState.suggested)">
+          <ion-label class="geo-picker-field">
+            <span class="geo-picker-label">{{ translate('State') }}</span>
+            <span :class="{ 'geo-picker-placeholder': !stateName(addressState.suggested) }">{{ stateName(addressState.suggested) || (addressState.suggested.countryGeoId ? translate('Select') : translate('Select country first')) }}</span>
+          </ion-label>
+          <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
         </ion-item>
         <InlineSearchableSelect
           :label="translate('Country')"
@@ -85,6 +83,20 @@
       </ion-list>
     </ion-radio-group>
 
+    <div v-else class="address-task-addresses" aria-hidden="true">
+      <ion-list v-for="col in 2" :key="col" class="ion-no-padding" lines="full">
+        <ion-list-header>
+          <ion-label><ion-skeleton-text :animated="true" style="width: 45%" /></ion-label>
+        </ion-list-header>
+        <ion-item v-for="row in 6" :key="row" class="bad-address-skeleton-item">
+          <ion-label>
+            <ion-skeleton-text :animated="true" class="bad-address-skeleton-label" />
+            <ion-skeleton-text :animated="true" class="bad-address-skeleton-value" />
+          </ion-label>
+        </ion-item>
+      </ion-list>
+    </div>
+
     <template #actions>
       <ion-button fill="clear" color="primary" @click="saveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
       <ion-button fill="clear" color="primary" @click="cancelOrder()">{{ translate('Cancel order') }}</ion-button>
@@ -95,9 +107,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   IonButton,
+  IonIcon,
   IonInput,
   IonItem,
   IonLabel,
@@ -105,24 +118,25 @@ import {
   IonListHeader,
   IonRadio,
   IonRadioGroup,
-  IonSelect,
-  IonSelectOption,
+  IonSkeletonText,
   alertController,
   modalController,
 } from '@ionic/vue';
+import { chevronDownOutline } from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
 import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import InlineSearchableSelect from '@/components/common/InlineSearchableSelect.vue';
+import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { taskOrderTitle } from '@/utils/taskCardDisplay';
+import { buildAddressState } from '@/utils/badAddressState';
 import type { AddressState } from '@/types/order';
 
 const props = withDefaults(defineProps<{
   task: any;
-  addressState: AddressState;
   countries: any[];
   selectable?: boolean;
   selected?: boolean;
@@ -141,16 +155,47 @@ const emit = defineEmits<{
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
 
-const originalStates = computed(() => seedStore.getStatesForCountry(props.addressState.original.countryGeoId));
-const suggestedStates = computed(() => seedStore.getStatesForCountry(props.addressState.suggested.countryGeoId));
 const countryOptions = computed(() => props.countries.map((country: any) => ({ value: country.geoId, label: country.geoName })));
+
+// Editable per-card address form. Built lazily (see onMounted) from the task so
+// the shell + skeleton paint first; stays null until then, which drives the
+// skeleton placeholder and keeps the layout stable (no shift on hydrate).
+const addressState = ref<AddressState | null>(null);
+
+function hydrate() {
+  if (addressState.value) return;
+  const state = buildAddressState(props.task);
+  if (state.original.countryGeoId) seedStore.loadGeoAssocs(state.original.countryGeoId);
+  if (state.suggested.countryGeoId) seedStore.loadGeoAssocs(state.suggested.countryGeoId);
+  addressState.value = state;
+}
+
+onMounted(() => {
+  // Defer past the first paint so opening/returning to a list never blocks on
+  // building every card's form synchronously.
+  requestAnimationFrame(hydrate);
+});
+
+function stateName(address: AddressState['original']): string {
+  if (!address.countryGeoId || !address.stateProvinceGeoId) return '';
+  return seedStore.getStatesForCountry(address.countryGeoId).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
+}
 
 function onCountrySelect(address: AddressState['original'], countryGeoId: string) {
   address.countryGeoId = countryGeoId;
-  // Clear the dependent state and load the new country's regions, matching the
-  // previous ion-select behavior.
   address.stateProvinceGeoId = '';
   if (countryGeoId) seedStore.loadGeoAssocs(countryGeoId);
+}
+
+async function openStatePicker(address: AddressState['original']) {
+  if (!address.countryGeoId) return;
+  const modal = await modalController.create({
+    component: GeoSelectModal,
+    componentProps: { title: translate('Select state'), items: seedStore.getStatesForCountry(address.countryGeoId), selectedGeoId: address.stateProvinceGeoId },
+  });
+  await modal.present();
+  const { data, role } = await modal.onWillDismiss();
+  if (role === 'selected') address.stateProvinceGeoId = data;
 }
 
 function validateAddress(address: AddressState['original']): string | null {
@@ -191,13 +236,16 @@ function taskItemSummary(task: any): string {
 }
 
 function validate(): string | null {
-  const address = props.addressState[props.addressState.selectedAddressType];
-  return validateAddress(address);
+  hydrate();
+  const state = addressState.value!;
+  return validateAddress(state[state.selectedAddressType]);
 }
 
 async function submitSaveAndRelease() {
+  hydrate();
   const task = props.task;
-  const address = props.addressState[props.addressState.selectedAddressType];
+  const state = addressState.value!;
+  const address = state[state.selectedAddressType];
   await orderTaskStore.updateShippingInformation(task.orderId, task.shipGroupSeqId, address);
   await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_COMPLETED');
 }
@@ -289,6 +337,42 @@ defineExpose({
 
 .address-task-addresses>ion-list:not(:first-child) {
   border-inline-start: var(--border-medium);
+}
+
+.geo-picker-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.geo-picker-label {
+  color: var(--ion-color-medium);
+  font-size: 0.75rem;
+}
+
+.geo-picker-placeholder {
+  color: var(--ion-color-medium);
+}
+
+/* Skeleton rows mimic the stacked input height so hydration causes no shift. */
+.bad-address-skeleton-item {
+  --min-height: 57px;
+}
+
+.bad-address-skeleton-item ion-label {
+  margin-top: 8px;
+  margin-bottom: 8px;
+}
+
+.bad-address-skeleton-label {
+  width: 35%;
+  height: 10px;
+  margin-bottom: 7px;
+}
+
+.bad-address-skeleton-value {
+  width: 72%;
+  height: 15px;
 }
 
 @media (max-width: 640px) {
