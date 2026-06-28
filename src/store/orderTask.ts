@@ -137,6 +137,8 @@ type TaskLoadStatus = 'idle' | 'loading' | 'success' | 'error';
 export const useOrderTaskStore = defineStore('orderTask', {
   state: () => ({
     holdTasks: [] as any[],
+    holdStatus: 'idle' as 'idle' | 'loading' | 'success' | 'error',
+    holdError: '' as string,
     addressValidationTasks: [] as any[],
     swapTasks: [] as any[],
     fraudTasks: [] as any[],
@@ -151,6 +153,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
   }),
   getters: {
     getHoldTasks: (state) => state.holdTasks,
+    getHoldStatus: (state) => state.holdStatus,
+    getHoldError: (state) => state.holdError,
     isHoldTasksScrollable: (state): boolean => {
       return (
         state.holdTasks?.length > 0 &&
@@ -189,6 +193,13 @@ export const useOrderTaskStore = defineStore('orderTask', {
   },
   actions: {
     async fetchHoldTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
+      const isFirstPage = !(payload.pageIndex > 0);
+      // Loading status only gates the first-page fetch; page 2+ keeps the existing
+      // list visible and relies on the infinite-scroll indicator instead.
+      if (isFirstPage) {
+        this.holdStatus = 'loading';
+        this.holdError = '';
+      }
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({
@@ -204,9 +215,14 @@ export const useOrderTaskStore = defineStore('orderTask', {
         });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map((task: any) => enrichHoldTask(task)));
-        this.holdTasks = payload.pageIndex > 0 ? [...this.holdTasks, ...detailedTasks] : detailedTasks;
-      } catch (err) {
+        this.holdTasks = isFirstPage ? detailedTasks : [...this.holdTasks, ...detailedTasks];
+        if (isFirstPage) this.holdStatus = 'success';
+      } catch (err: any) {
         console.error('Failed to fetch the hold tasks', err);
+        if (isFirstPage) {
+          this.holdStatus = 'error';
+          this.holdError = 'Failed to load hold tasks. Please try again.';
+        }
       }
     },
     async fetchAddressValidationTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
