@@ -299,11 +299,18 @@ ion-content {
   --columns-tablet: 8;
   --columns-desktop: 8;
   cursor: pointer;
+  grid-template-columns: minmax(180px, 3fr) repeat(6, 1fr) max-content;
+  padding-inline-end: var(--spacer-sm);
+  border-bottom: var(--border-medium);
 }
 
 .facility-inventory-row > ion-item,
 .facility-inventory-mobile-row > ion-item {
   width: 100%;
+}
+
+.facility-inventory-row ion-radio ion-label {
+  white-space: normal;
 }
 </style>
 
