@@ -10,7 +10,7 @@
     >
       <ion-label>
         <p>{{ label }}</p>
-        <span :class="{ 'inline-searchable-select-placeholder': !selectedOption }">{{ displayText }}</span>
+        <span>{{ displayText }}</span>
       </ion-label>
       <ion-icon slot="end" :icon="chevronDownOutline" />
     </ion-item>
@@ -127,10 +127,6 @@ let instanceCounter = 0;
 </script>
 
 <style scoped>
-.inline-searchable-select-placeholder {
-  color: var(--ion-color-medium);
-}
-
 .inline-searchable-select-options {
   max-height: 40vh;
   overflow-y: auto;
