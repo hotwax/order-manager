@@ -1510,10 +1510,13 @@ const riskSummary = computed(() => {
 // Whether the merged Holds segment has any risk context to show (signal, in-flight/error
 // state, or assessments). Used to render the risk summary section and to suppress the
 // "No holds" empty state when only risk-review work exists.
+// Only treat an order as having risk context when there is a real risk signal (or
+// loaded assessments). The risk-assessment fetch runs on every Holds open, so counting
+// its transient loading/error state here would flash the risk section on non-risky
+// orders before settling to "No holds". The loading/error sub-states still render inside
+// the risk summary for genuinely risky orders (gated by hasRiskSignal there).
 const hasRiskContext = computed(() =>
   riskSummary.value.hasRiskSignal
-  || riskAssessmentsStatus.value === 'loading'
-  || riskAssessmentsStatus.value === 'error'
   || riskAssessments.value.length > 0
 );
 
