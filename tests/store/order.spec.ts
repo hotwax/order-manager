@@ -50,4 +50,33 @@ describe('order workflow store', () => {
     await expect(store.shipPackedWorkflowOrders(['M100001'])).rejects.toThrow('No packed shipments found');
     expect(api).not.toHaveBeenCalled();
   });
+
+  it('builds order-search params from the active search and filters', () => {
+    const store = useOrderStore();
+    store.searchQuery = 'HC#2601';
+    store.searchFilters = {
+      status: ['ORDER_APPROVED'],
+      channel: 'WEB_SALES_CHANNEL',
+      productStoreId: 'STORE',
+      dateFrom: '2026-06-01',
+      dateThru: '2026-06-28',
+      hasVirtualFacilityItems: true,
+      archivedOnly: false,
+    };
+    store.searchSort = 'orderDate asc';
+
+    expect(store.toSearchParams(2)).toEqual({
+      queryString: 'HC#2601',
+      status: ['ORDER_APPROVED'],
+      channel: 'WEB_SALES_CHANNEL',
+      productStoreId: 'STORE',
+      dateFrom: '2026-06-01',
+      dateThru: '2026-06-28',
+      hasVirtualFacilityItems: true,
+      archivedOnly: false,
+      sort: 'orderDate asc',
+      pageSize: 50,
+      pageIndex: 2,
+    });
+  });
 });
