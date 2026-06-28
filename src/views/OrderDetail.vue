@@ -2835,7 +2835,7 @@ async function openCreateHoldTaskModal() {
       autoGenerateTaskName: true,
       defaultOrderName: currentOrder.orderName || currentOrder.id,
       defaultWorkEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-      defaultWorkEffortPurposeTypeId: 'INVALID_ADDRESS',
+      defaultWorkEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
     },
   });
   await modal.present();
