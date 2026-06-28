@@ -36,13 +36,15 @@
           </ion-label>
           <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
         </ion-item>
-        <ion-item button :detail="false" @click="openCountryPicker(addressState.original)">
-          <ion-label class="geo-picker-field">
-            <span class="geo-picker-label">{{ translate('Country') }}</span>
-            <span :class="{ 'geo-picker-placeholder': !countryName(addressState.original.countryGeoId) }">{{ countryName(addressState.original.countryGeoId) || translate('Select') }}</span>
-          </ion-label>
-          <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
-        </ion-item>
+        <InlineSearchableSelect
+          :label="translate('Country')"
+          :model-value="addressState.original.countryGeoId"
+          :options="countryOptions"
+          :placeholder="translate('Select')"
+          :search-placeholder="translate('Search countries')"
+          :empty-text="translate('No countries found')"
+          @update:model-value="onCountrySelect(addressState.original, $event)"
+        />
       </ion-list>
 
       <ion-list class="ion-no-padding" lines="full">
@@ -69,13 +71,15 @@
           </ion-label>
           <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
         </ion-item>
-        <ion-item button :detail="false" @click="openCountryPicker(addressState.suggested)">
-          <ion-label class="geo-picker-field">
-            <span class="geo-picker-label">{{ translate('Country') }}</span>
-            <span :class="{ 'geo-picker-placeholder': !countryName(addressState.suggested.countryGeoId) }">{{ countryName(addressState.suggested.countryGeoId) || translate('Select') }}</span>
-          </ion-label>
-          <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
-        </ion-item>
+        <InlineSearchableSelect
+          :label="translate('Country')"
+          :model-value="addressState.suggested.countryGeoId"
+          :options="countryOptions"
+          :placeholder="translate('Select')"
+          :search-placeholder="translate('Search countries')"
+          :empty-text="translate('No countries found')"
+          @update:model-value="onCountrySelect(addressState.suggested, $event)"
+        />
       </ion-list>
     </ion-radio-group>
 
@@ -103,7 +107,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   IonButton,
   IonIcon,
@@ -122,6 +126,7 @@ import { chevronDownOutline } from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
 import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
+import InlineSearchableSelect from '@/components/common/InlineSearchableSelect.vue';
 import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
@@ -150,6 +155,8 @@ const emit = defineEmits<{
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
 
+const countryOptions = computed(() => props.countries.map((country: any) => ({ value: country.geoId, label: country.geoName })));
+
 // Editable per-card address form. Built lazily (see onMounted) from the task so
 // the shell + skeleton paint first; stays null until then, which drives the
 // skeleton placeholder and keeps the layout stable (no shift on hydrate).
@@ -169,27 +176,15 @@ onMounted(() => {
   requestAnimationFrame(hydrate);
 });
 
-function countryName(geoId: string): string {
-  return props.countries.find((c: any) => c.geoId === geoId)?.geoName || '';
-}
-
 function stateName(address: AddressState['original']): string {
   if (!address.countryGeoId || !address.stateProvinceGeoId) return '';
   return seedStore.getStatesForCountry(address.countryGeoId).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
 }
 
-async function openCountryPicker(address: AddressState['original']) {
-  const modal = await modalController.create({
-    component: GeoSelectModal,
-    componentProps: { title: translate('Select country'), items: props.countries, selectedGeoId: address.countryGeoId },
-  });
-  await modal.present();
-  const { data, role } = await modal.onWillDismiss();
-  if (role === 'selected' && data && data !== address.countryGeoId) {
-    address.countryGeoId = data;
-    address.stateProvinceGeoId = '';
-    seedStore.loadGeoAssocs(data);
-  }
+function onCountrySelect(address: AddressState['original'], countryGeoId: string) {
+  address.countryGeoId = countryGeoId;
+  address.stateProvinceGeoId = '';
+  if (countryGeoId) seedStore.loadGeoAssocs(countryGeoId);
 }
 
 async function openStatePicker(address: AddressState['original']) {
