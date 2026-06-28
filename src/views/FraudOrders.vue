@@ -40,6 +40,9 @@
         </FilterSelect>
       </SearchFilterCard>
 
+      <!-- Refetch progress bar: shown while a first-page reload runs over existing cards. -->
+      <ion-progress-bar v-if="isRefetching" type="indeterminate" />
+
       <ion-list v-if="fraudTasks.length" lines="none">
         <ion-list-header class="order-results-header">
           <span class="order-results-header-start">
@@ -59,7 +62,21 @@
         </ion-list-header>
       </ion-list>
 
-      <div class="fraud-orders">
+      <!-- First-load spinner: only before any card exists. -->
+      <div v-if="isFirstLoad" class="ion-text-center ion-padding">
+        <ion-spinner name="crescent" />
+      </div>
+
+      <!-- Error/retry state replaces the list when the first-page request failed. -->
+      <ErrorState
+        v-else-if="hasError"
+        :title="translate('Could not load fraud tasks')"
+        :message="translate(fraudError)"
+        retryable
+        @retry="fetchFraudTasks()"
+      />
+
+      <div v-else class="fraud-orders">
         <FraudTaskCard
           v-for="task in fraudTasks"
           :key="task.workEffortId"
@@ -71,7 +88,8 @@
           @update:selected="val => selectedOrders[task.workEffortId] = val"
           @completed="fetchFraudTasks()"
         />
-        <div class="empty-state" v-if="!fraudTasks.length">
+        <!-- True empty state: only after a successful zero-row response. -->
+        <div class="empty-state" v-if="showEmptyState">
           <p v-html="getEmptyMessage()"></p>
         </div>
       </div>
@@ -101,10 +119,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUpdate } from 'vue';
-import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonSelectOption, IonTitle, IonToolbar, IonInfiniteScroll, IonInfiniteScrollContent, alertController, onIonViewWillEnter } from '@ionic/vue';
+import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonProgressBar, IonSelectOption, IonSpinner, IonTitle, IonToolbar, IonInfiniteScroll, IonInfiniteScrollContent, alertController, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
 import router from '@/router';
 import { showToast } from '@/utils';
+import ErrorState from '@/components/common/ErrorState.vue';
 import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
@@ -140,7 +159,18 @@ onBeforeUpdate(() => {
 });
 
 const fraudTasks = computed(() => orderTaskStore.getFraudTasks);
+const fraudStatus = computed(() => orderTaskStore.getFraudStatus);
+const fraudError = computed(() => orderTaskStore.getFraudError);
 const isScrollable = computed(() => orderTaskStore.isFraudTasksScrollable);
+// First load: request pending and no cards rendered yet.
+const isFirstLoad = computed(() => fraudStatus.value === 'loading' && !fraudTasks.value.length);
+// Refetch: reload running while cards already exist (keeps list visible, shows a bar).
+const isRefetching = computed(() => fraudStatus.value === 'loading' && fraudTasks.value.length > 0);
+// Only take over the page when there's nothing to show; a failed refetch with
+// cards on screen keeps the existing rows instead of blanking the queue.
+const hasError = computed(() => fraudStatus.value === 'error' && !fraudTasks.value.length);
+// Empty copy only after a settled, successful, zero-row first-page response.
+const showEmptyState = computed(() => fraudStatus.value === 'success' && !fraudTasks.value.length);
 const selectedTaskCount = computed(() => Object.values(selectedOrders.value).filter(Boolean).length as number);
 const hasFilters = computed(() => !!(searchQuery.value || assignee.value || recommendation.value || orderChannel.value || severity.value));
 const currentPageTaskIds = computed(() => fraudTasks.value.map((task: any) => task.workEffortId));
@@ -192,6 +222,10 @@ function clearFilters() {
 }
 
 const fetchFraudTasks = async (pageSize?: any, pageIndex?: any) => {
+  // A first-page load replaces the result set, so drop any stale selection.
+  if (!pageIndex) {
+    selectedOrders.value = {};
+  }
   await orderTaskStore.fetchFraudTasks({
     pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
     pageIndex: pageIndex ?? 0,

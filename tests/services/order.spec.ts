@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { commonUtil, useSolrSearch } from '@common';
-import { buildOrderLookupPayload, searchOrders } from '@/services/order';
+import {
+  buildOrderLookupPayload,
+  buildVirtualLocationCountsPayload,
+  fetchVirtualLocationOrderCounts,
+  searchOrders
+} from '@/services/order';
 
 vi.mock('@common', () => ({
   api: vi.fn(),
@@ -80,14 +85,9 @@ describe('buildOrderLookupPayload facility filtering', () => {
     ]));
   });
 
-  it('requests the address, reason, and delivery fields used by queue list rows', () => {
+  it('requests the reason and delivery fields used by queue list rows', () => {
     const fields = fieldsOf();
     expect(fields).toEqual(expect.arrayContaining([
-      'address1',
-      'city',
-      'stateProvinceGeoId',
-      'postalCode',
-      'countryGeoId',
       'estimatedDeliveryDate',
       'shipBeforeDate',
       'rejectionReason',
@@ -151,5 +151,162 @@ describe('buildOrderLookupPayload facility filtering', () => {
       queueReason: 'Inventory not available',
       ruleName: 'Rule name'
     });
+  });
+
+  it('summarizes brokered facilities from physical facility docs only', async () => {
+    mockSolrResponse({
+      grouped: {
+        orderId: {
+          ngroups: 1,
+          groups: [{
+            doclist: {
+              docs: [{
+                orderId: 'M100002',
+                orderName: '#100002',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: 'BROADWAY',
+                facilityName: 'Broadway',
+                facilityTypeId: 'RETAIL_STORE',
+                quantity: 1
+              }, {
+                orderId: 'M100002',
+                orderName: '#100002',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: 'BROADWAY',
+                facilityName: 'Broadway',
+                facilityTypeId: 'RETAIL_STORE',
+                quantity: 1
+              }, {
+                orderId: 'M100002',
+                orderName: '#100002',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: 'GARDEN_CITY',
+                facilityName: 'Garden City',
+                facilityTypeId: 'RETAIL_STORE',
+                quantity: 1
+              }, {
+                orderId: 'M100002',
+                orderName: '#100002',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: '_NA_',
+                facilityName: 'Brokering Queue',
+                facilityTypeId: 'VIRTUAL_FACILITY',
+                quantity: 1
+              }]
+            }
+          }]
+        }
+      }
+    });
+
+    const result = await searchOrders();
+
+    expect(result.orders[0]).toMatchObject({
+      brokeredFacilityName: 'Broadway',
+      brokeredFacilitySplitCount: 1,
+      dominantVirtualFacilityName: '',
+      brokeredItemCount: 3,
+      totalItemCount: 4
+    });
+  });
+
+  it('uses the dominant virtual facility when an order is fully unbrokered', async () => {
+    mockSolrResponse({
+      grouped: {
+        orderId: {
+          ngroups: 1,
+          groups: [{
+            doclist: {
+              docs: [{
+                orderId: 'M100003',
+                orderName: '#100003',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: '_NA_',
+                facilityName: 'Brokering Queue',
+                facilityTypeId: 'VIRTUAL_FACILITY',
+                quantity: 1
+              }, {
+                orderId: 'M100003',
+                orderName: '#100003',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: '_NA_',
+                facilityName: 'Brokering Queue',
+                facilityTypeId: 'VIRTUAL_FACILITY',
+                quantity: 1
+              }, {
+                orderId: 'M100003',
+                orderName: '#100003',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: '_NA_',
+                facilityName: 'Brokering Queue',
+                facilityTypeId: 'VIRTUAL_FACILITY',
+                quantity: 1
+              }, {
+                orderId: 'M100003',
+                orderName: '#100003',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: 'REJECTED_PARKING',
+                facilityName: 'Rejected Queue',
+                facilityTypeId: 'VIRTUAL_FACILITY',
+                quantity: 1
+              }]
+            }
+          }]
+        }
+      }
+    });
+
+    const result = await searchOrders();
+
+    expect(result.orders[0]).toMatchObject({
+      brokeredFacilityName: '',
+      brokeredFacilitySplitCount: 0,
+      dominantVirtualFacilityName: 'Brokering Queue',
+      dominantVirtualFacilitySplitCount: 1,
+      brokeredItemCount: 0,
+      totalItemCount: 4
+    });
+  });
+});
+
+describe('virtual location count payload', () => {
+  function virtualLocationFiltersOf(params: Parameters<typeof buildVirtualLocationCountsPayload>[0]) {
+    return buildVirtualLocationCountsPayload(params).json.filter as string[];
+  }
+
+  it('counts created and approved orders by virtual facility for the selected product store', () => {
+    const filters = virtualLocationFiltersOf({
+      productStoreId: 'STORE',
+      facilityIds: ['_NA_', 'REJECTED_ITM_PARKING', 'UNFILLABLE_PARKING']
+    });
+
+    expect(filters).toContain('docType: ORDER');
+    expect(filters).toContain('orderTypeId: SALES_ORDER');
+    expect(filters).toContain('orderStatusId:(ORDER_CREATED OR ORDER_APPROVED)');
+    expect(filters).toContain('productStoreId:STORE');
+    expect(filters).toContain('facilityId:(_NA_ OR REJECTED_ITM_PARKING OR UNFILLABLE_PARKING)');
+  });
+
+  it('normalizes Solr facet buckets into facility order counts', async () => {
+    mockSolrResponse({
+      facets: {
+        facilityCounts: {
+          buckets: [
+            { val: '_NA_', count: 3, orders: 2 },
+            { val: 'UNFILLABLE_PARKING', count: 5, orders: '4' }
+          ]
+        }
+      }
+    });
+
+    const counts = await fetchVirtualLocationOrderCounts({
+      productStoreId: 'STORE',
+      facilityIds: ['_NA_', 'UNFILLABLE_PARKING']
+    });
+
+    expect(counts).toEqual([
+      { facilityId: '_NA_', count: 2 },
+      { facilityId: 'UNFILLABLE_PARKING', count: 4 }
+    ]);
   });
 });
