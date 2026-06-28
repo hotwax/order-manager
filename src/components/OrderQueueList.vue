@@ -79,6 +79,7 @@
         >
           <ion-item lines="none">
             <ion-checkbox
+              v-if="selectMode"
               slot="start"
               :checked="selectedOrderIds.includes(order.id)"
               @click.stop
@@ -495,12 +496,10 @@ function handleOrderRowClick(order: Order) {
 function setOrderSelection(orderId: string, checked: boolean) {
   if (checked) {
     if (!selectedOrderIds.value.includes(orderId)) selectedOrderIds.value = [...selectedOrderIds.value, orderId];
-    selectMode.value = true;
     return;
   }
 
   selectedOrderIds.value = selectedOrderIds.value.filter((selectedOrderId) => selectedOrderId !== orderId);
-  if (!selectedOrderIds.value.length) selectMode.value = false;
 }
 
 function orderDetailLink(order: Order) {
