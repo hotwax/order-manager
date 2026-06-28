@@ -1,4 +1,6 @@
 import { api, commonUtil, useSolrSearch } from '@common';
+import { getActivePinia } from 'pinia';
+import { useSeedStore } from '@/store/seed';
 import {
   allDocs,
   normalizeOrderDoc,
@@ -7,12 +9,16 @@ import {
   type OrderSearchResult
 } from './OrderService';
 
+// Facility id used by OMS to hold archived order items (General Operations Parking).
+// Confirmed present in ORDER docs via the indexed `facilityId` field (see PR #309 field dump).
+export const GENERAL_OPS_PARKING_FACILITY_ID = 'GENERAL_OPS_PARKING';
+
 const VIRTUAL_OR_PARKING_FACILITY_IDS = [
   '_NA_',
   'REJECTED_ITM_PARKING',
   'REJECTED_PARKING',
   'UNFILLABLE_PARKING',
-  'GENERAL_OPS_PARKING'
+  GENERAL_OPS_PARKING_FACILITY_ID
 ];
 
 export interface OrderSearchParams {
@@ -22,6 +28,8 @@ export interface OrderSearchParams {
   shipmentMethodTypeId?: string;
   productStoreId?: string;
   facilityIds?: string[];
+  hasVirtualFacilityItems?: boolean;
+  archivedOnly?: boolean;
   dateFrom?: string;
   dateThru?: string;
   sort?: string;
@@ -71,16 +79,6 @@ const orderSolrFields = [
   'shipBeforeDate',
   'shipByDate',
   'promisedDatetime',
-  'address1',
-  'shippingAddress1',
-  'city',
-  'shippingCity',
-  'stateProvinceGeoId',
-  'shippingStateProvinceGeoId',
-  'postalCode',
-  'shippingPostalCode',
-  'countryGeoId',
-  'shippingCountryGeoId',
   'facilityId',
   'reservationFacilityId',
   'facilityTypeId',
@@ -136,6 +134,14 @@ export function buildOrderLookupPayload(params: OrderSearchParams = {}) {
   const facilityIds = (params.facilityIds ?? []).filter((facilityId) => facilityId && facilityId !== 'All');
   const facilityFilter = buildShipGroupFacilityFilter(facilityIds);
   if (facilityFilter) filters.push(facilityFilter);
+
+  // Orders with at least one item still sitting at a virtual facility.
+  // Backed by the indexed `facilityTypeId` field on the ORDER item docs.
+  if (params.hasVirtualFacilityItems) filters.push(`facilityTypeId:${escapeSolrValue('VIRTUAL_FACILITY')}`);
+
+  // Archived orders = items parked in General Operations Parking.
+  // Backed by the indexed `facilityId` field on the ORDER item docs.
+  if (params.archivedOnly) filters.push(`facilityId:${escapeSolrValue(GENERAL_OPS_PARKING_FACILITY_ID)}`);
 
   const dateFilter = buildOrderDateSolrFilter(params.dateFrom, params.dateThru);
   if (dateFilter) filters.push(dateFilter);
@@ -256,7 +262,8 @@ function normalizeOrderWithParkingUnits(docs: any[]) {
 
   return {
     ...normalizeOrderDoc(primaryDoc),
-    parkingUnitCount: sumParkingUnits(docs)
+    parkingUnitCount: sumParkingUnits(docs),
+    ...summarizeBrokeredFacilities(docs)
   };
 }
 
@@ -285,6 +292,72 @@ function normalizeActivePhysicalFacilityOrderVolume(data: any): ActiveFacilityOr
     })
     .filter((row: ActiveFacilityOrderVolume) => row.facilityId && row.lastOrderCount > 0)
     .sort((a: ActiveFacilityOrderVolume, b: ActiveFacilityOrderVolume) => b.lastOrderCount - a.lastOrderCount || a.facilityName.localeCompare(b.facilityName));
+}
+
+type FacilityItemCount = { name: string; count: number };
+
+// Derives the location summary purely from the per-item ORDER docs the grouped
+// search already returns (no per-row detail fetch). Physical facilities drive
+// the brokered numerator/chip. When none are brokered, virtual/parking facilities
+// provide the fallback location chip without contributing to the numerator.
+function summarizeBrokeredFacilities(docs: any[]) {
+  const itemsByPhysicalFacility = new Map<string, { name: string; count: number }>();
+  const itemsByVirtualFacility = new Map<string, { name: string; count: number }>();
+  let brokeredItemCount = 0;
+
+  docs.forEach((doc) => {
+    const facilityId = toStringValue(doc.facilityId);
+    if (!facilityId) return;
+
+    const name = toStringValue(doc.facilityName) || facilityId;
+    if (isVirtualFacilityDoc(doc)) {
+      addFacilityItemCount(itemsByVirtualFacility, facilityId, name);
+      return;
+    }
+
+    addFacilityItemCount(itemsByPhysicalFacility, facilityId, name);
+    brokeredItemCount += 1;
+  });
+
+  const rankedPhysical = rankFacilityItemCounts(itemsByPhysicalFacility);
+  const rankedVirtual = brokeredItemCount === 0 ? rankFacilityItemCounts(itemsByVirtualFacility) : [];
+  const topPhysicalFacility = rankedPhysical[0];
+  const topVirtualFacility = rankedVirtual[0];
+
+  return {
+    brokeredFacilityName: topPhysicalFacility?.name ?? '',
+    brokeredFacilitySplitCount: rankedPhysical.length > 1 ? rankedPhysical.length - 1 : 0,
+    dominantVirtualFacilityName: topVirtualFacility?.name ?? '',
+    dominantVirtualFacilitySplitCount: rankedVirtual.length > 1 ? rankedVirtual.length - 1 : 0,
+    brokeredItemCount,
+    totalItemCount: docs.length
+  };
+}
+
+function addFacilityItemCount(counts: Map<string, FacilityItemCount>, facilityId: string, name: string) {
+  const existing = counts.get(facilityId);
+  if (existing) {
+    existing.count += 1;
+    if (!existing.name) existing.name = name;
+    return;
+  }
+
+  counts.set(facilityId, { name, count: 1 });
+}
+
+function rankFacilityItemCounts(counts: Map<string, FacilityItemCount>) {
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+}
+
+function isVirtualFacilityDoc(doc: any) {
+  const facilityTypeId = toStringValue(doc.facilityTypeId);
+  if (facilityTypeId === 'VIRTUAL_FACILITY') return true;
+
+  // The parent-type check needs the seed store; guard it so this service stays callable
+  // outside an active Pinia (e.g. unit tests), falling back to the direct type check.
+  if (!facilityTypeId || !getActivePinia()) return false;
+  const parentTypeId = useSeedStore().facilityType(facilityTypeId)?.parentTypeId;
+  return parentTypeId === 'VIRTUAL_FACILITY';
 }
 
 function buildOrderSearchQuery(searchTerm: string) {

@@ -30,6 +30,8 @@
         </FilterSelect>
       </SearchFilterCard>
 
+      <ion-progress-bar v-if="isRefetching" type="indeterminate" />
+
       <ion-list v-if="heldTasks.length" lines="none">
         <ion-list-header class="order-results-header">
           <span class="order-results-header-start">
@@ -51,7 +53,6 @@
 
       <div class="hold-orders-list">
         <HoldTaskCard
-          v-if="heldTasks.length"
           v-for="task in heldTasks"
           :key="task.workEffortId"
           :ref="(el) => setCardRef(task.workEffortId, el)"
@@ -62,7 +63,20 @@
           @update:selected="val => selectedOrders[task.workEffortId] = val"
           @completed="fetchHoldTasks()"
         />
-        <div class="empty-state" v-if="!heldTasks.length">
+
+        <div v-if="isFirstLoad" class="ion-text-center ion-padding">
+          <ion-spinner name="crescent" />
+        </div>
+
+        <ErrorState
+          v-else-if="isError"
+          :title="translate('Unable to load hold tasks')"
+          :message="translate(holdError)"
+          retryable
+          @retry="fetchHoldTasks()"
+        />
+
+        <div class="empty-state" v-else-if="isEmpty">
           <p v-html="getEmptyMessage()"></p>
         </div>
       </div>
@@ -105,7 +119,9 @@ import {
   IonTitle,
   IonToolbar,
   IonButton,
+  IonProgressBar,
   IonSelectOption,
+  IonSpinner,
   alertController,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
@@ -114,6 +130,7 @@ import {
 import { translate } from '@common';
 import router from '@/router';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
+import ErrorState from '@/components/common/ErrorState.vue';
 import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
@@ -129,7 +146,6 @@ const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANN
 const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
 
 const searchQuery = ref('');
-const swappable = ref(false);
 const assignee = ref('');
 const dateAfter = ref('');
 const dateBefore = ref('');
@@ -148,11 +164,22 @@ function setCardRef(workEffortId: string, el: any) {
 
 const heldTasks = computed(() => orderTaskStore.getHoldTasks);
 const isScrollable = computed(() => orderTaskStore.isHoldTasksScrollable);
+const holdStatus = computed(() => orderTaskStore.getHoldStatus);
+const holdError = computed(() => orderTaskStore.getHoldError);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
 const hasFilters = computed(() => !!(searchQuery.value || assignee.value || dateAfter.value || dateBefore.value || orderChannel.value));
 const currentPageTaskIds = computed(() => heldTasks.value.map((task) => task.workEffortId));
 const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));
 const someCurrentPageSelected = computed(() => currentPageTaskIds.value.some((workEffortId: string) => selectedOrders.value[workEffortId]));
+
+// First-load spinner: loading the initial page with nothing on screen yet.
+const isFirstLoad = computed(() => holdStatus.value === 'loading' && !heldTasks.value.length);
+// Progress bar: a first-page refetch while rows are still shown (filter change / refresh).
+const isRefetching = computed(() => holdStatus.value === 'loading' && heldTasks.value.length > 0);
+// Error state only when nothing is on screen to show instead.
+const isError = computed(() => holdStatus.value === 'error' && !heldTasks.value.length);
+// True empty state only after a successful zero-row response.
+const isEmpty = computed(() => holdStatus.value === 'success' && !heldTasks.value.length);
 
 function getEmptyMessage() {
   return hasFilters.value
@@ -190,7 +217,6 @@ watch(heldTasks, () => {
 
 function clearFilters() {
   searchQuery.value = '';
-  swappable.value = false;
   assignee.value = '';
   dateAfter.value = '';
   dateBefore.value = '';
@@ -231,6 +257,7 @@ async function resolveSelectedTasks() {
 
 
 const fetchHoldTasks = async (pageSize?: any, pageIndex?: any) => {
+  // The store owns loading/error status and keeps failures in state.
   await orderTaskStore.fetchHoldTasks({
     pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
     pageIndex: pageIndex ?? 0,

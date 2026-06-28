@@ -125,13 +125,12 @@
             </ion-label>
           </ion-item>
 
-          <ion-label class="tablet ion-text-start">
+          <ion-label class="tablet">
             {{ order.customerName || translate('Customer') }}
-            <p>{{ order.productStoreName }}</p>
             <p>{{ order.externalId }}</p>
           </ion-label>
 
-          <ion-label class="tablet ion-text-start">
+          <ion-label class="tablet">
             <p class="overline">{{ order.facilityName || order.facilityId || translate('Facility') }}</p>
             {{ order.shipmentMethodDesc || order.shippingMethodTypeId }}
             <p>{{ formatChannel(order.salesChannelEnumId) }}</p>
