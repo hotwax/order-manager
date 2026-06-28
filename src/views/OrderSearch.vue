@@ -84,28 +84,46 @@
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
-        <ion-item
+        <div
           v-for="order in searchResults"
           :key="order.id"
-          button
+          class="list-item order-search-row"
+          :role="selectMode ? 'button' : 'link'"
+          tabindex="0"
           @click="handleOrderRowClick(order, $event)"
+          @keydown.enter.prevent="handleOrderRowClick(order, $event)"
+          @keydown.space.prevent="handleOrderRowClick(order, $event)"
         >
-          <ion-checkbox
-            v-if="selectMode"
-            slot="start"
-            :checked="selectedOrderIds.includes(order.id)"
-            @click.stop
-            @ionChange="setOrderSelection(order.id, $event.detail.checked)"
-          />
-          <ion-label>
-            <h2>{{ order.externalId || order.id }}</h2>
-            <p>{{ order.id }} · {{ order.customerName || order.customerId || translate('Unknown customer') }}</p>
-            <p>{{ createdDateLabel(order.orderDate) }} · {{ translate('Ship') }} {{ shipTimeLeftLabel(order.orderDate) }}</p>
+          <ion-item lines="none">
+            <ion-checkbox
+              v-if="selectMode"
+              slot="start"
+              :checked="selectedOrderIds.includes(order.id)"
+              @click.stop
+              @keydown.stop
+              @ionChange="setOrderSelection(order.id, $event.detail.checked)"
+            />
+            <ion-label>
+              <p class="overline">{{ order.id }}</p>
+              {{ order.externalId || order.id }}
+            </ion-label>
+          </ion-item>
+
+          <ion-label class="tablet ion-text-start">
+            {{ order.customerName || order.customerId || translate('Unknown customer') }}
           </ion-label>
-          <ion-badge :color="statusColor(order.status)" slot="end">
-            {{ statusDescription(order.status) }}
-          </ion-badge>
-        </ion-item>
+
+          <ion-label class="tablet">
+            {{ createdDateLabel(order.orderDate) }}
+            <p>{{ translate('Ship') }} {{ shipTimeLeftLabel(order.orderDate) }}</p>
+          </ion-label>
+
+          <ion-label class="order-search-status ion-text-end">
+            <ion-badge :color="statusColor(order.status)">
+              {{ statusDescription(order.status) }}
+            </ion-badge>
+          </ion-label>
+        </div>
       </ion-list>
 
       <EmptyState
@@ -443,5 +461,27 @@ function parseOrderDate(value: string) {
 
 .bulk-action-buttons {
   overflow-x: auto;
+}
+
+.order-search-row {
+  --columns-desktop: 4;
+  --columns-tablet: 4;
+  min-height: 5rem;
+  border-block-start: var(--border-medium);
+  padding-inline: var(--spacer-sm);
+}
+
+
+.order-search-row > ion-label {
+  width: 100%;
+}
+
+.order-search-row > ion-label.order-search-status {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 8rem;
+  min-width: 8rem;
+  width: 8rem;
 }
 </style>

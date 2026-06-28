@@ -1,6 +1,6 @@
 import { DateTime, Settings } from "luxon";
 import { defineStore } from "pinia";
-import { api, commonUtil, logger, translate } from "@common";
+import { api, commonUtil, cookieHelper, logger, translate } from "@common";
 import { useAuth } from "@common/composables/useAuth";
 import { showToast } from "@/utils";
 import { useSeedStore } from "./seed";
@@ -60,6 +60,8 @@ export const useUserStore = defineStore("user", {
         if (this.current.timeZone) {
           Settings.defaultZone = this.current.timeZone;
         }
+        // TODO: This should be set from the Login Component
+        this.oms = cookieHelper().get("oms") || '';
         this.fetchStatus.profile = "success";
       } catch (error: any) {
         await showToast(translate("Failed to fetch user profile information"));
