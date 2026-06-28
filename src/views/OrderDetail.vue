@@ -2827,7 +2827,17 @@ async function openCreateHoldTaskModal() {
     return;
   }
 
-  const modal = await modalController.create({ component: AddOrderTaskModal, componentProps: { shipGroups, title: translate('Create hold task') } });
+  const modal = await modalController.create({
+    component: AddOrderTaskModal,
+    componentProps: {
+      shipGroups,
+      title: translate('Create hold task'),
+      autoGenerateTaskName: true,
+      defaultOrderName: currentOrder.orderName || currentOrder.id,
+      defaultWorkEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+      defaultWorkEffortPurposeTypeId: 'INVALID_ADDRESS',
+    },
+  });
   await modal.present();
   const { data, role } = await modal.onWillDismiss();
   if (role !== 'confirm' || !data) return;
