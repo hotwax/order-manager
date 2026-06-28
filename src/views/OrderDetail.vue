@@ -1675,7 +1675,7 @@ async function loadOrder(orderId: string, force = false) {
   if (customerPartyId.value) {
     await customerStore.loadCustomerProfile(customerPartyId.value, force);
   }
-  // Rich product data (name/SKU/image): fetch only uncached products, never refetch.
+  // Rich product data (name/SKU/image): fetch only missing or stale products.
   useProductMaster().init();
   await useProductMaster().prefetch(orderDetailStore.allItems.map((item: any) => item.productId));
   // Fetch shipping methods and carriers (not order-specific, fetch once)

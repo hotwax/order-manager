@@ -13,8 +13,8 @@ Everything on the page resolves from one of three sources, none of which is a se
    addresses, and — via the extended master — the customer's Person/PartyGroup)
 2. **The seed store** (stable reference data loaded once at login via `loadInitialSeedData`
    — status/enum/type labels and geo names)
-3. **The product cache** (rich product fields fetched once per `productId` and never
-   refetched — a shared lookup, not a per-order call; see `docs/ProductData.md`)
+3. **The product cache** (rich product fields fetched by `productId` and refreshed after
+   the cache stale window — a shared lookup, not a per-order call; see `docs/ProductData.md`)
 
 This doc is the contract for what the page renders and where each label comes from.
 
@@ -49,9 +49,9 @@ This doc is the contract for what the page renders and where each label comes fr
 
 1. **The order payload** — one `GET oms/orders?...` per order (transactional data).
 2. **The seed store** — stable reference data loaded once at login (labels + geo).
-3. **The product cache** — rich product data fetched **once per productId, ever**, and
-   cached (see `docs/ProductData.md`). Not an order call; a shared lookup that never
-   refetches the same product.
+3. **The product cache** — rich product data fetched by `productId`, persisted in Dexie,
+   and refreshed when stale (see `docs/ProductData.md`). Not an order call; a shared
+   lookup across order detail views.
 
 | UI element | Source |
 | --- | --- |
@@ -80,7 +80,7 @@ falls back to `postalAddress.toName`. The `customer` store is **dropped** from t
 ### Product data is rich, via the shared product cache
 The payload has no product name/SKU/image — only `itemDescription`, `productId`,
 `externalId`. We adopt the inventory-count product-master pattern: fetch product display
-fields from Solr **on demand, cached per `productId`, never refetched** (`docs/ProductData.md`).
+fields from Solr **on demand and cached per `productId`** (`docs/ProductData.md`).
 After the order loads, `prefetch(itemProductIds)` runs once; item labels then resolve to
 `product.productName` with `itemDescription`/`productId` as graceful fallback.
 
@@ -100,5 +100,5 @@ Both added to `loadInitialSeedData`.
   comms, returns all come from that single payload.
 - All reference labels (statuses, enums, types, **geo**, **identification types**,
   **adjustment types**) come from the seed store loaded at login.
-- Product names/SKUs/images come from the shared product cache — fetched once per product,
-  never twice.
+- Product names/SKUs/images come from the shared product cache — fetched by product and
+  refreshed after the cache stale window.

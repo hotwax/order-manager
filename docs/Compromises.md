@@ -30,33 +30,21 @@ Wired the **multi-tenant Dexie backend**: `src/services/productDb.ts` (`${oms}-C
 and `productCache.ts` now keeps a reactive in-memory mirror **persisted to Dexie** — hydrated
 per OMS, never drops on logout (only the mirror clears). 28 tests + build still green.
 
-The original in-memory-only note is kept below for history.
+The historical blocker details are summarized below.
 
-### (history) Dexie not installed — product cache is in-memory for now
+### (history) Dexie install blocker was resolved
 
-**What:** The product master was specced to use Dexie/IndexedDB (multi-tenant per OMS,
-persistent across sessions), mirroring inventory-count. Dexie is **not installed**.
+**What:** The product master was originally specced to use Dexie/IndexedDB
+(multi-tenant per OMS, persistent across sessions), mirroring inventory-count.
 
-**Why:** `pnpm --filter order-manager add dexie` fails on a **pre-existing workspace
-catalog error**:
-```
-ERR_PNPM_CATALOG_ENTRY_NOT_FOUND_FOR_SPEC  No catalog entry 'chart.js' was found for catalog 'default'.
-```
-`apps/order-manager/package.json` references `"chart.js": "catalog:"` but the workspace
-catalog (`pnpm-workspace.yaml`) does not define `chart.js`. This blocks **all** new
-dependency installs workspace-wide. Fixing it (adding a chart.js catalog entry) is out of
-scope and would mean guessing a version, so I left it alone.
+**Resolved path:** The previous package blocker came from a dangling, unused
+`"chart.js": "catalog:"` entry in `order-manager/package.json`. After that entry was
+removed, Dexie was installed and wired through `src/services/productDb.ts` and
+`src/store/productCache.ts`.
 
-**What I did instead:** implemented `useProductMaster` with the **same public API** backed
-by an **in-memory Pinia cache**. It still never refetches a product within a session. Only
-cross-session persistence and multi-tenant on-disk storage are deferred.
-
-**To finish (when you're back):**
-1. Add a `chart.js` entry to the workspace catalog (or change order-manager's
-   `"chart.js": "catalog:"` to a pinned version), so `pnpm install` works again.
-2. `pnpm --filter order-manager add dexie`.
-3. Swap the in-memory Map in `src/store/productCache.ts` for the `CommonDB` Dexie tables
-   (per `docs/ProductData.md`). **No consumer changes** — the composable API is unchanged.
+**Current behavior:** `useProductMaster` keeps the same public API, hydrates cached products
+from Dexie, and refreshes missing or stale products from Solr based on `updatedAt` and
+`staleMs`.
 
 ---
 

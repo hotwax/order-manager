@@ -3,7 +3,8 @@
 The order payload gives each line only `productId`, `itemDescription`, `externalId` — no
 product name, SKU, or image. To show rich product info **without re-calling the same
 product twice**, we adopt the inventory-count app's product-master pattern: a cache keyed
-by `productId` that fetches on demand from Solr and never refetches a cached product.
+by `productId` that fetches on demand from Solr and refreshes cached products after the
+configured stale window.
 
 This is the **one product architecture** for the whole app — the order detail page is the
 first consumer.
@@ -20,7 +21,7 @@ Key properties of that implementation:
   just opens a different database. Data for multiple OMS coexists.
 - **`getById(productId)`** — read from cache; if hit and fresh (`updatedAt` within
   `staleMs`), return it; else fetch from Solr, upsert, return.
-- **`prefetch(productIds)`** — fetch only the IDs **not already cached**, in batches.
+- **`prefetch(productIds)`** — fetch only missing or stale IDs, in batches.
 - **`upsertFromApi(docs)`** — normalize Solr docs → product records + identification rows,
   bulk write.
 - Product data source: a Solr query (`docType:PRODUCT`) selecting
@@ -34,38 +35,37 @@ Key properties of that implementation:
 - **Scope:** order detail only needs product display fields (name, SKU/identifier, image).
   No inventory/ATP tables, no scan/variance tables — those are cycle-count concerns.
 
-## Storage backend — Dexie deferred (see Compromises.md)
+## Storage backend — Dexie/IndexedDB
 
-The intended backend is **Dexie/IndexedDB, multi-tenant per OMS**, identical to
-inventory-count. It is **not installed yet**: `pnpm add dexie` fails on a pre-existing
-workspace catalog error (`No catalog entry 'chart.js'`) that is out of scope to fix.
+The backend is **Dexie/IndexedDB, multi-tenant per OMS**, aligned with inventory-count.
+The `productCache` store keeps a reactive in-memory mirror for the current session and
+persists records in the Dexie DB named `${oms}-CommonDB`.
 
-Therefore this phase ships a **storage-abstracted in-memory cache** with the **same public
-API**. The order-detail consumer code does not change when we later swap the backend to
-Dexie — only the internals of the store/composable do.
+`updatedAt` is written whenever Solr product data is cached. `useProductMaster` compares
+that timestamp with `staleMs` before returning a cache hit, so persisted product data can
+survive reloads without becoming permanent stale data.
 
-| Capability | In-memory (now) | Dexie (target) |
-| --- | --- | --- |
-| Never refetch within a session | ✅ | ✅ |
-| Survives reload / new session | ❌ (re-fetched on demand) | ✅ |
-| Multi-tenant per OMS | n/a (cleared on logout) | ✅ `${oms}-CommonDB` |
-| Public API (`getById`, `getByIds`, `prefetch`, `upsertFromApi`, `cacheReady`) | ✅ | ✅ |
+| Capability | Current behavior |
+| --- | --- |
+| Fresh cache hit | Served from the reactive mirror after Dexie hydration |
+| Missing or stale product | Re-fetched from Solr and persisted back to Dexie |
+| Survives reload / new session | Yes, via `${oms}-CommonDB` |
+| Multi-tenant per OMS | Yes, each OMS gets a separate Dexie DB |
+| Logout behavior | Clears only the in-memory mirror; Dexie data stays available for the same OMS |
+| Public API (`getById`, `getByIds`, `prefetch`, `upsertFromApi`, `cacheReady`) | Stable |
 
-When the catalog issue is resolved: `pnpm --filter order-manager add dexie`, then replace
-the in-memory Map in the product store with the `CommonDB` Dexie tables (products +
-productIdentification), keyed by `${oms}-CommonDB`. No consumer changes.
+## API design
 
-## API design (this phase)
-
-A Pinia store `productCache` holds the cache; a composable `useProductMaster` is the public
-API (so consumers never touch the store internals — matches inventory-count).
+A Pinia store `productCache` owns the reactive mirror and Dexie persistence; a composable
+`useProductMaster` is the public API (so consumers never touch the store internals —
+matches inventory-count).
 
 ```ts
 useProductMaster() => {
   init(opts?)                         // set staleMs etc.; marks cacheReady
   getById(productId): Promise<{ product, status }>   // cache hit | fetch+cache
   getByIds(productIds): Promise<Product[]>           // batched Solr fetch
-  prefetch(productIds): Promise<void>                // fetch only uncached ids
+  prefetch(productIds): Promise<void>                // fetch only missing or stale ids
   upsertFromApi(docs): void                          // normalize + store
   cacheReady: Ref<boolean>
 }
@@ -86,7 +86,7 @@ After the order loads, prefetch the products for its items, then bind names from
 
 ```ts
 const productIds = orderDetail.allItems.map(i => i.productId);
-await useProductMaster().prefetch(productIds);   // one batched call, only uncached ids
+await useProductMaster().prefetch(productIds);   // one batched call, only missing/stale ids
 ```
 
 Item display label resolves: `product.productName || itemDescription || productId`.
