@@ -205,38 +205,59 @@ function sumParkingUnits(docs: any[]) {
   return docs.reduce((total, doc) => total + toNumberValue(doc.quantity), 0);
 }
 
-// Derives the brokered-to facility summary purely from the per-item ORDER docs
-// the grouped search already returns (no per-row detail fetch). Virtual/parking
-// facilities are excluded from the brokered numerator / chip / split count, using
-// the same classification as OrderQueueList.isVirtualShipGroup.
+type FacilityItemCount = { name: string; count: number };
+
+// Derives the location summary purely from the per-item ORDER docs the grouped
+// search already returns (no per-row detail fetch). Physical facilities drive
+// the brokered numerator/chip. When none are brokered, virtual/parking facilities
+// provide the fallback location chip without contributing to the numerator.
 function summarizeBrokeredFacilities(docs: any[]) {
   const itemsByPhysicalFacility = new Map<string, { name: string; count: number }>();
+  const itemsByVirtualFacility = new Map<string, { name: string; count: number }>();
   let brokeredItemCount = 0;
 
   docs.forEach((doc) => {
     const facilityId = toStringValue(doc.facilityId);
-    if (!facilityId || isVirtualFacilityDoc(doc)) return;
+    if (!facilityId) return;
 
-    const existing = itemsByPhysicalFacility.get(facilityId);
     const name = toStringValue(doc.facilityName) || facilityId;
-    if (existing) {
-      existing.count += 1;
-      if (!existing.name) existing.name = name;
-    } else {
-      itemsByPhysicalFacility.set(facilityId, { name, count: 1 });
+    if (isVirtualFacilityDoc(doc)) {
+      addFacilityItemCount(itemsByVirtualFacility, facilityId, name);
+      return;
     }
+
+    addFacilityItemCount(itemsByPhysicalFacility, facilityId, name);
     brokeredItemCount += 1;
   });
 
-  const ranked = [...itemsByPhysicalFacility.values()].sort((a, b) => b.count - a.count);
-  const topFacility = ranked[0];
+  const rankedPhysical = rankFacilityItemCounts(itemsByPhysicalFacility);
+  const rankedVirtual = brokeredItemCount === 0 ? rankFacilityItemCounts(itemsByVirtualFacility) : [];
+  const topPhysicalFacility = rankedPhysical[0];
+  const topVirtualFacility = rankedVirtual[0];
 
   return {
-    brokeredFacilityName: topFacility?.name ?? '',
-    brokeredFacilitySplitCount: ranked.length > 1 ? ranked.length - 1 : 0,
+    brokeredFacilityName: topPhysicalFacility?.name ?? '',
+    brokeredFacilitySplitCount: rankedPhysical.length > 1 ? rankedPhysical.length - 1 : 0,
+    dominantVirtualFacilityName: topVirtualFacility?.name ?? '',
+    dominantVirtualFacilitySplitCount: rankedVirtual.length > 1 ? rankedVirtual.length - 1 : 0,
     brokeredItemCount,
     totalItemCount: docs.length
   };
+}
+
+function addFacilityItemCount(counts: Map<string, FacilityItemCount>, facilityId: string, name: string) {
+  const existing = counts.get(facilityId);
+  if (existing) {
+    existing.count += 1;
+    if (!existing.name) existing.name = name;
+    return;
+  }
+
+  counts.set(facilityId, { name, count: 1 });
+}
+
+function rankFacilityItemCounts(counts: Map<string, FacilityItemCount>) {
+  return [...counts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
 function isVirtualFacilityDoc(doc: any) {

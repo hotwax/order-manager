@@ -344,6 +344,8 @@ export interface Order {
   parkingUnitCount?: number;
   brokeredFacilityName?: string;
   brokeredFacilitySplitCount?: number;
+  dominantVirtualFacilityName?: string;
+  dominantVirtualFacilitySplitCount?: number;
   brokeredItemCount?: number;
   totalItemCount?: number;
   shippingAddress1?: string;

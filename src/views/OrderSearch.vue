@@ -128,9 +128,9 @@
           </ion-label>
 
           <ion-label class="tablet ion-text-start">
-            <template v-if="order.brokeredFacilityName">
+            <template v-if="locationChipName(order)">
               <ion-chip class="brokered-facility-chip" outline>
-                <ion-label>{{ brokeredFacilityChipLabel(order) }}</ion-label>
+                <ion-label>{{ locationChipLabel(order) }}</ion-label>
               </ion-chip>
               <p>{{ brokeredProgressLabel(order) }}</p>
             </template>
@@ -442,9 +442,18 @@ function statusColor(statusId: string) {
   return commonUtil.getColorByDesc(label) || commonUtil.getColorByDesc(statusId) || commonUtil.getColorByDesc('default');
 }
 
-function brokeredFacilityChipLabel(order: any) {
-  const splitCount = Number(order.brokeredFacilitySplitCount) || 0;
-  return splitCount > 0 ? `${order.brokeredFacilityName} +${splitCount}` : order.brokeredFacilityName;
+function locationChipName(order: any) {
+  return order.brokeredFacilityName || order.dominantVirtualFacilityName || '';
+}
+
+function locationChipLabel(order: any) {
+  const splitCount = Number(
+    order.brokeredFacilityName
+      ? order.brokeredFacilitySplitCount
+      : order.dominantVirtualFacilitySplitCount
+  ) || 0;
+  const facilityName = locationChipName(order);
+  return splitCount > 0 ? `${facilityName} +${splitCount}` : facilityName;
 }
 
 function brokeredProgressLabel(order: any) {
