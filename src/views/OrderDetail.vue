@@ -20,6 +20,9 @@
             <h1>{{ order.orderName ? order.orderName : order.id }}</h1>
             <p>{{ order.id }}</p>
           </ion-label>
+          <ion-badge v-if="order.status" slot="end" :color="commonUtil.getStatusColor(order.statusId)">
+            {{ order.status }}
+          </ion-badge>
         </ion-item>
 
         <!-- timeline: child matching .order-detail-timeline -->
@@ -154,8 +157,8 @@
                   :href="shopifyOrderUrl"
                   target="_blank"
                   rel="noopener noreferrer"
-                  aria-label="Open in Shopify"
-                  title="Open in Shopify"
+                  :aria-label="translate('Open in Shopify')"
+                  :title="translate('Open in Shopify')"
                 >
                   <ion-icon slot="icon-only" :icon="openOutline" />
                 </ion-button>

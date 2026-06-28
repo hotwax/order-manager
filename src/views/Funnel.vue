@@ -73,8 +73,8 @@
               <p slot="end">{{ formatCount(fulfillmentStats.pickedShipGroups) }} {{ translate("ship groups") }}</p>
             </ion-item>
             <ion-item button :detail="true" router-link="/packed">
-              <ion-label>{{ translate("Packed") }}</ion-label>
-              <p slot="end">{{ formatCount(fulfillmentStats.packedShipGroups) }} {{ translate("ship groups") }}</p>
+              <ion-label>{{ translate("Packed and shipped") }}</ion-label>
+              <p slot="end">{{ formatCount(fulfillmentStats.packedAndShippedShipGroups) }} {{ translate("ship groups") }}</p>
             </ion-item>
           </ion-list>
         </StatCard>
