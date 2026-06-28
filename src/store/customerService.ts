@@ -13,6 +13,7 @@ import type {
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
+import { getActivePhysicalFacilityOrderVolume } from '@/services/order';
 
 // Load-status keys for the funnel dashboard metric groups. Each group's fetch
 // transitions its status loading -> success/error so the Funnel view can show
@@ -80,6 +81,13 @@ function matchesFilters(order: WorkflowOrder, filters: WorkflowFilters): boolean
     if (DateTime.fromISO(order.orderDate) > thru) return false;
   }
   return true;
+}
+
+function hasUsableFacilityOrderVolume(facilities: any[]) {
+  return facilities.some((facility) =>
+    facility?.facilityId
+    && Number(facility.lastOrderCount || facility.orderCount || facility.shipGroupCount || 0) > 0
+  );
 }
 
 function inBucket(order: WorkflowOrder, bucket: WorkflowBucket): boolean {
@@ -266,7 +274,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
           params
         });
         if (resp.data) {
-          this.facilityOrderVolume = resp.data.facilities || [];
+          const facilities = Array.isArray(resp.data.facilities) ? resp.data.facilities : [];
+          this.facilityOrderVolume = hasUsableFacilityOrderVolume(facilities)
+            ? facilities
+            : await getActivePhysicalFacilityOrderVolume({ productStoreId });
         }
         this.dashboardStatus.facilityOrderVolume = 'success';
       } catch (error) {
