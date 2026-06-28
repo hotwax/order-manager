@@ -55,6 +55,13 @@ export interface BulkActionDefinition {
   confirmText?: string;
 }
 
+export interface VirtualLocationWorkCount {
+  id: string;
+  label: string;
+  facilityIds: string[];
+  count: number;
+}
+
 export interface ProductStore {
   productStoreId: string;
   storeName: string;
