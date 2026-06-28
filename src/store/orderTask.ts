@@ -140,6 +140,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
     addressValidationTasks: [] as any[],
     swapTasks: [] as any[],
     fraudTasks: [] as any[],
+    fraudStatus: 'idle' as 'idle' | 'loading' | 'success' | 'error',
+    fraudError: '' as string,
     orderHoldTasks: [] as any[],
     orderAddressValidationTasks: [] as any[],
     orderSwapTasks: [] as any[],
@@ -172,6 +174,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
     getSwapStatus: (state) => state.swapStatus,
     getSwapError: (state) => state.swapError,
     getFraudTasks: (state) => state.fraudTasks,
+    getFraudStatus: (state) => state.fraudStatus,
+    getFraudError: (state) => state.fraudError,
     isFraudTasksScrollable: (state): boolean => {
       return (
         state.fraudTasks?.length > 0 &&
@@ -266,6 +270,13 @@ export const useOrderTaskStore = defineStore('orderTask', {
       }
     },
     async fetchFraudTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string; riskRecommendationEnumId?: string; riskLevelEnumId?: string } = {}) {
+      // Treat only first-page requests as the page-level load. Infinite-scroll
+      // pages (pageIndex > 0) append without touching the first-load status.
+      const isFirstPage = !payload.pageIndex;
+      if (isFirstPage) {
+        this.fraudStatus = 'loading';
+        this.fraudError = '';
+      }
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({
@@ -280,9 +291,15 @@ export const useOrderTaskStore = defineStore('orderTask', {
         });
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map((task: any) => enrichFraudTask(task)));
-        this.fraudTasks = payload.pageIndex > 0 ? [...this.fraudTasks, ...detailedTasks] : detailedTasks;
+        this.fraudTasks = isFirstPage ? detailedTasks : [...this.fraudTasks, ...detailedTasks];
+        // Success only after both the list and the per-task enrichment have settled.
+        if (isFirstPage) this.fraudStatus = 'success';
       } catch (err) {
         console.error('Failed to fetch the fraud tasks', err);
+        if (isFirstPage) {
+          this.fraudStatus = 'error';
+          this.fraudError = 'Failed to load fraud tasks. Please try again.';
+        }
       }
     },
     /**
