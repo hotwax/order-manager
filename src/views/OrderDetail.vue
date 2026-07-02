@@ -960,7 +960,7 @@
 
     <ion-content v-else>
       <EmptyState :title="translate('Order not found')"
-        :message="translate('The selected order is not available in this workspace.')" />
+        :message="translate('Order {orderId} was not found in the database. It may have been removed, or a stale search index is still listing it.', { orderId })" />
     </ion-content>
 
     <ion-footer v-if="order && selectedSegment === 'items'">
