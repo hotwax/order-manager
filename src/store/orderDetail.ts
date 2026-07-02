@@ -3,7 +3,7 @@ import { api, commonUtil, logger} from "@common";
 import { useOrderDetail } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
 
-type LoadStatus = "idle" | "loading" | "loaded" | "error";
+type LoadStatus = "idle" | "loading" | "loaded" | "error" | "notfound";
 
 interface OrderEntry {
   payload: any | null; // verbatim API response[0] — no transformation
@@ -336,13 +336,25 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         if (commonUtil.hasError(resp)) throw resp.data;
 
         const payload = Array.isArray(resp.data) ? resp.data[0] : resp.data;
-        if (!payload) throw new Error("Order not found");
+        if (!payload) {
+          // HTTP 200 with no order row means this orderId is not in the order database.
+          // Most common cause: a stale search index (Solr) still lists an order that no
+          // longer exists — the queue/search shows it, but GET oms/orders returns nothing.
+          // Surface this as "not found" (distinct from a genuine load failure) so the UI
+          // and logs are precise instead of a generic "failed to load".
+          logger.warn(`Order [${orderId}] not found in the database — GET oms/orders?orderId=${orderId}&dependentLevels=1 returned no order row (likely a stale search-index entry pointing at a deleted/missing order).`);
+          entry.status = "notfound";
+          entry.error = "";
+          entry.payload = null;
+          entry.loadedAt = new Date().toISOString();
+          return;
+        }
 
         entry.payload = payload;
         entry.status = "loaded";
         entry.loadedAt = new Date().toISOString();
       } catch (error: any) {
-        logger.error("Failed to load order detail", error);
+        logger.error(`Failed to load order detail for [${orderId}]`, error);
         entry.status = "error";
         entry.error = error?.message || "Failed to load order";
       }
