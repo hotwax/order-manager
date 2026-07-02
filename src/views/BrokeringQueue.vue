@@ -31,7 +31,7 @@
 import { IonSelect, IonSelectOption } from '@ionic/vue';
 import { api, translate } from '@common';
 import { computed, onMounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import router from '@/router';
 import OrderQueueList from '@/components/OrderQueueList.vue';
 
 const ALL_FACILITY_OPTION_ID = 'All';
@@ -43,7 +43,7 @@ type FacilityOption = { id: string; name: string };
 const selectedFacilityIds = ref<string[]>([ALL_FACILITY_OPTION_ID]);
 const lastSelectedFacilityIds = ref<string[]>([ALL_FACILITY_OPTION_ID]);
 const virtualFacilities = ref<FacilityOption[]>([]);
-const route = useRoute();
+const route = router.currentRoute.value;
 const facilityIds = computed(() => {
   if (selectedFacilityIds.value.includes(ALL_FACILITY_OPTION_ID) || !selectedFacilityIds.value.length) {
     return virtualFacilityIds.value.length ? virtualFacilityIds.value : FALLBACK_BROKERING_FACILITY_IDS;
