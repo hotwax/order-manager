@@ -55,11 +55,11 @@
           v-else
           slot="end"
           fill="outline"
-          :disabled="addingProductId === product.productId || isInventoryUnavailable(product.productId)"
+          :disabled="addingProductId === product.productId || isInventoryLoading(product.productId) || isInventoryUnavailable(product.productId)"
           @click="addToOrder(product)"
         >
-          <ion-spinner v-if="addingProductId === product.productId" name="crescent" slot="start" />
-          {{ isInventoryUnavailable(product.productId) ? translate('Unavailable') : translate('Add') }}
+          <ion-spinner v-if="addingProductId === product.productId || isInventoryLoading(product.productId)" name="crescent" slot="start" />
+          {{ addButtonLabel(product.productId) }}
         </ion-button>
       </ion-item>
     </ion-list>
@@ -108,21 +108,33 @@ async function onSearch() {
   if (!keyword) {
     products.value = [];
     facilityInventoryByProductId.value = {};
+    loadingInventoryProductIds.value = new Set();
     return;
   }
   isLoading.value = true;
   try {
     const result = await searchProducts({ keyword, viewSize: 20 });
     products.value = result.products || [];
-    void loadFacilityInventory(products.value);
+    facilityInventoryByProductId.value = {};
+    loadingInventoryProductIds.value = new Set();
   } catch {
     products.value = [];
+    facilityInventoryByProductId.value = {};
+    loadingInventoryProductIds.value = new Set();
   } finally {
     isLoading.value = false;
   }
 }
 
 async function addToOrder(product: any) {
+  if (props.shipGroupFacilityId) {
+    const row = await loadFacilityInventory(product.productId);
+    if (!row || Number(row.available || 0) < 1) {
+      await showToast(translate('Inventory unavailable at selected facility.'));
+      return;
+    }
+  }
+
   addingProductId.value = product.productId;
   try {
     const data: Record<string, any> = {
@@ -182,9 +194,18 @@ function facilityInventoryLabel(productId: string) {
 function isInventoryUnavailable(productId: string) {
   if (!props.shipGroupFacilityId) return false;
   if (loadingInventoryProductIds.value.has(productId)) return true;
-  if (!(productId in facilityInventoryByProductId.value)) return true;
+  if (!(productId in facilityInventoryByProductId.value)) return false;
   const row = facilityInventoryByProductId.value[productId];
   return !row || Number(row.available || 0) < 1;
+}
+
+function isInventoryLoading(productId: string) {
+  return loadingInventoryProductIds.value.has(productId);
+}
+
+function addButtonLabel(productId: string) {
+  if (isInventoryLoading(productId)) return translate('Checking');
+  return isInventoryUnavailable(productId) ? translate('Unavailable') : translate('Add');
 }
 
 function setInventoryLoading(productId: string, loading: boolean) {
@@ -193,47 +214,49 @@ function setInventoryLoading(productId: string, loading: boolean) {
   loadingInventoryProductIds.value = next;
 }
 
-async function loadFacilityInventory(productList: any[]) {
-  if (!props.shipGroupFacilityId || !productList.length) return;
+async function loadFacilityInventory(productId: string): Promise<FacilityInventoryRow | null> {
+  if (!props.shipGroupFacilityId || !productId) return null;
+  if (productId in facilityInventoryByProductId.value) {
+    return facilityInventoryByProductId.value[productId];
+  }
 
   if (props.productStoreId) {
     await seedStore.loadProductStoreSeedData(props.productStoreId);
   }
 
-  await Promise.all(productList.map(async (product) => {
-    const productId = product.productId;
-    if (!productId) return;
-    setInventoryLoading(productId, true);
-    try {
-      const response = await api({
-        url: 'oms/productFacilities',
-        method: 'GET',
-        params: { productId, pageSize: 500 }
-      });
-      const productFacilities = responseList(response.data);
-      const productStoreFacilities = props.productStoreId
-        ? seedStore.productStoreFacilitiesByStoreId[props.productStoreId]?.ids?.map((id: string) => seedStore.productStoreFacilitiesByStoreId[props.productStoreId].byId[id]) ?? []
-        : [];
-      const rows = normalizeFacilityRows({
-        productFacilities,
-        productStoreFacilities,
-        facilityGroups: seedStore.facilityGroups.ids.map((id: string) => seedStore.facilityGroups.byId[id]),
-        facilityGroupMembers: seedStore.facilityGroupMembers.ids.map((id: string) => seedStore.facilityGroupMembers.byId[id]),
-        facilityName: (facilityId) => seedStore.facilityName(facilityId)
-      });
-      facilityInventoryByProductId.value = {
-        ...facilityInventoryByProductId.value,
-        [productId]: rows.find((row) => row.facilityId === props.shipGroupFacilityId) || null
-      };
-    } catch {
-      facilityInventoryByProductId.value = {
-        ...facilityInventoryByProductId.value,
-        [productId]: null
-      };
-    } finally {
-      setInventoryLoading(productId, false);
-    }
-  }));
+  setInventoryLoading(productId, true);
+  try {
+    const response = await api({
+      url: 'oms/productFacilities',
+      method: 'GET',
+      params: { productId, pageSize: 500 }
+    });
+    const productFacilities = responseList(response.data);
+    const productStoreFacilities = props.productStoreId
+      ? seedStore.productStoreFacilitiesByStoreId[props.productStoreId]?.ids?.map((id: string) => seedStore.productStoreFacilitiesByStoreId[props.productStoreId].byId[id]) ?? []
+      : [];
+    const rows = normalizeFacilityRows({
+      productFacilities,
+      productStoreFacilities,
+      facilityGroups: seedStore.facilityGroups.ids.map((id: string) => seedStore.facilityGroups.byId[id]),
+      facilityGroupMembers: seedStore.facilityGroupMembers.ids.map((id: string) => seedStore.facilityGroupMembers.byId[id]),
+      facilityName: (facilityId) => seedStore.facilityName(facilityId)
+    });
+    const row = rows.find((row) => row.facilityId === props.shipGroupFacilityId) || null;
+    facilityInventoryByProductId.value = {
+      ...facilityInventoryByProductId.value,
+      [productId]: row
+    };
+    return row;
+  } catch {
+    facilityInventoryByProductId.value = {
+      ...facilityInventoryByProductId.value,
+      [productId]: null
+    };
+    return null;
+  } finally {
+    setInventoryLoading(productId, false);
+  }
 }
 
 function dismiss() {
