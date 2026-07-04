@@ -203,8 +203,8 @@
           <ion-segment-button value="velocity">
             <ion-label>{{ translate("Fulfillment Velocity") }}</ion-label>
           </ion-segment-button>
-          <ion-segment-button value="partial">
-            <ion-label>{{ translate("Partial Fulfillments") }}</ion-label>
+          <ion-segment-button value="rejections">
+            <ion-label>{{ translate("Rejections") }}</ion-label>
           </ion-segment-button>
         </ion-segment>
       </div>
@@ -639,7 +639,7 @@ const holdTasks = computed(() => store.getHoldTasks);
 const facilityFulfillmentProgress = computed(() => store.getFacilityFulfillmentProgress);
 const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
 const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);
-const facilityPartialFulfillments = computed(() => store.getFacilityPartialFulfillments);
+const facilityRejections = computed(() => store.getFacilityRejections);
 const unfillableTrend = computed(() => store.unfillableTrend);
 const virtualLocationWorkRows = computed(() => store.getVirtualLocationCounts);
 
@@ -808,7 +808,7 @@ const selectedStoreName = computed(
 // facility list shows the loading/error/empty state for the selected segment.
 const facilityMetricKey = computed<DashboardStatusKey>(() => {
   if (selectedDimension.value === 'velocity') return 'facilityFulfillmentVelocity';
-  if (selectedDimension.value === 'partial') return 'facilityPartialFulfillments';
+  if (selectedDimension.value === 'rejections') return 'facilityRejections';
   return 'facilityOrderVolume';
 });
 const facilityMetricsLoading = computed(() => store.isDashboardGroupLoading(facilityMetricKey.value));
@@ -836,7 +836,7 @@ function fetchStoreDashboardData(productStoreId: string) {
   store.fetchVirtualLocationCounts(productStoreId);
   store.fetchFacilityOrderVolume(productStoreId);
   store.fetchFacilityFulfillmentVelocity(productStoreId);
-  store.fetchFacilityPartialFulfillments(productStoreId);
+  store.fetchFacilityRejections(productStoreId);
   store.fetchHoldTasks(productStoreId);
 }
 
@@ -964,7 +964,7 @@ function retryHoldTasks() {
 }
 function retryFacilityMetrics() {
   if (selectedDimension.value === 'velocity') store.fetchFacilityFulfillmentVelocity(selectedProductStoreId.value);
-  else if (selectedDimension.value === 'partial') store.fetchFacilityPartialFulfillments(selectedProductStoreId.value);
+  else if (selectedDimension.value === 'rejections') store.fetchFacilityRejections(selectedProductStoreId.value);
   else store.fetchFacilityOrderVolume(selectedProductStoreId.value);
 }
 function retryFacilityProgress() {
@@ -996,15 +996,17 @@ const filteredFacilities = computed(() => {
     list = facilityFulfillmentVelocity.value.map(item => ({
       facilityId: item.facilityId,
       name: item.facilityName || getFacilityName(item.facilityId),
-      value: item.fulfillmentVelocity || 0,
-      label: `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
+      value: item.activeFacilityFallback ? item.lastOrderCount : (item.fulfillmentVelocity || 0),
+      label: item.activeFacilityFallback
+        ? `${item.lastOrderCount || 0} ${translate("active orders")}`
+        : `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
     }));
-  } else if (selectedDimension.value === 'partial') {
-    list = facilityPartialFulfillments.value.map(item => ({
+  } else if (selectedDimension.value === 'rejections') {
+    list = facilityRejections.value.map(item => ({
       facilityId: item.facilityId,
       name: item.facilityName || getFacilityName(item.facilityId),
-      value: item.partialFulfillmentRatio || 0,
-      label: `${Math.round((item.partialFulfillmentRatio || 0) * 100)}% partial (${item.partialFulfilledOrders || 0}/${item.totalFulfilledOrders || 0} orders)`
+      value: item.rejectedShipGroupCount || 0,
+      label: `${item.rejectedShipGroupCount || 0} ${translate("rejected orders")}`
     }));
   }
 
