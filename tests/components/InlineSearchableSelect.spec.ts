@@ -26,14 +26,14 @@ describe('inline searchable select', () => {
 
 describe('bad address country picker wiring', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/tasks/BadAddressTaskCard.vue'), 'utf8');
+  const badAddressOrdersSource = readFileSync(resolve(process.cwd(), 'src/views/BadAddressOrders.vue'), 'utf8');
 
-  it('uses searchable selects for countries while keeping the modal state picker', () => {
-    expect(source.match(/<InlineSearchableSelect/g)?.length).toBe(2);
+  it('uses a searchable select for the editable country while keeping original address data read-only', () => {
+    expect(source.match(/<InlineSearchableSelect/g)?.length).toBe(1);
     expect(source).toContain('import InlineSearchableSelect');
     expect(source).toContain('import GeoSelectModal');
-    expect(source).toContain('@update:model-value="onCountrySelect(addressState.original, $event)"');
+    expect(source).toContain('readOnlyAddressValue(countryName(addressState.original.countryGeoId))');
     expect(source).toContain('@update:model-value="onCountrySelect(addressState.suggested, $event)"');
-    expect(source).toContain('openStatePicker(addressState.original)');
     expect(source).toContain('openStatePicker(addressState.suggested)');
   });
 
@@ -41,5 +41,13 @@ describe('bad address country picker wiring', () => {
     expect(source).toContain('address.countryGeoId = countryGeoId;');
     expect(source).toContain("address.stateProvinceGeoId = '';");
     expect(source).toContain('seedStore.loadGeoAssocs(countryGeoId)');
+  });
+
+  it('loads countries before rendering route task cards', () => {
+    expect(badAddressOrdersSource).toContain(`onIonViewWillEnter(async () => {
+  loadPhysicalFacilities();
+  await seedStore.loadGeos();
+  await replaceAddressValidationTasks();
+});`);
   });
 });
