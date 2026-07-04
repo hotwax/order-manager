@@ -55,10 +55,10 @@
           v-else
           slot="end"
           fill="outline"
-          :disabled="addingProductId === product.productId || isInventoryLoading(product.productId) || isInventoryUnavailable(product.productId)"
+          :disabled="addingProductIds.has(product.productId) || isInventoryLoading(product.productId) || isInventoryUnavailable(product.productId)"
           @click="addToOrder(product)"
         >
-          <ion-spinner v-if="addingProductId === product.productId || isInventoryLoading(product.productId)" name="crescent" slot="start" />
+          <ion-spinner v-if="addingProductIds.has(product.productId) || isInventoryLoading(product.productId)" name="crescent" slot="start" />
           {{ addButtonLabel(product.productId) }}
         </ion-button>
       </ion-item>
@@ -97,7 +97,7 @@ const requiresFulfillmentReview = computed(() => Boolean(props.requiresFulfillme
 const queryString = ref('');
 const products = ref<any[]>([]);
 const isLoading = ref(false);
-const addingProductId = ref<string | null>(null);
+const addingProductIds = ref<Set<string>>(new Set());
 const loadingInventoryProductIds = ref<Set<string>>(new Set());
 const facilityInventoryByProductId = ref<Record<string, FacilityInventoryRow | null>>({});
 // Tracks all successfully added productIds during this modal session
@@ -127,20 +127,24 @@ async function onSearch() {
 }
 
 async function addToOrder(product: any) {
-  if (props.shipGroupFacilityId) {
-    const row = await loadFacilityInventory(product.productId);
-    if (!row || Number(row.available || 0) < 1) {
-      await showToast(translate('Inventory unavailable at selected facility.'));
-      return;
-    }
-  }
+  const productId = product.productId;
+  if (!productId || addingProductIds.value.has(productId)) return;
 
-  addingProductId.value = product.productId;
+  setAddingProduct(productId, true);
+
   try {
+    if (props.shipGroupFacilityId) {
+      const row = await loadFacilityInventory(productId);
+      if (!row || Number(row.available || 0) < 1) {
+        await showToast(translate('Inventory unavailable at selected facility.'));
+        return;
+      }
+    }
+
     const data: Record<string, any> = {
       orderId: props.orderId,
       shipGroupSeqId: props.shipGroupSeqId,
-      productId: product.productId,
+      productId,
       quantity: 1,
     };
     if (props.defaultItemStatusId) data.statusId = props.defaultItemStatusId;
@@ -151,13 +155,13 @@ async function addToOrder(product: any) {
       data,
     });
     // Mark as added and stay open for more additions
-    addedProductIds.value = new Set([...addedProductIds.value, product.productId]);
+    addedProductIds.value = new Set([...addedProductIds.value, productId]);
     await showToast(translate(props.defaultItemStatusId === 'ITEM_APPROVED' ? 'Item added and approved for fulfillment.' : 'Item added to order successfully.'));
     props.onItemAdded?.();
   } catch (err: any) {
     await showToast(err?.response?.data?.errorMessage || translate('Failed to add item. Insufficient inventory or invalid product.'));
   } finally {
-    addingProductId.value = null;
+    setAddingProduct(productId, false);
   }
 }
 
@@ -206,6 +210,12 @@ function isInventoryLoading(productId: string) {
 function addButtonLabel(productId: string) {
   if (isInventoryLoading(productId)) return translate('Checking');
   return isInventoryUnavailable(productId) ? translate('Unavailable') : translate('Add');
+}
+
+function setAddingProduct(productId: string, adding: boolean) {
+  const next = new Set(addingProductIds.value);
+  adding ? next.add(productId) : next.delete(productId);
+  addingProductIds.value = next;
 }
 
 function setInventoryLoading(productId: string, loading: boolean) {

@@ -8,9 +8,12 @@ describe('add item to order modal', () => {
 
     expect(source).toContain("url: 'oms/productFacilities'");
     expect(source).toContain('normalizeFacilityRows({');
-    expect(source).toContain('await loadFacilityInventory(product.productId)');
+    expect(source).toContain('await loadFacilityInventory(productId)');
     expect(source).not.toContain('void loadFacilityInventory(products.value)');
     expect(source).not.toContain('Promise.all(productList.map');
+    expect(source).toContain('if (!productId || addingProductIds.value.has(productId)) return;');
+    expect(source).toContain('setAddingProduct(productId, true);');
+    expect(source.indexOf('setAddingProduct(productId, true);')).toBeLessThan(source.indexOf('await loadFacilityInventory(productId)'));
     expect(source).toContain('isInventoryUnavailable(product.productId)');
     expect(source).toContain("translate('Checking')");
     expect(source).toContain("translate('Inventory unavailable at selected facility.')");
