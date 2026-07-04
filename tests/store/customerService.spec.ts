@@ -78,14 +78,30 @@ describe('customer service funnel facility metrics', () => {
     expect(store.getDashboardStatus('facilityFulfillmentVelocity')).toBe('success');
   });
 
-  it('groups rejected ship groups by source facility for the selected date window', async () => {
+  it('enriches active facilities with selected-date rejection counts without reordering by rejections', async () => {
+    vi.mocked(getActivePhysicalFacilityOrderVolume).mockResolvedValueOnce([{
+      facilityId: 'GARDEN_CITY',
+      facilityName: 'Garden City',
+      lastOrderCount: 8,
+      assignedItemQuantity: 12,
+    }, {
+      facilityId: 'BROADWAY',
+      facilityName: 'Broadway',
+      lastOrderCount: 4,
+      assignedItemQuantity: 7,
+    }, {
+      facilityId: 'STATEN_ISLAND',
+      facilityName: 'Staten Island',
+      lastOrderCount: 2,
+      assignedItemQuantity: 3,
+    }]);
     vi.mocked(api).mockResolvedValueOnce({
       data: {
         entityValueList: [
           { fromFacilityId: 'BROADWAY', orderId: 'O1', shipGroupSeqId: '00001' },
           { fromFacilityId: 'BROADWAY', orderId: 'O1', shipGroupSeqId: '00001' },
           { fromFacilityId: 'BROADWAY', orderId: 'O2', shipGroupSeqId: '00002' },
-          { fromFacilityId: 'GARDEN_CITY', orderId: 'O3', shipGroupSeqId: '00001' },
+          { fromFacilityId: 'STATEN_ISLAND', orderId: 'O3', shipGroupSeqId: '00001' },
           { fromFacilityId: '_NA_', orderId: 'O4', shipGroupSeqId: '00001' },
         ],
       },
@@ -94,6 +110,7 @@ describe('customer service funnel facility metrics', () => {
     const store = useCustomerServiceStore();
     await store.fetchFacilityRejections('STORE');
 
+    expect(getActivePhysicalFacilityOrderVolume).toHaveBeenCalledWith({ productStoreId: 'STORE' });
     expect(api).toHaveBeenCalledWith({
       url: 'oms/dataDocumentView',
       method: 'POST',
@@ -111,8 +128,27 @@ describe('customer service funnel facility metrics', () => {
       },
     });
     expect(store.getFacilityRejections).toEqual([
-      { facilityId: 'BROADWAY', rejectedShipGroupCount: 2 },
-      { facilityId: 'GARDEN_CITY', rejectedShipGroupCount: 1 },
+      {
+        facilityId: 'GARDEN_CITY',
+        facilityName: 'Garden City',
+        lastOrderCount: 8,
+        assignedItemQuantity: 12,
+        rejectedShipGroupCount: 0,
+      },
+      {
+        facilityId: 'BROADWAY',
+        facilityName: 'Broadway',
+        lastOrderCount: 4,
+        assignedItemQuantity: 7,
+        rejectedShipGroupCount: 2,
+      },
+      {
+        facilityId: 'STATEN_ISLAND',
+        facilityName: 'Staten Island',
+        lastOrderCount: 2,
+        assignedItemQuantity: 3,
+        rejectedShipGroupCount: 1,
+      },
     ]);
     expect(store.getDashboardStatus('facilityRejections')).toBe('success');
   });

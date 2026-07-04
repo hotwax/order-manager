@@ -1005,8 +1005,10 @@ const filteredFacilities = computed(() => {
     list = facilityRejections.value.map(item => ({
       facilityId: item.facilityId,
       name: item.facilityName || getFacilityName(item.facilityId),
-      value: item.rejectedShipGroupCount || 0,
-      label: `${item.rejectedShipGroupCount || 0} ${translate("rejected orders")}`
+      value: item.lastOrderCount || 0,
+      label: item.rejectedShipGroupCount
+        ? `${item.lastOrderCount || 0} ${translate("active orders")}, ${item.rejectedShipGroupCount} ${translate("rejected orders")}`
+        : `${item.lastOrderCount || 0} ${translate("active orders")}`
     }));
   }
 

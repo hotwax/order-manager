@@ -32,6 +32,8 @@ describe('Funnel product store scope', () => {
     expect(funnelSource).toContain('<ion-segment-button value="rejections">');
     expect(funnelSource).toContain('store.fetchFacilityRejections(productStoreId)');
     expect(funnelSource).toContain('facilityRejections.value.map');
+    expect(funnelSource).toContain('item.lastOrderCount || 0');
+    expect(funnelSource).toContain('item.rejectedShipGroupCount');
     expect(funnelSource).not.toContain('<ion-segment-button value="partial">');
   });
 

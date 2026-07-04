@@ -194,6 +194,12 @@ describe('buildOrderLookupPayload facility filtering', () => {
             itemQuantity: 1,
             facilityNames: { buckets: [{ val: 'Garden City' }] }
           }, {
+            val: 'OREM',
+            count: 336,
+            orderCount: 336,
+            itemQuantity: 0,
+            facilityNames: { buckets: [{ val: 'Orem' }] }
+          }, {
             val: 'EMPTY_STORE',
             count: 0,
             orderCount: 0,

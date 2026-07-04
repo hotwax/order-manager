@@ -202,7 +202,7 @@ function activeFacilityVelocityFallbackRows(facilities: any[]) {
   }));
 }
 
-function normalizeFacilityRejectionRows(rows: any[]) {
+function buildFacilityRejectionCountMap(rows: any[]) {
   const rejectedByFacility = new Map<string, Set<string>>();
 
   rows.forEach((row) => {
@@ -216,13 +216,20 @@ function normalizeFacilityRejectionRows(rows: any[]) {
     rejectedByFacility.get(facilityId)!.add(rejectionKey);
   });
 
-  return [...rejectedByFacility.entries()]
-    .map(([facilityId, rejectedShipGroups]) => ({
-      facilityId,
-      rejectedShipGroupCount: rejectedShipGroups.size
-    }))
-    .filter((row) => row.rejectedShipGroupCount > 0)
-    .sort((left, right) => right.rejectedShipGroupCount - left.rejectedShipGroupCount || left.facilityId.localeCompare(right.facilityId));
+  const rejectionCounts = new Map<string, number>();
+  rejectedByFacility.forEach((rejectedShipGroups, facilityId) => {
+    rejectionCounts.set(facilityId, rejectedShipGroups.size);
+  });
+  return rejectionCounts;
+}
+
+function activeFacilityRowsWithRejections(facilities: any[], rejectionRows: any[]) {
+  const rejectionCountByFacility = buildFacilityRejectionCountMap(rejectionRows);
+
+  return facilities.map((facility) => ({
+    ...facility,
+    rejectedShipGroupCount: rejectionCountByFacility.get(facility.facilityId) || 0
+  }));
 }
 
 function inBucket(order: WorkflowOrder, bucket: WorkflowBucket): boolean {
@@ -502,18 +509,21 @@ export const useCustomerServiceStore = defineStore('customerService', {
         };
         if (productStoreId) customParametersMap.productStoreId = productStoreId;
 
-        const resp = await api({
-          url: 'oms/dataDocumentView',
-          method: 'POST',
-          data: {
-            dataDocumentId: 'ORDER_FACILITY_CHANGE',
-            customParametersMap,
-            fieldsToSelect: 'fromFacilityId,orderId,shipGroupSeqId',
-            distinct: true
-          }
-        });
+        const [activeFacilities, resp] = await Promise.all([
+          getActivePhysicalFacilityOrderVolume({ productStoreId }),
+          api({
+            url: 'oms/dataDocumentView',
+            method: 'POST',
+            data: {
+              dataDocumentId: 'ORDER_FACILITY_CHANGE',
+              customParametersMap,
+              fieldsToSelect: 'fromFacilityId,orderId,shipGroupSeqId',
+              distinct: true
+            }
+          })
+        ]);
 
-        this.facilityRejections = normalizeFacilityRejectionRows(resp.data?.entityValueList || []);
+        this.facilityRejections = activeFacilityRowsWithRejections(activeFacilities, resp.data?.entityValueList || []);
         this.dashboardStatus.facilityRejections = 'success';
       } catch (error) {
         console.error('Failed to fetch facility rejections', error);
