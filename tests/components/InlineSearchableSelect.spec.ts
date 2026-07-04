@@ -26,6 +26,7 @@ describe('inline searchable select', () => {
 
 describe('bad address country picker wiring', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/tasks/BadAddressTaskCard.vue'), 'utf8');
+  const badAddressOrdersSource = readFileSync(resolve(process.cwd(), 'src/views/BadAddressOrders.vue'), 'utf8');
 
   it('uses searchable selects for countries while keeping the modal state picker', () => {
     expect(source.match(/<InlineSearchableSelect/g)?.length).toBe(2);
@@ -41,5 +42,12 @@ describe('bad address country picker wiring', () => {
     expect(source).toContain('address.countryGeoId = countryGeoId;');
     expect(source).toContain("address.stateProvinceGeoId = '';");
     expect(source).toContain('seedStore.loadGeoAssocs(countryGeoId)');
+  });
+
+  it('loads countries before rendering route task cards', () => {
+    expect(badAddressOrdersSource).toContain(`onIonViewWillEnter(async () => {
+  await seedStore.loadGeos();
+  await fetchAddressValidationTasks();
+});`);
   });
 });
