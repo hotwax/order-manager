@@ -87,6 +87,8 @@ export interface OrderSearchFilters {
   productStoreId: string;
   dateFrom: string;
   dateThru: string;
+  hasVirtualFacilityItems: boolean;
+  archivedOnly: boolean;
 }
 
 export const useOrderStore = defineStore('orders', {
@@ -98,6 +100,8 @@ export const useOrderStore = defineStore('orders', {
       productStoreId: 'All',
       dateFrom: '',
       dateThru: '',
+      hasVirtualFacilityItems: false,
+      archivedOnly: false,
     } as OrderSearchFilters,
     searchSort: 'orderDate desc',
     searchResults: [] as Order[],
@@ -190,6 +194,8 @@ export const useOrderStore = defineStore('orders', {
         productStoreId: this.searchFilters.productStoreId,
         dateFrom: this.searchFilters.dateFrom,
         dateThru: this.searchFilters.dateThru,
+        hasVirtualFacilityItems: this.searchFilters.hasVirtualFacilityItems,
+        archivedOnly: this.searchFilters.archivedOnly,
         sort: this.searchSort,
         pageSize: this.pageSize,
         pageIndex,

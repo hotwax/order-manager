@@ -287,6 +287,7 @@ export function normalizeOrderDoc(doc: any): Order {
     shippingPostalCode: toStringValue(doc.shippingPostalCode ?? doc.postalCode),
     shippingCountryGeoId: toStringValue(doc.shippingCountryGeoId ?? doc.countryGeoId),
     estimatedDeliveryDate: toStringValue(doc.estimatedDeliveryDate ?? doc.promisedDatetime),
+    promisedDatetime: toStringValue(doc.promisedDatetime),
     shipBeforeDate: toStringValue(doc.shipBeforeDate),
     shipByDate: toStringValue(doc.shipByDate),
     queueReason: toStringValue(doc.rejectionReasonDesc ?? doc.rejectionReason ?? doc.rejectionReasonId),

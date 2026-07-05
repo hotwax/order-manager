@@ -15,6 +15,12 @@ describe('OrderQueueList', () => {
     expect(source).not.toContain('<ion-badge :color="statusColor(order.status)" slot="end">');
   });
 
+  it('labels result totals as matching the active queue filters', () => {
+    expect(source).toContain('translate("{loaded} of {total} matching orders"');
+    expect(source).toContain('total: searchTotal');
+    expect(source).not.toContain('translate("{loaded} of {total} orders"');
+  });
+
   it('keeps the row-level navigation behavior while letting checkboxes enter select mode', () => {
     expect(source).toContain(':role="selectMode ? \'button\' : \'link\'"');
     expect(source).toContain('ionRouter.push(orderDetailLink(order));');
