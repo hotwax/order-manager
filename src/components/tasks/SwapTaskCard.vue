@@ -111,7 +111,7 @@
         <ion-label>{{ translate('New total') }}</ion-label>
         <ion-note slot="end" color="dark">{{ money(getSuggestedItems(task).newTotal) }}</ion-note>
       </ion-item>
-      <ion-item>
+      <ion-item lines="none">
         <ion-input
           :label="translate('Suggested refund')"
           label-placement="start"

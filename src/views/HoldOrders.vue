@@ -13,7 +13,6 @@
       <SearchFilterCard
         v-model="searchQuery"
         :placeholder="translate('Search')"
-        :show-clear="false"
         @search="fetchHoldTasks()"
         @clear="clearFilters"
       >
@@ -31,22 +30,53 @@
         </FilterSelect>
       </SearchFilterCard>
 
-      <SelectAllResultsItem v-if="heldTasks.length" v-model="selectAll" :count="heldTasks.length" />
+      <ion-progress-bar v-if="isRefetching" type="indeterminate" />
+
+      <ion-list v-if="heldTasks.length" lines="none">
+        <ion-list-header class="order-results-header">
+          <span class="order-results-header-start">
+            <ion-checkbox
+              v-if="selectMode"
+              :checked="allCurrentPageSelected"
+              :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
+              @ionChange="toggleCurrentPageSelection($event.detail.checked)"
+            />
+          </span>
+          <ion-label>
+            {{ heldTasks.length }} {{ heldTasks.length === 1 ? translate('hold task') : translate('hold tasks') }}
+          </ion-label>
+          <ion-button fill="clear" size="small" @click="toggleSelectMode">
+            {{ selectMode ? translate('Done') : translate('Select') }}
+          </ion-button>
+        </ion-list-header>
+      </ion-list>
 
       <div class="hold-orders-list">
         <HoldTaskCard
-          v-if="heldTasks.length"
           v-for="task in heldTasks"
           :key="task.workEffortId"
           :ref="(el) => setCardRef(task.workEffortId, el)"
           :task="task"
-          :selectable="true"
+          :selectable="selectMode"
           :selected="!!selectedOrders[task.workEffortId]"
           show-view-order-action
           @update:selected="val => selectedOrders[task.workEffortId] = val"
           @completed="fetchHoldTasks()"
         />
-        <div class="empty-state" v-if="!heldTasks.length">
+
+        <div v-if="isFirstLoad" class="ion-text-center ion-padding">
+          <ion-spinner name="crescent" />
+        </div>
+
+        <ErrorState
+          v-else-if="isError"
+          :title="translate('Unable to load hold tasks')"
+          :message="translate(holdError)"
+          retryable
+          @retry="fetchHoldTasks()"
+        />
+
+        <div class="empty-state" v-else-if="isEmpty">
           <p v-html="getEmptyMessage()"></p>
         </div>
       </div>
@@ -63,7 +93,7 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <ion-footer v-if="heldTasks.length">
+    <ion-footer v-if="selectMode">
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks" @click="resolveSelectedTasks()">{{ translate('Resolve') }}</ion-button>
@@ -77,25 +107,32 @@
 import { ref, computed, watch } from 'vue';
 import {
   IonButtons,
+  IonCheckbox,
   IonContent,
   IonFooter,
   IonHeader,
+  IonLabel,
+  IonList,
+  IonListHeader,
   IonMenuButton,
   IonPage,
   IonTitle,
   IonToolbar,
   IonButton,
+  IonProgressBar,
   IonSelectOption,
+  IonSpinner,
   alertController,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
   onIonViewWillEnter
 } from '@ionic/vue';
 import { translate } from '@common';
+import router from '@/router';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
+import ErrorState from '@/components/common/ErrorState.vue';
 import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
-import SelectAllResultsItem from '@/components/common/SelectAllResultsItem.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useUserStore } from '@/store/user';
 import { useOrderTaskStore } from '@/store/orderTask';
@@ -109,12 +146,11 @@ const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANN
 const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
 
 const searchQuery = ref('');
-const swappable = ref(false);
 const assignee = ref('');
 const dateAfter = ref('');
 const dateBefore = ref('');
 const orderChannel = ref('');
-const selectAll = ref(false);
+const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
 const cardRefs = ref<Record<string, any>>({});
 
@@ -128,8 +164,22 @@ function setCardRef(workEffortId: string, el: any) {
 
 const heldTasks = computed(() => orderTaskStore.getHoldTasks);
 const isScrollable = computed(() => orderTaskStore.isHoldTasksScrollable);
+const holdStatus = computed(() => orderTaskStore.getHoldStatus);
+const holdError = computed(() => orderTaskStore.getHoldError);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
 const hasFilters = computed(() => !!(searchQuery.value || assignee.value || dateAfter.value || dateBefore.value || orderChannel.value));
+const currentPageTaskIds = computed(() => heldTasks.value.map((task) => task.workEffortId));
+const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));
+const someCurrentPageSelected = computed(() => currentPageTaskIds.value.some((workEffortId: string) => selectedOrders.value[workEffortId]));
+
+// First-load spinner: loading the initial page with nothing on screen yet.
+const isFirstLoad = computed(() => holdStatus.value === 'loading' && !heldTasks.value.length);
+// Progress bar: a first-page refetch while rows are still shown (filter change / refresh).
+const isRefetching = computed(() => holdStatus.value === 'loading' && heldTasks.value.length > 0);
+// Error state only when nothing is on screen to show instead.
+const isError = computed(() => holdStatus.value === 'error' && !heldTasks.value.length);
+// True empty state only after a successful zero-row response.
+const isEmpty = computed(() => holdStatus.value === 'success' && !heldTasks.value.length);
 
 function getEmptyMessage() {
   return hasFilters.value
@@ -141,19 +191,37 @@ watch([assignee, dateAfter, dateBefore, orderChannel], () => {
   fetchHoldTasks();
 });
 
-watch(selectAll, (val) => {
-  heldTasks.value.forEach(task => {
-    selectedOrders.value[task.workEffortId] = val;
+function toggleSelectMode() {
+  if (selectMode.value) {
+    selectMode.value = false;
+    selectedOrders.value = {};
+    return;
+  }
+  selectMode.value = true;
+}
+
+function toggleCurrentPageSelection(checked: boolean) {
+  heldTasks.value.forEach((task) => {
+    selectedOrders.value[task.workEffortId] = checked;
+  });
+}
+
+// Prune selections for tasks that are no longer in the list (e.g. after a filter change)
+// without forcing select mode on or off.
+watch(heldTasks, () => {
+  const validIds = new Set(heldTasks.value.map((task) => task.workEffortId));
+  Object.keys(selectedOrders.value).forEach((id) => {
+    if (!validIds.has(id)) delete selectedOrders.value[id];
   });
 });
 
 function clearFilters() {
   searchQuery.value = '';
-  swappable.value = false;
   assignee.value = '';
   dateAfter.value = '';
   dateBefore.value = '';
   orderChannel.value = '';
+  router.replace({ query: {} });
   fetchHoldTasks();
 }
 
@@ -179,7 +247,6 @@ async function resolveSelectedTasks() {
               .map(card => card.submitResolve())
           );
           selectedOrders.value = {};
-          selectAll.value = false;
           await fetchHoldTasks();
         }
       }
@@ -190,6 +257,7 @@ async function resolveSelectedTasks() {
 
 
 const fetchHoldTasks = async (pageSize?: any, pageIndex?: any) => {
+  // The store owns loading/error status and keeps failures in state.
   await orderTaskStore.fetchHoldTasks({
     pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
     pageIndex: pageIndex ?? 0,
@@ -217,6 +285,17 @@ onIonViewWillEnter(() => {
 <style scoped>
 .hold-orders-list {
   padding: 0 var(--spacer-sm) var(--spacer-sm);
+}
+
+.order-results-header {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.order-results-header-start {
+  display: flex;
+  min-width: 24px;
 }
 
 @media (max-width: 640px) {
