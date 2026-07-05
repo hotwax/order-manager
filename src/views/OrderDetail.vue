@@ -71,10 +71,15 @@
         <div class="order-detail-header-details">
           <ion-card class="customer-summary-card">
             <ion-card-header>
-              <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
-              <ion-button v-if="customerPartyId" fill="clear" size="small" :router-link="'/customers/' + customerPartyId">
-                {{ translate('View details') }}
-              </ion-button>
+              <ion-item lines="none">
+                <ion-label>
+                  <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
+                </ion-label>
+                <ion-button v-if="customerPartyId" slot="end" fill="clear" size="small"
+                  :router-link="'/customers/' + customerPartyId">
+                  {{ translate('View details') }}
+                </ion-button>
+              </ion-item>
             </ion-card-header>
             <ion-list lines="none">
               <ion-item>
@@ -185,13 +190,13 @@
               <ion-card-title>{{ translate('Attributes') }}</ion-card-title>
             </ion-card-header>
             <ion-list lines="none">
-              <ion-item v-for="attribute in order.attributes" :key="attribute.id">
-                <ion-label>
-                  <p>{{ attribute.name }}</p>
-                  {{ attribute.value || translate('Value not available') }}
-                  <p v-if="attribute.description">{{ attribute.description }}</p>
-                </ion-label>
-              </ion-item>
+              <AttributeListItem
+                v-for="attribute in order.attributes"
+                :key="attribute.id"
+                :name="attribute.name"
+                :value="attribute.value"
+                :description="attribute.description"
+              />
               <ion-item v-if="!order.attributes.length">
                 <ion-label>{{ translate('No order attributes') }}</ion-label>
               </ion-item>
@@ -1015,6 +1020,7 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import PhysicalFacilityModal from '@/components/fulfillment/PhysicalFacilityModal.vue';
 import RoutingGroupModal from '@/components/fulfillment/RoutingGroupModal.vue';
 import OrderItemAttributesModal from '@/components/orders/OrderItemAttributesModal.vue';
+import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import ItemFacilityInventoryModal from '@/components/fulfillment/ItemFacilityInventoryModal.vue';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
