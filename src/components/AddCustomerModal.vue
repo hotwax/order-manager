@@ -98,7 +98,7 @@
 <script setup lang="ts">
 import { showToast } from '@/utils';
 import { emitter, translate } from '@common';
-import { IonInput, IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonSegment, IonSegmentButton, IonSegmentView, IonSegmentContent, IonSpinner, IonItem, IonLabel, IonSearchbar, IonTitle, IonToolbar, modalController } from '@ionic/vue';
+import { IonInput, IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonSegment, IonSegmentButton, IonSegmentView, IonSegmentContent, IonSpinner, IonItem, IonLabel, IonSearchbar, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { closeOutline, saveOutline } from "ionicons/icons";
 import { ref } from 'vue';
 import { searchShopifyCustomers, createShopifyCustomer } from '@/services/customer';
