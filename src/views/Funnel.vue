@@ -111,7 +111,7 @@
         <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard v-if="!unfillableError" button router-link="/unfillable" :title="translate('Unfillable today')" :stat="unfillableLoading ? '' : totalUnfillable">
+        <StatCard v-if="!unfillableError" button :router-link="{ path: '/unfillable', query: { dateFrom: todayDateStr } }" :title="translate('Unfillable today')" :stat="unfillableLoading ? '' : totalUnfillable">
           <template v-if="unfillableLoading" #stat>
             <ion-spinner name="crescent" />
           </template>
@@ -612,10 +612,13 @@ import { translate, StatCard, Sparkline, commonUtil } from '@common';
 import { useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
+import { useUserStore } from '@/store/user';
+import { getDashboardDateFilter } from '@/utils/dashboardDate';
 
 const store = useCustomerServiceStore();
 const productStore = useProductStore() as any;
 const seedStore = useSeedStore();
+const userStore = useUserStore();
 
 // Per-section load status helpers. These drive loading affordances and error
 // states so the dashboard never renders default zeros/empty copy while a group
@@ -641,6 +644,7 @@ const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
 const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);
 const facilityPartialFulfillments = computed(() => store.getFacilityPartialFulfillments);
 const unfillableTrend = computed(() => store.unfillableTrend);
+const todayDateStr = computed(() => getDashboardDateFilter(userStore.current?.timeZone || userStore.current?.userTimeZone));
 const virtualLocationWorkRows = computed(() => store.getVirtualLocationCounts);
 
 const fulfillmentSyncData = computed(() => store.getFulfillmentSyncData);
@@ -814,7 +818,7 @@ const facilityMetricKey = computed<DashboardStatusKey>(() => {
 const facilityMetricsLoading = computed(() => store.isDashboardGroupLoading(facilityMetricKey.value));
 const facilityMetricsError = computed(() => store.isDashboardGroupError(facilityMetricKey.value));
 
-const totalUnfillable = computed(() => unfillableTrend.value.reduce((sum, val) => sum + val, 0));
+const totalUnfillable = computed(() => store.getUnfillable.totalCount || 0);
 const virtualLocationWorkTotal = computed(() => virtualLocationWorkRows.value.reduce((sum, row) => sum + row.count, 0));
 
 function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {

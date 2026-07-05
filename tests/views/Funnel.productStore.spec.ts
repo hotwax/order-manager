@@ -21,6 +21,13 @@ describe('Funnel product store scope', () => {
     expect(funnelSource).not.toContain('route.query.productStoreId');
   });
 
+  it('uses the dashboard date helper for the Unfillable Today route filter', () => {
+    expect(funnelSource).toContain("import { getDashboardDateFilter } from '@/utils/dashboardDate';");
+    expect(funnelSource).toContain('userStore.current?.timeZone || userStore.current?.userTimeZone');
+    expect(funnelSource).toContain("query: { dateFrom: todayDateStr }");
+    expect(funnelSource).not.toContain("DateTime.now().toFormat('yyyy-MM-dd')");
+  });
+
   it('does not keep static fallback facilities in the customer service store', () => {
     expect(customerServiceSource).not.toContain('const FACILITIES');
     expect(customerServiceSource).not.toContain('facilities: () => FACILITIES');

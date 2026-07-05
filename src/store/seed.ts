@@ -33,7 +33,8 @@ const enumTypeIds = [
   "ORDER_RISK_RECOMMENDATION",
   "RISK_FACT_SENTIMENT",
   "PP_SORT_PARAM_TYPE",
-  "PP_FILTER_PRM_TYPE"
+  "PP_FILTER_PRM_TYPE",
+  "WorkEffortType"
 ];
 
 const geoTypeEnumIds = ["GEOT_COUNTRY", "GEOT_STATE", "GEOT_PROVINCE"];
@@ -296,7 +297,8 @@ export const useSeedStore = defineStore("seed", {
         this.loadProductStoreEmailSettings(),
         this.loadShopifyShops(),
         this.loadShopifyShopLocations(),
-        ...scopedProductStoreIds.map((productStoreId) => this.loadProductStoreSeedData(productStoreId))
+        ...scopedProductStoreIds.map((productStoreId) => this.loadProductStoreSeedData(productStoreId)),
+        this.loadEnumsByParentType('WorkEffortPurposeType')
       ]);
     },
     async loadProductStoreSeedData(productStoreId: string) {

@@ -1,6 +1,7 @@
 import { api, commonUtil, useSolrSearch } from '@common';
 import { getActivePinia } from 'pinia';
 import { useSeedStore } from '@/store/seed';
+import type { Order } from '@/types/order';
 import {
   allDocs,
   normalizeOrderDoc,
@@ -239,18 +240,20 @@ function normalizeVirtualLocationCountResponse(data: any): VirtualLocationOrderC
 function normalizeOrderSolrResponse(data: any): OrderSearchResult {
   const groupedOrders = data?.grouped?.orderId;
 
-  if (groupedOrders?.groups?.length) {
+  if (groupedOrders) {
     return {
-      orders: groupedOrders.groups
+      orders: (groupedOrders.groups || [])
         .map(normalizeGroupedOrder)
         .filter(Boolean),
-      total: Number(groupedOrders.ngroups ?? groupedOrders.matches ?? groupedOrders.groups.length)
+      total: Number(groupedOrders.ngroups ?? groupedOrders.matches ?? (groupedOrders.groups?.length || 0))
     };
   }
 
   const docs = allDocs(data);
   return {
-    orders: docs.map((doc: any) => normalizeOrderWithParkingUnits([doc])),
+    orders: docs
+      .map((doc: any) => normalizeOrderWithParkingUnits([doc]))
+      .filter(Boolean) as Order[],
     total: Number(data?.response?.numFound ?? docs.length)
   };
 }
