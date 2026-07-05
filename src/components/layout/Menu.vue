@@ -100,11 +100,29 @@
         </ion-menu-toggle>
       </ion-list>
     </ion-content>
+
+    <ion-footer v-if="currentProductStore?.productStoreId || productStores.length">
+      <ion-toolbar>
+        <ion-item v-if="productStores.length > 1" lines="none">
+          <ion-select :label="translate('Select store')" interface="popover" :value="currentProductStore.productStoreId" @ionChange="setCurrentProductStore($event)">
+            <ion-select-option v-for="store in productStores" :key="store.productStoreId" :value="store.productStoreId">
+              {{ store.storeName || store.productStoreId }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+        <ion-item v-else-if="currentProductStore?.productStoreId" lines="none">
+          <ion-label class="ion-text-wrap">
+            <p class="overline">{{ translate("Product Store") }}</p>
+            {{ currentProductStore.storeName || currentProductStore.productStoreId }}
+          </ion-label>
+        </ion-item>
+      </ion-toolbar>
+    </ion-footer>
   </ion-menu>
 </template>
 
 <script setup lang="ts">
-import { IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonMenu, IonMenuToggle, IonTitle, IonToolbar } from '@ionic/vue';
+import { IonContent, IonFooter, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonMenu, IonMenuToggle, IonSelect, IonSelectOption, IonTitle, IonToolbar } from '@ionic/vue';
 import {
   addCircleOutline,
   airplaneOutline,
@@ -133,11 +151,16 @@ import {
   SWAP_ORDER_PERMISSION
 } from '@/authorization/permissions';
 import router from '@/router';
+import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
-import { computed } from 'vue';
+import { computed, onMounted } from 'vue';
 
 const { isAuthenticated } = useAuth();
 const userStore = useUserStore();
+const productStore = useProductStore();
+
+const currentProductStore = computed(() => productStore.getCurrentProductStore);
+const productStores = computed(() => productStore.getProductStores || []);
 
 function hasPermission(permissionId: string) {
   return userStore.hasPermission(permissionId);
@@ -146,6 +169,22 @@ function hasPermission(permissionId: string) {
 const selectedPage = computed(() => {
   return router.currentRoute.value.path
 })
+
+onMounted(async () => {
+  if (isAuthenticated.value && !productStores.value.length) {
+    await productStore.fetchProductStores();
+    await productStore.fetchProductStorePreference();
+  }
+})
+
+function setCurrentProductStore(event: CustomEvent) {
+  if (currentProductStore.value.productStoreId !== event.detail.value) {
+    const selectedProductStore = productStores.value.find((store: any) => store.productStoreId == event.detail.value)
+    if (selectedProductStore) {
+      productStore.setProductStorePreference(selectedProductStore)
+    }
+  }
+}
 </script>
 
 <style scoped>

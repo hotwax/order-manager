@@ -52,7 +52,7 @@
             :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
             @ion-change="toggleCurrentPageSelection($event.detail.checked)"
           />
-          <ion-label>{{ orderTotal }} {{ orderTotal === 1 ? translate('order') : translate('orders') }}</ion-label>
+          <ion-label>{{ orderCountLabel }}</ion-label>
           <ion-button fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
@@ -160,6 +160,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { DateTime } from 'luxon';
 import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
+import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import type { BulkActionDefinition, WorkflowBucket, WorkflowOrder } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
@@ -178,6 +179,7 @@ const props = defineProps<{
 
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
+const productStore = useProductStore();
 const seedStore = useSeedStore();
 const route = router.currentRoute.value;
 const toastMessage = ref('');
@@ -234,10 +236,21 @@ const isLoading = computed(() => isApiBucket && orderStore.workflowOrdersLoading
 const orderTotal = computed(() =>
   isApiBucket ? orderStore.workflowOrdersTotal[apiBucket] : orders.value.length
 );
+const orderCountLabel = computed(() => {
+  if (isApiBucket) {
+    return translate('{loaded} of {total} orders', {
+      loaded: orders.value.length,
+      total: orderTotal.value
+    });
+  }
+
+  return `${orderTotal.value} ${orderTotal.value === 1 ? translate('order') : translate('orders')}`;
+});
 
 const hasMore = computed(() =>
   isApiBucket && orderStore.workflowOrders[apiBucket].length < orderStore.workflowOrdersTotal[apiBucket]
 );
+const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 
 function applyRouteFilters() {
   const facilityId = route.query.facilityId;
@@ -248,9 +261,12 @@ function applyRouteFilters() {
 }
 
 watch(() => route.query.facilityId, applyRouteFilters, { immediate: true });
+watch(selectedProductStoreId, () => {
+  filters.value.productStoreId = selectedProductStoreId.value;
+}, { immediate: true });
 
 function loadWorkflowOrders() {
-  orderStore.fetchWorkflowOrders(props.bucket as 'open' | 'inflight' | 'packed', filters.value);
+  return orderStore.fetchWorkflowOrders(props.bucket as 'open' | 'inflight' | 'packed', filters.value);
 }
 
 async function loadMore(event: any) {
@@ -293,6 +309,7 @@ watch(orders, () => {
 
 function clearFilters() {
   store.clearFilters(props.bucket);
+  filters.value.productStoreId = selectedProductStoreId.value;
 }
 
 function enterSelectMode() {
@@ -358,6 +375,7 @@ async function runAction(action: BulkActionDefinition) {
   const count = selectedIds.value.size;
   try {
     await store.runBulkAction(props.bucket, action.id);
+    if (isApiBucket) await loadWorkflowOrders();
     toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
   } catch {
     toastMessage.value = translate('Failed to complete bulk action. Please try again.');

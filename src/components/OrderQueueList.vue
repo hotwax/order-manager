@@ -62,7 +62,7 @@
               @ionChange="toggleCurrentPageSelection($event.detail.checked)"
             />
           </span>
-          <ion-label>{{ translate("{loaded} of {total} orders", { loaded: searchResults.length, total: searchTotal }) }}</ion-label>
+          <ion-label>{{ translate("{loaded} of {total} matching orders", { loaded: searchResults.length, total: searchTotal }) }}</ion-label>
           <ion-button fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
@@ -79,6 +79,7 @@
         >
           <ion-item lines="none">
             <ion-checkbox
+              v-if="selectMode"
               slot="start"
               :checked="selectedOrderIds.includes(order.id)"
               @click.stop
@@ -92,13 +93,13 @@
             </ion-label>
           </ion-item>
 
-          <ion-label class="tablet ion-text-start">
+          <ion-label class="tablet">
             {{ order.customerName || order.customerId || translate('Unknown customer') }}
             <p>{{ customerAddressLine(order) }}</p>
             <p v-if="customerAddressTrailingLine(order)">{{ customerAddressTrailingLine(order) }}</p>
           </ion-label>
 
-          <ion-label class="tablet ion-text-start">
+          <ion-label class="tablet">
             {{ queueReasonLabel(order) }}
             <p>{{ queueRuleLabel(order) }}</p>
           </ion-label>
@@ -196,6 +197,7 @@ const props = defineProps<{
   emptyTitle: string;
   emptyMessage: string;
   globalActions?: QueueGlobalAction[];
+  status?: string | string[];
 }>();
 const emit = defineEmits<{
   (e: 'clearFilters'): void;
@@ -263,6 +265,7 @@ function toSearchParams(page: number) {
     sort: 'orderDate desc',
     pageSize: PAGE_SIZE,
     pageIndex: page,
+    status: props.status,
   };
 }
 
@@ -493,12 +496,10 @@ function handleOrderRowClick(order: Order) {
 function setOrderSelection(orderId: string, checked: boolean) {
   if (checked) {
     if (!selectedOrderIds.value.includes(orderId)) selectedOrderIds.value = [...selectedOrderIds.value, orderId];
-    selectMode.value = true;
     return;
   }
 
   selectedOrderIds.value = selectedOrderIds.value.filter((selectedOrderId) => selectedOrderId !== orderId);
-  if (!selectedOrderIds.value.length) selectMode.value = false;
 }
 
 function orderDetailLink(order: Order) {
@@ -522,7 +523,7 @@ function parkingUnitCountLabel(order: Order) {
 }
 
 function customerAddressLine(order: Order) {
-  return order.shippingAddress1 || order.customerId || order.externalId || '';
+  return order.shippingAddress1 || order.customerId || '';
 }
 
 function customerAddressTrailingLine(order: Order) {
@@ -534,7 +535,7 @@ function customerAddressTrailingLine(order: Order) {
   ].filter(Boolean);
 
   if (parts.length) return parts.join(' ');
-  return order.shippingAddress1 ? '' : order.externalId;
+  return '';
 }
 
 function queueReasonLabel(order: Order) {

@@ -69,27 +69,38 @@
 
         <!-- details wrapper: child matching .order-detail-header-details -->
         <div class="order-detail-header-details">
-          <ion-card>
-            <ion-item lines="none">
-              <ion-card-header class="ion-no-padding">
-                <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
-              </ion-card-header>
-              <ion-button v-if="customerPartyId" slot="end" fill="outline" size="small" :router-link="`/customers/${customerPartyId}`">
-                {{ translate('View customer') }}
-              </ion-button>
-            </ion-item>
+          <ion-card class="customer-summary-card">
+            <ion-card-header>
+              <ion-item lines="none">
+                <ion-label>
+                  <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
+                </ion-label>
+                <ion-button v-if="customerPartyId" slot="end" fill="clear" size="small"
+                  :router-link="'/customers/' + customerPartyId">
+                  {{ translate('View details') }}
+                </ion-button>
+              </ion-item>
+            </ion-card-header>
             <ion-list lines="none">
               <ion-item>
                 <ion-label>
                   <p>{{ translate('Email') }}</p>
                   {{ customer?.email || translate('Email not available') }}
                 </ion-label>
+                <ion-button v-if="!customer?.email && customerPartyId" slot="end" fill="clear" size="small"
+                  @click="openCustomerContactModal('EMAIL_ADDRESS', 'ORDER_EMAIL')">
+                  {{ translate('Add') }}
+                </ion-button>
               </ion-item>
               <ion-item>
                 <ion-label>
                   <p>{{ translate('Phone') }}</p>
                   {{ customer?.phone || translate('Phone not available') }}
                 </ion-label>
+                <ion-button v-if="!customer?.phone && customerPartyId" slot="end" fill="clear" size="small"
+                  @click="openCustomerContactModal('TELECOM_NUMBER', 'PHONE_BILLING')">
+                  {{ translate('Add') }}
+                </ion-button>
               </ion-item>
               <ion-item>
                 <ion-label>
@@ -108,6 +119,10 @@
                   </template>
                   <div v-else>{{ translate('Billing address not available') }}</div>
                 </ion-label>
+                <ion-button v-if="!billingAddress?.lines?.length && customerPartyId" slot="end" fill="clear" size="small"
+                  @click="openCustomerContactModal('POSTAL_ADDRESS', 'BILLING_LOCATION')">
+                  {{ translate('Add') }}
+                </ion-button>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -161,6 +176,12 @@
                   {{ order.channel || translate('Channel') }}
                 </ion-label>
               </ion-item>
+              <ion-item v-if="order.originFacilityId">
+                <ion-label>
+                  <p>{{ translate('Placed at') }}</p>
+                  {{ order.originFacilityName }}
+                </ion-label>
+              </ion-item>
             </ion-list>
           </ion-card>
 
@@ -169,13 +190,13 @@
               <ion-card-title>{{ translate('Attributes') }}</ion-card-title>
             </ion-card-header>
             <ion-list lines="none">
-              <ion-item v-for="attribute in order.attributes" :key="attribute.id">
-                <ion-label>
-                  <p>{{ attribute.name }}</p>
-                  {{ attribute.value || translate('Value not available') }}
-                  <p v-if="attribute.description">{{ attribute.description }}</p>
-                </ion-label>
-              </ion-item>
+              <AttributeListItem
+                v-for="attribute in order.attributes"
+                :key="attribute.id"
+                :name="attribute.name"
+                :value="attribute.value"
+                :description="attribute.description"
+              />
               <ion-item v-if="!order.attributes.length">
                 <ion-label>{{ translate('No order attributes') }}</ion-label>
               </ion-item>
@@ -187,7 +208,7 @@
               <ion-card-title>{{ translate('Fraud risk') }}</ion-card-title>
             </ion-card-header>
             <ion-list lines="none">
-              <ion-item button detail @click="selectedSegment = 'risk'">
+              <ion-item button detail @click="selectedSegment = 'holds'">
                 <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(order.riskLevelEnumId)" />
                 <ion-label>
                   <p>{{ translate('Recommendation') }}</p>
@@ -212,9 +233,6 @@
         <ion-segment-button value="holds">
           <ion-label>{{ translate('Holds') }}</ion-label>
         </ion-segment-button>
-        <ion-segment-button value="risk">
-          <ion-label>{{ translate('Risk') }}</ion-label>
-        </ion-segment-button>
         <ion-segment-button value="comms">
           <ion-label>{{ translate('Comms') }}</ion-label>
         </ion-segment-button>
@@ -226,7 +244,7 @@
           <ion-item lines="full" class="order-items-toolbar">
             <ion-checkbox :checked="areAllSelected" justify="start" label-placement="end"
               @ionChange="toggleSelectAll($event.detail.checked)">{{ translate('Select all') }}</ion-checkbox>
-            <ion-button slot="end" fill="outline" color="medium" @click="openAddItemFromItemsSegment">
+            <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" slot="end" fill="outline" color="medium" @click="openAddItemFromItemsSegment">
               {{ translate('Add items') }}
             </ion-button>
           </ion-item>
@@ -263,7 +281,6 @@
                     :facility-label="item.facilityName"
                     :facility-disabled="isItemFacilityActionDisabled(item)"
                     :attributes-label="attributeChipLabel(item.attributeCount)"
-                    :attributes-disabled="!item.attributeCount"
                     :status-label="item.status"
                     :status-color="commonUtil.getStatusColor(item.statusId)"
                     :status-detail="itemStatusDetail(item)"
@@ -308,6 +325,9 @@
             </ion-list>
           </ion-card>
           <ion-card class="totals">
+            <ion-card-header>
+              <ion-card-title>{{ translate('Total') }}</ion-card-title>
+            </ion-card-header>
             <ion-list lines="full">
               <ion-item>
                 <ion-label>{{ translate('Subtotal') }}</ion-label>
@@ -706,7 +726,7 @@
                 :disabled="isShipGroupActionDisabled(shipGroup, 'RELEASE')" @click="releaseSelectedItems(shipGroup)">{{
                   translate('Release') }}</ion-button>
               <ion-button fill="clear" @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
-              <ion-button fill="clear" @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
+              <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" fill="clear" @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
             </div>
           <!-- Gift message modal -->
           <ion-modal :is-open="giftModalShipGroupId === shipGroup.id" @didDismiss="giftModalShipGroupId = null">
@@ -816,8 +836,60 @@
       </div>
 
       <div v-if="selectedSegment === 'holds'">
+        <div v-if="hasRiskContext" class="risk-summary">
+          <ion-list>
+            <ion-list-header>
+              <ion-label>{{ translate('Fraud risk') }}</ion-label>
+            </ion-list-header>
+            <ion-item lines="none" v-if="riskSummary.hasRiskSignal">
+              <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(order.riskLevelEnumId)" />
+              <ion-label>
+                {{ riskSummary.recommendation }}
+                <p>{{ translate('Recommendation') }}</p>
+              </ion-label>
+              <ion-badge slot="end" :color="riskLevelColor(order.riskLevelEnumId)">{{ riskSummary.level }}</ion-badge>
+            </ion-item>
+          </ion-list>
+
+          <ion-list v-if="riskAssessmentsStatus === 'loading'">
+            <ion-item lines="none">
+              <ion-label>{{ translate('Loading risk assessments...') }}</ion-label>
+            </ion-item>
+          </ion-list>
+
+          <ErrorState
+            v-else-if="riskAssessmentsStatus === 'error'"
+            :title="translate('Risk assessments failed to load')"
+            :message="riskAssessmentsError"
+          />
+
+          <ion-list v-else-if="riskAssessments.length">
+            <ion-list-header>
+              <ion-label>{{ translate('Assessment details') }}</ion-label>
+            </ion-list-header>
+            <ion-item v-for="risk in riskAssessments" :key="risk.providerId">
+              <ion-icon slot="start" :icon="informationCircleOutline" :color="riskLevelColor(risk.riskLevelEnumId)" />
+              <ion-label>
+                {{ risk.providerName || risk.providerId || translate('Risk provider') }}
+                <p>{{ seed.enumDescription(risk.riskLevelEnumId) }}</p>
+                <template v-for="fact in risk.facts || []" :key="fact.factSeqId">
+                  <p>{{ fact.description }} · {{ seed.enumDescription(fact.sentimentEnumId) }}</p>
+                </template>
+              </ion-label>
+              <ion-note slot="end">{{ formatDate(risk.createdDate) }}</ion-note>
+            </ion-item>
+          </ion-list>
+
+          <ion-list v-else>
+            <ion-item lines="none">
+              <ion-label>{{ translate('No risk assessments for this order') }}</ion-label>
+            </ion-item>
+          </ion-list>
+        </div>
+
         <template v-if="hasOrderHoldTasks">
           <BadAddressTaskCard v-for="task in orderAddressValidationTasks" :key="task.workEffortId" :task="task"
+            :countries="seed.getCountries"
             @completed="reloadHoldTasks" />
           <SwapTaskCard v-for="task in orderSwapTasks" :key="task.workEffortId" :task="task"
             @completed="reloadHoldTasks" />
@@ -826,58 +898,12 @@
           <HoldTaskCard v-for="task in orderHoldTasks" :key="task.workEffortId" :task="task"
             @completed="reloadHoldTasks" />
         </template>
-        <EmptyState v-else :title="translate('No holds')" :message="translate('No holds on this order')" />
-      </div>
-
-      <div v-if="selectedSegment === 'risk'">
-        <ion-list>
-          <ion-list-header>
-            <ion-label>{{ translate('Fraud risk') }}</ion-label>
-          </ion-list-header>
-          <ion-item lines="none">
-            <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(order.riskLevelEnumId)" />
-            <ion-label>
-              {{ riskSummary.recommendation }}
-              <p>{{ translate('Recommendation') }}</p>
-            </ion-label>
-            <ion-badge slot="end" :color="riskLevelColor(order.riskLevelEnumId)">{{ riskSummary.level }}</ion-badge>
-          </ion-item>
-        </ion-list>
-
-        <ion-list v-if="riskAssessmentsStatus === 'loading'">
-          <ion-item lines="none">
-            <ion-label>{{ translate('Loading risk assessments...') }}</ion-label>
-          </ion-item>
-        </ion-list>
-
-        <ErrorState
-          v-else-if="riskAssessmentsStatus === 'error'"
-          :title="translate('Risk assessments failed to load')"
-          :message="riskAssessmentsError"
-        />
-
-        <ion-list v-else-if="riskAssessments.length">
-          <ion-list-header>
-            <ion-label>{{ translate('Assessment details') }}</ion-label>
-          </ion-list-header>
-          <ion-item v-for="risk in riskAssessments" :key="risk.providerId">
-            <ion-icon slot="start" :icon="informationCircleOutline" :color="riskLevelColor(risk.riskLevelEnumId)" />
-            <ion-label>
-              {{ risk.providerName || risk.providerId || translate('Risk provider') }}
-              <p>{{ seed.enumDescription(risk.riskLevelEnumId) }}</p>
-              <template v-for="fact in risk.facts || []" :key="fact.factSeqId">
-                <p>{{ fact.description }} · {{ seed.enumDescription(fact.sentimentEnumId) }}</p>
-              </template>
-            </ion-label>
-            <ion-note slot="end">{{ formatDate(risk.createdDate) }}</ion-note>
-          </ion-item>
-        </ion-list>
-
-        <ion-list v-else>
-          <ion-item lines="none">
-            <ion-label>{{ translate('No risk assessments for this order') }}</ion-label>
-          </ion-item>
-        </ion-list>
+        <template v-else-if="!hasRiskContext">
+          <EmptyState :title="translate('No holds')" :message="translate('No holds on this order')" />
+          <div class="ion-text-center ion-padding">
+            <ion-button fill="outline" @click="openCreateHoldTaskModal()">{{ translate('Create hold task') }}</ion-button>
+          </div>
+        </template>
       </div>
 
       <div v-if="selectedSegment === 'comms'">
@@ -962,6 +988,14 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
+
+    <ion-footer v-if="order && selectedSegment === 'holds' && hasOrderHoldTasks">
+      <ion-toolbar>
+        <ion-buttons slot="end">
+          <ion-button @click="openCreateHoldTaskModal()">{{ translate('Create hold task') }}</ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-footer>
   </ion-page>
 </template>
 
@@ -986,6 +1020,7 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import PhysicalFacilityModal from '@/components/fulfillment/PhysicalFacilityModal.vue';
 import RoutingGroupModal from '@/components/fulfillment/RoutingGroupModal.vue';
 import OrderItemAttributesModal from '@/components/orders/OrderItemAttributesModal.vue';
+import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import ItemFacilityInventoryModal from '@/components/fulfillment/ItemFacilityInventoryModal.vue';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
@@ -1032,6 +1067,15 @@ const order = computed(() => {
     statusId: raw.statusId,
     channel: seed.enumDescription(raw.salesChannelEnumId),
     productStoreName: seed.productStoreName(raw.productStoreId),
+    // Origin/placed-at facility from the order header (set by the OMS order import for
+    // POS/retail-location orders). Prefer a name from the payload, then the seed facility
+    // lookup, falling back to the raw id. Empty when the order has no origin facility.
+    // '_NA_' is the OMS "no origin facility" sentinel (common on non-POS orders) and
+    // resolves to a virtual "Brokering Queue" facility — treat it (and blanks) as no origin.
+    originFacilityId: raw.originFacilityId && raw.originFacilityId !== '_NA_' ? raw.originFacilityId : '',
+    originFacilityName: raw.originFacilityId && raw.originFacilityId !== '_NA_'
+      ? (raw.originFacilityName || seed.facility(raw.originFacilityId)?.facilityName || raw.originFacilityId)
+      : '',
     currency: raw.currencyUom,
     localeString: raw.localeString || raw.locale,
     riskRecommendationEnumId: raw.riskRecommendationEnumId,
@@ -1482,6 +1526,19 @@ const riskSummary = computed(() => {
   };
 });
 
+// Whether the merged Holds segment has any risk context to show (signal, in-flight/error
+// state, or assessments). Used to render the risk summary section and to suppress the
+// "No holds" empty state when only risk-review work exists.
+// Only treat an order as having risk context when there is a real risk signal (or
+// loaded assessments). The risk-assessment fetch runs on every Holds open, so counting
+// its transient loading/error state here would flash the risk section on non-risky
+// orders before settling to "No holds". The loading/error sub-states still render inside
+// the risk summary for genuinely risky orders (gated by hasRiskSignal there).
+const hasRiskContext = computed(() =>
+  riskSummary.value.hasRiskSignal
+  || riskAssessments.value.length > 0
+);
+
 const paymentReceivedTotal = computed(() =>
   (order.value?.payments || []).reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0)
 );
@@ -1502,8 +1559,8 @@ watch(selectedSegment, (segment) => {
   if (!props.orderId) return;
   if (segment === 'holds') {
     orderTaskStore.fetchOrderHoldTasks(props.orderId);
+    orderDetailStore.fetchRiskAssessments(props.orderId);
   }
-  if (segment === 'risk') orderDetailStore.fetchRiskAssessments(props.orderId);
   if (segment === 'comms') orderDetailStore.fetchCommEvents(props.orderId);
 });
 
@@ -2450,6 +2507,8 @@ async function openItemAttributesModal(item: any) {
     }
   });
   await modal.present();
+  await modal.onDidDismiss();
+  if (order.value?.id) await loadOrder(order.value.id, true);
 }
 
 async function brokerShipGroup(shipGroupSeqId: string) {
@@ -2685,7 +2744,10 @@ async function startReturn() {
 async function runOrderStatusAction(action: any) {
   if (!order.value) return;
   const orderId = order.value.id;
-  // Destructive transitions (cancel/reject) confirm first; approve is direct.
+  if (action.id === 'ORDER_CANCELLED') {
+    await cancelOrder(orderId);
+    return;
+  }
   if (action.color === 'danger') {
     const alert = await alertController.create({
       header: translate(action.label),
@@ -2699,6 +2761,40 @@ async function runOrderStatusAction(action: any) {
     return;
   }
   await changeOrderStatus(orderId, action.toStatusId);
+}
+
+async function cancelOrder(orderId: string) {
+  const items = groupedItems.value
+    .flatMap((group: any) => group.items)
+    .filter((item: any) => !['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId))
+    .map((item: any) => ({
+      orderItemSeqId: item.orderItemSeqId,
+      shipGroupSeqId: item.shipGroupSeqId,
+      reason: 'NO_VARIANCE_LOG',
+      comment: ''
+    }));
+  if (!items.length) return;
+  const alert = await alertController.create({
+    header: translate('Cancel order'),
+    message: translate("Are you sure you want to cancel this order?"),
+    buttons: [
+      { text: translate('Cancel'), role: 'cancel' },
+      {
+        text: translate('Cancel order'),
+        role: 'confirm',
+        handler: async () => {
+          try {
+            await orderTaskStore.cancelOrder(orderId, items);
+            await showToast(translate('Order cancelled successfully.'));
+            await loadOrder(orderId, true);
+          } catch {
+            await showToast(translate('Failed to cancel the order. Please try again.'));
+          }
+        }
+      }
+    ]
+  });
+  await alert.present();
 }
 
 async function changeOrderStatus(orderId: string, statusId: string) {
@@ -2735,6 +2831,63 @@ async function openAddTaskModal(shipGroup: any) {
       }]
     });
     await showToast(translate('Tasks created successfully.'));
+  } catch {
+    await showToast(translate('Failed to create tasks. Please try again.'));
+  }
+}
+
+// Create one or more hold tasks for the current order directly from the Holds
+// tab. Single-ship-group orders default automatically; multi-ship-group orders
+// let the user pick which ship groups to add the task to.
+async function openCreateHoldTaskModal() {
+  const currentOrder = order.value;
+  if (!currentOrder) return;
+
+  const shipGroups = (currentOrder.shipGroups ?? []).map((shipGroup: any) => ({
+    id: shipGroup.id,
+    label: shipGroup.facilityName ? `${shipGroup.id} · ${shipGroup.facilityName}` : shipGroup.id,
+  }));
+  if (!shipGroups.length) {
+    await showToast(translate('This order has no ship groups to add a task to.'));
+    return;
+  }
+
+  const modal = await modalController.create({
+    component: AddOrderTaskModal,
+    componentProps: {
+      shipGroups,
+      title: translate('Create hold task'),
+      autoGenerateTaskName: true,
+      defaultOrderName: currentOrder.orderName || currentOrder.id,
+      defaultWorkEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+      defaultWorkEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+    },
+  });
+  await modal.present();
+  const { data, role } = await modal.onWillDismiss();
+  if (role !== 'confirm' || !data) return;
+
+  const shipGroupSeqIds: string[] = data.shipGroupSeqIds?.length
+    ? data.shipGroupSeqIds
+    : shipGroups.map((shipGroup) => shipGroup.id);
+  const orderId = currentOrder.id;
+  try {
+    await api({
+      url: 'oms/orders/tasks',
+      method: 'POST',
+      data: shipGroupSeqIds.map((shipGroupSeqId) => ({
+        orderId,
+        shipGroupSeqId,
+        workEffortName: data.workEffortName,
+        workEffortTypeId: data.workEffortTypeId,
+        workEffortPurposeTypeId: data.workEffortPurposeTypeId,
+        description: data.description,
+        statusId: 'TASK_CREATED',
+      })),
+    });
+    await showToast(translate('Tasks created successfully.'));
+    selectedSegment.value = 'holds';
+    await reloadHoldTasks();
   } catch {
     await showToast(translate('Failed to create tasks. Please try again.'));
   }
@@ -2967,5 +3120,11 @@ ion-card-header ion-buttons {
   .order-items .order-summary {
     grid-template-columns: 1fr;
   }
+}
+.customer-summary-card ion-card-header {
+  align-items: center;
+  display: flex;
+  gap: var(--spacer-xs);
+  justify-content: space-between;
 }
 </style>

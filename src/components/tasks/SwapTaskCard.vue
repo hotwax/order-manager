@@ -111,7 +111,7 @@
         <ion-label>{{ translate('New total') }}</ion-label>
         <ion-note slot="end" color="dark">{{ money(getSuggestedItems(task).newTotal) }}</ion-note>
       </ion-item>
-      <ion-item>
+      <ion-item lines="none">
         <ion-input
           :label="translate('Suggested refund')"
           label-placement="start"
@@ -461,13 +461,17 @@ async function cancelOrder(task: any) {
         text: translate('Cancel order'),
         role: 'confirm',
         handler: async () => {
-          const items = (task.items ?? []).map((item: any) => ({
-            orderItemSeqId: item.orderItemSeqId,
-            shipGroupSeqId: task.shipGroupSeqId,
-          }));
-          await orderTaskStore.cancelOrder(task.orderId, items);
-          await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED');
-          emit('completed');
+          try {
+            const items = (task.items ?? []).map((item: any) => ({
+              orderItemSeqId: item.orderItemSeqId,
+              shipGroupSeqId: task.shipGroupSeqId,
+            }));
+            await orderTaskStore.cancelOrder(task.orderId, items);
+            await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED');
+            emit('completed');
+          } catch {
+            await showToast(translate('Failed to cancel the order. Please try again.'));
+          }
         }
       }
     ]
