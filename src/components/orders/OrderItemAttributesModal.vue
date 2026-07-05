@@ -15,24 +15,31 @@
       <ion-list-header>
         <ion-label>{{ translate('Add Attribute') }}</ion-label>
       </ion-list-header>
-      <ion-item>
-        <ion-input
-          v-model="form.attrName"
-          :label="translate('Name')"
-          label-placement="stacked"
-          :placeholder="translate('Attribute name')"
-          :disabled="saving"
-        />
-      </ion-item>
-      <ion-item>
-        <ion-input
-          v-model="form.attrValue"
-          :label="translate('Value')"
-          label-placement="stacked"
-          :placeholder="translate('Attribute value')"
-          :disabled="saving"
-        />
-      </ion-item>
+      <!--
+        Name and Value sit side by side when the viewport has room so the
+        key/value relationship reads clearly, and stack on narrow screens
+        (flexbox, no ion-grid/row/col). Description stays full-width below.
+      -->
+      <div class="attribute-form__pair">
+        <ion-item class="attribute-form__field">
+          <ion-input
+            v-model="form.attrName"
+            :label="translate('Name')"
+            label-placement="stacked"
+            :placeholder="translate('Attribute name')"
+            :disabled="saving"
+          />
+        </ion-item>
+        <ion-item class="attribute-form__field">
+          <ion-input
+            v-model="form.attrValue"
+            :label="translate('Value')"
+            label-placement="stacked"
+            :placeholder="translate('Attribute value')"
+            :disabled="saving"
+          />
+        </ion-item>
+      </div>
       <ion-item>
         <ion-input
           v-model="form.attrDescription"
@@ -48,17 +55,20 @@
       <ion-list-header>
         <ion-label>{{ translate('Attributes') }}</ion-label>
       </ion-list-header>
-      <ion-item v-for="attr in localAttributes" :key="attr.attrName">
-        <ion-label>
-          <p>{{ attr.attrName }}</p>
-          {{ attr.attrValue || '-' }}
-          <p v-if="attr.attrDescription">{{ attr.attrDescription }}</p>
-        </ion-label>
-        <ion-button slot="end" fill="clear" color="danger" :disabled="deletingAttr === attr.attrName" @click="deleteAttribute(attr)">
-          <ion-spinner v-if="deletingAttr === attr.attrName" slot="icon-only" name="crescent" />
-          <ion-icon v-else slot="icon-only" :icon="trashOutline" />
-        </ion-button>
-      </ion-item>
+      <AttributeListItem
+        v-for="attr in localAttributes"
+        :key="attr.attrName"
+        :name="attr.attrName"
+        :value="attr.attrValue"
+        :description="attr.attrDescription"
+      >
+        <template #end>
+          <ion-button fill="clear" color="danger" :disabled="deletingAttr === attr.attrName" @click="deleteAttribute(attr)">
+            <ion-spinner v-if="deletingAttr === attr.attrName" slot="icon-only" name="crescent" />
+            <ion-icon v-else slot="icon-only" :icon="trashOutline" />
+          </ion-button>
+        </template>
+      </AttributeListItem>
     </ion-list>
 
     <EmptyState
@@ -82,6 +92,7 @@ import { addOutline, closeOutline, trashOutline } from 'ionicons/icons';
 import { reactive, ref } from 'vue';
 import { api, translate } from '@common';
 import EmptyState from '@/components/common/EmptyState.vue';
+import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import { showToast } from '@/utils';
 
 type Attribute = { attrName: string; attrValue?: string; attrDescription?: string };
@@ -147,5 +158,14 @@ async function deleteAttribute(attr: Attribute) {
 <style scoped>
 ion-content {
   --padding-bottom: 16px;
+}
+
+.attribute-form__pair {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.attribute-form__field {
+  flex: 1 1 12rem;
 }
 </style>

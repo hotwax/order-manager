@@ -13,7 +13,6 @@
       <SearchFilterCard
         v-model="searchQuery"
         :placeholder="translate('Search')"
-        :show-clear="false"
         @search="fetchFraudTasks()"
         @clear="clearFilters"
       >
@@ -41,21 +40,56 @@
         </FilterSelect>
       </SearchFilterCard>
 
-      <SelectAllResultsItem v-if="fraudTasks.length" v-model="selectAll" :count="fraudTasks.length" />
+      <!-- Refetch progress bar: shown while a first-page reload runs over existing cards. -->
+      <ion-progress-bar v-if="isRefetching" type="indeterminate" />
 
-      <div class="fraud-orders">
+      <ion-list v-if="fraudTasks.length" lines="none">
+        <ion-list-header class="order-results-header">
+          <span class="order-results-header-start">
+            <ion-checkbox
+              v-if="selectMode"
+              :checked="allCurrentPageSelected"
+              :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
+              @ionChange="toggleCurrentPageSelection($event.detail.checked)"
+            />
+          </span>
+          <ion-label>
+            {{ fraudTasks.length }} {{ fraudTasks.length === 1 ? translate('fraud task') : translate('fraud tasks') }}
+          </ion-label>
+          <ion-button fill="clear" size="small" @click="toggleSelectMode">
+            {{ selectMode ? translate('Done') : translate('Select') }}
+          </ion-button>
+        </ion-list-header>
+      </ion-list>
+
+      <!-- First-load spinner: only before any card exists. -->
+      <div v-if="isFirstLoad" class="ion-text-center ion-padding">
+        <ion-spinner name="crescent" />
+      </div>
+
+      <!-- Error/retry state replaces the list when the first-page request failed. -->
+      <ErrorState
+        v-else-if="hasError"
+        :title="translate('Could not load fraud tasks')"
+        :message="translate(fraudError)"
+        retryable
+        @retry="fetchFraudTasks()"
+      />
+
+      <div v-else class="fraud-orders">
         <FraudTaskCard
           v-for="task in fraudTasks"
           :key="task.workEffortId"
           :ref="setCardRef"
           :task="task"
-          :selectable="true"
+          :selectable="selectMode"
           :selected="!!selectedOrders[task.workEffortId]"
           show-view-order-action
           @update:selected="val => selectedOrders[task.workEffortId] = val"
           @completed="fetchFraudTasks()"
         />
-        <div class="empty-state" v-if="!fraudTasks.length">
+        <!-- True empty state: only after a successful zero-row response. -->
+        <div class="empty-state" v-if="showEmptyState">
           <p v-html="getEmptyMessage()"></p>
         </div>
       </div>
@@ -72,7 +106,7 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <ion-footer v-if="fraudTasks.length">
+    <ion-footer v-if="selectMode">
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button color="primary" :disabled="!selectedTaskCount" @click="bulkResolve">{{ translate('Resolve') }}</ion-button>
@@ -85,12 +119,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUpdate } from 'vue';
-import { IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonMenuButton, IonPage, IonSelectOption, IonTitle, IonToolbar, IonInfiniteScroll, IonInfiniteScrollContent, alertController, onIonViewWillEnter } from '@ionic/vue';
+import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonProgressBar, IonSelectOption, IonSpinner, IonTitle, IonToolbar, IonInfiniteScroll, IonInfiniteScrollContent, alertController, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
+import router from '@/router';
 import { showToast } from '@/utils';
+import ErrorState from '@/components/common/ErrorState.vue';
 import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
-import SelectAllResultsItem from '@/components/common/SelectAllResultsItem.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
@@ -111,7 +146,7 @@ const assignee = ref('');
 const recommendation = ref('');
 const orderChannel = ref('');
 const severity = ref('');
-const selectAll = ref(false);
+const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
 
 // Card component instances, collected in render order to map back to fraudTasks.
@@ -124,9 +159,23 @@ onBeforeUpdate(() => {
 });
 
 const fraudTasks = computed(() => orderTaskStore.getFraudTasks);
+const fraudStatus = computed(() => orderTaskStore.getFraudStatus);
+const fraudError = computed(() => orderTaskStore.getFraudError);
 const isScrollable = computed(() => orderTaskStore.isFraudTasksScrollable);
+// First load: request pending and no cards rendered yet.
+const isFirstLoad = computed(() => fraudStatus.value === 'loading' && !fraudTasks.value.length);
+// Refetch: reload running while cards already exist (keeps list visible, shows a bar).
+const isRefetching = computed(() => fraudStatus.value === 'loading' && fraudTasks.value.length > 0);
+// Only take over the page when there's nothing to show; a failed refetch with
+// cards on screen keeps the existing rows instead of blanking the queue.
+const hasError = computed(() => fraudStatus.value === 'error' && !fraudTasks.value.length);
+// Empty copy only after a settled, successful, zero-row first-page response.
+const showEmptyState = computed(() => fraudStatus.value === 'success' && !fraudTasks.value.length);
 const selectedTaskCount = computed(() => Object.values(selectedOrders.value).filter(Boolean).length as number);
 const hasFilters = computed(() => !!(searchQuery.value || assignee.value || recommendation.value || orderChannel.value || severity.value));
+const currentPageTaskIds = computed(() => fraudTasks.value.map((task: any) => task.workEffortId));
+const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));
+const someCurrentPageSelected = computed(() => currentPageTaskIds.value.some((workEffortId: string) => selectedOrders.value[workEffortId]));
 
 function getEmptyMessage() {
   return hasFilters.value
@@ -134,14 +183,32 @@ function getEmptyMessage() {
     : translate('No records found.');
 }
 
-watch(selectAll, (val) => {
-  fraudTasks.value.forEach((task: any) => {
-    selectedOrders.value[task.workEffortId] = val;
-  });
-});
-
 watch([assignee, orderChannel, recommendation, severity], () => {
   fetchFraudTasks();
+});
+
+function toggleSelectMode() {
+  if (selectMode.value) {
+    selectMode.value = false;
+    selectedOrders.value = {};
+    return;
+  }
+  selectMode.value = true;
+}
+
+function toggleCurrentPageSelection(checked: boolean) {
+  fraudTasks.value.forEach((task: any) => {
+    selectedOrders.value[task.workEffortId] = checked;
+  });
+}
+
+// Prune selections for tasks no longer in the list (e.g. after a filter change)
+// without forcing select mode on or off.
+watch(fraudTasks, () => {
+  const validIds = new Set(fraudTasks.value.map((task: any) => task.workEffortId));
+  Object.keys(selectedOrders.value).forEach((id) => {
+    if (!validIds.has(id)) delete selectedOrders.value[id];
+  });
 });
 
 function clearFilters() {
@@ -150,10 +217,15 @@ function clearFilters() {
   recommendation.value = '';
   orderChannel.value = '';
   severity.value = '';
+  router.replace({ query: {} });
   fetchFraudTasks();
 }
 
 const fetchFraudTasks = async (pageSize?: any, pageIndex?: any) => {
+  // A first-page load replaces the result set, so drop any stale selection.
+  if (!pageIndex) {
+    selectedOrders.value = {};
+  }
   await orderTaskStore.fetchFraudTasks({
     pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
     pageIndex: pageIndex ?? 0,
@@ -197,7 +269,6 @@ async function bulkResolve() {
     await Promise.all(cards.map((card: any) => card.submitResolve()));
     await showToast(translate('{count} tasks resolved.', { count: cards.length }));
     selectedOrders.value = {};
-    selectAll.value = false;
     await fetchFraudTasks();
   } catch {
     await showToast(translate('Failed to resolve some tasks. Please try again.'));
@@ -216,10 +287,13 @@ async function bulkCancel() {
         text: translate('Cancel orders'),
         role: 'confirm',
         handler: async () => {
-          await Promise.all(cards.map((card: any) => card.submitCancel()));
-          selectedOrders.value = {};
-          selectAll.value = false;
-          await fetchFraudTasks();
+          try {
+            await Promise.all(cards.map((card: any) => card.submitCancel()));
+            selectedOrders.value = {};
+            await fetchFraudTasks();
+          } catch {
+            await showToast(translate('Failed to cancel some orders. Please try again.'));
+          }
         }
       }
     ]
@@ -235,6 +309,17 @@ onIonViewWillEnter(() => {
 <style scoped>
 .fraud-orders {
   padding: 0 var(--spacer-sm) var(--spacer-sm);
+}
+
+.order-results-header {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.order-results-header-start {
+  display: flex;
+  min-width: 24px;
 }
 
 @media (max-width: 640px) {

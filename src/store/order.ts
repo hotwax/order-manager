@@ -49,6 +49,8 @@ async function fetchWorkflowPage(
       currencyUomId: toStringValue(doc.currencyUom) || 'USD',
       itemCount: toNumberValue(doc.itemCount),
       shipGroupSeqId: toStringValue(doc.shipGroupSeqId),
+      shipmentId: toStringValue(doc.shipmentId),
+      shipmentStatusId: toStringValue(doc.shipmentStatusId),
       shippingMethodTypeId: toStringValue(doc.shipmentMethodTypeId),
       shipmentMethodDesc: (() => { const m = seedStore.shipmentMethodTypes.byId[toStringValue(doc.shipmentMethodTypeId)]; return m?.description || toStringValue(doc.shipmentMethodTypeId); })(),
       carrierPartyId: toStringValue(doc.carrierPartyId),
@@ -85,6 +87,8 @@ export interface OrderSearchFilters {
   productStoreId: string;
   dateFrom: string;
   dateThru: string;
+  hasVirtualFacilityItems: boolean;
+  archivedOnly: boolean;
 }
 
 export const useOrderStore = defineStore('orders', {
@@ -96,6 +100,8 @@ export const useOrderStore = defineStore('orders', {
       productStoreId: 'All',
       dateFrom: '',
       dateThru: '',
+      hasVirtualFacilityItems: false,
+      archivedOnly: false,
     } as OrderSearchFilters,
     searchSort: 'orderDate desc',
     searchResults: [] as Order[],
@@ -188,6 +194,8 @@ export const useOrderStore = defineStore('orders', {
         productStoreId: this.searchFilters.productStoreId,
         dateFrom: this.searchFilters.dateFrom,
         dateThru: this.searchFilters.dateThru,
+        hasVirtualFacilityItems: this.searchFilters.hasVirtualFacilityItems,
+        archivedOnly: this.searchFilters.archivedOnly,
         sort: this.searchSort,
         pageSize: this.pageSize,
         pageIndex,
@@ -243,6 +251,27 @@ export const useOrderStore = defineStore('orders', {
       } finally {
         this.workflowOrdersLoading[bucket] = false;
       }
+    },
+    async shipPackedWorkflowOrders(orderIds: string[]) {
+      const selectedOrderIds = new Set(orderIds);
+      const shipmentIds = [
+        ...new Set(
+          this.workflowOrders.packed
+            .filter((order) => selectedOrderIds.has(order.orderId))
+            .map((order) => order.shipmentId)
+            .filter((shipmentId): shipmentId is string => !!shipmentId)
+        )
+      ];
+
+      if (!shipmentIds.length) {
+        throw new Error('No packed shipments found for selected orders.');
+      }
+
+      await api({
+        url: 'poorti/shipments/bulkShip',
+        method: 'POST',
+        data: { shipmentIds }
+      });
     },
   },
   persist: {

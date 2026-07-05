@@ -102,7 +102,16 @@
           </ion-select>
         </ion-item>
         <ion-item>
-          <template v-if="stateOptions.length">
+          <template v-if="!form.countryGeoId">
+            <ion-select
+              label="State / Province"
+              label-placement="stacked"
+              interface="popover"
+              placeholder="Select country first"
+              disabled
+            />
+          </template>
+          <template v-else-if="stateOptions.length">
             <ion-select
               label="State / Province"
               label-placement="stacked"
@@ -118,6 +127,15 @@
                 {{ state.geoName }}
               </ion-select-option>
             </ion-select>
+          </template>
+          <template v-else-if="isLoadingStates">
+            <ion-select
+              label="State / Province"
+              label-placement="stacked"
+              interface="popover"
+              placeholder="Loading states"
+              disabled
+            />
           </template>
           <template v-else>
             <ion-input
@@ -220,17 +238,21 @@ const stateOptions = computed(() => {
   return ((seed as any).getStatesForCountry(form.countryGeoId) as Array<{ geoId: string; geoName: string }>);
 });
 
-function onCountryChange() {
+const isLoadingStates = computed(() =>
+  !!form.countryGeoId && ['idle', 'loading'].includes((seed as any).geoAssocStatus?.(form.countryGeoId))
+);
+
+async function onCountryChange() {
   form.stateProvinceGeoId = '';
   if (form.countryGeoId) {
-    (seed as any).loadGeoAssocs(form.countryGeoId);
+    await (seed as any).loadGeoAssocs(form.countryGeoId);
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (props.contactMechTypeId === 'POSTAL_ADDRESS') {
     if ((seed as any).geos?.status !== 'loaded') {
-      (seed as any).loadGeos?.();
+      await (seed as any).loadGeos?.();
     }
   }
 
@@ -250,7 +272,7 @@ onMounted(() => {
       form.postalCode = c.postalAddress?.postalCode || '';
       form.countryGeoId = c.postalAddress?.countryGeoId || '';
       if (form.countryGeoId) {
-        (seed as any).loadGeoAssocs(form.countryGeoId);
+        await (seed as any).loadGeoAssocs(form.countryGeoId);
       }
     }
   }
@@ -260,7 +282,12 @@ const isValid = computed(() => {
   if (props.contactMechTypeId === 'EMAIL_ADDRESS') return form.infoString.trim().length > 0;
   if (props.contactMechTypeId === 'TELECOM_NUMBER') return form.contactNumber.trim().length > 0;
   if (props.contactMechTypeId === 'POSTAL_ADDRESS') {
-    return form.address1.trim().length > 0 && form.city.trim().length > 0 && form.postalCode.trim().length > 0;
+    return form.address1.trim().length > 0
+      && form.city.trim().length > 0
+      && form.postalCode.trim().length > 0
+      && form.countryGeoId.trim().length > 0
+      && !isLoadingStates.value
+      && (!stateOptions.value.length || form.stateProvinceGeoId.trim().length > 0);
   }
   return false;
 });
@@ -271,6 +298,24 @@ function dismiss() {
 
 function expire() {
   modalController.dismiss(null, 'expire');
+}
+
+function normalizeStateProvinceGeoId(value: string) {
+  const stateProvince = value.trim();
+  if (!stateProvince) return '';
+
+  const candidates = stateOptions.value.length
+    ? stateOptions.value
+    : ((seed as any).getStates as Array<{ geoId: string; geoName: string; geoCode?: string; geoCodeAlpha2?: string }>);
+  const normalizedStateProvince = stateProvince.toLowerCase();
+  const match = candidates.find((state: any) =>
+    state.geoId === stateProvince
+    || state.geoCode === stateProvince
+    || state.geoCodeAlpha2 === stateProvince
+    || state.geoName?.toLowerCase() === normalizedStateProvince
+  );
+
+  return match?.geoId || stateProvince;
 }
 
 function confirm() {
@@ -287,7 +332,8 @@ function confirm() {
     payload.address1 = form.address1.trim();
     if (form.address2.trim()) payload.address2 = form.address2.trim();
     payload.city = form.city.trim();
-    if (form.stateProvinceGeoId.trim()) payload.stateProvinceGeoId = form.stateProvinceGeoId.trim();
+    const stateProvinceGeoId = normalizeStateProvinceGeoId(form.stateProvinceGeoId);
+    if (stateProvinceGeoId) payload.stateProvinceGeoId = stateProvinceGeoId;
     payload.postalCode = form.postalCode.trim();
     if (form.countryGeoId.trim()) payload.countryGeoId = form.countryGeoId.trim();
   }

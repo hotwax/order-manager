@@ -212,13 +212,17 @@ async function cancelOrder() {
         text: translate('Cancel order'),
         role: 'confirm',
         handler: async () => {
-          const items = (props.task.items ?? []).map((item: any) => ({
-            orderItemSeqId: item.orderItemSeqId,
-            shipGroupSeqId: props.task.shipGroupSeqId,
-          }));
-          await orderTaskStore.cancelOrder(props.task.orderId, items);
-          await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_CANCELLED');
-          emit('completed');
+          try {
+            const items = (props.task.items ?? []).map((item: any) => ({
+              orderItemSeqId: item.orderItemSeqId,
+              shipGroupSeqId: props.task.shipGroupSeqId,
+            }));
+            await orderTaskStore.cancelOrder(props.task.orderId, items);
+            await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_CANCELLED');
+            emit('completed');
+          } catch {
+            await showToast(translate('Failed to cancel the order. Please try again.'));
+          }
         }
       }
     ]
