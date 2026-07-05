@@ -707,41 +707,43 @@ export async function getOrderProgressStatuses(orderId: string): Promise<string[
  */
 export async function getCustomerTasks(
   partyId: string,
-  params: { statusId?: string; pageSize?: number; pageIndex?: number; orderByField?: string } = {}
+  params: { taskStatusId?: string; pageSize?: number; pageIndex?: number; orderByField?: string } = {}
 ): Promise<CustomerTaskSummary[]> {
   const response = await api({
     url: `oms/customers/${partyId}/tasks`,
     method: 'get',
     params: {
-      statusId: params.statusId,
+      taskStatusId: params.taskStatusId,
       pageSize: params.pageSize ?? 20,
       pageIndex: params.pageIndex ?? 0,
       orderByField: params.orderByField
     }
   });
-  return (response.data?.tasks || []).map(normalizeCustomerTask);
+  return asList(response.data).map(normalizeCustomerTask);
 }
 
 export function normalizeCustomerTask(task: any): CustomerTaskSummary {
-  const person = (value: any) => (value
-    ? { partyId: toStringValue(value.partyId), name: value.name || toStringValue(value.partyId), fromDate: value.fromDate ? toStringValue(value.fromDate) : undefined }
-    : undefined);
-
   return {
     workEffortId: toStringValue(task.workEffortId),
     workEffortName: toStringValue(task.workEffortName),
     workEffortTypeId: toStringValue(task.workEffortTypeId),
-    purposeTypeId: task.purposeTypeId ? toStringValue(task.purposeTypeId) : undefined,
-    statusId: toStringValue(task.statusId),
-    dueDate: task.dueDate ? toStringValue(task.dueDate) : undefined,
+    workEffortPurposeTypeId: task.workEffortPurposeTypeId ? toStringValue(task.workEffortPurposeTypeId) : undefined,
+    taskStatusId: toStringValue(task.taskStatusId),
+    orderStatusId: task.orderStatusId ? toStringValue(task.orderStatusId) : undefined,
     orderId: task.orderId ? toStringValue(task.orderId) : undefined,
     orderName: task.orderName || undefined,
     orderDate: task.orderDate ? toStringValue(task.orderDate) : undefined,
-    orderTotal: task.orderTotal != null ? Number(task.orderTotal) : undefined,
-    assignee: person(task.assignee),
-    reporter: person(task.reporter),
+    grandTotal: task.grandTotal != null ? Number(task.grandTotal) : undefined,
+    customerPartyId: task.customerPartyId ? toStringValue(task.customerPartyId) : undefined,
+    assigneePartyId: task.assigneePartyId ? toStringValue(task.assigneePartyId) : undefined,
+    assigneeName: task.assigneeFullName || undefined,
+    assigneeSince: task.assigneeSince ? toStringValue(task.assigneeSince) : undefined,
+    reporterPartyId: task.reporterPartyId ? toStringValue(task.reporterPartyId) : undefined,
+    reporterName: task.reporterFullName || undefined,
+    reporterSince: task.reporterSince ? toStringValue(task.reporterSince) : undefined,
     notes: task.notes || undefined,
-    resolution: task.resolution || undefined
+    resolution: task.resolution || undefined,
+    dueDate: task.dueDate ? toStringValue(task.dueDate) : undefined,
   };
 }
 

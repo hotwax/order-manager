@@ -300,7 +300,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           method: 'GET',
           params: {
             ...payload,
-            statusId: 'TASK_CREATED',
+            taskStatusId: 'TASK_CREATED',
             workEffortTypeId: 'REVIEW_RISK_ORDER',
             productStoreId,
           },
@@ -397,7 +397,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
             method: 'GET',
             params: {
               orderId,
-              statusId: 'TASK_CREATED',
+              taskStatusId: 'TASK_CREATED',
               workEffortTypeId: 'REVIEW_RISK_ORDER',
               productStoreId,
             },
@@ -465,6 +465,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         });
       } catch (err) {
         console.error('Failed to change the task status', err);
+        throw err;
       }
     },
     async parkOrder(orderId: string, shipGroupSeqId: string, facilityId: string, workEffortId?: string) {

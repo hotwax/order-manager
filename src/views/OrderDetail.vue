@@ -155,6 +155,17 @@
                   <p>{{ id.typeLabel }}</p>
                   {{ id.idValue }}
                 </ion-label>
+                <a
+                  v-if="id.shopifyAdminUrl"
+                  slot="end"
+                  :href="id.shopifyAdminUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  :aria-label="translate('View in Shopify')"
+                  :title="translate('View in Shopify')"
+                >
+                  <ion-icon :icon="openOutline" />
+                </a>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -1004,7 +1015,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
+import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
@@ -1028,9 +1039,10 @@ import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
-import { api, commonUtil, DxpShopifyImg, translate, useSolrSearch } from '@common';
+import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
 import { showToast, isKit, riskLevelColor } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
+import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
@@ -1050,6 +1062,77 @@ const { isLoading: loading, error } = storeToRefs(orderDetailStore);
 
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 const customerPartyId = computed(() => orderDetailStore.customerPartyId);
+
+// Shopify Admin deep-link. Primary source is the order's own shopifyShopOrder record
+// (the shop it actually came from — same source CloneOrderModal uses). That endpoint
+// isn't exposed by the connector yet (hotwax/mantle-shopify-connector#381), so until
+// it ships we fall back to inferring the shop from the order's product store, but ONLY
+// when exactly one Shopify shop maps to that store (see fallbackShopIdByProductStore) —
+// an ambiguous multi-shop store or an unknown store degrades to no link, so we never
+// point at the wrong store. No shop / no myshopify domain also degrades to no link. The
+// URL is a computed over the seed dataset so it appears reactively even when the
+// boot-time shops load finishes after the order renders.
+const shopifyOrderShopId = ref('');
+// Successful resolutions are memoized (the order→shop mapping is immutable): force
+// reloads skip the refetch — no link flicker, and a transient refetch failure can't
+// erase an already-resolved link. Not set on error, so the next loadOrder retries.
+let resolvedShopifyShop = { orderId: '', shopId: '' };
+
+const shopifyOrderId = computed(() => {
+  const identifications = orderDetailStore.current?.identifications || [];
+  return identifications.find((identification: any) => identification.orderIdentificationTypeId === 'SHOPIFY_ORD_ID')?.idValue ?? '';
+});
+
+// Interim fallback until the connector exposes GET oms/orders/{id}/shopifyShopOrder
+// (hotwax/mantle-shopify-connector#381): infer the shop from the order's product store,
+// but ONLY when exactly one Shopify shop maps to it — 0 or >1 matches → '' (no link),
+// so we never link to the wrong store. Reactive over the seed dataset so it resolves
+// once the boot-time shops load completes. Skipped once the record-based id is known.
+const fallbackShopIdByProductStore = computed(() => {
+  if (shopifyOrderShopId.value) return '';
+  const productStoreId = orderDetailStore.current?.productStoreId;
+  if (!productStoreId) return '';
+  const shops = seed.shopifyShops.ids.map((id: string) => seed.shopifyShops.byId[id]);
+  return singleShopIdForProductStore(shops, productStoreId);
+});
+
+const shopifyAdminUrl = computed(() => {
+  if (!shopifyOrderId.value) return '';
+  const shopId = shopifyOrderShopId.value || fallbackShopIdByProductStore.value;
+  if (!shopId) return '';
+  const shop: any = seed.shopifyShops.byId[shopId];
+  return shop ? shopifyAdminOrderUrl(shop.myshopifyDomain || shop.domain, shopifyOrderId.value) : '';
+});
+
+async function resolveShopifyOrderShop(orderId: string) {
+  // Stale caller: a slow loadOrder for a previously viewed order must not clobber
+  // the state of the order now on screen.
+  if (orderId !== props.orderId) return;
+  if (resolvedShopifyShop.orderId === orderId) {
+    // Already resolved — re-assert rather than trust the ref: a racing resolver for
+    // another order may have cleared it before its stale response was discarded.
+    shopifyOrderShopId.value = resolvedShopifyShop.shopId;
+    return;
+  }
+  shopifyOrderShopId.value = '';
+  if (!shopifyOrderId.value) return;
+  seed.loadShopifyShops();
+  try {
+    const resp = await api({ url: `oms/orders/${orderId}/shopifyShopOrder`, method: 'GET' });
+    const rows: any[] = Array.isArray(resp.data) ? resp.data : (resp.data?.docs ?? []);
+    if (orderId !== props.orderId) return; // stale response after navigating to another order
+    shopifyOrderShopId.value = rows.find((row: any) => row.shopId)?.shopId || '';
+    resolvedShopifyShop = { orderId, shopId: shopifyOrderShopId.value };
+  } catch (error: any) {
+    // 404 is expected until the connector exposes this endpoint
+    // (hotwax/mantle-shopify-connector#381); the product-store fallback covers the
+    // link meanwhile. Only surface genuinely unexpected failures.
+    if (error?.response?.status !== 404) {
+      logger.error('Failed to resolve the Shopify shop for the order', error);
+    }
+  }
+}
+
 /**
  * View model — adapts the raw order master-detail payload to the shape this template
  * already binds, joining IDs to labels through the seed store and product cache. The
@@ -1091,7 +1174,10 @@ const order = computed(() => {
     identifications: (raw.identifications || []).map((identification: any) => ({
       orderIdentificationTypeId: identification.orderIdentificationTypeId,
       typeLabel: seed.orderIdentificationTypeDescription(identification.orderIdentificationTypeId),
-      idValue: identification.idValue
+      idValue: identification.idValue,
+      // Deep-link into the Shopify Admin order screen; prefer the per-order
+      // shopifyShopOrder record, with a constrained single-shop product-store fallback.
+      shopifyAdminUrl: identification.orderIdentificationTypeId === 'SHOPIFY_ORD_ID' ? shopifyAdminUrl.value : ''
     })),
     payments: (raw.paymentPreferences || []).map((payment: any) => ({
       id: payment.orderPaymentPreferenceId,
@@ -1687,6 +1773,9 @@ async function loadOrder(orderId: string, force = false) {
   } else {
     await orderDetailStore.setCurrentOrder(orderId);
   }
+  // Fire-and-forget: the Shopify Admin link hydrates when it resolves; the page
+  // never waits on it.
+  resolveShopifyOrderShop(orderId);
   if (customerPartyId.value) {
     await customerStore.loadCustomerProfile(customerPartyId.value, force);
   }

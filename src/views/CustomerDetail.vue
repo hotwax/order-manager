@@ -55,7 +55,7 @@
                   </ion-item>
                   <ion-item v-for="value in section.values" :key="value.contactMechId">
                     <ion-label>{{ value.display }}</ion-label>
-                    <ion-note slot="end">{{ seed.describe(value.contactMechPurposeTypeId) }}</ion-note>
+                    <ion-note slot="end">{{ seedDescribe(value.contactMechPurposeTypeId) }}</ion-note>
                   </ion-item>
                   <ion-item v-if="!section.values.length" lines="none">
                     <ion-label color="medium"><em>None on file</em></ion-label>
@@ -73,7 +73,7 @@
                 <ion-list lines="none">
                   <ion-item v-for="relationship in personalRelationships" :key="relationship.key">
                     <ion-label>
-                      <p class="overline">{{ seed.describe(relationship.partyRelationshipTypeId) }}</p>
+                      <p class="overline">{{ seedDescribe(relationship.partyRelationshipTypeId) }}</p>
                       <h3>{{ relationship.relatedPartyName }}</h3>
                       <p>{{ relationship.relatedPartyId }}</p>
                     </ion-label>
@@ -182,59 +182,23 @@
 
       <!-- ===== Dashboard ===== -->
       <div v-if="selectedSegment === 'dashboard'">
-        <!-- Open tasks (placeholder until GET /oms/parties/{partyId}/tasks lands) -->
+        <!-- Open tasks — first task only; full list is in the Tasks segment -->
         <div class="section-header">
-          <h2>Open tasks</h2>
-          <ion-button fill="outline" size="small">View all</ion-button>
+          <h2>{{ translate('Open tasks') }}</h2>
+          <ion-button fill="outline" size="small" @click="selectedSegment = 'tasks'">View all</ion-button>
         </div>
 
-        <ion-card v-for="task in openTasks" :key="task.workEffortId" class="task-card">
-          <ion-item lines="full">
-            <ion-checkbox slot="start" />
-            <ion-label>
-              <h2>{{ task.orderName || task.orderId || task.workEffortName }}</h2>
-              <p v-if="task.orderDate">{{ formatLongDate(task.orderDate) }}</p>
-            </ion-label>
-            <ion-chip slot="end" outline>{{ task.workEffortId }}</ion-chip>
-            <ion-note v-if="task.orderTotal != null" slot="end">{{ money(task.orderTotal) }}</ion-note>
-          </ion-item>
-
-          <div class="task-grid">
-            <div>
-              <p class="overline">Task</p>
-              <h3>{{ task.workEffortName }}</h3>
-              <p>{{ seed.describe(task.purposeTypeId || task.workEffortTypeId) }}</p>
-              <p class="muted" v-if="task.dueDate">Due {{ formatLongDate(task.dueDate) }}</p>
-            </div>
-            <div>
-              <p class="overline">Assignee</p>
-              <h3>{{ task.assignee?.name || 'Unassigned' }}</h3>
-              <p class="muted" v-if="task.assignee?.fromDate">{{ formatLongDate(task.assignee.fromDate) }}</p>
-            </div>
-            <div>
-              <p class="overline">Reporter</p>
-              <h3>{{ task.reporter?.name || '—' }}</h3>
-            </div>
-          </div>
-
-          <div class="task-grid" v-if="task.notes">
-            <div>
-              <p class="overline">Notes</p>
-              <p>{{ task.notes }}</p>
-            </div>
-          </div>
-
-          <div class="card-actions">
-            <ion-button fill="clear" size="small">Resolve task</ion-button>
-            <ion-button v-if="task.orderId" fill="clear" size="small" :router-link="`/orders/${task.orderId}`">
-              View order
-            </ion-button>
-          </div>
-        </ion-card>
+        <HoldTaskCard
+          v-for="task in dashboardTaskCards"
+          :key="task.workEffortId"
+          :task="task"
+          show-view-order-action
+          @completed="refresh"
+        />
         <EmptyState
           v-if="tasksStatus === 'loaded' && !openTasks.length"
-          title="No open tasks"
-          message="This customer has no open tasks."
+          :title="translate('No open tasks')"
+          :message="translate('This customer has no open tasks.')"
         />
 
         <!-- Recent orders (real when present, placeholder until the Solr orders query lands) -->
@@ -486,10 +450,10 @@
             <ion-item lines="full">
               <ion-label>
                 <h2>{{ comm.subject || '(No subject)' }}</h2>
-                <p>{{ (seed as any).describe(comm.communicationEventTypeId) || comm.communicationEventTypeId }}</p>
+                <p>{{ seedDescribe(comm.communicationEventTypeId) || comm.communicationEventTypeId }}</p>
               </ion-label>
               <ion-chip slot="end" :color="commStatusColor(comm.statusId)" outline>
-                {{ (seed as any).describe(comm.statusId) || comm.statusId }}
+                {{ seedDescribe(comm.statusId) || comm.statusId }}
               </ion-chip>
             </ion-item>
 
@@ -538,6 +502,32 @@
         </div>
       </div>
 
+      <!-- ===== Tasks segment ===== -->
+      <div v-else-if="selectedSegment === 'tasks'">
+        <div class="section-header">
+          <h2>{{ translate('Open tasks') }}</h2>
+        </div>
+
+        <HoldTaskCard
+          v-for="task in customerTaskCards"
+          :key="task.workEffortId"
+          :task="task"
+          show-view-order-action
+          @completed="refresh"
+        />
+
+        <EmptyState
+          v-if="tasksStatus === 'loaded' && !openTasks.length"
+          :title="translate('No open tasks')"
+          :message="translate('This customer has no open tasks.')"
+        />
+        <div v-if="tasksHasMore" class="ion-text-center ion-padding">
+          <ion-button fill="outline" size="small" :disabled="tasksStatus === 'loading'" @click="loadMoreTasks">
+            {{ tasksStatus === 'loading' ? translate('Loading...') : translate('Load more') }}
+          </ion-button>
+        </div>
+      </div>
+
       <!-- ===== Other segments (placeholder) ===== -->
       <div v-else class="segment-placeholder">
         <EmptyState
@@ -572,7 +562,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { DxpShopifyImg, commonUtil, translate } from '@common';
 import {
   IonBackButton,
   IonButton,
@@ -580,7 +570,6 @@ import {
   IonCard,
   IonCardHeader,
   IonCardTitle,
-  IonCheckbox,
   IonChip,
   IonContent,
   IonHeader,
@@ -603,7 +592,6 @@ import {
   alertController,
   modalController
 } from '@ionic/vue';
-import { DateTime } from 'luxon';
 import {
   addCircleOutline,
   chevronUp,
@@ -613,18 +601,20 @@ import {
   pricetagOutline,
   trashOutline
 } from 'ionicons/icons';
-import { commonUtil, DxpShopifyImg } from '@common';
-import { useCustomerDetail } from '@/composables/useCustomerDetail';
-import { useProductCacheStore } from '@/store/productCache';
-import { useSeedStore } from '@/store/seed';
-import type { CustomerOrderSummary, CustomerReturnSummary } from '@/types/customer';
+import { DateTime } from 'luxon';
+import { computed, onMounted, ref, watch } from 'vue';
 import AddContactModal from '@/components/AddContactModal.vue';
 import AddRelationshipModal from '@/components/AddRelationshipModal.vue';
-import RelationshipHistoryModal from '@/components/RelationshipHistoryModal.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
+import RelationshipHistoryModal from '@/components/RelationshipHistoryModal.vue';
+import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
+import { useCustomerDetail } from '@/composables/useCustomerDetail';
 import router from '@/router';
 import { deleteCustomerDetails, indexCustomer } from '@/services/customer';
+import { useProductCacheStore } from '@/store/productCache';
+import { useSeedStore } from '@/store/seed';
+import type { CustomerOrderSummary, CustomerReturnSummary, CustomerTaskSummary } from '@/types/customer';
 
 const props = defineProps<{
   customerId: string;
@@ -648,6 +638,7 @@ const {
   timeline,
   recentOrders: recentOrdersSource,
   openTasks,
+  tasksHasMore,
   customerReturns: customerReturnsSource,
   customerCommunications: customerCommunicationsSource,
   ordersStatus,
@@ -660,8 +651,10 @@ const {
   lifetimeCurrency,
   customerSince: customerSinceRaw,
   load,
+  refresh,
   loadReturns,
   loadCommunications,
+  loadMoreTasks,
   expireRelationship,
   mergeContact,
   createRelationship,
@@ -717,7 +710,58 @@ const allOrders = computed(() => {
   return q ? mapped.filter((o) => matchesOrderQuery(o, q)) : mapped;
 });
 const unfillableOrders = computed(() => recentOrdersSource.value.filter((o: CustomerOrderSummary) => o.isUnfillable).map(mapOrder));
+const customerTaskCards = computed(() => openTasks.value.map(mapCustomerTaskCard));
+const dashboardTaskCards = computed(() => customerTaskCards.value.slice(0, 1));
 const returnRows = computed(() => customerReturns.value.map(mapReturnRow));
+
+function mapCustomerTaskCard(task: CustomerTaskSummary) {
+  const customerName = customer.value?.name || '';
+  const customerNameParts = nameParts(customerName);
+
+  return {
+    ...task,
+    grandTotal: Number(task.grandTotal || 0),
+    purposeDescription: seedDescribe(task.workEffortPurposeTypeId || task.workEffortTypeId)
+      || task.workEffortPurposeTypeId
+      || task.workEffortTypeId,
+    estimatedCompletionDate: task.dueDate ? formatLongDate(task.dueDate) : '',
+    resolutionComment: task.resolution || '',
+    customer: {
+      partyId: props.customerId,
+      firstName: customerNameParts.firstName,
+      lastName: customerNameParts.lastName,
+    },
+    customerPhone: contactValue('phone'),
+    customerEmail: contactValue('email'),
+    assignedParties: [
+      ...(task.assigneePartyId || task.assigneeName ? [{
+        partyId: task.assigneePartyId,
+        roleTypeId: 'TASK_ASSIGNEE',
+        fromDate: task.assigneeSince,
+        groupName: task.assigneeName,
+      }] : []),
+      ...(task.reporterPartyId || task.reporterName ? [{
+        partyId: task.reporterPartyId,
+        roleTypeId: 'TASK_REPORTER',
+        fromDate: task.reporterSince,
+        groupName: task.reporterName,
+      }] : []),
+    ],
+  };
+}
+
+function contactValue(key: string): string {
+  return contactSections.value.find((section) => section.key === key)?.values[0]?.display || '';
+}
+
+function nameParts(name: string): { firstName: string; lastName: string } {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+
+  return {
+    firstName: parts[0] || '',
+    lastName: parts.slice(1).join(' '),
+  };
+}
 
 const segmentLabel = computed(() => {
   const labels: Record<string, string> = {
@@ -853,6 +897,10 @@ watch(() => props.customerId, () => {
   void load();
   void loadSelectedSegment();
 });
+
+function seedDescribe(id?: string): string {
+  return (seed as any).describe(id) || '';
+}
 
 function money(value: number, currency = 'USD') {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(Number(value || 0));

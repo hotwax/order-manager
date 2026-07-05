@@ -50,10 +50,13 @@ describe('OrderQueueList', () => {
     expect(source).toContain('<DateFilterSelect v-model="searchFilters.dateFrom" :label="translate(\'Order date from\')" />');
     expect(source).toContain('<DateFilterSelect v-model="searchFilters.dateThru" :label="translate(\'Order date thru\')" />');
     expect(source).toContain('shipmentMethodTypeId: searchFilters.value.shipmentMethodTypeId');
+    expect(source).toContain('dateFrom?: string;');
+    expect(source).toContain("dateFrom: props.dateFrom || ''");
     expect(source).not.toContain('statusTriggerId');
     expect(source).not.toContain('All statuses');
     expect(source).not.toContain('Sort by order date');
     expect(source).not.toContain('type="date"');
     expect(source).not.toContain('<h3>');
+    expect(source).not.toContain("import router from '@/router';");
   });
 });

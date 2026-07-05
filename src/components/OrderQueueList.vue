@@ -198,6 +198,7 @@ const props = defineProps<{
   emptyMessage: string;
   globalActions?: QueueGlobalAction[];
   status?: string | string[];
+  dateFrom?: string;
 }>();
 const emit = defineEmits<{
   (e: 'clearFilters'): void;
@@ -214,7 +215,7 @@ const searchQuery = ref('');
 const searchFilters = ref({
   channel: 'All',
   shipmentMethodTypeId: 'All',
-  dateFrom: '',
+  dateFrom: props.dateFrom || '',
   dateThru: '',
 });
 const searchResults = ref<Order[]>([]);
@@ -248,6 +249,12 @@ onMounted(runSearch);
 watch(searchQuery, scheduleSearch);
 watch(() => props.facilityIds, () => runSearch(), { deep: true });
 watch(searchFilters, () => runSearch(), { deep: true });
+watch(
+  () => props.dateFrom,
+  (newDateFrom) => {
+    searchFilters.value.dateFrom = newDateFrom ? String(newDateFrom) : '';
+  }
+);
 watch(searchResults, () => {
   const currentOrderIds = new Set(currentPageOrderIds.value);
   selectedOrderIds.value = selectedOrderIds.value.filter((orderId) => currentOrderIds.has(orderId));

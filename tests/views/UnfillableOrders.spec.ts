@@ -9,4 +9,9 @@ describe('UnfillableOrders', () => {
     expect(source).toContain(':facility-ids="[\'UNFILLABLE_PARKING\']"');
     expect(source).toContain(':global-actions="[\'brokerSelected\']"');
   });
+
+  it('passes the route date filter into the queue list', () => {
+    expect(source).toContain(':date-from="dateFrom"');
+    expect(source).toContain('router.currentRoute.value.query.dateFrom');
+  });
 });
