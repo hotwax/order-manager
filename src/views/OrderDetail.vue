@@ -71,10 +71,15 @@
         <div class="order-detail-header-details">
           <ion-card class="customer-summary-card">
             <ion-card-header>
-              <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
-              <ion-button v-if="customerPartyId" fill="clear" size="small" :router-link="'/customers/' + customerPartyId">
-                {{ translate('View details') }}
-              </ion-button>
+              <ion-item lines="none">
+                <ion-label>
+                  <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
+                </ion-label>
+                <ion-button v-if="customerPartyId" slot="end" fill="clear" size="small"
+                  :router-link="'/customers/' + customerPartyId">
+                  {{ translate('View details') }}
+                </ion-button>
+              </ion-item>
             </ion-card-header>
             <ion-list lines="none">
               <ion-item>

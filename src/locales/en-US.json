@@ -145,6 +145,7 @@
   "Customer": "Customer",
   "{count} customers": "{count} customers",
   "{loaded} of {total} customers": "{loaded} of {total} customers",
+  "{loaded} of {total} matching orders": "{loaded} of {total} matching orders",
   "{loaded} of {total} orders": "{loaded} of {total} orders",
   "Customer search failed": "Customer search failed",
   "Date after": "Date after",
