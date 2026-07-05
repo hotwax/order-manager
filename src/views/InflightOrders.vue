@@ -466,7 +466,7 @@ async function runAction(action: BulkActionDefinition) {
 }
 
 function customerAddressLine(order: WorkflowOrder) {
-  return order.shippingAddress1 || order.productStoreName || order.externalId || '';
+  return order.shippingAddress1 || order.productStoreName || '';
 }
 
 function customerAddressTrailingLine(order: WorkflowOrder) {
@@ -478,7 +478,7 @@ function customerAddressTrailingLine(order: WorkflowOrder) {
   ].filter(Boolean);
 
   if (parts.length) return parts.join(' ');
-  return order.shippingAddress1 ? '' : order.externalId;
+  return '';
 }
 
 function carrierLabel(order: WorkflowOrder) {

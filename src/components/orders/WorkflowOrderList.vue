@@ -160,6 +160,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { DateTime } from 'luxon';
 import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
+import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import type { BulkActionDefinition, WorkflowBucket, WorkflowOrder } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
@@ -178,6 +179,7 @@ const props = defineProps<{
 
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
+const productStore = useProductStore();
 const seedStore = useSeedStore();
 const route = router.currentRoute.value;
 const toastMessage = ref('');
@@ -248,6 +250,7 @@ const orderCountLabel = computed(() => {
 const hasMore = computed(() =>
   isApiBucket && orderStore.workflowOrders[apiBucket].length < orderStore.workflowOrdersTotal[apiBucket]
 );
+const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 
 function applyRouteFilters() {
   const facilityId = route.query.facilityId;
@@ -258,6 +261,9 @@ function applyRouteFilters() {
 }
 
 watch(() => route.query.facilityId, applyRouteFilters, { immediate: true });
+watch(selectedProductStoreId, () => {
+  filters.value.productStoreId = selectedProductStoreId.value;
+}, { immediate: true });
 
 function loadWorkflowOrders() {
   return orderStore.fetchWorkflowOrders(props.bucket as 'open' | 'inflight' | 'packed', filters.value);
@@ -303,6 +309,7 @@ watch(orders, () => {
 
 function clearFilters() {
   store.clearFilters(props.bucket);
+  filters.value.productStoreId = selectedProductStoreId.value;
 }
 
 function enterSelectMode() {

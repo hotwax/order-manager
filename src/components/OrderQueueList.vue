@@ -62,7 +62,7 @@
               @ionChange="toggleCurrentPageSelection($event.detail.checked)"
             />
           </span>
-          <ion-label>{{ translate("{loaded} of {total} orders", { loaded: searchResults.length, total: searchTotal }) }}</ion-label>
+          <ion-label>{{ translate("{loaded} of {total} matching orders", { loaded: searchResults.length, total: searchTotal }) }}</ion-label>
           <ion-button fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
@@ -93,13 +93,13 @@
             </ion-label>
           </ion-item>
 
-          <ion-label class="tablet ion-text-start">
+          <ion-label class="tablet">
             {{ order.customerName || order.customerId || translate('Unknown customer') }}
             <p>{{ customerAddressLine(order) }}</p>
             <p v-if="customerAddressTrailingLine(order)">{{ customerAddressTrailingLine(order) }}</p>
           </ion-label>
 
-          <ion-label class="tablet ion-text-start">
+          <ion-label class="tablet">
             {{ queueReasonLabel(order) }}
             <p>{{ queueRuleLabel(order) }}</p>
           </ion-label>
@@ -523,7 +523,7 @@ function parkingUnitCountLabel(order: Order) {
 }
 
 function customerAddressLine(order: Order) {
-  return order.shippingAddress1 || order.customerId || order.externalId || '';
+  return order.shippingAddress1 || order.customerId || '';
 }
 
 function customerAddressTrailingLine(order: Order) {
@@ -535,7 +535,7 @@ function customerAddressTrailingLine(order: Order) {
   ].filter(Boolean);
 
   if (parts.length) return parts.join(' ');
-  return order.shippingAddress1 ? '' : order.externalId;
+  return '';
 }
 
 function queueReasonLabel(order: Order) {
