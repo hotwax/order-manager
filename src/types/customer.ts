@@ -13,6 +13,7 @@ export interface SourceEntry<T> {
   pageIndex?: number;
   pageSize?: number;
   total?: number;
+  hasMore?: boolean;
 }
 
 export interface CustomerContactMech {
@@ -99,17 +100,23 @@ export interface CustomerTaskSummary {
   workEffortId: string;
   workEffortName: string;
   workEffortTypeId: string;
-  purposeTypeId?: string;
-  statusId: string;
-  dueDate?: string;
+  workEffortPurposeTypeId?: string;
+  taskStatusId: string;
+  orderStatusId?: string;
   orderId?: string;
   orderName?: string;
   orderDate?: string;
-  orderTotal?: number;
-  assignee?: { partyId: string; name: string; fromDate?: string };
-  reporter?: { partyId: string; name: string; fromDate?: string };
+  grandTotal?: number;
+  customerPartyId?: string;
+  assigneePartyId?: string;
+  assigneeName?: string;
+  assigneeSince?: string;
+  reporterPartyId?: string;
+  reporterName?: string;
+  reporterSince?: string;
   notes?: string;
   resolution?: string;
+  dueDate?: string;
 }
 
 export interface CustomerReturnSummary {

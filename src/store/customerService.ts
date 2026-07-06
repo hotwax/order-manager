@@ -16,7 +16,7 @@ import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { getDashboardDateFilter } from '@/utils/dashboardDate';
 import { useUserStore } from '@/store/user';
-import { fetchVirtualLocationOrderCounts } from '@/services/order';
+import { fetchVirtualLocationOrderCounts, searchOrders } from '@/services/order';
 
 const CHANNELS = ['WEB_SALES_CHANNEL', 'POS_SALES_CHANNEL', 'MOBILE_SALES_CHANNEL', 'MARKETPLACE_CHANNEL'];
 const BROKERABLE_ORDER_STATUSES = ['ORDER_CREATED', 'ORDER_APPROVED'];
@@ -88,6 +88,19 @@ function buildVirtualLocationWorkCounts(facilities: { facilityId: string; facili
     .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
 
   return [...rows, ...dynamicRows];
+}
+
+function responseListCount(response: any): number {
+  const headerCount = response?.headers?.get?.('x-total-count')
+    ?? response?.headers?.['x-total-count']
+    ?? response?.headers?.['X-Total-Count'];
+  const fallbackCount = Array.isArray(response?.data) ? response.data.length : 0;
+  const countValue = headerCount !== undefined && headerCount !== null && String(headerCount).trim() !== ''
+    ? headerCount
+    : fallbackCount;
+  const count = Number(countValue);
+
+  return Number.isFinite(count) ? count : fallbackCount;
 }
 
 // Load-status keys for the funnel dashboard metric groups. Each group's fetch
@@ -177,7 +190,8 @@ export const useCustomerServiceStore = defineStore('customerService', {
       oldestOpenOrderDate: null as number | null
     },
     unfillable: {
-      unfillableHourlyCounts: [] as { shipGroupDateHour: string; shipGroupCount: number }[]
+      unfillableHourlyCounts: [] as { shipGroupDateHour: string; shipGroupCount: number }[],
+      totalCount: 0
     },
     holdTasks: {
       holdTasksTotalCount: 0,
@@ -303,14 +317,34 @@ export const useCustomerServiceStore = defineStore('customerService', {
     async fetchUnfillable(productStoreId?: string) {
       this.dashboardStatus.unfillable = 'loading';
       try {
-        const params: any = {};
+        const todayStr = getUserDashboardDateFilter();
+        const params: any = { dateFilter: todayStr };
         if (productStoreId) params.productStoreId = productStoreId;
         const resp = await api({
           url: 'oms/orders/funnelDashboard/unfillable',
           method: 'GET',
           params
         });
-        if (resp.data) this.unfillable = resp.data;
+        if (resp.data) {
+          this.unfillable = {
+            ...this.unfillable,
+            ...resp.data,
+            unfillableHourlyCounts: resp.data.unfillableHourlyCounts || []
+          };
+        }
+
+        const solrParams: any = {
+          facilityIds: ['UNFILLABLE_PARKING'],
+          status: ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD'],
+          dateFrom: todayStr,
+          pageSize: 0
+        };
+        if (productStoreId && productStoreId !== 'All') {
+          solrParams.productStoreId = productStoreId;
+        }
+
+        const solrResult = await searchOrders(solrParams);
+        this.unfillable.totalCount = solrResult.total || 0;
         this.dashboardStatus.unfillable = 'success';
       } catch (error) {
         console.error('Failed to fetch unfillable stats', error);
@@ -320,14 +354,51 @@ export const useCustomerServiceStore = defineStore('customerService', {
     async fetchHoldTasks(productStoreId?: string) {
       this.dashboardStatus.holdTasks = 'loading';
       try {
-        const params: any = {};
-        if (productStoreId) params.productStoreId = productStoreId;
-        const resp = await api({
-          url: 'oms/orders/funnelDashboard/holdTasks',
-          method: 'GET',
-          params
-        });
-        if (resp.data) this.holdTasks = resp.data;
+        const [swapResp, addressResp, fraudResp] = await Promise.all([
+          api({
+            url: 'oms/orders/tasks/shipGroupTasks',
+            method: 'GET',
+            params: {
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+              workEffortPurposeTypeId: 'NEG_RES_REVIEW',
+              productStoreId,
+              pageSize: 10000,
+            }
+          }),
+          api({
+            url: 'oms/orders/tasks/shipGroupTasks',
+            method: 'GET',
+            params: {
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+              workEffortPurposeTypeId: 'INVALID_ADDRESS',
+              productStoreId,
+              pageSize: 10000,
+            }
+          }),
+          api({
+            url: 'oms/orders/tasks',
+            method: 'GET',
+            params: {
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'REVIEW_RISK_ORDER',
+              productStoreId,
+              pageSize: 10000,
+            }
+          })
+        ]);
+
+        const swapCount = responseListCount(swapResp);
+        const addressCount = responseListCount(addressResp);
+        const fraudCount = responseListCount(fraudResp);
+
+        this.holdTasks = {
+          holdSubstituteCount: swapCount,
+          holdBadAddressCount: addressCount,
+          holdFraudRiskCount: fraudCount,
+          holdTasksTotalCount: swapCount + addressCount + fraudCount
+        };
         this.dashboardStatus.holdTasks = 'success';
       } catch (error) {
         console.error('Failed to fetch hold task counts', error);
@@ -406,6 +477,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
           method: 'GET',
           params
         });
+
         if (resp.data) {
           this.facilityPartialFulfillments = resp.data.facilities || [];
         }
