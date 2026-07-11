@@ -3244,4 +3244,8 @@ ion-card-header ion-buttons {
   gap: var(--spacer-xs);
   justify-content: space-between;
 }
+.customer-summary-card ion-card-header ion-item {
+  flex: 1;
+  width: 100%;
+}
 </style>
