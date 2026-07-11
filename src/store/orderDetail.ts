@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { api, commonUtil, logger} from "@common";
 import { useOrderDetail } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
+import { useSeedStore } from "./seed";
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error";
 
@@ -16,8 +17,17 @@ const HEADER_SEQ_ID = "_NA_";
 
 const newEntry = (): OrderEntry => ({ payload: null, status: "idle", loadedAt: "", error: "" });
 
+// Order adjustments (e.g. tax) commonly carry only an orderAdjustmentTypeId, no free-text
+// comment/description — fall back to the seeded enum description so rows show "Sales Tax"
+// rather than the raw "SALES_TAX" id. This also backs the rollup grouping key below, so
+// adjustments only merge under their human-readable label, not the raw type id.
 const adjustmentDisplayLabel = (adj: any) =>
-  adj.comments || adj.comment || adj.description || adj.orderAdjustmentTypeId || "OTHER_ADJUSTMENT";
+  adj.comments
+  || adj.comment
+  || adj.description
+  || useSeedStore().orderAdjustmentTypeDescription(adj.orderAdjustmentTypeId)
+  || adj.orderAdjustmentTypeId
+  || "OTHER_ADJUSTMENT";
 
 const adjustmentUniqueKey = (adj: any, fallbackSeqId = "") =>
   adj.orderAdjustmentId || [
@@ -278,7 +288,11 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         }
       });
 
-      const total = this.current.grandTotal || (subtotal + adjustmentsTotal);
+      // Sum the rows actually displayed (subtotal + every adjustment, including tax) rather than
+      // trusting the backend's grandTotal, which has been observed to exclude tax. Round to avoid
+      // floating-point drift (e.g. 59 + 1.53 + 0.59 + 2.86 = 63.980000000000004).
+      const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
+      const total = computedTotal || this.current.grandTotal || 0;
 
       return { subtotal, adjustments, total };
     },

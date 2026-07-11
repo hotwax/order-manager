@@ -30,13 +30,10 @@
           <ion-item lines="none">
             <ion-icon slot="start" :icon="timeOutline" />
             <h2>{{ translate('Timeline') }}</h2>
-            <ion-badge v-if="order.status" slot="end" :color="commonUtil.getStatusColor(order.statusId)">
-              {{ order.status }}
-            </ion-badge>
           </ion-item>
 
-          <ion-list class="ion-margin-start">
-            <ion-item v-for="event in orderTimeline" :key="event.id">
+          <ion-list>
+            <ion-item v-for="event in orderTimeline" :key="event.id" :router-link="event.route" :button="!!event.route" :detail="false">
               <ion-icon :icon="event.icon" slot="start" />
               <ion-label>
                 <p v-if="event.timeDiff">{{ event.timeDiff }}</p>
@@ -271,6 +268,8 @@
                 :selected="group.selected"
                 :quantity="group.totalQty"
                 :quantity-label="translate('qty')"
+                :facility-label="groupLocationLabel(group)"
+                :facility-disabled="true"
                 :status-label="group.status"
                 :status-color="commonUtil.getStatusColor(group.statusId)"
                 :amount="money(group.totalPrice, order.currency)"
@@ -351,7 +350,7 @@
                 </ion-label>
                 <ion-label slot="end">{{ money(adjustment.amount, order.currency) }}</ion-label>
               </ion-item>
-              <ion-item>
+              <ion-item class="grand-total-row">
                 <ion-label>{{ translate('Grand total') }}</ion-label>
                 <ion-label slot="end" color="dark">{{ money(orderTotals.total, order.currency) }}</ion-label>
               </ion-item>
@@ -1012,14 +1011,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
+import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
+import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
+import router from '@/router';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import AddContactModal from '@/components/AddContactModal.vue';
@@ -1040,6 +1040,7 @@ import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
 import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
+import { summarizeBrokeredFacilities } from '@/services/order';
 import { showToast, isKit, riskLevelColor } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
@@ -1058,10 +1059,11 @@ const seed = useSeedStore();
 const productCache = useProductCacheStore();
 const customerStore = useCustomerStore();
 
-const { isLoading: loading, error } = storeToRefs(orderDetailStore);
+const loading = computed(() => orderDetailStore.loadingById(props.orderId));
+const error = computed(() => orderDetailStore.errorById(props.orderId));
 
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
-const customerPartyId = computed(() => orderDetailStore.customerPartyId);
+const customerPartyId = computed(() => orderDetailStore.customerPartyIdByOrderId(props.orderId));
 
 // Shopify Admin deep-link. Primary source is the order's own shopifyShopOrder record
 // (the shop it actually came from — same source CloneOrderModal uses). That endpoint
@@ -1079,7 +1081,7 @@ const shopifyOrderShopId = ref('');
 let resolvedShopifyShop = { orderId: '', shopId: '' };
 
 const shopifyOrderId = computed(() => {
-  const identifications = orderDetailStore.current?.identifications || [];
+  const identifications = orderDetailStore.orderById(props.orderId)?.identifications || [];
   return identifications.find((identification: any) => identification.orderIdentificationTypeId === 'SHOPIFY_ORD_ID')?.idValue ?? '';
 });
 
@@ -1090,7 +1092,7 @@ const shopifyOrderId = computed(() => {
 // once the boot-time shops load completes. Skipped once the record-based id is known.
 const fallbackShopIdByProductStore = computed(() => {
   if (shopifyOrderShopId.value) return '';
-  const productStoreId = orderDetailStore.current?.productStoreId;
+  const productStoreId = orderDetailStore.orderById(props.orderId)?.productStoreId;
   if (!productStoreId) return '';
   const shops = seed.shopifyShops.ids.map((id: string) => seed.shopifyShops.byId[id]);
   return singleShopIdForProductStore(shops, productStoreId);
@@ -1139,7 +1141,7 @@ async function resolveShopifyOrderShop(orderId: string) {
  * template graph and CSS are unchanged; only the data feeding it is real now.
  */
 const order = computed(() => {
-  const raw = orderDetailStore.current;
+  const raw = orderDetailStore.orderById(props.orderId);
   if (!raw) return null;
 
   return {
@@ -1163,8 +1165,8 @@ const order = computed(() => {
     localeString: raw.localeString || raw.locale,
     riskRecommendationEnumId: raw.riskRecommendationEnumId,
     riskLevelEnumId: raw.riskLevelEnumId,
-    customerName: orderDetailStore.customerName,
-    history: orderDetailStore.headerStatuses.map((entry: any) => ({
+    customerName: orderDetailStore.customerNameByOrderId(props.orderId),
+    history: orderDetailStore.headerStatusesByOrderId(props.orderId).map((entry: any) => ({
       id: entry.orderStatusId,
       label: seed.statusDescription(entry.statusId),
       detail: entry.statusUserLogin || '',
@@ -1227,7 +1229,7 @@ const order = computed(() => {
 const customerProfile = computed(() => customerPartyId.value ? customerStore.getCustomer(customerPartyId.value) : null);
 
 const customer = computed(() => {
-  const raw = orderDetailStore.current;
+  const raw = orderDetailStore.orderById(props.orderId);
   if (!raw) return undefined;
 
   const emailContact = findOrderContact('EMAIL_ADDRESS', ['ORDER_EMAIL'])
@@ -1249,7 +1251,7 @@ const billingAddress = computed(() => {
 });
 
 const orderTimeline = computed(() => {
-  const raw = orderDetailStore.current;
+  const raw = orderDetailStore.orderById(props.orderId);
   if (!raw) return [];
 
   const timeline = [] as Array<{
@@ -1260,6 +1262,7 @@ const orderTimeline = computed(() => {
     timeDiff?: string;
     value?: number;
     valueType: 'date-time-millis';
+    route?: string;
   }>;
   const usedStatusIds = new Set<string>();
   const orderDate = timelineMillis(raw.orderDate);
@@ -1278,6 +1281,26 @@ const orderTimeline = computed(() => {
     });
     usedStatusIds.add('ORDER_CREATED');
   }
+
+  // Exchange lineage: OrderItemAssoc rows of type EXCHANGE on this order point at the
+  // order it was exchanged from (toOrderId). One entry per distinct source order.
+  const exchangeSourceOrderIds = [...new Set(
+    (raw.itemAssocs || [])
+      .filter((assoc: any) => assoc.orderItemAssocTypeId === 'EXCHANGE' && assoc.toOrderId && assoc.toOrderId !== raw.orderId)
+      .map((assoc: any) => assoc.toOrderId as string)
+  )];
+  exchangeSourceOrderIds.forEach((toOrderId) => {
+    const assoc = (raw.itemAssocs || []).find((row: any) => row.toOrderId === toOrderId);
+    timeline.push({
+      label: 'Exchanged from',
+      id: `exchange-${toOrderId}`,
+      value: timelineMillis(assoc?.createdStamp) || orderDate,
+      icon: swapHorizontalOutline,
+      valueType: 'date-time-millis',
+      metaData: toOrderId,
+      route: `/${router.currentRoute.value.path.split('/')[1] || 'orders'}/${toOrderId}`
+    });
+  });
 
   if (entryDate) {
     timeline.push({
@@ -1351,7 +1374,7 @@ const orderTimeline = computed(() => {
   });
 });
 
-const timelineByShipGroup = computed(() => orderDetailStore.timelineByShipGroup);
+const timelineByShipGroup = computed(() => orderDetailStore.timelineByShipGroupByOrderId(props.orderId));
 const expandedShipGroupIds = ref<Set<string>>(new Set());
 const collapsibleObservers = new WeakMap<HTMLElement, ResizeObserver>();
 
@@ -1463,10 +1486,10 @@ function shippingMethodLabel(shipmentMethodTypeId: string): string {
 }
 
 // ── Holds segment — order-scoped task cards ───────────────────────────────────
-const orderAddressValidationTasks = computed(() => orderTaskStore.getOrderAddressValidationTasks);
-const orderSwapTasks = computed(() => orderTaskStore.getOrderSwapTasks);
-const orderFraudTasks = computed(() => orderTaskStore.getOrderFraudTasks);
-const orderHoldTasks = computed(() => orderTaskStore.getOrderHoldTasks);
+const orderAddressValidationTasks = computed(() => orderTaskStore.getOrderAddressValidationTasksByOrderId(props.orderId));
+const orderSwapTasks = computed(() => orderTaskStore.getOrderSwapTasksByOrderId(props.orderId));
+const orderFraudTasks = computed(() => orderTaskStore.getOrderFraudTasksByOrderId(props.orderId));
+const orderHoldTasks = computed(() => orderTaskStore.getOrderHoldTasksByOrderId(props.orderId));
 const hasOrderHoldTasks = computed(() =>
   orderAddressValidationTasks.value.length > 0
   || orderSwapTasks.value.length > 0
@@ -1499,7 +1522,7 @@ function reloadHoldTasks() {
   return orderTaskStore.fetchOrderHoldTasks(props.orderId);
 }
 
-const commEvents = computed(() => orderDetailStore.commEvents.map((ev: any) => ({
+const commEvents = computed(() => (orderDetailStore.commEventsByOrderId[props.orderId] || []).map((ev: any) => ({
   id: ev.communicationEventId,
   partyIdFrom: ev.partyIdFrom,
   partyIdTo: ev.partyIdTo,
@@ -1544,14 +1567,14 @@ const groupedItems = computed(() => {
 
   (order.value.shipGroups || []).forEach((sg: any) => {
     (sg.items || []).forEach((item: any) => {
-      const rawSg = orderDetailStore.current?.shipGroups?.find((g: any) => g.shipGroupSeqId === sg.id);
+      const rawSg = orderDetailStore.orderById(props.orderId)?.shipGroups?.find((g: any) => g.shipGroupSeqId === sg.id);
       const rawItem = rawSg?.items?.find((i: any) => i.orderItemSeqId === item.id);
 
       const externalId = rawItem?.externalId || item.sku || item.id;
       const unitPrice = Number(rawItem?.unitPrice || 0);
       const statusId = rawItem?.statusId || '';
       const status = seed.statusDescription(statusId);
-      const returnedQty = orderDetailStore.returnedQtyByItemSeqId[item.id] || 0;
+      const returnedQty = orderDetailStore.returnedQtyByItemSeqIdByOrderId(props.orderId)[item.id] || 0;
       const returnableQty = Math.max(0, Number(item.quantity || 0) - returnedQty);
 
       if (!groups[externalId]) {
@@ -1595,11 +1618,11 @@ const groupedItems = computed(() => {
   return Object.values(groups);
 });
 
-const orderTotals = computed(() => orderDetailStore.totals);
+const orderTotals = computed(() => orderDetailStore.orderTotalsByOrderId(props.orderId));
 
-const riskAssessments = computed(() => orderDetailStore.riskAssessments);
-const riskAssessmentsStatus = computed(() => orderDetailStore.riskAssessmentsStatus);
-const riskAssessmentsError = computed(() => orderDetailStore.riskAssessmentsError);
+const riskAssessments = computed(() => orderDetailStore.riskAssessmentsByOrderId[props.orderId] || []);
+const riskAssessmentsStatus = computed(() => orderDetailStore.riskAssessmentsStatusByOrderId[props.orderId] || 'idle');
+const riskAssessmentsError = computed(() => orderDetailStore.riskAssessmentsErrorByOrderId[props.orderId] || '');
 
 const riskSummary = computed(() => {
   const recommendationEnumId = order.value?.riskRecommendationEnumId || '';
@@ -1630,10 +1653,12 @@ const paymentReceivedTotal = computed(() =>
 );
 
 const orderAdjustmentRows = computed(() =>
+  // orderTotals.adjustments is already keyed by the resolved comment/description
+  // (see adjustmentDisplayLabel in the orderDetail store) — no further lookup needed here.
   Object.entries(orderTotals.value.adjustments)
-    .map(([typeId, amount]) => ({
-      label: seed.orderAdjustmentTypeDescription(typeId) || typeId,
-      detail: shippingAdjustmentDetail(typeId),
+    .map(([label, amount]) => ({
+      label,
+      detail: shippingAdjustmentDetail(label),
       amount: Number(amount)
     }))
     .filter((row) => row.amount !== 0)
@@ -1764,7 +1789,11 @@ function shipGroupProductIdentification(identificationPref: string, item: any): 
   return product ? commonUtil.getProductIdentificationValue(identificationPref, product) : '';
 }
 
-onMounted(() => loadOrder(props.orderId));
+// Ionic caches routed page instances: navigating /orders/A → /orders/B and back re-activates
+// A's instance without re-mounting, while the store's currentOrderId still points at B. Load on
+// every view activation (onIonViewWillEnter fires on first enter and on each re-enter; the store
+// skips the refetch when the order is already loaded) so the page re-asserts its own order.
+onIonViewWillEnter(() => loadOrder(props.orderId));
 watch(() => props.orderId, (orderId) => loadOrder(orderId));
 
 async function loadOrder(orderId: string, force = false) {
@@ -1994,8 +2023,8 @@ const fetchDistancesForOrder = async (shipGroups: any[]) => {
   const zipsToLookup = new Set<string>();
   brokered.forEach((sg: any) => {
     const mech = sg.contactMechId
-      ? orderDetailStore.contactMechsById[sg.contactMechId]
-      : orderDetailStore.contactMechsByPurpose['SHIPPING_LOCATION'];
+      ? orderDetailStore.contactMechsByIdByOrderId(props.orderId)[sg.contactMechId]
+      : orderDetailStore.contactMechsByPurposeByOrderId(props.orderId)['SHIPPING_LOCATION'];
     const addr = mech?.postalAddress;
     const destLat = num(addr?.latitude);
     const destLon = num(addr?.longitude);
@@ -2213,8 +2242,8 @@ function shippingAddressView(shipGroup: any): { name: string; street: string; lo
 
 function shipGroupShippingContactMech(shipGroup: any) {
   return shipGroup.contactMechId
-    ? orderDetailStore.contactMechsById[shipGroup.contactMechId]
-    : orderDetailStore.contactMechsByPurpose['SHIPPING_LOCATION'];
+    ? orderDetailStore.contactMechsByIdByOrderId(props.orderId)[shipGroup.contactMechId]
+    : orderDetailStore.contactMechsByPurposeByOrderId(props.orderId)['SHIPPING_LOCATION'];
 }
 
 const editingShipGroupId = ref<string | null>(null);
@@ -2346,7 +2375,7 @@ function formatTelecomNumber(telecom: any) {
 }
 
 function findOrderContact(contactMechTypeId: string, purposeTypeIds: string[]) {
-  return (orderDetailStore.current?.contactMechs || []).find((contact: any) =>
+  return (orderDetailStore.orderById(props.orderId)?.contactMechs || []).find((contact: any) =>
     contactMechTypeId === contactMechTypeIdFromContact(contact, contactMechTypeId)
     && contactMatchesPurpose(contact, purposeTypeIds)
   );
@@ -2495,6 +2524,24 @@ function groupSecondaryIdentifier(group: any): string {
     || group.externalId;
 }
 
+// Same location-chip semantics as the Find Orders list rows: the group's items act as the
+// "docs" — the top physical facility wins the chip (+N for further splits), and virtual/parking
+// facilities only label the chip when nothing is brokered. Facility type comes from the seed
+// store since ship groups don't carry it.
+function groupLocationLabel(group: any): string {
+  const summary = summarizeBrokeredFacilities(group.items.map((item: any) => ({
+    facilityId: item.facilityId,
+    facilityName: seed.facilityName(item.facilityId) || item.facilityName,
+    facilityTypeId: seed.facility(item.facilityId)?.facilityTypeId
+  })));
+
+  const brokered = Boolean(summary.brokeredFacilityName);
+  const name = summary.brokeredFacilityName || summary.dominantVirtualFacilityName;
+  if (!name) return '';
+  const splitCount = brokered ? summary.brokeredFacilitySplitCount : summary.dominantVirtualFacilitySplitCount;
+  return splitCount > 0 ? `${name} +${splitCount}` : name;
+}
+
 function getGroupAdjustmentRows(group: any): Array<{ label: string; amount: string }> {
   return getGroupAdjustments(group).map((adjustment) => ({
     label: adjustment.comment,
@@ -2504,7 +2551,7 @@ function getGroupAdjustmentRows(group: any): Array<{ label: string; amount: stri
 
 function getItemAdjustmentRows(item: any): Array<{ label: string; amount: string }> {
   return (item.adjustments || []).map((adjustment: any) => ({
-    label: adjustment.comment,
+    label: itemAdjustmentLabel(adjustment),
     amount: money(adjustment.amount, order.value?.currency || 'USD')
   }));
 }
@@ -2522,7 +2569,12 @@ function attributeChipLabel(count: number): string {
 }
 
 function itemAdjustmentLabel(adj: any): string {
-  return adj.comments || adj.comment || adj.description || adj.orderAdjustmentTypeId || translate('Adjustment');
+  return adj.comments
+    || adj.comment
+    || adj.description
+    || seed.orderAdjustmentTypeDescription(adj.orderAdjustmentTypeId)
+    || adj.orderAdjustmentTypeId
+    || translate('Adjustment');
 }
 
 function itemAdjustmentKey(adj: any, fallbackSeqId = ""): string {
@@ -2539,7 +2591,7 @@ function itemAdjustmentSummaries(rawItem: any, orderItemSeqId: string): Array<{ 
   const totals: Record<string, number> = {};
   const seen = new Set<string>();
   const adjustments = [
-    ...(orderDetailStore.current?.adjustments || []).filter((adj: any) => adj.orderItemSeqId === orderItemSeqId),
+    ...(orderDetailStore.orderById(props.orderId)?.adjustments || []).filter((adj: any) => adj.orderItemSeqId === orderItemSeqId),
     ...(rawItem?.adjustments || [])
   ];
 
@@ -2659,7 +2711,7 @@ async function parkShipGroup(shipGroupSeqId: string) {
 }
 
 async function cancelOrderItems() {
-  const raw = orderDetailStore.current;
+  const raw = orderDetailStore.orderById(props.orderId);
   if (!raw || !selectedItems.value.length) return;
   const itemsSnapshot = [...selectedItems.value];
   const alert = await alertController.create({
@@ -2703,7 +2755,7 @@ async function rejectAndReleaseItem(item: any, productId: string) {
   // Step 1 — pick a facility with inventory to release to
   const facilityModal = await modalController.create({
     component: ItemFacilityInventoryModal,
-    componentProps: { productId, productStoreId: orderDetailStore.current?.productStoreId },
+    componentProps: { productId, productStoreId: orderDetailStore.orderById(props.orderId)?.productStoreId },
     cssClass: 'item-facility-inventory-modal'
   });
   await facilityModal.present();
@@ -2751,7 +2803,7 @@ async function rejectAndReleaseItem(item: any, productId: string) {
 }
 
 async function cancelSingleItem(item: any) {
-  const raw = orderDetailStore.current;
+  const raw = orderDetailStore.orderById(props.orderId);
   if (!raw) return;
   const alert = await alertController.create({
     header: translate('Cancel Item'),
@@ -3243,5 +3295,9 @@ ion-card-header ion-buttons {
   display: flex;
   gap: var(--spacer-xs);
   justify-content: space-between;
+}
+
+.grand-total-row {
+  --background: rgba(255, 255, 255, 0.06);
 }
 </style>
