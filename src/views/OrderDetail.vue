@@ -190,6 +190,21 @@
                   {{ order.originFacilityName }}
                 </ion-label>
               </ion-item>
+              <template v-for="source in exchangeSources" :key="source.orderId">
+                <ion-item button :detail="true" :router-link="`/orders/${source.orderId}`">
+                  <ion-label>
+                    <p>{{ translate('Exchange of') }}</p>
+                    <ion-skeleton-text v-if="source.loading" animated style="width: 60%" />
+                    <template v-else>{{ source.orderName }}</template>
+                  </ion-label>
+                </ion-item>
+                <ion-item v-for="returnId in source.returnIds" :key="returnId" button :detail="true" :router-link="`/returns/${returnId}`">
+                  <ion-label>
+                    <p>{{ translate('Processed with return') }}</p>
+                    {{ returnId }}
+                  </ion-label>
+                </ion-item>
+              </template>
             </ion-list>
           </ion-card>
 
@@ -326,8 +341,20 @@
                   <p class="overline">{{ payment.paymentMethodTypeId || payment.method }}</p>
                   {{ payment.paymentMethodTypeDesc || payment.method }}
                   <p>{{ payment.statusDesc || payment.status || payment.statusId }}</p>
+                  <ion-button
+                    v-for="returnId in carriedOverReturnIds(payment)"
+                    :key="returnId"
+                    fill="clear"
+                    size="small"
+                    class="payment-return-link"
+                    :router-link="`/returns/${returnId}`"
+                    @click.stop
+                  >
+                    <ion-icon slot="start" :icon="openOutline" />
+                    {{ translate('Return') }} {{ returnId }}
+                  </ion-button>
                 </ion-label>
-                <ion-note slot="end">{{ money(payment.amount, order.currency) }}</ion-note>
+                <ion-label slot="end">{{ money(payment.amount, order.currency) }}</ion-label>
               </ion-item>
               <ion-item v-if="!order.payments.length">
                 <ion-label>{{ translate('No payment preference records') }}</ion-label>
@@ -1011,7 +1038,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
+import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
 import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
@@ -1187,7 +1214,10 @@ const order = computed(() => {
       paymentMethodTypeDesc: seed.paymentMethodDescription(payment.paymentMethodTypeId),
       amount: payment.maxAmount ?? payment.presentmentAmount,
       statusId: payment.statusId,
-      statusDesc: seed.statusDescription(payment.statusId)
+      statusDesc: seed.statusDescription(payment.statusId),
+      // Shopify carry-over lineage: on exchange orders this equals the manualRefNum of the
+      // original order's refunded OPP ('MATTR-<txn>' exchange credit, 'EPRA-<txn>' payment).
+      parentRefNum: payment.parentRefNum || ''
     })),
     attributes: orderAttributeRows(raw),
     shipGroups: (raw.shipGroups || []).map((shipGroup: any) => ({
@@ -1795,6 +1825,52 @@ function shipGroupProductIdentification(identificationPref: string, item: any): 
 // skips the refetch when the order is already loaded) so the page re-asserts its own order.
 onIonViewWillEnter(() => loadOrder(props.orderId));
 watch(() => props.orderId, (orderId) => loadOrder(orderId));
+
+// Orders this one was exchanged from (OrderItemAssoc rows of type EXCHANGE, pointing at the
+// original via toOrderId). Distinct, and never the order itself.
+const exchangeSourceOrderIds = computed(() => [...new Set(
+  (orderDetailStore.current?.itemAssocs || [])
+    .filter((assoc: any) => assoc.orderItemAssocTypeId === 'EXCHANGE' && assoc.toOrderId && assoc.toOrderId !== orderDetailStore.current?.orderId)
+    .map((assoc: any) => assoc.toOrderId as string)
+)]);
+
+// Lazily hydrate each original order (cached in the store by id) so the Source card can show
+// its name and the returns that were processed as part of the exchange.
+watch(exchangeSourceOrderIds, (ids) => {
+  ids.forEach((id) => orderDetailStore.fetchOrder(id));
+}, { immediate: true });
+
+const exchangeSources = computed(() => exchangeSourceOrderIds.value.map((orderId) => {
+  const entry = orderDetailStore.byOrderId[orderId];
+  const payload = entry?.payload;
+  return {
+    orderId,
+    loading: !entry || entry.status === 'loading' || entry.status === 'idle',
+    orderName: payload?.orderName || payload?.externalId || orderId,
+    returnIds: [...new Set((payload?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[]
+  };
+}));
+
+// Returns behind an exchange-credit/payment OPP. The returnId is NOT derivable from the OPP's
+// ref numbers (they carry Shopify txn ids), so the source of truth is the original order's
+// returnItems. When this order was exchanged from several originals, an OPP with a
+// parentRefNum narrows to the original whose refunded OPP carries that same manualRefNum;
+// otherwise every source's returns are listed rather than guessing (amount/id-adjacency
+// heuristics proved unreliable against real data).
+function carriedOverReturnIds(payment: any): string[] {
+  if (!['EXCHANGE_CREDIT', 'EXCHANGE_PAYMENT'].includes(payment.paymentMethodTypeId)) return [];
+
+  let sources = exchangeSources.value;
+  if (payment.parentRefNum && sources.length > 1) {
+    const matching = sources.filter((source) =>
+      (orderDetailStore.byOrderId[source.orderId]?.payload?.paymentPreferences || []).some(
+        (opp: any) => opp.manualRefNum === payment.parentRefNum
+      )
+    );
+    if (matching.length) sources = matching;
+  }
+  return [...new Set(sources.flatMap((source) => source.returnIds))];
+}
 
 async function loadOrder(orderId: string, force = false) {
   if (force) {
@@ -3299,5 +3375,10 @@ ion-card-header ion-buttons {
 
 .grand-total-row {
   --background: rgba(255, 255, 255, 0.06);
+}
+
+.payment-return-link {
+  margin-inline-start: calc(-1 * var(--spacer-xs, 8px));
+  text-transform: none;
 }
 </style>
