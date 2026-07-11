@@ -44,3 +44,4 @@ npm-debug.log*
 /.claude
 /.gstack
 .claude/launch.json
+CLAUDE.local.md
