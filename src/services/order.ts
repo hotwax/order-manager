@@ -295,7 +295,8 @@ type FacilityItemCount = { name: string; count: number };
 // search already returns (no per-row detail fetch). Physical facilities drive
 // the brokered numerator/chip. When none are brokered, virtual/parking facilities
 // provide the fallback location chip without contributing to the numerator.
-function summarizeBrokeredFacilities(docs: any[]) {
+// Exported so OrderDetail can summarize a grouped item's locations the same way.
+export function summarizeBrokeredFacilities(docs: any[]) {
   const itemsByPhysicalFacility = new Map<string, { name: string; count: number }>();
   const itemsByVirtualFacility = new Map<string, { name: string; count: number }>();
   let brokeredItemCount = 0;
