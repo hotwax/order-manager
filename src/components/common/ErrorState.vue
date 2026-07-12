@@ -8,6 +8,7 @@
     </ion-card-content>
     <ion-button
       v-if="retryable"
+      color="light"
       fill="clear"
       class="retry-button"
       @click="$emit('retry')"
