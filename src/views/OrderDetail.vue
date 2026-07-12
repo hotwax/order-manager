@@ -332,31 +332,41 @@
         <!-- Totals Card -->
 
         <div class="order-summary">
-          <ion-card>
+          <ion-card class="payment-card">
             <ion-card-header>
               <ion-card-title>{{ translate('Payment') }}</ion-card-title>
+              <ion-card-subtitle v-if="order.payments.length">
+                {{ translate('Net') }} {{ money(paymentNetAmount, order.currency) }}
+              </ion-card-subtitle>
             </ion-card-header>
             <ion-list lines="none">
-              <ion-item v-for="(payment, index) in order.payments" :key="payment.id || `${payment.paymentMethodTypeId}-${index}`">
-                <ion-label>
-                  <p class="overline">{{ payment.paymentMethodTypeId || payment.method }}</p>
-                  {{ payment.paymentMethodTypeDesc || payment.method }}
-                  <p>{{ payment.statusDesc || payment.status || payment.statusId }}</p>
-                  <ion-button
-                    v-for="returnId in carriedOverReturnIds(payment)"
-                    :key="returnId"
-                    fill="clear"
-                    size="small"
-                    class="payment-return-link"
-                    :router-link="`/returns/${returnId}`"
-                    @click.stop
-                  >
-                    <ion-icon slot="start" :icon="openOutline" />
-                    {{ translate('Return') }} {{ returnId }}
-                  </ion-button>
-                </ion-label>
-                <ion-label slot="end">{{ money(payment.amount, order.currency) }}</ion-label>
-              </ion-item>
+              <template v-for="section in paymentSections" :key="section.statusId">
+                <ion-item-divider color="light">
+                  <ion-label>{{ section.label }}</ion-label>
+                  <ion-label slot="end">{{ money(section.total, order.currency) }}</ion-label>
+                </ion-item-divider>
+                <ion-item v-for="(payment, index) in section.payments" :key="payment.id || `${payment.paymentMethodTypeId}-${index}`">
+                  <ion-label>
+                    <p class="overline">{{ payment.paymentMethodTypeId || payment.method }}</p>
+                    {{ payment.paymentMethodTypeDesc || payment.method }}
+                    <p>{{ payment.statusDesc || payment.status || payment.statusId }}</p>
+                    <p v-if="payment.createdDate">{{ formatDateTime(payment.createdDate) }}</p>
+                    <ion-button
+                      v-for="returnId in carriedOverReturnIds(payment)"
+                      :key="returnId"
+                      fill="clear"
+                      size="small"
+                      class="payment-return-link"
+                      :router-link="`/returns/${returnId}`"
+                      @click.stop
+                    >
+                      <ion-icon slot="start" :icon="openOutline" />
+                      {{ translate('Return') }} {{ returnId }}
+                    </ion-button>
+                  </ion-label>
+                  <ion-label slot="end">{{ money(payment.amount, order.currency) }}</ion-label>
+                </ion-item>
+              </template>
               <ion-item v-if="!order.payments.length">
                 <ion-label>{{ translate('No payment preference records') }}</ion-label>
               </ion-item>
@@ -1039,7 +1049,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
+import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
 import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
@@ -1218,6 +1228,7 @@ const order = computed(() => {
       amount: payment.maxAmount ?? payment.presentmentAmount,
       statusId: payment.statusId,
       statusDesc: seed.statusDescription(payment.statusId),
+      createdDate: payment.createdDate || payment.createdStamp,
       // Shopify carry-over lineage: on exchange orders this equals the manualRefNum of the
       // original order's refunded OPP ('MATTR-<txn>' exchange credit, 'EPRA-<txn>' payment).
       parentRefNum: payment.parentRefNum || ''
@@ -1812,6 +1823,45 @@ const hasRiskContext = computed(() =>
 const paymentReceivedTotal = computed(() =>
   (order.value?.payments || []).reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0)
 );
+
+// Payment card sections: one divider per distinct preference status, in order of first
+// appearance, with refunded pinned to the bottom (stable sort keeps the rest in place).
+const paymentSections = computed(() => {
+  const sections: Array<{ statusId: string; label: string; payments: any[]; total: number }> = [];
+  const byStatus: Record<string, { statusId: string; label: string; payments: any[]; total: number }> = {};
+
+  (order.value?.payments || []).forEach((payment: any) => {
+    const statusId = payment.statusId || 'UNKNOWN';
+    if (!byStatus[statusId]) {
+      byStatus[statusId] = {
+        statusId,
+        label: payment.statusDesc || payment.status || statusId,
+        payments: [],
+        total: 0
+      };
+      sections.push(byStatus[statusId]);
+    }
+    byStatus[statusId].payments.push(payment);
+    byStatus[statusId].total += Number(payment.amount || 0);
+  });
+
+  sections.forEach((section) => { section.total = Math.round(section.total * 100) / 100; });
+  return sections.sort((left, right) =>
+    Number(left.statusId === 'PAYMENT_REFUNDED') - Number(right.statusId === 'PAYMENT_REFUNDED')
+  );
+});
+
+// Net collected right now: approved/settled/received preferences minus refunded ones.
+// Cancelled/declined/not-received preferences never contribute in either direction.
+const PAYMENT_COLLECTED_STATUSES = new Set(['PAYMENT_AUTHORIZED', 'PAYMENT_SETTLED', 'PAYMENT_RECEIVED']);
+const paymentNetAmount = computed(() => {
+  const net = (order.value?.payments || []).reduce((sum: number, payment: any) => {
+    if (PAYMENT_COLLECTED_STATUSES.has(payment.statusId)) return sum + Number(payment.amount || 0);
+    if (payment.statusId === 'PAYMENT_REFUNDED') return sum - Number(payment.amount || 0);
+    return sum;
+  }, 0);
+  return Math.round(net * 100) / 100;
+});
 
 const orderAdjustmentRows = computed(() =>
   // orderTotals.adjustments is already keyed by the resolved comment/description
@@ -3511,5 +3561,12 @@ ion-card-header ion-buttons {
 .payment-return-link {
   margin-inline-start: calc(-1 * var(--spacer-xs, 8px));
   text-transform: none;
+}
+
+/* Net amount sits across from the Payment title (the header grid's actions column). */
+.payment-card ion-card-header ion-card-subtitle {
+  grid-area: actions;
+  align-self: center;
+  margin: 0;
 }
 </style>
