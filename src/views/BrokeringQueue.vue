@@ -53,7 +53,7 @@ const facilityIds = computed(() => {
 });
 const virtualFacilityIds = computed(() => virtualFacilities.value
   .map((facility) => facility.id)
-  .filter((id) => id && id !== ALL_FACILITY_OPTION_ID));
+  .filter((id) => id && id !== ALL_FACILITY_OPTION_ID && !isUnfillableFacilityId(id)));
 
 function normalizeFacilityName(facility: any) {
   return facility?.facilityName || facility?.facilityId || facility?.name || facility?.id;
@@ -63,7 +63,7 @@ function buildFacilityList(facilities: any[]) {
   const map = new Map<string, string>();
   facilities.forEach((facility) => {
     const id = facility?.facilityId || facility?.id;
-    if (!id || id === GENERAL_OPS_PARKING_FACILITY_ID) return;
+    if (!id || id === GENERAL_OPS_PARKING_FACILITY_ID || isUnfillableFacility(facility)) return;
 
     map.set(id, normalizeFacilityName(facility));
   });
@@ -74,9 +74,18 @@ function buildFacilityList(facilities: any[]) {
 }
 
 function dedupeAndSort(values: string[]) {
-  return [...new Set(values.filter((value) => value && value !== ALL_FACILITY_OPTION_ID))].sort((left, right) =>
+  return [...new Set(values.filter((value) => value && value !== ALL_FACILITY_OPTION_ID && !isUnfillableFacilityId(value)))].sort((left, right) =>
     String(left).localeCompare(String(right))
   );
+}
+function isUnfillableFacilityId(facilityId: string) {
+  return facilityId.toUpperCase().includes('UNFILLABLE');
+}
+
+function isUnfillableFacility(facility: any) {
+  const id = facility?.facilityId || facility?.id || '';
+  const name = normalizeFacilityName(facility) || '';
+  return isUnfillableFacilityId(id) || String(name).toUpperCase().includes('UNFILLABLE');
 }
 function clearFacilityFilter() {
   selectedFacilityIds.value = [ALL_FACILITY_OPTION_ID];
