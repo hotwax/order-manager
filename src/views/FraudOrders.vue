@@ -89,9 +89,12 @@
           @completed="fetchFraudTasks()"
         />
         <!-- True empty state: only after a successful zero-row response. -->
-        <div class="empty-state" v-if="showEmptyState">
-          <p v-html="getEmptyMessage()"></p>
-        </div>
+        <TaskQueueEmptyState
+          v-if="showEmptyState"
+          kind="fraud"
+          :filtered="hasFilters"
+          @clear="clearFilters"
+        />
       </div>
 
       <ion-infinite-scroll
@@ -126,6 +129,7 @@ import { showToast } from '@/utils';
 import ErrorState from '@/components/common/ErrorState.vue';
 import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
@@ -176,12 +180,6 @@ const hasFilters = computed(() => !!(searchQuery.value || assignee.value || reco
 const currentPageTaskIds = computed(() => fraudTasks.value.map((task: any) => task.workEffortId));
 const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));
 const someCurrentPageSelected = computed(() => currentPageTaskIds.value.some((workEffortId: string) => selectedOrders.value[workEffortId]));
-
-function getEmptyMessage() {
-  return hasFilters.value
-    ? translate('No records found for the search criteria.')
-    : translate('No records found.');
-}
 
 watch([assignee, orderChannel, recommendation, severity], () => {
   fetchFraudTasks();
