@@ -21,6 +21,7 @@ describe('OrderRow', () => {
   });
 
   it('keeps the deadline column visible and preserves whole-row keyboard and selection behavior', () => {
+    expect(source).toContain('Ordered {{ model.orderedRelativeAge }}');
     expect(source).toContain('<ion-note>No estimated delivery date</ion-note>');
     expect(source).not.toContain('v-show="model.estimatedDeliveryDateTime"');
     expect(source).not.toContain(String.fromCharCode(183));
