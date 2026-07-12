@@ -208,7 +208,7 @@ async function loadSetupCandidates() {
 async function openSubstituteModal(candidate: SwapSetupCandidate) {
   const modal = await modalController.create({
     component: SubstituteRelationshipModal,
-    componentProps: { productId: candidate.productId },
+    componentProps: { productId: candidate.productId, sourceProduct: candidate },
   });
   await modal.present();
   const { data, role } = await modal.onWillDismiss();

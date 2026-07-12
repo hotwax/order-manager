@@ -24,4 +24,9 @@ describe('SubstituteRelationshipModal', () => {
     expect(source).toContain('expireSubstituteAssociation(props.productId, existingById.value[productId])');
     expect(source).toContain('<ion-fab vertical="bottom" horizontal="end" slot="fixed">');
   });
+
+  it('excludes the source product from results and selection', () => {
+    expect(source).toContain('!isSameProduct(product, sourceProduct.value)');
+    expect(source).toContain('if (isSameProduct(product, sourceProduct.value)) return;');
+  });
 });

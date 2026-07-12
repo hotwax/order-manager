@@ -111,6 +111,7 @@ import {
   fetchActiveSubstitutes,
   type SubstituteAssociation,
 } from '@/services/productAssociations';
+import { isSameProduct, type ProductIdentity } from '@/utils/productIdentity';
 
 interface SelectableProduct {
   productId: string;
@@ -121,7 +122,10 @@ interface SelectableProduct {
   mainImageUrl?: string;
 }
 
-const props = defineProps<{ productId: string }>();
+const props = defineProps<{
+  productId: string;
+  sourceProduct?: ProductIdentity;
+}>();
 const { searchProducts } = useSolrSearch();
 const productMaster = useProductMaster();
 
@@ -134,6 +138,7 @@ const loading = ref(false);
 const saving = ref(false);
 const error = ref('');
 
+const sourceProduct = computed<ProductIdentity>(() => props.sourceProduct || { productId: props.productId });
 const selectedProducts = computed(() => Object.values(selectedById.value));
 const selectedIds = computed(() => new Set(Object.keys(selectedById.value)));
 const dirty = computed(() => {
@@ -187,7 +192,7 @@ async function search() {
   try {
     const result = await searchProducts({ keyword, viewSize: 30 });
     products.value = (result.products || [])
-      .filter((product: any) => product.productId && product.productId !== props.productId)
+      .filter((product: any) => product.productId && !isSameProduct(product, sourceProduct.value))
       .map(normalizeProduct);
   } catch (cause) {
     error.value = translate('Product search failed. Please try again.');
@@ -197,6 +202,7 @@ async function search() {
 }
 
 function toggleSelected(product: SelectableProduct) {
+  if (isSameProduct(product, sourceProduct.value)) return;
   if (selectedById.value[product.productId]) {
     removeSelected(product.productId);
     return;
