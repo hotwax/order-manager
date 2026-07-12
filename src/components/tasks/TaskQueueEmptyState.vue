@@ -34,7 +34,7 @@ import { computed } from 'vue';
 import { translate } from '@common';
 import EmptyState from '@/components/common/EmptyState.vue';
 
-type TaskQueueKind = 'badAddress' | 'fraud' | 'hold';
+type TaskQueueKind = 'badAddress' | 'fraud' | 'hold' | 'swap';
 
 const SHOPIFY_FRAUD_ANALYSIS_URL = 'https://help.shopify.com/en/manual/fulfillment/managing-orders/protecting-orders/fraud-analysis';
 const SHOPIFY_RISK_FLOW_URL = 'https://help.shopify.com/en/manual/fulfillment/managing-orders/protecting-orders/shopify-flow';
@@ -57,6 +57,10 @@ const emit = defineEmits<{
 }>();
 
 const copy = {
+  swap: {
+    title: 'No swap reviews',
+    message: 'Orders appear here when an allocated item cannot reserve inventory and needs a substitute review.',
+  },
   badAddress: {
     title: 'No addresses to review',
     message: 'Orders appear here when automatic address validation cannot verify a shipping address. Address validation must be configured for this product store. FedEx through Unigate is currently supported.',
