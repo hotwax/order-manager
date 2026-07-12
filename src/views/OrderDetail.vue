@@ -1820,9 +1820,15 @@ const hasRiskContext = computed(() =>
   || riskAssessments.value.length > 0
 );
 
-const paymentReceivedTotal = computed(() =>
-  (order.value?.payments || []).reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0)
-);
+const PAYMENT_COLLECTED_STATUSES = new Set(['PAYMENT_AUTHORIZED', 'PAYMENT_SETTLED', 'PAYMENT_RECEIVED']);
+
+// Only preferences that actually collected money count — refunded, cancelled and
+// declined preferences would otherwise inflate this past the grand total.
+const paymentReceivedTotal = computed(() => {
+  const total = (order.value?.payments || []).reduce((sum: number, payment: any) =>
+    PAYMENT_COLLECTED_STATUSES.has(payment.statusId) ? sum + Number(payment.amount || 0) : sum, 0);
+  return Math.round(total * 100) / 100;
+});
 
 // Payment card sections: one divider per distinct preference status, in order of first
 // appearance, with refunded pinned to the bottom (stable sort keeps the rest in place).
@@ -1853,7 +1859,6 @@ const paymentSections = computed(() => {
 
 // Net collected right now: approved/settled/received preferences minus refunded ones.
 // Cancelled/declined/not-received preferences never contribute in either direction.
-const PAYMENT_COLLECTED_STATUSES = new Set(['PAYMENT_AUTHORIZED', 'PAYMENT_SETTLED', 'PAYMENT_RECEIVED']);
 const paymentNetAmount = computed(() => {
   const net = (order.value?.payments || []).reduce((sum: number, payment: any) => {
     if (PAYMENT_COLLECTED_STATUSES.has(payment.statusId)) return sum + Number(payment.amount || 0);
