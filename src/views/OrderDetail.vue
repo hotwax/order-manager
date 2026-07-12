@@ -335,7 +335,7 @@
           <ion-card class="payment-card">
             <ion-card-header>
               <ion-card-title>{{ translate('Payment') }}</ion-card-title>
-              <ion-card-subtitle v-if="order.payments.length">
+              <ion-card-subtitle v-if="order.payments.length" :color="paymentNetColor">
                 {{ translate('Net') }} {{ money(paymentNetAmount, order.currency) }}
               </ion-card-subtitle>
             </ion-card-header>
@@ -1866,6 +1866,26 @@ const paymentNetAmount = computed(() => {
     return sum;
   }, 0);
   return Math.round(net * 100) / 100;
+});
+
+// Every non-cancelled item fully returned (by quantity).
+const allItemsReturned = computed(() => {
+  const raw = orderDetailStore.orderById(props.orderId);
+  const items = (raw?.shipGroups || [])
+    .flatMap((shipGroup: any) => shipGroup.items || [])
+    .filter((item: any) => item.statusId !== 'ITEM_CANCELLED');
+  if (!items.length) return false;
+
+  const returnedBySeqId = orderDetailStore.returnedQtyByItemSeqIdByOrderId(props.orderId);
+  return items.every((item: any) => (returnedBySeqId[item.orderItemSeqId] || 0) >= Number(item.quantity || 0));
+});
+
+// Negative net = more refunded than collected. Positive net on a fully-returned order =
+// money still held for goods that all came back — likely a refund owed.
+const paymentNetColor = computed(() => {
+  if (paymentNetAmount.value < 0) return 'danger';
+  if (paymentNetAmount.value > 0 && allItemsReturned.value) return 'warning';
+  return undefined;
 });
 
 const orderAdjustmentRows = computed(() =>
