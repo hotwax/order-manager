@@ -188,6 +188,7 @@
                 <ion-label>
                   <p>{{ translate('Placed at') }}</p>
                   {{ order.originFacilityName }}
+                  <p>{{ order.originFacilityId }}</p>
                 </ion-label>
               </ion-item>
               <template v-for="source in exchangeSources" :key="source.orderId">
