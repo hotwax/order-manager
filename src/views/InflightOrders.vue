@@ -111,6 +111,7 @@ import {
   IonToast,
   IonToolbar,
   alertController,
+  onIonViewWillEnter,
   useIonRouter
 } from '@ionic/vue';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -198,6 +199,7 @@ function applyRouteFilters() {
 }
 
 watch(() => [router.currentRoute.value.query.facilityId, router.currentRoute.value.query.dateFrom], applyRouteFilters, { immediate: true });
+onIonViewWillEnter(applyRouteFilters);
 
 function loadWorkflowOrders() {
   orderStore.fetchWorkflowOrders(bucket, filters.value);
