@@ -389,6 +389,8 @@ function selectedStatuses(status?: string | string[]) {
   return [...new Set(statuses.filter((statusId): statusId is string => Boolean(statusId && statusId !== 'All')))];
 }
 
-function escapeSolrValue(value: string) {
+// Exported for callers composing ad-hoc Solr filters (e.g. OrderDetail's reverse
+// exchange-order lookup by orderName prefix).
+export function escapeSolrValue(value: string) {
   return String(value).replace(/([\\+\-!(){}[\]^"~*?:]|&&|\|\|)/g, '\\$1');
 }

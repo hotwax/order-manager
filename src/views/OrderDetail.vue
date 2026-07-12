@@ -1042,7 +1042,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
+import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
@@ -1068,7 +1068,8 @@ import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
 import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
-import { summarizeBrokeredFacilities } from '@/services/order';
+import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
+import { getCustomerReturn } from '@/services/customer';
 import { showToast, isKit, riskLevelColor } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
@@ -1281,6 +1282,85 @@ const billingAddress = computed(() => {
   return lines.length ? { lines } : undefined;
 });
 
+// Return headers hydrate lazily per returnId to name the facility a return was processed
+// at (ReturnHeader.destinationFacilityId — the embedded ReturnItem rows don't carry it).
+// null = header unavailable (endpoint down or return not found); timeline wording degrades
+// to the facility-less variant.
+const returnHeadersById = ref<Record<string, any | null>>({});
+
+watch(() => {
+  const raw = orderDetailStore.orderById(props.orderId);
+  return [...new Set((raw?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[];
+}, (returnIds) => {
+  returnIds.forEach(async (returnId) => {
+    if (returnId in returnHeadersById.value) return;
+    returnHeadersById.value = { ...returnHeadersById.value, [returnId]: null };
+    try {
+      const header = await getCustomerReturn(returnId);
+      if (header) returnHeadersById.value = { ...returnHeadersById.value, [returnId]: header };
+    } catch (error) {
+      logger.debug(`Return header ${returnId} unavailable for timeline facility context`, error);
+    }
+  });
+}, { immediate: true });
+
+// Reverse exchange lineage: OrderItemAssoc EXCHANGE rows live only on the exchange order,
+// so an original order finds its exchanges by the EXC-<orderName>-N naming convention in
+// Solr, confirmed against each candidate's own itemAssocs before it may appear.
+const exchangeChildrenByOrderId = ref<Record<string, Array<{
+  orderId: string;
+  itemCount: number;
+  facilityName: string;
+  value: number;
+}>>>({});
+
+watch(() => orderDetailStore.orderById(props.orderId)?.orderName, () => discoverExchangeChildren(props.orderId), { immediate: true });
+
+async function discoverExchangeChildren(orderId: string) {
+  const raw = orderDetailStore.orderById(orderId);
+  if (!raw?.orderName || orderId in exchangeChildrenByOrderId.value) return;
+  exchangeChildrenByOrderId.value = { ...exchangeChildrenByOrderId.value, [orderId]: [] };
+
+  try {
+    const response = await useSolrSearch().runSolrQuery({
+      json: {
+        params: { rows: 50, q: '*:*' },
+        filter: ['docType: ORDER', `orderName: ${escapeSolrValue(`EXC-${raw.orderName}-`)}*`]
+      }
+    });
+    const candidateIds = [...new Set(
+      (response.data?.response?.docs || [])
+        .map((doc: any) => String(doc.orderId || ''))
+        .filter((candidateId: string) => candidateId && candidateId !== orderId)
+    )] as string[];
+
+    const children: Array<{ orderId: string; itemCount: number; facilityName: string; value: number }> = [];
+    await Promise.all(candidateIds.map(async (candidateId) => {
+      await orderDetailStore.fetchOrder(candidateId);
+      const payload = orderDetailStore.byOrderId[candidateId]?.payload;
+      const assoc = (payload?.itemAssocs || []).find(
+        (row: any) => row.orderItemAssocTypeId === 'EXCHANGE' && row.toOrderId === orderId
+      );
+      if (!assoc) return;
+
+      const itemCount = (payload.shipGroups || [])
+        .flatMap((shipGroup: any) => shipGroup.items || [])
+        .reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+      children.push({
+        orderId: candidateId,
+        itemCount,
+        facilityName: payload.originFacilityId && payload.originFacilityId !== '_NA_'
+          ? seed.facilityName(payload.originFacilityId)
+          : '',
+        value: timelineMillis(assoc.createdStamp) || timelineMillis(payload.orderDate) || 0
+      });
+    }));
+    exchangeChildrenByOrderId.value = { ...exchangeChildrenByOrderId.value, [orderId]: children };
+  } catch (error) {
+    logger.error('Failed to discover exchange orders for timeline', error);
+  }
+}
+
 const orderTimeline = computed(() => {
   const raw = orderDetailStore.orderById(props.orderId);
   if (!raw) return [];
@@ -1330,6 +1410,55 @@ const orderTimeline = computed(() => {
       valueType: 'date-time-millis',
       metaData: toOrderId,
       route: `/${router.currentRoute.value.path.split('/')[1] || 'orders'}/${toOrderId}`
+    });
+  });
+
+  // Returns raised against this order: one entry per distinct returnId across the embedded
+  // ReturnItem rows. The processing facility comes from the lazily-hydrated return header
+  // and the wording drops the location while (or if) that never resolves.
+  const returnGroups: Record<string, { count: number; value: number }> = {};
+  (raw.returnItems || []).forEach((item: any) => {
+    if (!item.returnId) return;
+    if (!returnGroups[item.returnId]) returnGroups[item.returnId] = { count: 0, value: 0 };
+    const group = returnGroups[item.returnId];
+    group.count += Number(item.returnQuantity || 0) || 1;
+    const created = timelineMillis(item.createdStamp);
+    if (created && (!group.value || created < group.value)) group.value = created;
+  });
+  Object.entries(returnGroups).forEach(([returnId, group]) => {
+    const facilityId = returnHeadersById.value[returnId]?.destinationFacilityId;
+    const facilityName = facilityId ? seed.facilityName(facilityId) : '';
+    const itemWord = group.count === 1 ? translate('item') : translate('items');
+    const value = group.value || orderDate;
+    timeline.push({
+      label: 'Return created',
+      id: `return-${returnId}`,
+      value,
+      icon: arrowUndoOutline,
+      valueType: 'date-time-millis',
+      timeDiff: findTimeDiff(orderDate, value),
+      metaData: facilityName
+        ? `${group.count} ${itemWord} ${translate('returned at')} ${facilityName}`
+        : `${group.count} ${itemWord} ${translate('returned')}`,
+      route: `/returns/${returnId}`
+    });
+  });
+
+  // Exchange orders created from this order (reverse lineage discovered asynchronously).
+  (exchangeChildrenByOrderId.value[raw.orderId] || []).forEach((child) => {
+    const itemWord = child.itemCount === 1 ? translate('item') : translate('items');
+    const value = child.value || orderDate;
+    timeline.push({
+      label: 'Exchange created',
+      id: `exchange-child-${child.orderId}`,
+      value,
+      icon: swapHorizontalOutline,
+      valueType: 'date-time-millis',
+      timeDiff: findTimeDiff(orderDate, value),
+      metaData: child.facilityName
+        ? `${child.itemCount} ${itemWord} ${translate('purchased in exchange at')} ${child.facilityName}`
+        : `${child.itemCount} ${itemWord} ${translate('purchased in exchange')}`,
+      route: `/orders/${child.orderId}`
     });
   });
 
