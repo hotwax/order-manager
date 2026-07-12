@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { api } from '@common';
 import { useOrderStore } from '@/store/order';
+import { fetchOrderRowEnrichment } from '@/services/order';
 
 vi.mock('@common', () => ({
   api: vi.fn(),
@@ -19,11 +20,18 @@ vi.mock('@/store/seed', () => ({
   })),
 }));
 
+vi.mock('@/services/order', () => ({
+  searchOrders: vi.fn(),
+  fetchOrderRowEnrichment: vi.fn(),
+}));
+
 describe('order workflow store', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.mocked(api).mockReset();
     vi.mocked(api).mockResolvedValue({ data: {} });
+    vi.mocked(fetchOrderRowEnrichment).mockReset();
+    vi.mocked(fetchOrderRowEnrichment).mockResolvedValue({});
   });
 
   it('ships selected packed workflow shipments through Poorti bulk ship', async () => {
@@ -78,5 +86,55 @@ describe('order workflow store', () => {
       pageSize: 50,
       pageIndex: 2,
     });
+  });
+
+  it('makes one batched enrichment request for each workflow result page', async () => {
+    const store = useOrderStore();
+    const filters = {
+      query: '', customerName: '', productStoreId: 'All', salesChannelEnumId: 'All',
+      facilityId: 'All', shipmentMethodTypeId: 'All', priority: null, dateFrom: '', dateThru: ''
+    } as const;
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        data: {
+          ordersCount: 3,
+          orders: [{ orderId: 'M100001' }, { orderId: 'M100002' }]
+        }
+      })
+      .mockResolvedValueOnce({
+        data: {
+          ordersCount: 3,
+          orders: [{ orderId: 'M100003' }]
+        }
+      });
+    vi.mocked(fetchOrderRowEnrichment)
+      .mockResolvedValueOnce({ M100001: { orderId: 'M100001', itemDocuments: [] } })
+      .mockResolvedValueOnce({ M100003: { orderId: 'M100003', itemDocuments: [] } });
+
+    await store.fetchWorkflowOrders('open', filters as any);
+    await store.loadMoreWorkflowOrders('open', filters as any);
+
+    expect(fetchOrderRowEnrichment).toHaveBeenNthCalledWith(1, ['M100001', 'M100002']);
+    expect(fetchOrderRowEnrichment).toHaveBeenNthCalledWith(2, ['M100003']);
+    expect(store.workflowOrderEnrichment.open).toEqual({
+      M100001: { orderId: 'M100001', itemDocuments: [] },
+      M100003: { orderId: 'M100003', itemDocuments: [] }
+    });
+  });
+
+  it('clears workflow enrichment when filters replace the result set', async () => {
+    const store = useOrderStore();
+    store.workflowOrderEnrichment.open = {
+      OLD: { orderId: 'OLD', itemDocuments: [] }
+    };
+    vi.mocked(api).mockResolvedValueOnce({ data: { ordersCount: 0, orders: [] } });
+
+    await store.fetchWorkflowOrders('open', {
+      query: 'new', customerName: '', productStoreId: 'All', salesChannelEnumId: 'All',
+      facilityId: 'All', shipmentMethodTypeId: 'All', priority: null, dateFrom: '', dateThru: ''
+    });
+
+    expect(store.workflowOrderEnrichment.open).toEqual({});
+    expect(fetchOrderRowEnrichment).not.toHaveBeenCalled();
   });
 });
