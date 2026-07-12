@@ -34,7 +34,7 @@
 
     <ion-label class="tablet">
       {{ model.orderedDateTime }}
-      <p v-if="model.orderedRelativeAge">{{ model.orderedRelativeAge }}</p>
+      <p v-if="model.orderedRelativeAge">Ordered {{ model.orderedRelativeAge }}</p>
     </ion-label>
 
     <ion-label :class="deadlineClass">
