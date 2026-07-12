@@ -184,10 +184,10 @@
                   {{ order.channel || translate('Channel') }}
                 </ion-label>
               </ion-item>
-              <ion-item v-if="order.originFacilityId">
+              <ion-item v-if="order.salesChannelEnumId === 'POS_SALES_CHANNEL'">
                 <ion-label>
                   <p>{{ translate('Placed at') }}</p>
-                  {{ order.originFacilityName }}
+                  {{ order.originFacilityName || translate('Facility not available') }}
                   <p>{{ order.originFacilityId }}</p>
                 </ion-label>
               </ion-item>
@@ -1180,13 +1180,14 @@ const order = computed(() => {
     status: seed.statusDescription(raw.statusId),
     statusId: raw.statusId,
     channel: seed.enumDescription(raw.salesChannelEnumId),
+    salesChannelEnumId: raw.salesChannelEnumId,
     productStoreName: seed.productStoreName(raw.productStoreId),
     // Origin/placed-at facility from the order header (set by the OMS order import for
     // POS/retail-location orders). Prefer a name from the payload, then the seed facility
-    // lookup, falling back to the raw id. Empty when the order has no origin facility.
-    // '_NA_' is the OMS "no origin facility" sentinel (common on non-POS orders) and
-    // resolves to a virtual "Brokering Queue" facility — treat it (and blanks) as no origin.
-    originFacilityId: raw.originFacilityId && raw.originFacilityId !== '_NA_' ? raw.originFacilityId : '',
+    // lookup, falling back to the raw id. The Source card shows this for POS-channel
+    // orders regardless of value — '_NA_' on a POS order is a data gap worth surfacing,
+    // not something to hide.
+    originFacilityId: raw.originFacilityId || '',
     originFacilityName: raw.originFacilityId && raw.originFacilityId !== '_NA_'
       ? (raw.originFacilityName || seed.facility(raw.originFacilityId)?.facilityName || raw.originFacilityId)
       : '',
