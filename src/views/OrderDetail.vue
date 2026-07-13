@@ -287,7 +287,7 @@
                 :facility-label="groupLocationLabel(group)"
                 :facility-disabled="true"
                 :status-label="group.status"
-                :status-color="commonUtil.getStatusColor(group.statusId)"
+                :status-color="group.statusColor"
                 :amount="money(group.totalPrice, order.currency)"
                 :adjustments="getGroupAdjustmentRows(group)"
                 @update:selected="group.selected = $event"
@@ -308,7 +308,7 @@
                     :facility-disabled="isItemFacilityActionDisabled(item)"
                     :attributes-label="attributeChipLabel(item.attributeCount)"
                     :status-label="item.status"
-                    :status-color="commonUtil.getStatusColor(item.statusId)"
+                    :status-color="item.statusColor"
                     :status-detail="itemStatusDetail(item)"
                     :amount="money(itemLineTotal(item), order.currency)"
                     :adjustments="getItemAdjustmentRows(item)"
@@ -1072,6 +1072,7 @@ import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
 import { getCustomerReturn } from '@/services/customer';
 import { showToast, isKit, riskLevelColor } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
+import { fulfillmentLineStatus, fulfillmentLineStatusColor } from '@/utils/fulfillmentLineStatus';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useUserStore } from '@/store/user';
@@ -1706,6 +1707,7 @@ const groupedItems = computed(() => {
     totalQty: number;
     totalPrice: number;
     status: string;
+    statusColor: string;
     selected: boolean;
     items: Array<{
       orderItemSeqId: string;
@@ -1716,6 +1718,7 @@ const groupedItems = computed(() => {
       quantity: number;
       statusId: string;
       status: string;
+      statusColor: string;
       selected: boolean;
       unitPrice: number;
       returnedQty: number;
@@ -1734,7 +1737,11 @@ const groupedItems = computed(() => {
       const externalId = rawItem?.externalId || item.sku || item.id;
       const unitPrice = Number(rawItem?.unitPrice || 0);
       const statusId = rawItem?.statusId || '';
-      const status = seed.statusDescription(statusId);
+      const lineStatus = fulfillmentLineStatus(timelineByShipGroup.value[sg.id]);
+      const status = lineStatus ? translate(lineStatus) : seed.statusDescription(statusId);
+      const statusColor = lineStatus
+        ? fulfillmentLineStatusColor(lineStatus)
+        : commonUtil.getStatusColor(statusId);
       const returnedQty = orderDetailStore.returnedQtyByItemSeqIdByOrderId(props.orderId)[item.id] || 0;
       const returnableQty = Math.max(0, Number(item.quantity || 0) - returnedQty);
 
@@ -1750,6 +1757,7 @@ const groupedItems = computed(() => {
           totalPrice: orderDetailStore.totalsByExternalId[externalId] || 0,
           status,
           statusId,
+          statusColor,
           get selected() { return this.items.length > 0 && this.items.every((i: any) => selectedItemIds.value.has(i.orderItemSeqId)); },
           set selected(v: boolean) { this.items.forEach((i: any) => v ? selectedItemIds.value.add(i.orderItemSeqId) : selectedItemIds.value.delete(i.orderItemSeqId)); },
           items: []
@@ -1764,6 +1772,7 @@ const groupedItems = computed(() => {
         quantity: item.quantity,
         statusId,
         status,
+        statusColor,
         get selected() { return selectedItemIds.value.has(item.id); },
         set selected(v: boolean) { v ? selectedItemIds.value.add(item.id) : selectedItemIds.value.delete(item.id); },
         unitPrice,
@@ -1776,7 +1785,12 @@ const groupedItems = computed(() => {
     });
   });
 
-  return Object.values(groups);
+  return Object.values(groups).map((group) => {
+    const statuses = [...new Set(group.items.map((item) => item.status))];
+    group.status = statuses.join(' / ');
+    group.statusColor = statuses.length === 1 ? group.items[0].statusColor : 'medium';
+    return group;
+  });
 });
 
 const orderTotals = computed(() => orderDetailStore.orderTotalsByOrderId(props.orderId));
