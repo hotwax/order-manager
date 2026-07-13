@@ -1,10 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
-import { commonUtil, useSolrSearch } from '@common';
+import { api, commonUtil, useSolrSearch } from '@common';
 import {
   buildOrderLookupPayload,
   buildOrderRowEnrichmentPayload,
   buildVirtualLocationCountsPayload,
   fetchVirtualLocationOrderCounts,
+  fetchWorkflowOrderTotals,
   searchOrders
 } from '@/services/order';
 
@@ -303,6 +304,20 @@ describe('order-row enrichment payload', () => {
   });
 });
 
+describe('workflow order totals', () => {
+  it('requests only the total from each authoritative workflow queue in one batch', async () => {
+    const totalsByBucket = { open: 6440, inflight: 557, packed: 81 };
+    (api as any).mockReset();
+    (api as any).mockImplementation(({ url, params }: any) => {
+      const bucket = url.split('/').pop() as keyof typeof totalsByBucket;
+      expect(params).toMatchObject({ pageSize: 1, pageIndex: 0, productStoreId: 'STORE' });
+      return Promise.resolve({ data: { ordersCount: totalsByBucket[bucket], orders: [] } });
+    });
+
+    await expect(fetchWorkflowOrderTotals('STORE')).resolves.toEqual(totalsByBucket);
+    expect(api).toHaveBeenCalledTimes(3);
+  });
+});
 describe('virtual location count payload', () => {
   function virtualLocationFiltersOf(params: Parameters<typeof buildVirtualLocationCountsPayload>[0]) {
     return buildVirtualLocationCountsPayload(params).json.filter as string[];
