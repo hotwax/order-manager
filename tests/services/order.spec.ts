@@ -51,6 +51,14 @@ describe('buildOrderLookupPayload facility filtering', () => {
     expect(filters).toContain('facilityId:(_NA_ OR REJECTED_PARKING)');
   });
 
+  it('finds operational parking items by excluding physical and archived facilities', () => {
+    const filters = filtersOf({ hasVirtualFacilityItems: true });
+
+    expect(filters).toContain('-facilityTypeId:(RETAIL_STORE OR WAREHOUSE)');
+    expect(filters).toContain('-facilityId:GENERAL_OPS_PARKING');
+    expect(filters).not.toContain('facilityTypeId:VIRTUAL_FACILITY');
+  });
+
   it("ignores the 'All' sentinel and empty facility values", () => {
     const filters = filtersOf({ facilityIds: ['All', '', 'UNFILLABLE_PARKING'] });
     expect(filters).toContain('facilityId:UNFILLABLE_PARKING');
