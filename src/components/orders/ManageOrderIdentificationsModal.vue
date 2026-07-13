@@ -56,11 +56,16 @@
         :label="seed.orderIdentificationTypeDescription(identification.orderIdentificationTypeId)"
         :value="identification.idValue"
         :hide-value="editingKey === rowKey(identification)"
+        :is-updatable="isRowUpdatable(identification)"
       >
         <template #end>
           <template v-if="editingKey === rowKey(identification)">
-            <ion-input class="identification-edit-input" v-model="editValue" :disabled="savingKey === rowKey(identification)" />
-            <ion-button fill="clear" :disabled="savingKey === rowKey(identification)" @click="saveEdit(identification)">
+            <ion-input class="identification-edit-input" v-model="editValue" :disabled="savingKey === rowKey(identification) || !isRowUpdatable(identification)" />
+            <ion-button
+              fill="clear"
+              :disabled="savingKey === rowKey(identification) || !isRowUpdatable(identification) || !editValue.trim() || editValue.trim() === identification.idValue"
+              @click="saveEdit(identification)"
+            >
               <ion-spinner v-if="savingKey === rowKey(identification)" slot="icon-only" name="crescent" />
               <ion-icon v-else :icon="checkmarkDoneOutline" />
             </ion-button>
@@ -69,10 +74,10 @@
             </ion-button>
           </template>
           <template v-else>
-            <ion-button fill="clear" @click="startEdit(identification)">
+            <ion-button v-if="isRowUpdatable(identification)" fill="clear" @click="startEdit(identification)">
               <ion-icon slot="icon-only" :icon="createOutline" />
             </ion-button>
-            <ion-button fill="clear" color="danger" :disabled="removingKey === rowKey(identification)" @click="removeIdentification(identification)">
+            <ion-button fill="clear" color="danger" :disabled="removingKey === rowKey(identification) || !isRowUpdatable(identification)" @click="removeIdentification(identification)">
               <ion-spinner v-if="removingKey === rowKey(identification)" slot="icon-only" name="crescent" />
               <ion-icon v-else slot="icon-only" :icon="trashOutline" />
             </ion-button>
@@ -107,6 +112,8 @@ import { computed, reactive, ref } from 'vue';
 import { DateTime } from 'luxon';
 import { api, commonUtil, translate } from '@common';
 import { useSeedStore } from '@/store/seed';
+import { useUserStore } from '@/store/user';
+import { ORDER_IDENTIFICATION_UPDATE_PERMISSION } from '@/authorization/permissions';
 import { showToast } from '@/utils';
 import EmptyState from '@/components/common/EmptyState.vue';
 import IdentificationListItem from '@/components/orders/IdentificationListItem.vue';
@@ -125,12 +132,35 @@ const props = defineProps<{
   identifications: Identification[];
 }>();
 
+// System/imported identifiers (e.g. Shopify-sourced) require ORDER_IDENTIFICATION_UPDATE_PERMISSION
+// to edit/remove/re-add; identifications outside this set can be edited/removed by anyone.
+const SYSTEM_SOURCED_TYPE_IDS = new Set(['SHOPIFY_ORD_ID', 'SHOPIFY_ORD_NO', 'SHOPIFY_ORD_NAME']);
+
+function isSystemSourced(identification: Identification) {
+  return SYSTEM_SOURCED_TYPE_IDS.has(identification.orderIdentificationTypeId);
+}
+
 const seed = useSeedStore();
+const userStore = useUserStore();
+// A user with ORDER_IDENTIFICATION_UPDATE_PERMISSION (ORDERMGR_ADMIN) can edit/remove any
+// identification, including system/imported ones; everyone else can only edit/remove the
+// identifications that aren't system-sourced.
+const canUpdate = computed(() => userStore.hasPermission(ORDER_IDENTIFICATION_UPDATE_PERMISSION));
+
+function isRowUpdatable(identification: Identification) {
+  return canUpdate.value || !isSystemSourced(identification);
+}
 
 const localIdentifications = ref<Identification[]>([...props.identifications]);
 const typeOptions = computed(() => {
   const existingTypeIds = new Set(localIdentifications.value.map((identification) => identification.orderIdentificationTypeId));
-  return seed.orderIdentificationTypeOptions.filter((type) => !existingTypeIds.has(type.enumId));
+  return seed.orderIdentificationTypeOptions.filter((type) => {
+    if (existingTypeIds.has(type.enumId)) return false;
+    // Without the permission, a user can't add a system-sourced type either — otherwise they
+    // could delete one (allowed) and immediately recreate it with an arbitrary value.
+    if (!canUpdate.value && SYSTEM_SOURCED_TYPE_IDS.has(type.enumId)) return false;
+    return true;
+  });
 });
 const dirty = ref(false);
 
@@ -149,6 +179,9 @@ function rowKey(identification: Identification) {
 
 async function addIdentification() {
   if (!canAdd.value) return;
+  // Defense in depth: the type picker already excludes system-sourced types without the
+  // permission, but guard the write itself in case addForm was populated some other way.
+  if (!canUpdate.value && SYSTEM_SOURCED_TYPE_IDS.has(addForm.orderIdentificationTypeId)) return;
 
   const isDuplicate = localIdentifications.value.some(
     (identification) =>
@@ -187,6 +220,7 @@ async function addIdentification() {
 }
 
 function startEdit(identification: Identification) {
+  if (!isRowUpdatable(identification)) return;
   editingKey.value = rowKey(identification);
   editValue.value = identification.idValue;
 }
@@ -197,22 +231,39 @@ function cancelEdit() {
 }
 
 async function saveEdit(identification: Identification) {
+  if (!isRowUpdatable(identification)) return;
+  if (!editValue.value.trim() || editValue.value.trim() === identification.idValue) return;
   const key = rowKey(identification);
   savingKey.value = key;
   try {
-    const resp = await api({
+    // Updating a value means expiring the old identification row, then creating a fresh
+    // one — there's no in-place value update on this entity.
+    const now = DateTime.now().toMillis();
+    const expireResp = await api({
       url: `oms/orders/${props.orderId}/identifications`,
       method: 'PUT',
       data: {
         orderIdentificationTypeId: identification.orderIdentificationTypeId,
         orderId: props.orderId,
         fromDate: identification.fromDate,
-        idValue: editValue.value.trim()
+        thruDate: now
       }
     });
-    if (commonUtil.hasError(resp)) throw resp.data;
+    if (commonUtil.hasError(expireResp)) throw expireResp.data;
+
+    const createResp = await api({
+      url: `oms/orders/${props.orderId}/identifications`,
+      method: 'POST',
+      data: {
+        orderIdentificationTypeId: identification.orderIdentificationTypeId,
+        idValue: editValue.value.trim(),
+        fromDate: now
+      }
+    });
+    if (commonUtil.hasError(createResp)) throw createResp.data;
 
     identification.idValue = editValue.value.trim();
+    identification.fromDate = String(now);
     editingKey.value = '';
     editValue.value = '';
     dirty.value = true;
@@ -225,6 +276,7 @@ async function saveEdit(identification: Identification) {
 }
 
 async function removeIdentification(identification: Identification) {
+  if (!isRowUpdatable(identification)) return;
   const key = rowKey(identification);
   removingKey.value = key;
   try {
