@@ -129,7 +129,10 @@
 
           <ion-card>
             <ion-card-header>
-              <ion-card-title>{{ translate('Order identifications') }}</ion-card-title>
+              <ion-card-title>{{ translate('Order Identifications') }}</ion-card-title>
+              <ion-button fill="clear" size="small" @click="openManageIdentificationsModal()">
+                {{ translate('Manage') }}
+              </ion-button>
             </ion-card-header>
             <ion-list lines="none">
               <ion-item>
@@ -1032,6 +1035,7 @@ import PhysicalFacilityModal from '@/components/fulfillment/PhysicalFacilityModa
 import RoutingGroupModal from '@/components/fulfillment/RoutingGroupModal.vue';
 import OrderItemAttributesModal from '@/components/orders/OrderItemAttributesModal.vue';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
+import ManageOrderIdentificationsModal from '@/components/orders/ManageOrderIdentificationsModal.vue';
 import ItemFacilityInventoryModal from '@/components/fulfillment/ItemFacilityInventoryModal.vue';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
@@ -1171,10 +1175,13 @@ const order = computed(() => {
       changeReason: entry.changeReason || '',
       at: entry.statusDatetime
     })),
-    identifications: (raw.identifications || []).map((identification: any) => ({
+    identifications: (raw.identifications || [])
+      .filter((identification: any) => !identification.thruDate || new Date(identification.thruDate).getTime() > Date.now())
+      .map((identification: any) => ({
       orderIdentificationTypeId: identification.orderIdentificationTypeId,
       typeLabel: seed.orderIdentificationTypeDescription(identification.orderIdentificationTypeId),
       idValue: identification.idValue,
+      fromDate: identification.fromDate,
       // Deep-link into the Shopify Admin order screen; prefer the per-order
       // shopifyShopOrder record, with a constrained single-shop product-store fallback.
       shopifyAdminUrl: identification.orderIdentificationTypeId === 'SHOPIFY_ORD_ID' ? shopifyAdminUrl.value : ''
@@ -2619,6 +2626,20 @@ async function openItemAttributesModal(item: any) {
   });
   await modal.present();
   await modal.onDidDismiss();
+  if (order.value?.id) await loadOrder(order.value.id, true);
+}
+
+async function openManageIdentificationsModal() {
+  const modal = await modalController.create({
+    component: ManageOrderIdentificationsModal,
+    componentProps: {
+      orderId: order.value!.id,
+      identifications: order.value!.identifications
+    }
+  });
+  await modal.present();
+  const { role } = await modal.onWillDismiss();
+  if (role !== 'confirm') return;
   if (order.value?.id) await loadOrder(order.value.id, true);
 }
 
