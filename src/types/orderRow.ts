@@ -41,7 +41,7 @@ export interface OrderRowEnrichment {
 
 export interface OrderRowViewModel {
   orderId: string;
-  orderReference: string;
+  orderName: string;
   customerName: string;
   status?: string;
   allocationSummary?: OrderAllocationSummaryModel;

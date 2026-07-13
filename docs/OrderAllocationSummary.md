@@ -42,7 +42,7 @@ Every row uses the same five logical slots. The fulfillment-context slot remains
 
 | Slot | Responsibility | Typical fields |
 |---|---|---|
-| Customer and order | Anchor the row in a person, with the order as the supporting identifier | Customer name as primary text; customer-facing order reference, OMS ID, and meaningful exception/status as secondary text |
+| Customer and order | Anchor the row in a person, with the order as the supporting identifier | Customer name as primary text; customer-facing `orderName`, OMS ID, and meaningful exception/status as secondary text |
 | Allocation or queue | Explain where items are or why the row is in this queue | Shared allocation summary, facility, queue facility |
 | Fulfillment context | Show how the order will move | `Carrier - shipping method` on the primary line when carrier is available; otherwise shipping method alone. Sales channel is the supporting line. |
 | Ordered | Show creation time without forcing mental calculation | Absolute ordered date/time with relative age directly beneath it; use minutes/hours for same-day orders and days thereafter |
@@ -75,7 +75,7 @@ Use the existing `list-item` class on the clickable row wrapper. Its **five imme
     <ion-checkbox v-if="selectMode" slot="start" @click.stop @keydown.stop />
     <ion-label>
       {{ customerName }}
-      <p>{{ orderReference }} - {{ internalOrderId }}</p>
+      <p>{{ orderName }} - {{ internalOrderId }}</p>
     </ion-label>
   </ion-item>
 
@@ -144,7 +144,7 @@ Workflow APIs determine the base result set. After each initial or appended work
 The enrichment may request:
 
 ```text
-orderId externalOrderId customerPartyName customerEmailId contactPhoneNumbers
+orderId orderName externalOrderId customerPartyName customerEmailId contactPhoneNumbers
 carrierPartyId salesChannelDesc facilityId facilityName facilityTypeId
 orderItemSeqId shipmentMethodTypeId
 ```
@@ -324,6 +324,7 @@ The facility lists remain sourced from the current page/store configuration. The
 | Workflow page loads more results | Exactly one additional enrichment request is made for newly fetched order IDs. |
 | Product-store or filter change | Existing workflow enrichment is cleared and rebuilt for the new result set. |
 | Existing Find Order row | The chip behavior remains unchanged for physical, virtual-only, and split-facility orders. |
+| Every row identity | The supporting line renders customer-facing `orderName`, OMS `orderId`, and status. `externalOrderId` remains searchable but is not used as the row label. |
 | Same-day order | Ordered relative age is expressed in minutes or hours, not only `Today`. |
 | Older order | Ordered relative age is expressed in whole days once the order is no longer same-day. |
 | Estimated delivery is available | Every page displays the same absolute deadline plus time-remaining or overdue treatment. |

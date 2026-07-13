@@ -454,6 +454,7 @@ function mergeSearchOrderEnrichment(
   if (!enrichment) return { ...order, allocationSummary: undefined };
   return {
     ...order,
+    orderName: enrichment.orderName || order.orderName,
     externalId: enrichment.externalOrderId || order.externalId,
     customerName: enrichment.customerPartyName || order.customerName,
     carrierPartyId: enrichment.carrierPartyId || order.carrierPartyId,

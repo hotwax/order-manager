@@ -116,6 +116,7 @@ describe('buildOrderLookupPayload facility filtering', () => {
               docs: [{
                 orderId: 'M100001',
                 orderName: '#100001',
+                externalOrderId: '5202667012349',
                 orderDate: '2026-06-12T10:00:00Z',
                 orderStatusId: 'ORDER_APPROVED',
                 customerPartyId: 'CUST_1',
@@ -150,6 +151,7 @@ describe('buildOrderLookupPayload facility filtering', () => {
     expect(result.orders).toHaveLength(1);
     expect(result.orders[0].parkingUnitCount).toBe(3.5);
     expect(result.orders[0]).toMatchObject({
+      orderName: '#100001',
       customerName: 'Angela Crutchfield',
       shippingAddress1: '602 White Oak Dr',
       shippingCity: 'Eufaula',
