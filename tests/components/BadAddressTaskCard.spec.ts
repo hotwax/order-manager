@@ -21,8 +21,8 @@ describe('bad address task card', () => {
     expect(originalAddress).not.toContain('<ion-input');
     expect(originalAddress).not.toContain('@click="openCountryPicker');
     expect(originalAddress).not.toContain('@click="openStatePicker');
-    expect(originalAddress).toContain('{{ addressState.original.address1 }}');
-    expect(originalAddress).toContain('{{ countryName(addressState.original.countryGeoId) }}');
+    expect(originalAddress.match(/readOnlyAddressValue\(/g)).toHaveLength(6);
+    expect(cardSource).toContain("return value || '\\u00A0';");
   });
 
   it('uses Ionic radios for the single-select country and state picker', () => {

@@ -34,37 +34,37 @@
         <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('Address line 1') }}</span>
-            <span>{{ addressState.original.address1 }}</span>
+            <span>{{ readOnlyAddressValue(addressState.original.address1) }}</span>
           </ion-label>
         </ion-item>
         <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('Address line 2') }}</span>
-            <span>{{ addressState.original.address2 }}</span>
+            <span>{{ readOnlyAddressValue(addressState.original.address2) }}</span>
           </ion-label>
         </ion-item>
         <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('City') }}</span>
-            <span>{{ addressState.original.city }}</span>
+            <span>{{ readOnlyAddressValue(addressState.original.city) }}</span>
           </ion-label>
         </ion-item>
         <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('Postal code') }}</span>
-            <span>{{ addressState.original.postalCode }}</span>
+            <span>{{ readOnlyAddressValue(addressState.original.postalCode) }}</span>
           </ion-label>
         </ion-item>
         <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('State') }}</span>
-            <span>{{ stateName(addressState.original) }}</span>
+            <span>{{ readOnlyAddressValue(stateName(addressState.original)) }}</span>
           </ion-label>
         </ion-item>
         <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('Country') }}</span>
-            <span>{{ countryName(addressState.original.countryGeoId) }}</span>
+            <span>{{ readOnlyAddressValue(countryName(addressState.original.countryGeoId)) }}</span>
           </ion-label>
         </ion-item>
       </ion-list>
@@ -200,6 +200,10 @@ function countryName(geoId: string): string {
 function stateName(address: AddressState['original']): string {
   if (!address.countryGeoId || !address.stateProvinceGeoId) return '';
   return seedStore.getStatesForCountry(address.countryGeoId).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
+}
+
+function readOnlyAddressValue(value: string): string {
+  return value || '\u00A0';
 }
 
 function brokeredFacilityName(task: any): string {
