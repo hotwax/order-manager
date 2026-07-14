@@ -16,6 +16,15 @@
     @update:selected="emit('update:selected', $event)"
     @action="handleAction"
   >
+    <template #content-start>
+      <ion-item lines="full">
+        <ion-label>
+          {{ translate('Facility') }}: {{ brokeredFacilityName(task) }}
+          <p>{{ translate('Shipping method') }}: {{ carrierShippingMethodLabel(task) }}</p>
+        </ion-label>
+      </ion-item>
+    </template>
+
     <ion-radio-group v-if="addressState" v-model="addressState.selectedAddressType" class="address-task-addresses">
       <ion-list class="ion-no-padding" lines="full">
         <ion-list-header>
@@ -191,6 +200,20 @@ function countryName(geoId: string): string {
 function stateName(address: AddressState['original']): string {
   if (!address.countryGeoId || !address.stateProvinceGeoId) return '';
   return seedStore.getStatesForCountry(address.countryGeoId).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
+}
+
+function brokeredFacilityName(task: any): string {
+  return task.facilityName
+    || seedStore.facilityName(task.facilityId)
+    || task.facilityId
+    || '-';
+}
+
+function carrierShippingMethodLabel(task: any): string {
+  const carrier = task.carrierPartyId ? seedStore.carrierName(task.carrierPartyId) : '';
+  const methodId = task.shipmentMethodTypeId || task.shippingMethodTypeId;
+  const method = methodId ? seedStore.shipmentMethodDescription(methodId) : '';
+  return [carrier, method].filter(Boolean).join(' - ') || '-';
 }
 
 async function openCountryPicker(address: AddressState['original']) {

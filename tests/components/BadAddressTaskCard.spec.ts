@@ -30,4 +30,16 @@ describe('bad address task card', () => {
     expect(geoSelectSource).toContain('<ion-radio slot="end" :value="item.geoId" />');
     expect(geoSelectSource).not.toContain('checkmarkOutline');
   });
+
+  it('shows the ship group facility and carrier shipping method before the addresses', () => {
+    const contextRow = cardSource.indexOf('<template #content-start>');
+    const addresses = cardSource.indexOf('<ion-radio-group v-if="addressState"');
+
+    expect(contextRow).toBeGreaterThan(-1);
+    expect(contextRow).toBeLessThan(addresses);
+    expect(cardSource).toContain("translate('Facility') }}: {{ brokeredFacilityName(task)");
+    expect(cardSource).toContain("translate('Shipping method') }}: {{ carrierShippingMethodLabel(task)");
+    expect(cardSource).toContain("seedStore.carrierName(task.carrierPartyId)");
+    expect(cardSource).toContain("seedStore.shipmentMethodDescription(methodId)");
+  });
 });
