@@ -147,13 +147,9 @@ export const useOrderTaskStore = defineStore('orderTask', {
     fraudTasks: [] as any[],
     fraudStatus: 'idle' as 'idle' | 'loading' | 'success' | 'error',
     fraudError: '' as string,
-    orderHoldTasks: [] as any[],
     orderHoldTasksByOrderId: {} as Record<string, any[]>,
-    orderAddressValidationTasks: [] as any[],
     orderAddressValidationTasksByOrderId: {} as Record<string, any[]>,
-    orderSwapTasks: [] as any[],
     orderSwapTasksByOrderId: {} as Record<string, any[]>,
-    orderFraudTasks: [] as any[],
     orderFraudTasksByOrderId: {} as Record<string, any[]>,
     swapStatus: 'idle' as TaskLoadStatus,
     swapError: '' as string,
@@ -193,13 +189,9 @@ export const useOrderTaskStore = defineStore('orderTask', {
         (state.fraudTasks?.length % Number(import.meta.env.VITE_VIEW_SIZE) === 0)
       );
     },
-    getOrderHoldTasks: (state) => state.orderHoldTasks,
     getOrderHoldTasksByOrderId: (state) => (orderId: string) => state.orderHoldTasksByOrderId[orderId] || [],
-    getOrderAddressValidationTasks: (state) => state.orderAddressValidationTasks,
     getOrderAddressValidationTasksByOrderId: (state) => (orderId: string) => state.orderAddressValidationTasksByOrderId[orderId] || [],
-    getOrderSwapTasks: (state) => state.orderSwapTasks,
     getOrderSwapTasksByOrderId: (state) => (orderId: string) => state.orderSwapTasksByOrderId[orderId] || [],
-    getOrderFraudTasks: (state) => state.orderFraudTasks,
     getOrderFraudTasksByOrderId: (state) => (orderId: string) => state.orderFraudTasksByOrderId[orderId] || [],
   },
   actions: {
@@ -356,7 +348,6 @@ export const useOrderTaskStore = defineStore('orderTask', {
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
           const detailed = await Promise.all(tasks.map((task: any) => enrichHoldTask(task)));
           this.orderHoldTasksByOrderId[orderId] = detailed;
-          this.orderHoldTasks = detailed;
         } catch (err) {
           console.error('Failed to fetch the order hold tasks', err);
         }
@@ -378,7 +369,6 @@ export const useOrderTaskStore = defineStore('orderTask', {
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
           const detailed = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
           this.orderAddressValidationTasksByOrderId[orderId] = detailed;
-          this.orderAddressValidationTasks = detailed;
         } catch (err) {
           console.error('Failed to fetch the order address validation tasks', err);
         }
@@ -400,7 +390,6 @@ export const useOrderTaskStore = defineStore('orderTask', {
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
           const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
           this.orderSwapTasksByOrderId[orderId] = detailedTasks;
-          this.orderSwapTasks = detailedTasks;
           await prefetchSwapTaskAssets(detailedTasks);
         } catch (err) {
           console.error('Failed to fetch the order swap tasks', err);
@@ -423,7 +412,6 @@ export const useOrderTaskStore = defineStore('orderTask', {
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
           const detailedTasks = await Promise.all(tasks.map((task: any) => enrichFraudTask(task)));
           this.orderFraudTasksByOrderId[orderId] = detailedTasks;
-          this.orderFraudTasks = detailedTasks;
           await prefetchFraudTaskAssets(detailedTasks);
         } catch (err) {
           console.error('Failed to fetch the order fraud tasks', err);
