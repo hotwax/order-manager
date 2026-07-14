@@ -23,30 +23,40 @@
           <ion-radio class="ion-margin-end" value="original" label-placement="start">{{ translate('keep original') }}</ion-radio>
         </ion-list-header>
         <ion-item>
-          <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="addressState.original.address1" />
+          <ion-label class="geo-picker-field">
+            <span class="geo-picker-label">{{ translate('Address line 1') }}</span>
+            <span>{{ addressState.original.address1 }}</span>
+          </ion-label>
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Address line 2')" label-placement="stacked" v-model="addressState.original.address2" />
+          <ion-label class="geo-picker-field">
+            <span class="geo-picker-label">{{ translate('Address line 2') }}</span>
+            <span>{{ addressState.original.address2 }}</span>
+          </ion-label>
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('City')" label-placement="stacked" v-model="addressState.original.city" />
+          <ion-label class="geo-picker-field">
+            <span class="geo-picker-label">{{ translate('City') }}</span>
+            <span>{{ addressState.original.city }}</span>
+          </ion-label>
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="addressState.original.postalCode" />
+          <ion-label class="geo-picker-field">
+            <span class="geo-picker-label">{{ translate('Postal code') }}</span>
+            <span>{{ addressState.original.postalCode }}</span>
+          </ion-label>
         </ion-item>
-        <ion-item button :detail="false" :disabled="!addressState.original.countryGeoId" @click="openStatePicker(addressState.original)">
+        <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('State') }}</span>
-            <span :class="{ 'geo-picker-placeholder': !stateName(addressState.original) }">{{ stateName(addressState.original) || (addressState.original.countryGeoId ? translate('Select') : translate('Select country first')) }}</span>
+            <span>{{ stateName(addressState.original) }}</span>
           </ion-label>
-          <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
         </ion-item>
-        <ion-item button :detail="false" @click="openCountryPicker(addressState.original)">
+        <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('Country') }}</span>
-            <span :class="{ 'geo-picker-placeholder': !countryName(addressState.original.countryGeoId) }">{{ countryName(addressState.original.countryGeoId) || translate('Select') }}</span>
+            <span>{{ countryName(addressState.original.countryGeoId) }}</span>
           </ion-label>
-          <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
         </ion-item>
       </ion-list>
 
