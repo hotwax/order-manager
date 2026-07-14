@@ -34,7 +34,7 @@ Sorting is part of this plan, but it remains a result-list action and is never r
 | Assignee | Remove Assignee from this filter surface. `currentUserPartyId` is not exposed by either task view and is currently ignored by the API. |
 | Swappable | Remove Swappable from this filter surface. `swappable` is not exposed by `shipGroupTasks` and is currently ignored by the API. |
 | Search | Keep order-name search and change the operator from `like` to `contains` so partial order names work without callers supplying wildcard characters. |
-| Date meaning | Order date filters map to `orderDate`. Task-created filters map to `workEffortCreatedDate`, projected from the WorkEffort creation stamp. Labels must state which date is being filtered. |
+| Date meaning | Order date filters map to `orderDate`. Task-created filters map to `workEffortCreatedDate`, projected from `WorkEffort.createdDate`. Labels must state which date is being filtered. |
 | Filter ordering | The complete common filter block always comes first. Page-specific filters append after it and never interrupt or reorder the common controls. |
 | Sort placement | Sort appears in the result header after the result count and before Select. It is not part of the filter sequence. |
 | Initial shared sort scope | Expose task date, order date, and order total. These fields have meaningful operational ascending and descending behavior on every task endpoint. |
