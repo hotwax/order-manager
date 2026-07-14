@@ -61,9 +61,13 @@
             @completed="fetchAddressValidationTasks()"
             :ref="setCardRef"
           />
-          <div class="empty-state" v-if="!addressValidationTasks.length">
-            <p v-html="getEmptyMessage()"></p>
-          </div>
+          <TaskQueueEmptyState
+            v-if="!addressValidationTasks.length"
+            kind="badAddress"
+            :filtered="hasFilters"
+            :company-carrier-url="companyCarrierUrl"
+            @clear="clearFilters"
+          />
         </div>
 
         <ion-infinite-scroll
@@ -94,11 +98,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUpdate } from 'vue';
 import { IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonMenuButton, IonPage, IonSpinner, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
-import { translate } from '@common';
+import { buildAppUrl, translate } from '@common';
 import { showToast } from '@/utils';
 import ErrorState from '@/components/common/ErrorState.vue';
 import OrderTaskFilterCard from '@/components/tasks/OrderTaskFilterCard.vue';
 import TaskQueueListHeader from '@/components/tasks/TaskQueueListHeader.vue';
+import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
@@ -119,6 +124,7 @@ const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getSh
 const sortOptions = taskSortOptions('badAddress');
 // Computed once here and passed as a prop — avoids N per-card reactive subscriptions.
 const countries = computed(() => seedStore.getCountries);
+const companyCarrierUrl = buildAppUrl('company', '/carriers');
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
 const bulkActionRunning = ref(false);
@@ -143,12 +149,6 @@ const hasFilters = computed(() => hasTaskFilters(filters.value));
 const currentPageTaskIds = computed(() => addressValidationTasks.value.map((task: any) => task.workEffortId));
 const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));
 const someCurrentPageSelected = computed(() => currentPageTaskIds.value.some((workEffortId: string) => selectedOrders.value[workEffortId]));
-
-function getEmptyMessage() {
-  return hasFilters.value
-    ? translate('No records found for the search criteria.')
-    : translate('No records found.');
-}
 
 // Each card builds its own address form lazily (see BadAddressTaskCard); the view
 // only prunes selections for tasks that drop out of the list on refresh.

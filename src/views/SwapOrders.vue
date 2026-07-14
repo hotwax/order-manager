@@ -67,9 +67,23 @@
             @update:selected="selectedTasks[task.workEffortId] = $event"
             @completed="replaceSwapTasks"
           />
-          <div class="empty-state" v-if="!swapTasks.length && isSuccess">
-            <p v-html="getEmptyMessage()"></p>
-          </div>
+          <TaskQueueEmptyState
+            v-if="!swapTasks.length && isSuccess && hasFilters"
+            kind="swap"
+            filtered
+            @clear="clearFilters"
+          />
+          <SwapSetupPanel
+            v-else-if="!swapTasks.length && isSuccess"
+            :candidates="setupCandidates"
+            :loading="setupLoading"
+            :error="setupError"
+            :can-manage-substitutes="canManageSubstitutes"
+            :configured-product-ids="configuredProductIds"
+            @manage="openSubstituteModal"
+            @rebroker="rebrokerProductOrders"
+            @retry="loadSetupCandidates"
+          />
         </div>
 
        <ion-infinite-scroll
@@ -109,16 +123,30 @@ import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
 import OrderTaskFilterCard from '@/components/tasks/OrderTaskFilterCard.vue';
 import TaskQueueListHeader from '@/components/tasks/TaskQueueListHeader.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
-import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
-import { showToast } from '@/utils';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
+import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
+import SubstituteRelationshipModal from '@/components/swaps/SubstituteRelationshipModal.vue';
+import SwapSetupPanel, { type SwapSetupCandidate } from '@/components/swaps/SwapSetupPanel.vue';
+import RoutingGroupModal from '@/components/fulfillment/RoutingGroupModal.vue';
+import { useProductMaster } from '@/composables/useProductMaster';
+import { useProductCacheStore } from '@/store/productCache';
+import { useProductStore } from '@/store/productStore';
+import { useUserStore } from '@/store/user';
+import { useOrderTaskStore } from '@/store/orderTask';
+import { useSeedStore } from '@/store/seed';
+import { PRODUCT_ASSOCIATION_UPDATE_PERMISSION } from '@/authorization/permissions';
+import { fetchUnfillableProductCandidates, fetchUnfillableShipGroupsForProduct } from '@/services/order';
+import { showToast } from '@/utils';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
+const productStore = useProductStore();
+const userStore = useUserStore();
+const productCache = useProductCacheStore();
+const productMaster = useProductMaster();
 
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'swap');
@@ -133,6 +161,10 @@ const selectMode = ref(false);
 const selectedTasks = ref<Record<string, boolean>>({});
 const cardRefs = ref<Record<string, any>>({});
 const bulkActionRunning = ref(false);
+const setupCandidates = ref<SwapSetupCandidate[]>([]);
+const setupLoading = ref(false);
+const setupError = ref('');
+const configuredProductIds = ref<string[]>([]);
 
 const swapTasks = computed(() => orderTaskStore.getSwapTasks);
 const swapTotal = computed(() => orderTaskStore.getSwapTotal);
@@ -142,6 +174,8 @@ const selectedTaskIds = computed(() => Object.entries(selectedTasks.value).filte
 const hasSelectedTasks = computed(() => selectedTaskIds.value.length > 0);
 const allLoadedSelected = computed(() => swapTasks.value.length > 0 && swapTasks.value.every((task: any) => selectedTasks.value[task.workEffortId]));
 const someLoadedSelected = computed(() => swapTasks.value.some((task: any) => selectedTasks.value[task.workEffortId]));
+const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || '');
+const canManageSubstitutes = computed(() => userStore.hasPermission(PRODUCT_ASSOCIATION_UPDATE_PERMISSION));
 const swapStatus = computed(() => orderTaskStore.getSwapStatus);
 const errorMessage = computed(() => translate(orderTaskStore.getSwapError));
 // First open / cleared list: nothing to show while the first page loads.
@@ -152,12 +186,6 @@ const isRefetching = computed(() => swapStatus.value === 'loading' && swapTasks.
 // cards on screen keeps the existing rows instead of blanking the queue.
 const isErrored = computed(() => swapStatus.value === 'error' && !swapTasks.value.length);
 const isSuccess = computed(() => swapStatus.value === 'success');
-
-function getEmptyMessage() {
-  return hasFilters.value
-    ? translate('No records found for the search criteria.')
-    : translate('No records found.');
-}
 
 let suppressAutomaticFetch = false;
 watch(() => [
@@ -191,6 +219,9 @@ const fetchSwapTasks = async (pageSize?: any, pageIndex?: any) => {
     pageSize ?? import.meta.env.VITE_VIEW_SIZE,
     pageIndex ?? 0,
   ));
+  if (isFirstPage && isSuccess.value && !swapTasks.value.length && !hasFilters.value) {
+    await loadSetupCandidates();
+  }
 };
 
 function replaceSwapTasks() {
@@ -257,6 +288,81 @@ async function bulkParkOrders() {
   await modal.present();
   const { data: facilityId } = await modal.onWillDismiss();
   if (facilityId) await runBulkAction('submitPark', facilityId);
+}
+
+async function loadSetupCandidates() {
+  const productStoreId = selectedProductStoreId.value;
+  if (!productStoreId) {
+    setupCandidates.value = [];
+    setupError.value = translate('Select a product store to review unfillable products.');
+    return;
+  }
+  setupLoading.value = true;
+  setupError.value = '';
+  try {
+    const candidates = await fetchUnfillableProductCandidates(productStoreId);
+    productMaster.init();
+    await productMaster.prefetch(candidates.map((candidate) => candidate.productId));
+    setupCandidates.value = candidates.map((candidate) => ({
+      ...candidate,
+      ...(productCache.getProduct(candidate.productId) || {}),
+    }));
+  } catch (cause) {
+    setupCandidates.value = [];
+    setupError.value = translate('Failed to load unfillable products. Please try again.');
+  } finally {
+    setupLoading.value = false;
+  }
+}
+
+async function openSubstituteModal(candidate: SwapSetupCandidate) {
+  const modal = await modalController.create({
+    component: SubstituteRelationshipModal,
+    componentProps: { productId: candidate.productId, sourceProduct: candidate },
+  });
+  await modal.present();
+  const { data, role } = await modal.onWillDismiss();
+  if (data?.hasSubstitutes) {
+    configuredProductIds.value = [...new Set([...configuredProductIds.value, candidate.productId])];
+  } else if (role === 'confirm') {
+    configuredProductIds.value = configuredProductIds.value.filter((productId) => productId !== candidate.productId);
+  }
+  if (role === 'confirm') await showToast(translate('Substitute relationships updated.'));
+}
+
+async function rebrokerProductOrders(candidate: SwapSetupCandidate) {
+  const productStoreId = selectedProductStoreId.value;
+  if (!productStoreId || productStoreId === 'All') return;
+  const modal = await modalController.create({ component: RoutingGroupModal, componentProps: { productStoreId } });
+  await modal.present();
+  const { data: routingGroupId } = await modal.onWillDismiss();
+  if (!routingGroupId) return;
+
+  setupLoading.value = true;
+  setupError.value = '';
+  try {
+    const shipGroups = await fetchUnfillableShipGroupsForProduct(productStoreId, candidate.productId);
+    if (!shipGroups.length) {
+      await showToast(translate('No approved unfillable orders remain for this product.'));
+      await loadSetupCandidates();
+      return;
+    }
+    const results = await Promise.allSettled(shipGroups.map((shipGroup) => orderTaskStore.brokerShipGroup({
+      routingGroupId,
+      productStoreId,
+      orderId: shipGroup.orderId,
+      shipGroupSeqId: shipGroup.shipGroupSeqId,
+    })));
+    const failures = results.filter((result) => result.status === 'rejected').length;
+    const successes = results.length - failures;
+    if (successes) await showToast(translate('{count} ship group(s) submitted for rebrokering.', { count: successes }));
+    if (failures) await showToast(translate('{count} ship group(s) could not be rebrokered.', { count: failures }));
+    await fetchSwapTasks();
+  } catch (cause) {
+    setupError.value = translate('Failed to rebroker orders for this product. Please try again.');
+  } finally {
+    setupLoading.value = false;
+  }
 }
 
 async function loadMoreSwapTasks(event: any) {

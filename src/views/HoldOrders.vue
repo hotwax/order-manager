@@ -63,9 +63,14 @@
           @retry="fetchHoldTasks()"
         />
 
-        <div class="empty-state" v-else-if="isEmpty">
-          <p v-html="getEmptyMessage()"></p>
-        </div>
+        <TaskQueueEmptyState
+          v-else-if="isEmpty"
+          kind="hold"
+          :filtered="hasFilters"
+          :can-create-tasks="canCreateHoldTasks"
+          @clear="clearFilters"
+          @start="openFindOrders"
+        />
       </div>
 
       <ion-infinite-scroll
@@ -111,9 +116,11 @@ import {
 } from '@ionic/vue';
 import { translate } from '@common';
 import { showToast } from '@/utils';
+import router from '@/router';
 import ErrorState from '@/components/common/ErrorState.vue';
 import OrderTaskFilterCard from '@/components/tasks/OrderTaskFilterCard.vue';
 import TaskQueueListHeader from '@/components/tasks/TaskQueueListHeader.vue';
+import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useUserStore } from '@/store/user';
 import { useOrderTaskStore } from '@/store/orderTask';
@@ -122,6 +129,7 @@ import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
+import { ORDER_TASK_CREATE_PERMISSION } from '@/authorization/permissions';
 
 const orderTaskStore = useOrderTaskStore();
 const userStore = useUserStore();
@@ -133,6 +141,7 @@ const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions()
 const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
 const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions);
 const sortOptions = taskSortOptions('hold');
+const canCreateHoldTasks = computed(() => userStore.hasPermission(ORDER_TASK_CREATE_PERMISSION));
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
 const cardRefs = ref<Record<string, any>>({});
@@ -166,10 +175,8 @@ const isError = computed(() => holdStatus.value === 'error' && !heldTasks.value.
 // True empty state only after a successful zero-row response.
 const isEmpty = computed(() => holdStatus.value === 'success' && !heldTasks.value.length);
 
-function getEmptyMessage() {
-  return hasFilters.value
-    ? translate('No records found for the search criteria.')
-    : translate('No records found.');
+function openFindOrders() {
+  router.push('/orders');
 }
 
 let suppressAutomaticFetch = false;
