@@ -132,9 +132,12 @@ const props = defineProps<{
   identifications: Identification[];
 }>();
 
-// System/imported identifiers (e.g. Shopify-sourced) require ORDER_IDENTIFICATION_UPDATE_PERMISSION
-// to edit/remove/re-add; identifications outside this set can be edited/removed by anyone.
-const SYSTEM_SOURCED_TYPE_IDS = new Set(['SHOPIFY_ORD_ID', 'SHOPIFY_ORD_NO', 'SHOPIFY_ORD_NAME']);
+const SYSTEM_SOURCED_TYPE_IDS = new Set(
+  (import.meta.env.VITE_SYSTEM_SOURCED_IDENTIFICATION_TYPE_IDS || '')
+    .split(',')
+    .map((typeId: string) => typeId.trim())
+    .filter(Boolean)
+);
 
 function isSystemSourced(identification: Identification) {
   return SYSTEM_SOURCED_TYPE_IDS.has(identification.orderIdentificationTypeId);
