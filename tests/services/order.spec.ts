@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import { commonUtil, useSolrSearch } from '@common';
 import {
   buildOrderLookupPayload,
+  buildUnfillableProductCandidatesPayload,
+  buildUnfillableShipGroupsForProductPayload,
   buildVirtualLocationCountsPayload,
+  fetchUnfillableProductCandidates,
+  fetchUnfillableShipGroupsForProduct,
   fetchVirtualLocationOrderCounts,
   searchOrders
 } from '@/services/order';
@@ -266,6 +270,44 @@ describe('buildOrderLookupPayload facility filtering', () => {
       brokeredItemCount: 0,
       totalItemCount: 4
     });
+  });
+});
+
+describe('proactive swap setup queries', () => {
+  it('facets approved active unfillable items by product count', () => {
+    const payload = buildUnfillableProductCandidatesPayload('STORE_1', 25);
+    expect(payload.json.filter).toEqual(expect.arrayContaining([
+      'orderStatusId:ORDER_APPROVED',
+      'orderItemStatusId:(ITEM_CREATED OR ITEM_APPROVED)',
+      'facilityId:UNFILLABLE_PARKING',
+      'productStoreId:STORE_1',
+    ]));
+    expect(payload.json.facet.products).toMatchObject({ field: 'productId', limit: 25, sort: 'count desc' });
+  });
+
+  it('normalizes product buckets in the server-provided count order', async () => {
+    mockSolrResponse({ facets: { products: { buckets: [
+      { val: 'SKU_A', count: 12 },
+      { val: 'SKU_B', count: 4 },
+    ] } } });
+    await expect(fetchUnfillableProductCandidates('STORE_1')).resolves.toEqual([
+      { productId: 'SKU_A', itemCount: 12 },
+      { productId: 'SKU_B', itemCount: 4 },
+    ]);
+  });
+
+  it('fetches and deduplicates affected ship groups for one product', async () => {
+    const payload = buildUnfillableShipGroupsForProductPayload('STORE_1', 'SKU_A');
+    expect(payload.json.filter).toContain('productId:SKU_A');
+    mockSolrResponse({ response: { docs: [
+      { orderId: 'ORDER_1', shipGroupSeqId: '00001' },
+      { orderId: 'ORDER_1', shipGroupSeqId: '00001' },
+      { orderId: 'ORDER_2', shipGroupSeqId: '00002' },
+    ] } });
+    await expect(fetchUnfillableShipGroupsForProduct('STORE_1', 'SKU_A')).resolves.toEqual([
+      { orderId: 'ORDER_1', shipGroupSeqId: '00001' },
+      { orderId: 'ORDER_2', shipGroupSeqId: '00002' },
+    ]);
   });
 });
 

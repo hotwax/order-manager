@@ -44,6 +44,16 @@ export interface VirtualLocationOrderCount {
   count: number;
 }
 
+export interface UnfillableProductCandidate {
+  productId: string;
+  itemCount: number;
+}
+
+export interface UnfillableShipGroup {
+  orderId: string;
+  shipGroupSeqId: string;
+}
+
 const orderSolrFields = [
   'orderId',
   'orderName',
@@ -233,6 +243,78 @@ export async function fetchVirtualLocationOrderCounts(params: VirtualLocationCou
   if (commonUtil.hasError(response)) return Promise.reject(response.data);
 
   return normalizeVirtualLocationCountResponse(response.data);
+}
+
+function unfillableItemFilters(productStoreId?: string, productId?: string) {
+  const filters = [
+    'docType:ORDER',
+    'orderTypeId:SALES_ORDER',
+    'orderStatusId:ORDER_APPROVED',
+    'orderItemStatusId:(ITEM_CREATED OR ITEM_APPROVED)',
+    'facilityId:UNFILLABLE_PARKING'
+  ];
+  if (productStoreId && productStoreId !== 'All') filters.push(`productStoreId:${escapeSolrValue(productStoreId)}`);
+  if (productId) filters.push(`productId:${escapeSolrValue(productId)}`);
+  return filters;
+}
+
+export function buildUnfillableProductCandidatesPayload(productStoreId?: string, limit = 50) {
+  return {
+    json: {
+      params: { rows: 0, start: 0, 'q.op': 'AND' },
+      query: '*:*',
+      filter: unfillableItemFilters(productStoreId),
+      facet: {
+        products: {
+          type: 'terms',
+          field: 'productId',
+          limit,
+          sort: 'count desc'
+        }
+      }
+    }
+  };
+}
+
+export async function fetchUnfillableProductCandidates(productStoreId?: string, limit = 50): Promise<UnfillableProductCandidate[]> {
+  const response = await useSolrSearch().runSolrQuery(buildUnfillableProductCandidatesPayload(productStoreId, limit));
+  if (commonUtil.hasError(response)) return Promise.reject(response.data);
+  const buckets = response.data?.facets?.products?.buckets
+    || response.data?.response?.facets?.products?.buckets
+    || [];
+  return buckets
+    .map((bucket: any) => ({
+      productId: toStringValue(bucket.val),
+      itemCount: toNumberValue(bucket.count)
+    }))
+}
+
+export function buildUnfillableShipGroupsForProductPayload(productStoreId: string, productId: string) {
+  return {
+    json: {
+      params: {
+        rows: 10000,
+        start: 0,
+        'q.op': 'AND',
+        fl: 'orderId shipGroupSeqId'
+      },
+      query: '*:*',
+      filter: unfillableItemFilters(productStoreId, productId)
+    }
+  };
+}
+
+export async function fetchUnfillableShipGroupsForProduct(productStoreId: string, productId: string): Promise<UnfillableShipGroup[]> {
+  const response = await useSolrSearch().runSolrQuery(buildUnfillableShipGroupsForProductPayload(productStoreId, productId));
+  if (commonUtil.hasError(response)) return Promise.reject(response.data);
+  const docs = response.data?.response?.docs || [];
+  const unique = new Map<string, UnfillableShipGroup>();
+  docs.forEach((doc: any) => {
+    const orderId = toStringValue(doc.orderId);
+    const shipGroupSeqId = toStringValue(doc.shipGroupSeqId);
+    if (orderId && shipGroupSeqId) unique.set(`${orderId}|${shipGroupSeqId}`, { orderId, shipGroupSeqId });
+  });
+  return [...unique.values()];
 }
 
 function normalizeVirtualLocationCountResponse(data: any): VirtualLocationOrderCount[] {

@@ -76,9 +76,14 @@
           @retry="fetchHoldTasks()"
         />
 
-        <div class="empty-state" v-else-if="isEmpty">
-          <p v-html="getEmptyMessage()"></p>
-        </div>
+        <TaskQueueEmptyState
+          v-else-if="isEmpty"
+          kind="hold"
+          :filtered="hasFilters"
+          :can-create-tasks="canCreateHoldTasks"
+          @clear="clearFilters"
+          @start="openFindOrders"
+        />
       </div>
 
       <ion-infinite-scroll
@@ -133,10 +138,12 @@ import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import FilterSelect from '@/components/common/FilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useUserStore } from '@/store/user';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
+import { ORDER_TASK_CREATE_PERMISSION } from '@/authorization/permissions';
 
 const orderTaskStore = useOrderTaskStore();
 const userStore = useUserStore();
@@ -144,6 +151,7 @@ const seedStore = useSeedStore();
 
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
 const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
+const canCreateHoldTasks = computed(() => userStore.hasPermission(ORDER_TASK_CREATE_PERMISSION));
 
 const searchQuery = ref('');
 const assignee = ref('');
@@ -181,12 +189,9 @@ const isError = computed(() => holdStatus.value === 'error' && !heldTasks.value.
 // True empty state only after a successful zero-row response.
 const isEmpty = computed(() => holdStatus.value === 'success' && !heldTasks.value.length);
 
-function getEmptyMessage() {
-  return hasFilters.value
-    ? translate('No records found for the search criteria.')
-    : translate('No records found.');
+function openFindOrders() {
+  router.push('/orders');
 }
-
 watch([assignee, dateAfter, dateBefore, orderChannel], () => {
   fetchHoldTasks();
 });
