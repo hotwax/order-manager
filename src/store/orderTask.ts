@@ -21,17 +21,21 @@ const FRAUD_RISK_PURPOSE_TYPE_ID = 'REVIEW_RISK_ORDER';
 /** Hold tasks merge the task detail (`oms/orders/tasks/{workEffortId}`) onto the row. */
 async function enrichHoldTask(task: any) {
   const detailResponse = await api({ url: `oms/orders/tasks/${task.workEffortId}`, method: 'GET' });
-  return { ...task, ...detailResponse.data.task };
+  const taskDetail = detailResponse.data.task ?? {};
+  const workEffortCreatedDate = task.workEffortCreatedDate ?? taskDetail.workEffortCreatedDate;
+  return { ...task, ...taskDetail, workEffortCreatedDate };
 }
 
 /** Address & swap tasks merge the ship group detail onto the row. */
 async function enrichShipGroupTask(task: any) {
+  const workEffortCreatedDate = task.workEffortCreatedDate;
   const shipGroupResponse = await api({ url: `oms/orders/${task.orderId}/shipGroups/${task.shipGroupSeqId}`, method: 'GET' });
-  return { ...task, ...shipGroupResponse.data.shipGroup };
+  return { ...task, ...shipGroupResponse.data.shipGroup, workEffortCreatedDate };
 }
 
 /** Fraud tasks enrich from `oms/orders` + `oms/orders/{id}/risks`. */
 async function enrichFraudTask(task: any) {
+  const workEffortCreatedDate = task.workEffortCreatedDate;
   const [orderResponse, risksResponse] = await Promise.all([
     api({ url: 'oms/orders', method: 'GET', params: { orderId: task.orderId } }),
     api({ url: `oms/orders/${task.orderId}/risks`, method: 'GET'}),
@@ -85,6 +89,7 @@ async function enrichFraudTask(task: any) {
     payments,
     items,
     risks,
+    workEffortCreatedDate,
     grandTotal: order.grandTotal,
     orderName: order.orderName,
     orderDate: order.orderDate,

@@ -34,12 +34,12 @@ Sorting is part of this plan, but it remains a result-list action and is never r
 | Assignee | Remove Assignee from this filter surface. `currentUserPartyId` is not exposed by either task view and is currently ignored by the API. |
 | Swappable | Remove Swappable from this filter surface. `swappable` is not exposed by `shipGroupTasks` and is currently ignored by the API. |
 | Search | Keep order-name search and change the operator from `like` to `contains` so partial order names work without callers supplying wildcard characters. |
-| Date meaning | Order date filters map to `orderDate`. Task-created filters map to `createdDate`. Labels must state which date is being filtered. |
+| Date meaning | Order date filters map to `orderDate`. Task-created filters map to `workEffortCreatedDate`, projected from the WorkEffort creation stamp. Labels must state which date is being filtered. |
 | Filter ordering | The complete common filter block always comes first. Page-specific filters append after it and never interrupt or reorder the common controls. |
 | Sort placement | Sort appears in the result header after the result count and before Select. It is not part of the filter sequence. |
 | Initial shared sort scope | Expose task date, order date, and order total. These fields have meaningful operational ascending and descending behavior on every task endpoint. |
-| Fraud-specific sorts | Append Risk severity, Risk recommendation, and Shipping method after the six shared options on Fraud only. Severity uses business rank; recommendation and method use displayed-label order. |
-| Fraud sort API contract | Extend `orders/tasks` with server-sortable severity-rank, recommendation-label, and primary-shipping-method-label fields. Do not sort the loaded client-side page or expose raw enum-ID ordering. |
+| Fraud-specific sorts | Append Risk severity and Risk recommendation after the six shared options on Fraud only. Severity uses the risk-level enumeration sequence; recommendation uses displayed-label order. |
+| Fraud sort API contract | Extend `orders/tasks` with server-sortable severity-rank and recommendation-label fields. Do not sort the loaded client-side page or expose raw enum-ID ordering. |
 | Deferred sort fields | Order name does not help operators prioritize queue work. Sales channel, Facility, and Order status remain deferred because the API sorts their IDs rather than their displayed labels or business rank. |
 | Default sort | Default every task queue to Oldest task first so the longest-waiting operational work appears first. |
 | Stable pagination | Every sort includes `workEffortId` as a deterministic secondary field. Do not sort only the loaded client-side page. |
@@ -105,8 +105,8 @@ Queue membership remains fixed by task status, task type, task purpose, and the 
 | Sales channel | `salesChannelEnumId` | Available on both task endpoints. |
 | Order date from | `orderDate_from` | Convert the selected date to the beginning of the local day. |
 | Order date through | `orderDate_thru` | Convert the selected date to the end of the local day so the selected day is inclusive. |
-| Task created from | `createdDate_from` | Convert the selected date to the beginning of the local day. |
-| Task created through | `createdDate_thru` | Convert the selected date to the end of the local day so the selected day is inclusive. |
+| Task created from | `workEffortCreatedDate_from` | Convert the selected date to the beginning of the local day. |
+| Task created through | `workEffortCreatedDate_thru` | Convert the selected date to the end of the local day so the selected day is inclusive. |
 | Facility | `facilityId` | Available on `shipGroupTasks`. |
 | Shipping method | `shipmentMethodTypeId` | Available on `shipGroupTasks`. |
 | Order status | `orderStatusId` | Available only on the Fraud `orders/tasks` view. |
@@ -129,12 +129,12 @@ The generic entity-list APIs accept `orderByField`. A leading `-` means descendi
 | Order total | Supported | Supported | Supported | Supported | Visible |
 | Sales channel | Supported | Supported | Supported | Supported | Deferred |
 | Facility | Supported | Supported | Not supported | Supported | Deferred |
-| Shipping method | Supported | Supported | Requires primary-method label projection | Supported | Fraud-specific after API support |
+| Shipping method | Supported | Supported | Not supported | Supported | Deferred |
 | Order status | Not supported | Not supported | Supported | Not supported | Deferred |
 | Risk recommendation | Not supported | Not supported | Requires display-label sort key | Not supported | Fraud-specific after API support |
 | Risk level | Not supported | Not supported | Requires severity-rank sort key | Not supported | Fraud-specific after API support |
 
-Raw categorical fields remain unsuitable because `orderByField` sorts their stored IDs. For example, sorting `riskLevelEnumId` does not produce a trustworthy severity order. The requested Fraud sorts are therefore backed by explicit rank or normalized display-label fields rather than raw IDs.
+Raw categorical fields remain unsuitable because `orderByField` sorts their stored IDs. For example, sorting `riskLevelEnumId` does not produce a trustworthy severity order. The requested Fraud sorts are therefore backed by enumeration sequence or normalized display-label fields rather than raw IDs.
 
 ### Canonical sort menu
 
@@ -153,15 +153,13 @@ Fraud appends these page-specific options after the complete shared block:
 8. Lowest risk severity first
 9. Risk recommendation A-Z
 10. Risk recommendation Z-A
-11. Shipping method A-Z
-12. Shipping method Z-A
 
-Swap, Bad Address, and Hold stop after the six shared options. Adding Shipping method to Fraud sorting does not add a Fraud shipping-method filter; those are separate capabilities.
+Swap, Bad Address, and Hold stop after the six shared options. Shipping-method filtering remains available on these ship-group task pages, but shipping-method sorting is not offered on the order-level Fraud queue.
 
 | UI option | API `orderByField` |
 |---|---|
-| Oldest task first | `createdDate,workEffortId` |
-| Newest task first | `-createdDate,-workEffortId` |
+| Oldest task first | `workEffortCreatedDate,workEffortId` |
+| Newest task first | `-workEffortCreatedDate,-workEffortId` |
 | Oldest order first | `orderDate,workEffortId` |
 | Newest order first | `-orderDate,-workEffortId` |
 | Highest order total | `-grandTotal,-workEffortId` |
@@ -171,18 +169,14 @@ Fraud-specific server mappings:
 
 | UI option | API `orderByField` | Required semantics |
 |---|---|---|
-| Highest risk severity first | `-riskLevelSortRank,-workEffortId` | Rank High above Medium, Low, None, and Pending or unknown. |
-| Lowest risk severity first | `riskLevelSortRank,workEffortId` | Reverse the same explicit rank. |
+| Highest risk severity first | `riskLevelSortRank,workEffortId` | Ascending enumeration sequence puts High above Medium, Low, None, and Pending. |
+| Lowest risk severity first | `-riskLevelSortRank,-workEffortId` | Reverse the same enumeration sequence. |
 | Risk recommendation A-Z | `riskRecommendationSortValue,workEffortId` | Case-normalized displayed recommendation; blank values last. |
 | Risk recommendation Z-A | `-riskRecommendationSortValue,-workEffortId` | Reverse displayed recommendation; blank values last. |
-| Shipping method A-Z | `shipmentMethodSortValue,workEffortId` | Case-normalized displayed method; blank values last. |
-| Shipping method Z-A | `-shipmentMethodSortValue,-workEffortId` | Reverse displayed method; blank values last. |
 
-The three Fraud sort fields above are aliases added to the `orders/tasks` response rather than raw entity fields. `riskLevelSortRank` encodes business severity. `riskRecommendationSortValue` matches the label shown by the seed enumeration. `shipmentMethodSortValue` matches the displayed shipment-method label.
+The two Fraud sort fields above are aliases added to the `orders/tasks` response rather than raw entity fields. `riskLevelSortRank` uses the risk-level enumeration sequence. `riskRecommendationSortValue` matches the label shown by the seed enumeration.
 
-Use this explicit severity rank: `ORLVL_HIGH = 4`, `ORLVL_MEDIUM = 3`, `ORLVL_LOW = 2`, `ORLVL_NONE = 1`, and `ORLVL_PENDING` or unknown `= 0`. This keeps severity independent of enum names and makes both directions predictable.
-
-Because a Fraud task is order-level, define its primary shipping method deterministically: use the task's `shipGroupSeqId` when present; otherwise use the order's lowest `shipGroupSeqId`. This same primary method must be returned and sorted by the server. Orders without a method sort after named methods.
+Use the existing `ORDER_RISK_LEVEL` enumeration sequence: High `10`, Medium `20`, Low `30`, None `40`, and Pending `50`. This keeps severity ordering in seed data and makes both directions predictable.
 
 Use a closed application sort type rather than accepting arbitrary route or API strings. The route may store a stable UI value, but the request builder must map it to one of the approved `orderByField` values above.
 
@@ -450,7 +444,7 @@ The responsive layout determines the actual number of tracks from available widt
 | Shared UI | Add `OrderTaskFilterCard.vue` using `SearchFilterCard`, `UniformFilterLayout`, outlined `ion-select`, and outlined `DateFilterSelect`. |
 | Shared sort model | Add a closed task-sort type and map each UI option to an approved, stable `orderByField`. |
 | Sort UI | Reuse `OrderSortPopover` with the canonical task options on all four pages. |
-| Fraud sort dependency | Add or coordinate the `orders/tasks` rank and display-label sort aliases before enabling the six Fraud-specific options. |
+| Fraud sort dependency | Add or coordinate the `orders/tasks` rank and display-label sort aliases before enabling the four Fraud-specific options. |
 | Shared result header | Add `TaskQueueListHeader.vue` for total count, Sort, Select or Done, and the loaded-task checkbox. |
 | Route state | Add a shared task-filter route-state composable so filter and sort selections survive refresh and back navigation. |
 | Store payloads | Extend the four fetch payloads with supported filter parameters and `orderByField`; remove ignored Assignee and Swappable parameters; capture `X-Total-Count`. |
@@ -467,7 +461,7 @@ The responsive layout determines the actual number of tracks from available widt
 
 ## Delivery sequence
 
-1. Confirm or add the three Fraud sort aliases on `orders/tasks`, including deterministic primary-shipping-method semantics.
+1. Confirm or add the two Fraud sort aliases on `orders/tasks` for severity rank and recommendation label.
 2. Add the typed filter and sort models plus API parameter mapping helpers.
 3. Add focused tests for partial order-name search, inclusive date boundaries, shared sort mappings, and Fraud-specific sort mappings.
 4. Extend the store to capture a total for each queue from `X-Total-Count`.
@@ -478,7 +472,7 @@ The responsive layout determines the actual number of tracks from available widt
 9. Update the store payload types and stop sending unsupported Assignee and Swappable parameters.
 10. Migrate Swap and Bad Address first because they share the same endpoint and control set; add Swap selection and safe bulk actions.
 11. Migrate Hold using the same ship-group filter configuration.
-12. Migrate Fraud with its order-status and risk-specific controls plus the appended severity, recommendation, and shipping-method sorts.
+12. Migrate Fraud with its order-status and risk-specific controls plus the appended severity and recommendation sorts.
 13. Normalize selection reset, bulk completion, and partial-failure reporting across all four pages.
 14. Run focused component, view, store, and route-state tests.
 15. Build from the AccxUI wrapper and verify all four routes against the configured backend.
@@ -492,7 +486,7 @@ Automated checks should cover:
 - Every visible date uses outlined `DateFilterSelect`.
 - Partial search sends `orderName_op=contains`.
 - Order dates map to `orderDate_from/thru`.
-- Task-created dates map to `createdDate_from/thru`.
+- Task-created dates map to `workEffortCreatedDate_from/thru`.
 - Through dates include the full selected day.
 - Swap, Bad Address, and Hold send Facility and Shipping method only when selected.
 - Fraud sends Order status, Risk recommendation, and Risk level only when selected.
@@ -548,17 +542,15 @@ Before final live acceptance, confirm the fixed task type and task purpose predi
 | Facility or method selected | Swap, Bad Address, and Hold narrow through `facilityId` or `shipmentMethodTypeId`; Fraud never renders those controls. |
 | Fraud-specific filter selected | Fraud narrows through `orderStatusId`, `riskRecommendationEnumId`, or `riskLevelEnumId`. |
 | Unsupported legacy filter | Assignee and Swappable are absent and their ignored parameters are not sent. |
-| Default sort | Every queue initially requests `createdDate,workEffortId` and labels it Oldest task first. |
+| Default sort | Every queue initially requests `workEffortCreatedDate,workEffortId` and labels it Oldest task first. |
 | Sort changed | The API receives the mapped `orderByField`, pagination returns to page zero, and the result set is replaced. |
 | Infinite scroll after sort | Appended results use the same filter and sort payload as the first page. |
 | Invalid route sort | The page safely falls back to Oldest task first. |
 | Deferred categorical sort | No page offers raw ID-based sorting for channel, facility, method, status, recommendation, or risk level. |
 | Deferred order-name sort | No page offers alphabetical order-name sorting because it does not improve operational prioritization. |
-| Fraud sort menu | The six shared options appear first; severity, recommendation, and shipping-method options append afterward. |
-| Fraud severity sort | Results follow the explicit business severity rank rather than alphabetical `riskLevelEnumId` order. |
+| Fraud sort menu | The six shared options appear first; severity and recommendation options append afterward. |
+| Fraud severity sort | Results follow the risk-level enumeration sequence rather than alphabetical `riskLevelEnumId` order. |
 | Fraud recommendation sort | Results follow the displayed recommendation label in the selected direction. |
-| Fraud shipping-method sort | Results follow the displayed primary shipping-method label in the selected direction. |
-| Multi-group Fraud order | The task's ship group is primary when supplied; otherwise the lowest `shipGroupSeqId` determines the primary shipping method. |
 | Missing Fraud sort alias | The affected option is not enabled; the client never substitutes loaded-page sorting. |
 | Initial result load | The header shows loaded and total matching tasks using the API total rather than only the current page length. |
 | Infinite scroll | Loaded count increases while total continues to represent all matching server results. |
@@ -577,5 +569,5 @@ Before final live acceptance, confirm the fixed task type and task purpose predi
 - The Order Manager application builds successfully from the AccxUI wrapper.
 - Swap, Bad Address, Fraud, and Hold were verified against the configured localhost backend at desktop and narrow viewport widths.
 - Selection mode and each queue's documented bulk-action footer were verified without executing a bulk mutation.
-- Fraud severity and Shipping method sorts were accepted by the live backend and persisted in route state.
+- Fraud severity and recommendation sorts were accepted by the live backend and persisted in route state.
 - The OMS entity XML is well formed. A standalone OMS Gradle build remains an environment check because the local shell provides Java 11 while the current build requires Java 17.

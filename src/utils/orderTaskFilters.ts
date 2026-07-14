@@ -26,7 +26,7 @@ export function buildTaskQueueRequest(
   if (filters.salesChannelEnumId !== 'All') params.salesChannelEnumId = filters.salesChannelEnumId;
 
   addDateRange(params, 'orderDate', filters.orderDateFrom, filters.orderDateThru);
-  addDateRange(params, 'createdDate', filters.taskCreatedFrom, filters.taskCreatedThru);
+  addDateRange(params, 'workEffortCreatedDate', filters.taskCreatedFrom, filters.taskCreatedThru);
 
   if (queue === 'fraud') {
     if (filters.orderStatusId !== 'All') params.orderStatusId = filters.orderStatusId;
@@ -58,7 +58,7 @@ export function hasTaskFilters(filters: OrderTaskFilters): boolean {
 
 function addDateRange(
   params: TaskQueueRequestParams,
-  field: 'orderDate' | 'createdDate',
+  field: 'orderDate' | 'workEffortCreatedDate',
   from: string,
   thru: string,
 ) {

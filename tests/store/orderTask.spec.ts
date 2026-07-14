@@ -126,7 +126,7 @@ describe('order task store', () => {
     await store.fetchSwapTasks({
       pageSize: 20,
       pageIndex: 0,
-      orderByField: 'createdDate,workEffortId',
+      orderByField: 'workEffortCreatedDate,workEffortId',
       orderName: '1001',
       orderName_op: 'contains',
     });
@@ -138,7 +138,7 @@ describe('order task store', () => {
       params: {
         pageSize: 20,
         pageIndex: 0,
-        orderByField: 'createdDate,workEffortId',
+        orderByField: 'workEffortCreatedDate,workEffortId',
         orderName: '1001',
         orderName_op: 'contains',
         statusId: 'TASK_CREATED',
@@ -147,6 +147,59 @@ describe('order task store', () => {
         productStoreId: 'STORE',
       },
     });
+  });
+
+  it('preserves the list task creation date when ship-group enrichment has its own created date', async () => {
+    const store = useOrderTaskStore();
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        data: [{
+          workEffortId: 'TASK_1',
+          orderId: 'ORDER_1',
+          shipGroupSeqId: '00001',
+          workEffortCreatedDate: 1784023200000,
+          items: [],
+        }],
+      })
+      .mockResolvedValueOnce({
+        data: {
+          shipGroup: {
+            createdDate: 1783936800000,
+            items: [],
+          },
+        },
+      });
+
+    await store.fetchSwapTasks({ pageSize: 20, pageIndex: 0 });
+
+    expect(store.getSwapTasks[0].workEffortCreatedDate).toBe(1784023200000);
+    expect(store.getSwapTasks[0].createdDate).toBe(1783936800000);
+  });
+
+  it('uses the fraud task creation timestamp returned by the queue API', async () => {
+    const store = useOrderTaskStore();
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        data: [{
+          workEffortId: 'TASK_1',
+          orderId: 'ORDER_1',
+          workEffortCreatedDate: 1784023200000,
+        }],
+      })
+      .mockResolvedValueOnce({
+        data: [{
+          orderId: 'ORDER_1',
+          roles: [],
+          contactMechs: [],
+          paymentPreferences: [],
+          shipGroups: [],
+        }],
+      })
+      .mockResolvedValueOnce({ data: [] });
+
+    await store.fetchFraudTasks({ pageSize: 20, pageIndex: 0 });
+
+    expect(store.getFraudTasks[0].workEffortCreatedDate).toBe(1784023200000);
   });
 
   it('fetches order fraud tasks with the hold type and risk review purpose', async () => {

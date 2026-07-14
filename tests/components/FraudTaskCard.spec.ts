@@ -7,6 +7,7 @@ describe('fraud task card Figma footer', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/components/tasks/FraudTaskCard.vue'), 'utf8');
 
     expect(source).toContain('class="suggested-action"');
+    expect(source).toContain('<ion-item lines="full" class="suggested-action">');
     expect(source).toContain('<ion-text :color="suggestedActionColor(task)">');
     expect(source).toContain('suggestedActionLabel(task)');
     expect(source).toContain('seedStore.enumDescription(task.riskRecommendationEnumId)');
@@ -21,6 +22,9 @@ describe('fraud task card Figma footer', () => {
     expect(source).not.toContain(':color="riskLevelColor(risk.riskLevelEnumId)"');
     expect(source).not.toContain('getProduct(item.productId).mainImageUrl');
     expect(source).not.toContain("{{ translate('Suggested action') }}: {{ task.suggestedAction }}");
+    expect(source).not.toContain('<template #actions-end>');
+    expect(source).toContain("{ id: 'resolve', label: translate('Resolve task'), kind: 'primary' }");
+    expect(source).toContain("{ id: 'cancel', label: translate('Cancel order'), kind: 'danger' }");
     expect(source).not.toContain('<ion-grid');
     expect(source).not.toContain('<ion-row');
     expect(source).not.toContain('<ion-col');

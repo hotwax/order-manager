@@ -1,7 +1,9 @@
 <template>
   <TaskCardShell
-    :title="getCardTitle(task)"
-    :subtitle="taskItemSummary(task)"
+    :title="taskOrderTitle(task)"
+    :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
+    :amount="formatTaskAmount(task.grandTotal)"
+    :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
     :contact-phone-href="getPhoneHref(task)"
@@ -12,19 +14,19 @@
     content-layout="grid"
     :selectable="selectable"
     :selected="selected"
+    :actions="cardActions"
+    :view-order-link="showViewOrderAction && task.orderId ? `/orders/${task.orderId}` : ''"
     @update:selected="emit('update:selected', $event)"
+    @action="handleAction"
   >
-    <template #heading-end>
-      <ion-note slot="end">{{ brokerageLabel(task) }}</ion-note>
-    </template>
-
     <template #content-start>
       <ion-list lines="full" v-if="hasRoutingDetails(task)">
         <ion-item>
           <ion-icon slot="start" :icon="gitBranchOutline" />
           <ion-label>
-            <p class="overline">{{ routingMovementLabel(task) }}</p>
-            {{ routingPath(task) || translate('Routing details') }}
+            <p class="overline">{{ brokerageLabel(task) }}</p>
+            {{ routingMovementLabel(task) }}
+            <p>{{ routingPath(task) || translate('Routing details') }}</p>
           </ion-label>
           <ion-note slot="end" v-if="routingTimestamp(task)">{{ formatRoutingTimestamp(task) }}</ion-note>
         </ion-item>
@@ -61,10 +63,6 @@
         >
           <ion-icon slot="icon-only" :icon="chevronForwardOutline" />
         </ion-button>
-      </ion-item>
-      <ion-item>
-        <ion-label>{{ translate('Original total') }}</ion-label>
-        <ion-note slot="end" color="dark">{{ money(task.grandTotal) }}</ion-note>
       </ion-item>
     </ion-list>
 
@@ -127,12 +125,6 @@
       </ion-item>
     </ion-list>
 
-    <template #actions>
-      <ion-button fill="clear" color="primary" @click="releaseUpdatedOrder(task)">{{ translate('Release updated order') }}</ion-button>
-      <ion-button fill="clear" color="danger" @click="cancelOrder(task)">{{ translate('Cancel order') }}</ion-button>
-      <ion-button fill="clear" color="primary" @click="parkOrder(task)">{{ translate('Park') }}</ion-button>
-      <ion-button v-if="showViewOrderAction && task.orderId" fill="clear" color="primary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
-    </template>
   </TaskCardShell>
 </template>
 
@@ -152,7 +144,8 @@ import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
 import { isSwapItemUnavailable } from '@/utils/swapItems';
-import { taskOrderTitle } from '@/utils/taskCardDisplay';
+import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
+import type { TaskCardAction } from '@/types/taskCard';
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean; showViewOrderAction?: boolean }>(), {
   selectable: false,
@@ -165,14 +158,16 @@ const emit = defineEmits<{ (e: 'update:selected', value: boolean): void; (e: 'co
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
 
+const cardActions = computed<TaskCardAction[]>(() => [
+  { id: 'release', label: translate('Release updated order'), kind: 'primary' },
+  { id: 'park', label: translate('Park'), kind: 'neutral' },
+  { id: 'cancel', label: translate('Cancel order'), kind: 'danger' },
+]);
+
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 
 function getCustomerName(customer: any): string {
   return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');
-}
-
-function getCardTitle(task: any): string {
-  return seedStore.facilityName(task.facilityId) || taskOrderTitle(task);
 }
 
 function routingFacilityName(task: any): string {
@@ -238,17 +233,10 @@ function hasRoutingDetails(task: any): boolean {
     || task.orderRoutingId
     || task.routingRuleName
     || task.routingRuleId
+    || task.facilityId
     || routingJustification(task)
     || routingTimestamp(task)
   );
-}
-
-function taskItemSummary(task: any): string {
-  const items = task.items ?? [];
-  const itemCount = items.length;
-  const unitCount = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
-
-  return `${itemCount} ${itemCount === 1 ? translate('item') : translate('items')} ${unitCount} ${unitCount === 1 ? translate('unit') : translate('units')}`;
 }
 
 function isVirtualFacility(task: any): boolean {
@@ -508,6 +496,12 @@ async function submitPark(facilityId: string) {
     facilityId,
     props.task.workEffortId,
   );
+}
+
+function handleAction(actionId: string) {
+  if (actionId === 'release') return releaseUpdatedOrder(props.task);
+  if (actionId === 'park') return parkOrder(props.task);
+  if (actionId === 'cancel') return cancelOrder(props.task);
 }
 
 defineExpose({ task: props.task, submitCancel, submitPark });

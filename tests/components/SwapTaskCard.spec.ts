@@ -43,7 +43,15 @@ describe('swap task card Figma routing block', () => {
     expect(source).toContain('async function submitPark(facilityId: string)');
     expect(source).toContain('async function submitCancel()');
     expect(source).toContain('defineExpose({ task: props.task, submitCancel, submitPark })');
-    expect(source).toContain('<ion-button fill="clear" color="danger" @click="cancelOrder(task)">{{ translate(\'Cancel order\') }}</ion-button>');
+    expect(source).toContain(":title=\"taskOrderTitle(task)\"");
+    expect(source).toContain(":subtitle=\"taskOrderSubtitle(task.orderDate, translate('Ordered'))\"");
+    expect(source).toContain(":amount=\"formatTaskAmount(task.grandTotal)\"");
+    expect(source).toContain("{ id: 'release', label: translate('Release updated order'), kind: 'primary' }");
+    expect(source).toContain("{ id: 'park', label: translate('Park'), kind: 'neutral' }");
+    expect(source).toContain("{ id: 'cancel', label: translate('Cancel order'), kind: 'danger' }");
+    expect(source).toContain("if (actionId === 'cancel') return cancelOrder(props.task);");
+    expect(source).not.toContain('function getCardTitle(task: any)');
+    expect(source).not.toContain('<template #heading-end>');
     expect(source).not.toContain("//await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED')");
     expect(source).not.toContain('getProduct(item.productId).mainImageUrl');
     expect(source).not.toContain("translate('Order facility change routing')");

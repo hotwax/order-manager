@@ -10,9 +10,7 @@ export type TaskSort =
   | 'highestRisk'
   | 'lowestRisk'
   | 'recommendationAsc'
-  | 'recommendationDesc'
-  | 'shippingMethodAsc'
-  | 'shippingMethodDesc';
+  | 'recommendationDesc';
 
 export interface TaskSortOption {
   label: string;
@@ -48,8 +46,8 @@ export interface TaskQueueRequestParams {
   salesChannelEnumId?: string;
   orderDate_from?: number;
   orderDate_thru?: number;
-  createdDate_from?: number;
-  createdDate_thru?: number;
+  workEffortCreatedDate_from?: number;
+  workEffortCreatedDate_thru?: number;
   facilityId?: string;
   shipmentMethodTypeId?: string;
   orderStatusId?: string;
@@ -74,23 +72,19 @@ export const FRAUD_TASK_SORT_OPTIONS: TaskSortOption[] = [
   { label: 'Lowest risk severity first', value: 'lowestRisk' },
   { label: 'Risk recommendation A-Z', value: 'recommendationAsc' },
   { label: 'Risk recommendation Z-A', value: 'recommendationDesc' },
-  { label: 'Shipping method A-Z', value: 'shippingMethodAsc' },
-  { label: 'Shipping method Z-A', value: 'shippingMethodDesc' },
 ];
 
 export const TASK_SORT_ORDER_BY: Record<TaskSort, string> = {
-  oldestTask: 'createdDate,workEffortId',
-  newestTask: '-createdDate,-workEffortId',
+  oldestTask: 'workEffortCreatedDate,workEffortId',
+  newestTask: '-workEffortCreatedDate,-workEffortId',
   oldestOrder: 'orderDate,workEffortId',
   newestOrder: '-orderDate,-workEffortId',
   highestTotal: '-grandTotal,-workEffortId',
   lowestTotal: 'grandTotal,workEffortId',
-  highestRisk: '-riskLevelSortRank,-workEffortId',
-  lowestRisk: 'riskLevelSortRank,workEffortId',
+  highestRisk: 'riskLevelSortRank,workEffortId',
+  lowestRisk: '-riskLevelSortRank,-workEffortId',
   recommendationAsc: 'riskRecommendationSortValue,workEffortId',
   recommendationDesc: '-riskRecommendationSortValue,-workEffortId',
-  shippingMethodAsc: 'shipmentMethodSortValue,workEffortId',
-  shippingMethodDesc: '-shipmentMethodSortValue,-workEffortId',
 };
 
 export function defaultOrderTaskFilters(): OrderTaskFilters {

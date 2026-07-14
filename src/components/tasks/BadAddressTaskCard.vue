@@ -1,7 +1,9 @@
 <template>
   <TaskCardShell
     :title="taskOrderTitle(task)"
-    :subtitle="taskItemSummary(task)"
+    :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
+    :amount="formatTaskAmount(task.grandTotal)"
+    :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
     :contact-phone-href="getPhoneHref(task)"
@@ -9,7 +11,10 @@
     :contact-email-href="getEmailHref(task)"
     :selectable="selectable"
     :selected="selected"
+    :actions="cardActions"
+    :view-order-link="showViewOrderAction && task.orderId ? `/orders/${task.orderId}` : ''"
     @update:selected="emit('update:selected', $event)"
+    @action="handleAction"
   >
     <ion-radio-group v-if="addressState" v-model="addressState.selectedAddressType" class="address-task-addresses">
       <ion-list class="ion-no-padding" lines="full">
@@ -93,19 +98,12 @@
       </ion-list>
     </div>
 
-    <template #actions>
-      <ion-button fill="clear" color="primary" @click="saveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
-      <ion-button fill="clear" color="primary" @click="cancelOrder()">{{ translate('Cancel order') }}</ion-button>
-      <ion-button fill="clear" color="primary" @click="parkOrder()">{{ translate('Park') }}</ion-button>
-      <ion-button v-if="showViewOrderAction && task.orderId" fill="clear" color="primary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
-    </template>
   </TaskCardShell>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
-  IonButton,
   IonIcon,
   IonInput,
   IonItem,
@@ -126,9 +124,10 @@ import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
-import { taskOrderTitle } from '@/utils/taskCardDisplay';
+import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import { buildAddressState } from '@/utils/badAddressState';
 import type { AddressState } from '@/types/order';
+import type { TaskCardAction } from '@/types/taskCard';
 
 const props = withDefaults(defineProps<{
   task: any;
@@ -149,6 +148,12 @@ const emit = defineEmits<{
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
+
+const cardActions = computed<TaskCardAction[]>(() => [
+  { id: 'save-and-release', label: translate('Save and release hold'), kind: 'primary' },
+  { id: 'park', label: translate('Park'), kind: 'neutral' },
+  { id: 'cancel', label: translate('Cancel order'), kind: 'danger' },
+]);
 
 // Editable per-card address form. Built lazily (see onMounted) from the task so
 // the shell + skeleton paint first; stays null until then, which drives the
@@ -231,13 +236,6 @@ function getEmailAddress(task: any): string {
 function getEmailHref(task: any): string {
   const email = getEmailAddress(task);
   return email ? `mailto:${email}` : '';
-}
-
-function taskItemSummary(task: any): string {
-  const items = task.items ?? [];
-  const itemCount = items.length;
-  const unitCount = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
-  return `${itemCount} ${itemCount === 1 ? translate('item') : translate('items')} ${unitCount} ${unitCount === 1 ? translate('unit') : translate('units')}`;
 }
 
 function validate(): string | null {
@@ -323,6 +321,12 @@ async function parkOrder() {
   } catch {
     await showToast(translate('Failed to park the order. Please try again.'));
   }
+}
+
+function handleAction(actionId: string) {
+  if (actionId === 'save-and-release') return saveAndReleaseHold();
+  if (actionId === 'park') return parkOrder();
+  if (actionId === 'cancel') return cancelOrder();
 }
 
 defineExpose({

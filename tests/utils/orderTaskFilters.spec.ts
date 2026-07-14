@@ -26,14 +26,14 @@ describe('order task filter request mapping', () => {
     expect(buildTaskQueueRequest('swap', filters, 20, 0)).toEqual({
       pageSize: 20,
       pageIndex: 0,
-      orderByField: '-createdDate,-workEffortId',
+      orderByField: '-workEffortCreatedDate,-workEffortId',
       orderName: '1001',
       orderName_op: 'contains',
       salesChannelEnumId: 'WEB_CHANNEL',
       orderDate_from: DateTime.fromISO('2026-07-01').startOf('day').toMillis(),
       orderDate_thru: DateTime.fromISO('2026-07-02').endOf('day').toMillis(),
-      createdDate_from: DateTime.fromISO('2026-07-03').startOf('day').toMillis(),
-      createdDate_thru: DateTime.fromISO('2026-07-04').endOf('day').toMillis(),
+      workEffortCreatedDate_from: DateTime.fromISO('2026-07-03').startOf('day').toMillis(),
+      workEffortCreatedDate_thru: DateTime.fromISO('2026-07-04').endOf('day').toMillis(),
       facilityId: 'FACILITY_1',
       shipmentMethodTypeId: 'STANDARD',
     });
@@ -53,18 +53,17 @@ describe('order task filter request mapping', () => {
     expect(buildTaskQueueRequest('fraud', filters, 20, 1)).toEqual({
       pageSize: 20,
       pageIndex: 1,
-      orderByField: '-riskLevelSortRank,-workEffortId',
+      orderByField: 'riskLevelSortRank,workEffortId',
       orderStatusId: 'ORDER_APPROVED',
       riskRecommendationEnumId: 'ORREC_CANCEL',
       riskLevelEnumId: 'ORLVL_HIGH',
     });
   });
 
-  it('keeps six common sorts first and appends six Fraud sorts', () => {
+  it('keeps six common sorts first and appends four Fraud sorts', () => {
     expect(COMMON_TASK_SORT_OPTIONS).toHaveLength(6);
     expect(FRAUD_TASK_SORT_OPTIONS.slice(0, 6)).toEqual(COMMON_TASK_SORT_OPTIONS);
-    expect(FRAUD_TASK_SORT_OPTIONS).toHaveLength(12);
+    expect(FRAUD_TASK_SORT_OPTIONS).toHaveLength(10);
     expect(TASK_SORT_ORDER_BY.recommendationAsc).toBe('riskRecommendationSortValue,workEffortId');
-    expect(TASK_SORT_ORDER_BY.shippingMethodDesc).toBe('-shipmentMethodSortValue,-workEffortId');
   });
 });
