@@ -32,28 +32,16 @@
           <ion-radio class="ion-margin-end" value="original" label-placement="start">{{ translate('keep original') }}</ion-radio>
         </ion-list-header>
         <ion-item>
-          <ion-label class="geo-picker-field">
-            <span class="geo-picker-label">{{ translate('Address line 1') }}</span>
-            <span>{{ readOnlyAddressValue(addressState.original.address1) }}</span>
-          </ion-label>
+          <ion-input :label="translate('Address line 1')" label-placement="stacked" :value="addressState.original.address1" readonly />
         </ion-item>
         <ion-item>
-          <ion-label class="geo-picker-field">
-            <span class="geo-picker-label">{{ translate('Address line 2') }}</span>
-            <span>{{ readOnlyAddressValue(addressState.original.address2) }}</span>
-          </ion-label>
+          <ion-input :label="translate('Address line 2')" label-placement="stacked" :value="addressState.original.address2" readonly />
         </ion-item>
         <ion-item>
-          <ion-label class="geo-picker-field">
-            <span class="geo-picker-label">{{ translate('City') }}</span>
-            <span>{{ readOnlyAddressValue(addressState.original.city) }}</span>
-          </ion-label>
+          <ion-input :label="translate('City')" label-placement="stacked" :value="addressState.original.city" readonly />
         </ion-item>
         <ion-item>
-          <ion-label class="geo-picker-field">
-            <span class="geo-picker-label">{{ translate('Postal code') }}</span>
-            <span>{{ readOnlyAddressValue(addressState.original.postalCode) }}</span>
-          </ion-label>
+          <ion-input :label="translate('Postal code')" label-placement="stacked" :value="addressState.original.postalCode" readonly />
         </ion-item>
         <ion-item>
           <ion-label class="geo-picker-field">

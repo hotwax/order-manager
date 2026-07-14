@@ -18,10 +18,12 @@ describe('bad address task card', () => {
       cardSource.indexOf("translate('Suggested address')")
     );
 
-    expect(originalAddress).not.toContain('<ion-input');
+    expect(originalAddress.match(/<ion-input/g)).toHaveLength(4);
+    expect(originalAddress.match(/readonly \/>/g)).toHaveLength(4);
+    expect(originalAddress).not.toContain('v-model=');
     expect(originalAddress).not.toContain('@click="openCountryPicker');
     expect(originalAddress).not.toContain('@click="openStatePicker');
-    expect(originalAddress.match(/readOnlyAddressValue\(/g)).toHaveLength(6);
+    expect(originalAddress.match(/readOnlyAddressValue\(/g)).toHaveLength(2);
     expect(cardSource).toContain("return value || '\\u00A0';");
   });
 
