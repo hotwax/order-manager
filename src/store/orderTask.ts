@@ -140,12 +140,12 @@ type TaskLoadStatus = 'idle' | 'loading' | 'success' | 'error';
 export const useOrderTaskStore = defineStore('orderTask', {
   state: () => ({
     holdTasks: [] as any[],
-    holdStatus: 'idle' as 'idle' | 'loading' | 'success' | 'error',
+    holdStatus: 'idle' as TaskLoadStatus,
     holdError: '' as string,
     addressValidationTasks: [] as any[],
     swapTasks: [] as any[],
     fraudTasks: [] as any[],
-    fraudStatus: 'idle' as 'idle' | 'loading' | 'success' | 'error',
+    fraudStatus: 'idle' as TaskLoadStatus,
     fraudError: '' as string,
     orderHoldTasksByOrderId: {} as Record<string, any[]>,
     orderAddressValidationTasksByOrderId: {} as Record<string, any[]>,
