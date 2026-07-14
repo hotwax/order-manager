@@ -217,7 +217,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           },
         });
         const tasks = listResponse.data ?? [];
-        const detailedTasks = await Promise.all(tasks.map((task: any) => enrichHoldTask(task)));
+        const detailedTasks = await Promise.all(tasks.map(enrichHoldTask));
         this.holdTasks = isFirstPage ? detailedTasks : [...this.holdTasks, ...detailedTasks];
         if (isFirstPage) this.holdStatus = 'success';
       } catch (err: any) {
@@ -243,7 +243,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           },
         });
         const tasks = listResponse.data ?? [];
-        const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
+        const detailedTasks = await Promise.all(tasks.map(enrichShipGroupTask));
         this.addressValidationTasks = payload.pageIndex > 0 ? [...this.addressValidationTasks, ...detailedTasks] : detailedTasks;
         return true;
       } catch (err) {
@@ -274,7 +274,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           },
         });
         const tasks = listResponse.data ?? [];
-        const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
+        const detailedTasks = await Promise.all(tasks.map(enrichShipGroupTask));
         this.swapTasks = isFirstPage ? detailedTasks : [...this.swapTasks, ...detailedTasks];
         // Only mark success once product master + stock enrichment have settled so
         // the cards render their images/stock without flashing partial content.
@@ -310,7 +310,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           },
         });
         const tasks = listResponse.data ?? [];
-        const detailedTasks = await Promise.all(tasks.map((task: any) => enrichFraudTask(task)));
+        const detailedTasks = await Promise.all(tasks.map(enrichFraudTask));
         this.fraudTasks = isFirstPage ? detailedTasks : [...this.fraudTasks, ...detailedTasks];
         // Success only after both the list and the per-task enrichment have settled.
         if (isFirstPage) this.fraudStatus = 'success';
@@ -346,8 +346,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          const detailed = await Promise.all(tasks.map((task: any) => enrichHoldTask(task)));
-          this.orderHoldTasksByOrderId[orderId] = detailed;
+          this.orderHoldTasksByOrderId[orderId] = await Promise.all(tasks.map(enrichHoldTask));
         } catch (err) {
           console.error('Failed to fetch the order hold tasks', err);
         }
@@ -367,8 +366,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          const detailed = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
-          this.orderAddressValidationTasksByOrderId[orderId] = detailed;
+          this.orderAddressValidationTasksByOrderId[orderId] = await Promise.all(tasks.map(enrichShipGroupTask));
         } catch (err) {
           console.error('Failed to fetch the order address validation tasks', err);
         }
@@ -388,7 +386,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
+          const detailedTasks = await Promise.all(tasks.map(enrichShipGroupTask));
           this.orderSwapTasksByOrderId[orderId] = detailedTasks;
           await prefetchSwapTaskAssets(detailedTasks);
         } catch (err) {
@@ -410,7 +408,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          const detailedTasks = await Promise.all(tasks.map((task: any) => enrichFraudTask(task)));
+          const detailedTasks = await Promise.all(tasks.map(enrichFraudTask));
           this.orderFraudTasksByOrderId[orderId] = detailedTasks;
           await prefetchFraudTaskAssets(detailedTasks);
         } catch (err) {
