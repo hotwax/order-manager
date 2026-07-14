@@ -40,8 +40,10 @@ describe('swap task card Figma routing block', () => {
     expect(source).toContain('?? task.progress');
     expect(source).toContain('?? task.progressPercent');
     expect(source).toContain('?? task.completionPercentage');
-    expect(source).toContain('parkOrder(task.orderId, task.shipGroupSeqId, facilityId, task.workEffortId)');
-    expect(source).toContain('<ion-button fill="clear" color="primary" @click="cancelOrder(task)">{{ translate(\'Cancel order\') }}</ion-button>');
+    expect(source).toContain('async function submitPark(facilityId: string)');
+    expect(source).toContain('async function submitCancel()');
+    expect(source).toContain('defineExpose({ task: props.task, submitCancel, submitPark })');
+    expect(source).toContain('<ion-button fill="clear" color="danger" @click="cancelOrder(task)">{{ translate(\'Cancel order\') }}</ion-button>');
     expect(source).not.toContain("//await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED')");
     expect(source).not.toContain('getProduct(item.productId).mainImageUrl');
     expect(source).not.toContain("translate('Order facility change routing')");

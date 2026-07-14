@@ -116,6 +116,39 @@ describe('order task store', () => {
     });
   });
 
+  it('captures queue totals and preserves stable sort parameters', async () => {
+    const store = useOrderTaskStore();
+    vi.mocked(api).mockResolvedValueOnce({
+      data: [],
+      headers: { 'x-total-count': '42' },
+    });
+
+    await store.fetchSwapTasks({
+      pageSize: 20,
+      pageIndex: 0,
+      orderByField: 'createdDate,workEffortId',
+      orderName: '1001',
+      orderName_op: 'contains',
+    });
+
+    expect(store.getSwapTotal).toBe(42);
+    expect(api).toHaveBeenCalledWith({
+      url: 'oms/orders/tasks/shipGroupTasks',
+      method: 'GET',
+      params: {
+        pageSize: 20,
+        pageIndex: 0,
+        orderByField: 'createdDate,workEffortId',
+        orderName: '1001',
+        orderName_op: 'contains',
+        statusId: 'TASK_CREATED',
+        workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+        workEffortPurposeTypeId: 'NEG_RES_REVIEW',
+        productStoreId: 'STORE',
+      },
+    });
+  });
+
   it('fetches order fraud tasks with the hold type and risk review purpose', async () => {
     const store = useOrderTaskStore();
     vi.mocked(api).mockResolvedValue({ data: [] });

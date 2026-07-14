@@ -10,46 +10,33 @@
     </ion-header>
 
     <ion-content>
-      <SearchFilterCard
-        v-model="searchQuery"
-        :placeholder="translate('Search')"
-        @search="fetchHoldTasks()"
+      <OrderTaskFilterCard
+        v-model="filters"
+        :channel-options="channelOptions"
+        :facility-options="facilityOptions"
+        :shipment-method-options="shipmentMethodOptions"
+        show-ship-group-filters
+        @search="replaceHoldTasks"
         @clear="clearFilters"
-      >
-        <FilterSelect v-model="assignee" :label="translate('Assignee')">
-          <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
-          <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
-        </FilterSelect>
-        <DateFilterSelect v-model="dateAfter" :label="translate('Order date after')" />
-        <DateFilterSelect v-model="dateBefore" :label="translate('Order date before')" />
-        <FilterSelect v-model="orderChannel" :label="translate('Channel')">
-          <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
-          <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
-            {{ channel.description || channel.enumId }}
-          </ion-select-option>
-        </FilterSelect>
-      </SearchFilterCard>
+      />
 
       <ion-progress-bar v-if="isRefetching" type="indeterminate" />
 
-      <ion-list v-if="heldTasks.length" lines="none">
-        <ion-list-header class="order-results-header">
-          <span class="order-results-header-start">
-            <ion-checkbox
-              v-if="selectMode"
-              :checked="allCurrentPageSelected"
-              :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
-              @ionChange="toggleCurrentPageSelection($event.detail.checked)"
-            />
-          </span>
-          <ion-label>
-            {{ heldTasks.length }} {{ heldTasks.length === 1 ? translate('hold task') : translate('hold tasks') }}
-          </ion-label>
-          <ion-button fill="clear" size="small" @click="toggleSelectMode">
-            {{ selectMode ? translate('Done') : translate('Select') }}
-          </ion-button>
-        </ion-list-header>
-      </ion-list>
+      <TaskQueueListHeader
+        :loaded-count="heldTasks.length"
+        :total-count="holdTotal"
+        singular-label="hold task"
+        plural-label="hold tasks"
+        :sort="filters.sort"
+        :sort-options="sortOptions"
+        trigger-id="hold-task-sort"
+        :select-mode="selectMode"
+        :all-loaded-selected="allCurrentPageSelected"
+        :some-loaded-selected="someCurrentPageSelected"
+        @update:sort="filters.sort = $event"
+        @toggle-select-mode="toggleSelectMode"
+        @toggle-loaded-selection="toggleCurrentPageSelection"
+      />
 
       <div class="hold-orders-list">
         <HoldTaskCard
@@ -96,7 +83,7 @@
     <ion-footer v-if="selectMode">
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks" @click="resolveSelectedTasks()">{{ translate('Resolve') }}</ion-button>
+          <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks || bulkActionRunning" @click="resolveSelectedTasks()">{{ translate('Resolve') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
@@ -107,20 +94,15 @@
 import { ref, computed, watch } from 'vue';
 import {
   IonButtons,
-  IonCheckbox,
   IonContent,
   IonFooter,
   IonHeader,
-  IonLabel,
-  IonList,
-  IonListHeader,
   IonMenuButton,
   IonPage,
   IonTitle,
   IonToolbar,
   IonButton,
   IonProgressBar,
-  IonSelectOption,
   IonSpinner,
   alertController,
   IonInfiniteScroll,
@@ -128,31 +110,33 @@ import {
   onIonViewWillEnter
 } from '@ionic/vue';
 import { translate } from '@common';
-import router from '@/router';
-import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
+import { showToast } from '@/utils';
 import ErrorState from '@/components/common/ErrorState.vue';
-import FilterSelect from '@/components/common/FilterSelect.vue';
-import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import OrderTaskFilterCard from '@/components/tasks/OrderTaskFilterCard.vue';
+import TaskQueueListHeader from '@/components/tasks/TaskQueueListHeader.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useUserStore } from '@/store/user';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
+import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
+import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
+import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
+import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
 const userStore = useUserStore();
 const seedStore = useSeedStore();
 
-const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
-const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
-
-const searchQuery = ref('');
-const assignee = ref('');
-const dateAfter = ref('');
-const dateBefore = ref('');
-const orderChannel = ref('');
+const filters = ref(defaultOrderTaskFilters());
+useOrderTaskRouteState(filters, 'hold');
+const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
+const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
+const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions);
+const sortOptions = taskSortOptions('hold');
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
 const cardRefs = ref<Record<string, any>>({});
+const bulkActionRunning = ref(false);
 
 function setCardRef(workEffortId: string, el: any) {
   if (el) {
@@ -163,11 +147,12 @@ function setCardRef(workEffortId: string, el: any) {
 }
 
 const heldTasks = computed(() => orderTaskStore.getHoldTasks);
+const holdTotal = computed(() => orderTaskStore.getHoldTotal);
 const isScrollable = computed(() => orderTaskStore.isHoldTasksScrollable);
 const holdStatus = computed(() => orderTaskStore.getHoldStatus);
 const holdError = computed(() => orderTaskStore.getHoldError);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
-const hasFilters = computed(() => !!(searchQuery.value || assignee.value || dateAfter.value || dateBefore.value || orderChannel.value));
+const hasFilters = computed(() => hasTaskFilters(filters.value));
 const currentPageTaskIds = computed(() => heldTasks.value.map((task) => task.workEffortId));
 const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));
 const someCurrentPageSelected = computed(() => currentPageTaskIds.value.some((workEffortId: string) => selectedOrders.value[workEffortId]));
@@ -187,9 +172,19 @@ function getEmptyMessage() {
     : translate('No records found.');
 }
 
-watch([assignee, dateAfter, dateBefore, orderChannel], () => {
-  fetchHoldTasks();
-});
+let suppressAutomaticFetch = false;
+watch(() => [
+  filters.value.salesChannelEnumId,
+  filters.value.orderDateFrom,
+  filters.value.orderDateThru,
+  filters.value.taskCreatedFrom,
+  filters.value.taskCreatedThru,
+  filters.value.facilityId,
+  filters.value.shipmentMethodTypeId,
+  filters.value.sort,
+], () => {
+  if (!suppressAutomaticFetch) replaceHoldTasks();
+}, { flush: 'sync' });
 
 function toggleSelectMode() {
   if (selectMode.value) {
@@ -216,13 +211,10 @@ watch(heldTasks, () => {
 });
 
 function clearFilters() {
-  searchQuery.value = '';
-  assignee.value = '';
-  dateAfter.value = '';
-  dateBefore.value = '';
-  orderChannel.value = '';
-  router.replace({ query: {} });
-  fetchHoldTasks();
+  suppressAutomaticFetch = true;
+  filters.value = defaultOrderTaskFilters();
+  suppressAutomaticFetch = false;
+  replaceHoldTasks();
 }
 
 async function resolveSelectedTasks() {
@@ -240,14 +232,22 @@ async function resolveSelectedTasks() {
         text: translate('Resolve tasks'),
         role: 'confirm',
         handler: async () => {
-          await Promise.all(
-            selected
-              .map(id => cardRefs.value[id])
-              .filter(Boolean)
-              .map(card => card.submitResolve())
-          );
-          selectedOrders.value = {};
-          await fetchHoldTasks();
+          bulkActionRunning.value = true;
+          try {
+            const results = await Promise.allSettled(
+              selected
+                .map(id => cardRefs.value[id])
+                .filter(Boolean)
+                .map(card => card.submitResolve())
+            );
+            const failed = results.filter((result) => result.status === 'rejected').length;
+            const succeeded = results.length - failed;
+            if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));
+            if (failed) await showToast(translate('{count} task(s) failed.', { count: failed }));
+            await replaceHoldTasks();
+          } finally {
+            bulkActionRunning.value = false;
+          }
         }
       }
     ]
@@ -257,17 +257,25 @@ async function resolveSelectedTasks() {
 
 
 const fetchHoldTasks = async (pageSize?: any, pageIndex?: any) => {
+  const isFirstPage = !Number(pageIndex || 0);
+  if (isFirstPage) resetSelection();
   // The store owns loading/error status and keeps failures in state.
-  await orderTaskStore.fetchHoldTasks({
-    pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
-    pageIndex: pageIndex ?? 0,
-    ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
-    ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
-    ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
-    ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
-    ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
-  });
+  await orderTaskStore.fetchHoldTasks(buildTaskQueueRequest(
+    'hold',
+    filters.value,
+    pageSize ?? import.meta.env.VITE_VIEW_SIZE,
+    pageIndex ?? 0,
+  ));
 };
+
+function replaceHoldTasks() {
+  return fetchHoldTasks(undefined, 0);
+}
+
+function resetSelection() {
+  selectedOrders.value = {};
+  selectMode.value = false;
+}
 
 async function loadMoreHoldTasks(event: any) {
   await fetchHoldTasks(
@@ -278,7 +286,8 @@ async function loadMoreHoldTasks(event: any) {
 }
 
 onIonViewWillEnter(() => {
-  fetchHoldTasks();
+  loadPhysicalFacilities();
+  replaceHoldTasks();
 });
 </script>
 

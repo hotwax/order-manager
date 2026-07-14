@@ -462,12 +462,7 @@ async function cancelOrder(task: any) {
         role: 'confirm',
         handler: async () => {
           try {
-            const items = (task.items ?? []).map((item: any) => ({
-              orderItemSeqId: item.orderItemSeqId,
-              shipGroupSeqId: task.shipGroupSeqId,
-            }));
-            await orderTaskStore.cancelOrder(task.orderId, items);
-            await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED');
+            await submitCancel();
             emit('completed');
           } catch {
             await showToast(translate('Failed to cancel the order. Please try again.'));
@@ -489,7 +484,7 @@ async function parkOrder(task: any) {
   if (!facilityId) return;
 
   try {
-    await orderTaskStore.parkOrder(task.orderId, task.shipGroupSeqId, facilityId, task.workEffortId);
+    await submitPark(facilityId);
     await showToast(translate('Order successfully moved to parking.'));
     emit('completed');
   } catch {
@@ -497,5 +492,23 @@ async function parkOrder(task: any) {
   }
 }
 
-defineExpose({ task: props.task });
+async function submitCancel() {
+  const items = (props.task.items ?? []).map((item: any) => ({
+    orderItemSeqId: item.orderItemSeqId,
+    shipGroupSeqId: props.task.shipGroupSeqId,
+  }));
+  await orderTaskStore.cancelOrder(props.task.orderId, items);
+  await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_CANCELLED');
+}
+
+async function submitPark(facilityId: string) {
+  await orderTaskStore.parkOrder(
+    props.task.orderId,
+    props.task.shipGroupSeqId,
+    facilityId,
+    props.task.workEffortId,
+  );
+}
+
+defineExpose({ task: props.task, submitCancel, submitPark });
 </script>
