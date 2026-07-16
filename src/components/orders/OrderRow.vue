@@ -67,7 +67,7 @@ const emit = defineEmits<{
   (event: 'selectionChange', selected: boolean): void;
 }>();
 
-const identityLabel = computed(() => [props.model.orderReference, props.model.orderId, props.model.status]
-  .filter(Boolean)
+const identityLabel = computed(() => [...new Set([props.model.orderName, props.model.orderId, props.model.status]
+  .filter(Boolean))]
   .join(' - '));
 </script>

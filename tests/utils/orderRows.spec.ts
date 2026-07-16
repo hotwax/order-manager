@@ -87,7 +87,8 @@ describe('order row view models', () => {
   it('omits unavailable carriers and unsupported deadlines without a placeholder', () => {
     const model = toSearchOrderRowViewModel({
       id: 'ORDER-1',
-      externalId: 'WEB-1',
+      orderName: '#1001',
+      externalId: '5300779516157',
       orderDate: DateTime.now().startOf('day').plus({ minutes: 1 }).toISO()!,
       status: 'ORDER_APPROVED',
       customerId: 'CUSTOMER-1',
@@ -108,8 +109,9 @@ describe('order row view models', () => {
     });
 
     expect(model.fulfillmentContext).toBe('Standard Shipping');
+    expect(model.orderName).toBe('#1001');
     expect(model.channelName).toBe('Web');
-    expect(model.orderedRelativeAge).toMatch(/min ago|h ago/);
+    expect(model.orderedRelativeAge).toMatch(/min ago|h(?: \d+m)? ago/);
     expect(model.estimatedDeliveryDateTime).toBeUndefined();
   });
 
@@ -155,7 +157,7 @@ describe('order row view models', () => {
     });
 
     expect(model.customerName).toBe('Priya Shah');
-    expect(model.orderReference).toBe('WEB-1');
+    expect(model.orderName).toBe('WEB-1');
     expect(model.fulfillmentContext).toBe('UPS - Ground');
     expect(model.channelName).toBe('Shopify');
     expect(model.allocationSummary).toEqual({

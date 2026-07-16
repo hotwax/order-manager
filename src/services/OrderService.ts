@@ -269,6 +269,7 @@ export function normalizeOrderDoc(doc: any): Order {
 
   return {
     id: orderId,
+    orderName: toStringValue(doc.orderName),
     externalId: toStringValue(doc.orderName ?? doc.externalOrderId ?? doc.externalId, orderId),
     orderDate: toStringValue(doc.orderDate ?? doc.orderEntryDate),
     status: toStringValue(doc.orderStatusDesc ?? doc.orderStatusId ?? doc.statusId, 'Created') as Order['status'],

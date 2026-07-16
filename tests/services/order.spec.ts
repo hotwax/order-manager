@@ -3,7 +3,11 @@ import { api, commonUtil, useSolrSearch } from '@common';
 import {
   buildOrderLookupPayload,
   buildOrderRowEnrichmentPayload,
+  buildUnfillableProductCandidatesPayload,
+  buildUnfillableShipGroupsForProductPayload,
   buildVirtualLocationCountsPayload,
+  fetchUnfillableProductCandidates,
+  fetchUnfillableShipGroupsForProduct,
   fetchVirtualLocationOrderCounts,
   fetchWorkflowOrderTotals,
   searchOrders
@@ -117,6 +121,7 @@ describe('buildOrderLookupPayload facility filtering', () => {
               docs: [{
                 orderId: 'M100001',
                 orderName: '#100001',
+                externalOrderId: '5202667012349',
                 orderDate: '2026-06-12T10:00:00Z',
                 orderStatusId: 'ORDER_APPROVED',
                 customerPartyId: 'CUST_1',
@@ -151,6 +156,7 @@ describe('buildOrderLookupPayload facility filtering', () => {
     expect(result.orders).toHaveLength(1);
     expect(result.orders[0].parkingUnitCount).toBe(3.5);
     expect(result.orders[0]).toMatchObject({
+      orderName: '#100001',
       customerName: 'Angela Crutchfield',
       shippingAddress1: '602 White Oak Dr',
       shippingCity: 'Eufaula',
@@ -318,6 +324,45 @@ describe('workflow order totals', () => {
     expect(api).toHaveBeenCalledTimes(3);
   });
 });
+
+describe('proactive swap setup queries', () => {
+  it('facets approved active unfillable items by product count', () => {
+    const payload = buildUnfillableProductCandidatesPayload('STORE_1', 25);
+    expect(payload.json.filter).toEqual(expect.arrayContaining([
+      'orderStatusId:ORDER_APPROVED',
+      'orderItemStatusId:(ITEM_CREATED OR ITEM_APPROVED)',
+      'facilityId:UNFILLABLE_PARKING',
+      'productStoreId:STORE_1',
+    ]));
+    expect(payload.json.facet.products).toMatchObject({ field: 'productId', limit: 25, sort: 'count desc' });
+  });
+
+  it('normalizes product buckets in the server-provided count order', async () => {
+    mockSolrResponse({ facets: { products: { buckets: [
+      { val: 'SKU_A', count: 12 },
+      { val: 'SKU_B', count: 4 },
+    ] } } });
+    await expect(fetchUnfillableProductCandidates('STORE_1')).resolves.toEqual([
+      { productId: 'SKU_A', itemCount: 12 },
+      { productId: 'SKU_B', itemCount: 4 },
+    ]);
+  });
+
+  it('fetches and deduplicates affected ship groups for one product', async () => {
+    const payload = buildUnfillableShipGroupsForProductPayload('STORE_1', 'SKU_A');
+    expect(payload.json.filter).toContain('productId:SKU_A');
+    mockSolrResponse({ response: { docs: [
+      { orderId: 'ORDER_1', shipGroupSeqId: '00001' },
+      { orderId: 'ORDER_1', shipGroupSeqId: '00001' },
+      { orderId: 'ORDER_2', shipGroupSeqId: '00002' },
+    ] } });
+    await expect(fetchUnfillableShipGroupsForProduct('STORE_1', 'SKU_A')).resolves.toEqual([
+      { orderId: 'ORDER_1', shipGroupSeqId: '00001' },
+      { orderId: 'ORDER_2', shipGroupSeqId: '00002' },
+    ]);
+  });
+});
+
 describe('virtual location count payload', () => {
   function virtualLocationFiltersOf(params: Parameters<typeof buildVirtualLocationCountsPayload>[0]) {
     return buildVirtualLocationCountsPayload(params).json.filter as string[];
