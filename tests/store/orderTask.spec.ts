@@ -108,7 +108,8 @@ describe('order task store', () => {
         pageSize: 20,
         pageIndex: 0,
         riskLevelEnumId: 'RISK_HIGH',
-        taskStatusId: 'TASK_CREATED',
+        taskStatusId: 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD',
+        taskStatusId_op: 'in',
         workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
         workEffortPurposeTypeId: 'REVIEW_RISK_ORDER',
         productStoreId: 'STORE',
@@ -141,7 +142,8 @@ describe('order task store', () => {
         orderByField: 'workEffortCreatedDate,workEffortId',
         orderName: '1001',
         orderName_op: 'contains',
-        statusId: 'TASK_CREATED',
+        taskStatusId: 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD',
+        taskStatusId_op: 'in',
         workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
         workEffortPurposeTypeId: 'NEG_RES_REVIEW',
         productStoreId: 'STORE',
@@ -214,12 +216,48 @@ describe('order task store', () => {
         method: 'GET',
         params: {
           orderId: 'ORDER_1',
-          taskStatusId: 'TASK_CREATED',
+          taskStatusId: 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD',
+          taskStatusId_op: 'in',
+          workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+          workEffortPurposeTypeId: 'ORD_HOLD_MANUAL,ORD_HOLD_CUST_REQ',
+          workEffortPurposeTypeId_op: 'in',
+          productStoreId: 'STORE',
+        },
+      }],
+      [{
+        url: 'oms/orders/tasks',
+        method: 'GET',
+        params: {
+          orderId: 'ORDER_1',
+          taskStatusId: 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD',
+          taskStatusId_op: 'in',
           workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
           workEffortPurposeTypeId: 'REVIEW_RISK_ORDER',
           productStoreId: 'STORE',
         },
       }],
     ]));
+  });
+
+  it('keeps ship-group and order-level operator holds visible through every blocking status', async () => {
+    const store = useOrderTaskStore();
+    vi.mocked(api).mockResolvedValueOnce({ data: [] });
+
+    await store.fetchHoldTasks({ pageSize: 20, pageIndex: 0 });
+
+    expect(api).toHaveBeenCalledWith({
+      url: 'oms/orders/tasks',
+      method: 'GET',
+      params: {
+        pageSize: 20,
+        pageIndex: 0,
+        taskStatusId: 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD',
+        taskStatusId_op: 'in',
+        workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+        workEffortPurposeTypeId: 'ORD_HOLD_MANUAL,ORD_HOLD_CUST_REQ',
+        workEffortPurposeTypeId_op: 'in',
+        productStoreId: 'STORE',
+      },
+    });
   });
 });

@@ -94,19 +94,6 @@ function buildVirtualLocationWorkCounts(facilities: { facilityId: string; facili
   return [...rows, ...dynamicRows];
 }
 
-function responseListCount(response: any): number {
-  const headerCount = response?.headers?.get?.('x-total-count')
-    ?? response?.headers?.['x-total-count']
-    ?? response?.headers?.['X-Total-Count'];
-  const fallbackCount = Array.isArray(response?.data) ? response.data.length : 0;
-  const countValue = headerCount !== undefined && headerCount !== null && String(headerCount).trim() !== ''
-    ? headerCount
-    : fallbackCount;
-  const count = Number(countValue);
-
-  return Number.isFinite(count) ? count : fallbackCount;
-}
-
 // Load-status keys for the funnel dashboard metric groups. Each group's fetch
 // transitions its status loading -> success/error so the Funnel view can show
 // per-section loading affordances and surface errors instead of false zeros.
@@ -358,51 +345,18 @@ export const useCustomerServiceStore = defineStore('customerService', {
     async fetchHoldTasks(productStoreId?: string) {
       this.dashboardStatus.holdTasks = 'loading';
       try {
-        const [swapResp, addressResp, fraudResp] = await Promise.all([
-          api({
-            url: 'oms/orders/tasks/shipGroupTasks',
-            method: 'GET',
-            params: {
-              statusId: 'TASK_CREATED',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'NEG_RES_REVIEW',
-              productStoreId,
-              pageSize: 10000,
-            }
-          }),
-          api({
-            url: 'oms/orders/tasks/shipGroupTasks',
-            method: 'GET',
-            params: {
-              statusId: 'TASK_CREATED',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'INVALID_ADDRESS',
-              productStoreId,
-              pageSize: 10000,
-            }
-          }),
-          api({
-            url: 'oms/orders/tasks',
-            method: 'GET',
-            params: {
-              taskStatusId: 'TASK_CREATED',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'REVIEW_RISK_ORDER',
-              productStoreId,
-              pageSize: 10000,
-            }
-          })
-        ]);
-
-        const swapCount = responseListCount(swapResp);
-        const addressCount = responseListCount(addressResp);
-        const fraudCount = responseListCount(fraudResp);
+        const resp = await api({
+          url: 'oms/orders/funnelDashboard/holdTasks',
+          method: 'GET',
+          params: { productStoreId }
+        });
+        const counts = resp.data || {};
 
         this.holdTasks = {
-          holdSubstituteCount: swapCount,
-          holdBadAddressCount: addressCount,
-          holdFraudRiskCount: fraudCount,
-          holdTasksTotalCount: swapCount + addressCount + fraudCount
+          holdSubstituteCount: Number(counts.holdSubstituteCount) || 0,
+          holdBadAddressCount: Number(counts.holdBadAddressCount) || 0,
+          holdFraudRiskCount: Number(counts.holdFraudRiskCount) || 0,
+          holdTasksTotalCount: Number(counts.holdTasksTotalCount) || 0
         };
         this.dashboardStatus.holdTasks = 'success';
       } catch (error) {

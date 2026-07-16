@@ -13,6 +13,8 @@ interface TaskStatusCommunicationOptions {
 
 const HOLD_TASK_TYPE_ID = 'RESOLVE_ONHOLD_ORDER';
 const FRAUD_RISK_PURPOSE_TYPE_ID = 'REVIEW_RISK_ORDER';
+const OPEN_TASK_STATUS_IDS = 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD';
+const USER_HOLD_PURPOSE_TYPE_IDS = 'ORD_HOLD_MANUAL,ORD_HOLD_CUST_REQ';
 
 // ── Per-task enrichment helpers ───────────────────────────────────────────────
 // Shared by both the queue list fetches and the order-scoped detail fetch so the
@@ -227,13 +229,17 @@ export const useOrderTaskStore = defineStore('orderTask', {
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({
-          url: 'oms/orders/tasks/shipGroupTasks',
+          // The order-task view retains concrete ship-group fields but also includes null-scope
+          // customer-request holds, so the queue matches the complete blocking population.
+          url: 'oms/orders/tasks',
           method: 'GET',
           params: {
             ...payload,
-            statusId: 'TASK_CREATED',
+            taskStatusId: OPEN_TASK_STATUS_IDS,
+            taskStatusId_op: 'in',
             workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-            workEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+            workEffortPurposeTypeId: USER_HOLD_PURPOSE_TYPE_IDS,
+            workEffortPurposeTypeId_op: 'in',
             productStoreId,
           },
         });
@@ -260,7 +266,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
           method: 'GET',
           params: {
             ...payload,
-            statusId: 'TASK_CREATED',
+            taskStatusId: OPEN_TASK_STATUS_IDS,
+            taskStatusId_op: 'in',
             workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
             workEffortPurposeTypeId: 'INVALID_ADDRESS',
             productStoreId,
@@ -294,7 +301,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
           method: 'GET',
           params: {
             ...payload,
-            statusId: 'TASK_CREATED',
+            taskStatusId: OPEN_TASK_STATUS_IDS,
+            taskStatusId_op: 'in',
             workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
             workEffortPurposeTypeId: 'NEG_RES_REVIEW',
             productStoreId,
@@ -333,7 +341,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
           method: 'GET',
           params: {
             ...payload,
-            taskStatusId: 'TASK_CREATED',
+            taskStatusId: OPEN_TASK_STATUS_IDS,
+            taskStatusId_op: 'in',
             workEffortTypeId: HOLD_TASK_TYPE_ID,
             workEffortPurposeTypeId: FRAUD_RISK_PURPOSE_TYPE_ID,
             productStoreId,
@@ -368,13 +377,15 @@ export const useOrderTaskStore = defineStore('orderTask', {
       const fetchHold = async () => {
         try {
           const listResponse = await api({
-            url: 'oms/orders/tasks/shipGroupTasks',
+            url: 'oms/orders/tasks',
             method: 'GET',
             params: {
               orderId,
-              statusId: 'TASK_CREATED',
+              taskStatusId: OPEN_TASK_STATUS_IDS,
+              taskStatusId_op: 'in',
               workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+              workEffortPurposeTypeId: USER_HOLD_PURPOSE_TYPE_IDS,
+              workEffortPurposeTypeId_op: 'in',
               productStoreId,
             },
           });
@@ -392,7 +403,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
             method: 'GET',
             params: {
               orderId,
-              statusId: 'TASK_CREATED',
+              taskStatusId: OPEN_TASK_STATUS_IDS,
+              taskStatusId_op: 'in',
               workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
               workEffortPurposeTypeId: 'INVALID_ADDRESS',
               productStoreId,
@@ -412,7 +424,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
             method: 'GET',
             params: {
               orderId,
-              statusId: 'TASK_CREATED',
+              taskStatusId: OPEN_TASK_STATUS_IDS,
+              taskStatusId_op: 'in',
               workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
               workEffortPurposeTypeId: 'NEG_RES_REVIEW',
               productStoreId,
@@ -434,7 +447,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
             method: 'GET',
             params: {
               orderId,
-              taskStatusId: 'TASK_CREATED',
+              taskStatusId: OPEN_TASK_STATUS_IDS,
+              taskStatusId_op: 'in',
               workEffortTypeId: HOLD_TASK_TYPE_ID,
               workEffortPurposeTypeId: FRAUD_RISK_PURPOSE_TYPE_ID,
               productStoreId,

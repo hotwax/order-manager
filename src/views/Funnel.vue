@@ -138,6 +138,12 @@
             <ion-spinner name="crescent" />
           </template>
           <ion-list v-if="!holdTasksLoading" lines="none" class="hold-tasks-list">
+            <!-- Operator-created manual and customer-request holds -->
+            <ion-item button :detail="true" router-link="/hold">
+              <ion-label>{{ translate("Manual and customer holds") }}</ion-label>
+              <p slot="end">{{ generalHoldTaskCount }} {{ translate("tasks") }}</p>
+            </ion-item>
+
             <!-- Substitute workefforts -->
             <ion-item button :detail="true" router-link="/swap">
               <ion-label>
@@ -639,6 +645,12 @@ const syncDataError = isError('fulfillmentSyncData');
 
 const fulfillmentProgress = computed(() => store.getFulfillmentProgress);
 const holdTasks = computed(() => store.getHoldTasks);
+const generalHoldTaskCount = computed(() => Math.max(0,
+  Number(holdTasks.value.holdTasksTotalCount || 0)
+  - Number(holdTasks.value.holdSubstituteCount || 0)
+  - Number(holdTasks.value.holdBadAddressCount || 0)
+  - Number(holdTasks.value.holdFraudRiskCount || 0)
+));
 const facilityFulfillmentProgress = computed(() => store.getFacilityFulfillmentProgress);
 const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
 const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);

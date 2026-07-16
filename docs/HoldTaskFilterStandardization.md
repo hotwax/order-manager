@@ -29,7 +29,7 @@ Sorting is part of this plan, but it remains a result-list action and is never r
 | Topic | Decision |
 |---|---|
 | Common filters | Order date range, task-created date range, and Sales channel appear on all four task pages. |
-| Facility and method filters | Facility and Shipping method filters appear on Swap, Bad Address, and Hold because `shipGroupTasks` exposes both fields. They do not appear as filters on Fraud. |
+| Facility and method filters | Facility and Shipping method filters appear on Swap and Bad Address through `shipGroupTasks`, and on Hold through optional ship-group aliases on the mixed-scope task view. They do not appear as filters on Fraud. |
 | Fraud filters | Order status, Risk recommendation, and Risk level appear only on Fraud because `orders/tasks` exposes those order-level fields. |
 | Assignee | Remove Assignee from this filter surface. `currentUserPartyId` is not exposed by either task view and is currently ignored by the API. |
 | Swappable | Remove Swappable from this filter surface. `swappable` is not exposed by `shipGroupTasks` and is currently ignored by the API. |
@@ -97,6 +97,8 @@ Search and the five common filters form a stable prefix on every page. Pages app
 
 Queue membership remains fixed by task status, task type, task purpose, and the globally selected product store. Those values are not repeated as user filters.
 
+All four queues include the blocking open statuses (`TASK_CREATED`, `TASK_IN_PROGRESS`, and `TASK_ON_HOLD`). The Hold queue and generic creation modal include both operator-created purposes (`ORD_HOLD_MANUAL` and `ORD_HOLD_CUST_REQ`); automated address, reservation, and order-level fraud purposes retain their dedicated producer flows and queues.
+
 ## API parameter mapping
 
 | UI field | API parameter | Notes |
@@ -154,7 +156,7 @@ Fraud appends these page-specific options after the complete shared block:
 9. Risk recommendation A-Z
 10. Risk recommendation Z-A
 
-Swap, Bad Address, and Hold stop after the six shared options. Shipping-method filtering remains available on these ship-group task pages, but shipping-method sorting is not offered on the order-level Fraud queue.
+Swap, Bad Address, and Hold stop after the six shared options. Shipping-method filtering remains available for scoped rows; the Hold queue may also contain null-scope customer-request tasks. Shipping-method sorting is not offered on the order-level Fraud queue.
 
 | UI option | API `orderByField` |
 |---|---|
@@ -528,7 +530,7 @@ Live checks should cover:
 - Desktop tracks remain equal width and wrap in a stable sequence.
 - Mobile controls stack cleanly and remain keyboard accessible.
 
-Before final live acceptance, confirm the fixed task type and task purpose predicates against the backend serving the local app. That queue-membership contract is separate from filter standardization and should not be silently changed inside this work.
+Before final live acceptance, confirm the canonical task type, open-status set, and purpose predicates against the backend serving the local app. This branch intentionally aligns queue membership with the blocking `RESOLVE_ONHOLD_ORDER` contract as part of the OMS migration; future membership changes remain outside filter-only work.
 
 ## Acceptance criteria
 
@@ -541,6 +543,8 @@ Before final live acceptance, confirm the fixed task type and task purpose predi
 | Sales channel selected | All four pages send the same `salesChannelEnumId` contract. |
 | Facility or method selected | Swap, Bad Address, and Hold narrow through `facilityId` or `shipmentMethodTypeId`; Fraud never renders those controls. |
 | Fraud-specific filter selected | Fraud narrows through `orderStatusId`, `riskRecommendationEnumId`, or `riskLevelEnumId`. |
+| Open hold changes status | A task in Created, In Progress, or On Hold remains visible until it is Completed or Cancelled. |
+| Customer-request hold exists | The task appears in the Hold queue alongside Manual holds. |
 | Unsupported legacy filter | Assignee and Swappable are absent and their ignored parameters are not sent. |
 | Default sort | Every queue initially requests `workEffortCreatedDate,workEffortId` and labels it Oldest task first. |
 | Sort changed | The API receives the mapped `orderByField`, pagination returns to page zero, and the result set is replaced. |

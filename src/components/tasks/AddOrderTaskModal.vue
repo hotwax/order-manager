@@ -108,6 +108,7 @@ const props = defineProps<{
 
 const seedStore = useSeedStore();
 const WORK_EFFORT_TYPE_ID = 'RESOLVE_ONHOLD_ORDER';
+const OPERATOR_HOLD_PURPOSE_IDS = new Set(['ORD_HOLD_MANUAL', 'ORD_HOLD_CUST_REQ']);
 
 const form = reactive({
   workEffortName: '',
@@ -121,7 +122,10 @@ const form = reactive({
 const selectedShipGroupSeqIds = ref<string[]>(props.shipGroups?.map((shipGroup) => shipGroup.id) ?? []);
 const taskNameEdited = ref(false);
 
-const taskPurposes = computed(() => seedStore.getEnumsByType(WORK_EFFORT_TYPE_ID));
+// Address, reservation, and fraud purposes are created by their owning backend flows. In
+// particular, fraud is order-scoped and must never be fanned out through this ship-group modal.
+const taskPurposes = computed(() => seedStore.getEnumsByType(WORK_EFFORT_TYPE_ID)
+  .filter((purpose: any) => OPERATOR_HOLD_PURPOSE_IDS.has(purpose.enumId)));
 
 const generatedTaskName = computed(() => {
   if (!props.autoGenerateTaskName) return '';

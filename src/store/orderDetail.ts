@@ -591,12 +591,19 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         orderIds.map(async (orderId) => {
           const resp = await api({ url: `oms/orders/${orderId}/shipGroups`, method: 'GET' });
           const shipGroups: any[] = Array.isArray(resp.data) ? resp.data : (resp.data?.docs ?? []);
-          return { orderId, shipGroupSeqId: shipGroups[0]?.shipGroupSeqId };
+          return {
+            orderId,
+            shipGroupSeqIds: shipGroups.map((shipGroup) => shipGroup.shipGroupSeqId).filter(Boolean)
+          };
         })
       );
       const payload = shipGroupsByOrder
-        .filter((item) => item.shipGroupSeqId)
-        .map((item) => ({ ...item, ...taskData, statusId: 'TASK_CREATED' }));
+        .flatMap(({ orderId, shipGroupSeqIds }) => shipGroupSeqIds.map((shipGroupSeqId) => ({
+          orderId,
+          shipGroupSeqId,
+          ...taskData,
+          statusId: 'TASK_CREATED'
+        })));
       return api({ url: 'oms/orders/tasks', method: 'POST', data: payload });
     },
     async bulkCancelOrders(orderIds: string[]) {
