@@ -6,13 +6,14 @@ describe('OrderQueueList', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/OrderQueueList.vue'), 'utf8');
 
   it('renders queue results with the design-system list item row structure', () => {
-    expect(source).toContain('class="list-item queue-order-row"');
-    expect(source).toContain('<p class="overline">{{ order.id }}</p>');
-    expect(source).toContain('customerAddressLine(order)');
-    expect(source).toContain('queueReasonLabel(order)');
-    expect(source).toContain('estimatedDeliveryDateLabel(order)');
+    expect(source).toContain('<OrderRow');
+    expect(source).toContain('row-class="queue-order-row"');
+    expect(source).toContain(':model="toSearchOrderRowViewModel(order)"');
+    expect(source).toContain("mode: 'queue-first' as const");
+    expect(source).toContain('queueFacilityIds: props.facilityIds');
     expect(source).toContain('handleOrderRowClick(order)');
-    expect(source).not.toContain('<ion-badge :color="statusColor(order.status)" slot="end">');
+    expect(source).not.toContain('queueReasonLabel(order)');
+    expect(source).not.toContain('customerAddressLine(order)');
   });
 
   it('labels result totals as matching the active queue filters', () => {
@@ -22,7 +23,8 @@ describe('OrderQueueList', () => {
   });
 
   it('keeps the row-level navigation behavior while letting checkboxes enter select mode', () => {
-    expect(source).toContain(':role="selectMode ? \'button\' : \'link\'"');
+    expect(source).toContain(':select-mode="selectMode"');
+    expect(source).toContain('@selection-change="setOrderSelection(order.id, $event)"');
     expect(source).toContain('ionRouter.push(orderDetailLink(order));');
     expect(source).toContain('selectMode.value = true;');
   });

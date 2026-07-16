@@ -20,6 +20,13 @@ import {
 // Confirmed present in ORDER docs via the indexed `facilityId` field (see PR #309 field dump).
 export const GENERAL_OPS_PARKING_FACILITY_ID = 'GENERAL_OPS_PARKING';
 
+// Physical fulfillment locations are indexed by their concrete facility type.
+// WAREHOUSE is the live indexed value for distribution centers.
+const PHYSICAL_FULFILLMENT_FACILITY_TYPE_IDS = [
+  'RETAIL_STORE',
+  'WAREHOUSE'
+];
+
 export interface OrderSearchParams {
   queryString?: string;
   status?: string | string[];
@@ -153,9 +160,13 @@ export function buildOrderLookupPayload(params: OrderSearchParams = {}) {
   const facilityFilter = buildShipGroupFacilityFilter(facilityIds);
   if (facilityFilter) filters.push(facilityFilter);
 
-  // Orders with at least one item still sitting at a virtual facility.
-  // Backed by the indexed `facilityTypeId` field on the ORDER item docs.
-  if (params.hasVirtualFacilityItems) filters.push(`facilityTypeId:${escapeSolrValue('VIRTUAL_FACILITY')}`);
+  // Operational parking locations are indexed by concrete child types such as
+  // NA rather than their VIRTUAL_FACILITY parent. Exclude physical fulfillment
+  // types instead, then keep archived General Operations items in their own scope.
+  if (params.hasVirtualFacilityItems) {
+    filters.push(`-facilityTypeId:(${PHYSICAL_FULFILLMENT_FACILITY_TYPE_IDS.map(escapeSolrValue).join(' OR ')})`);
+    filters.push(`-facilityId:${escapeSolrValue(GENERAL_OPS_PARKING_FACILITY_ID)}`);
+  }
 
   // Archived orders = items parked in General Operations Parking.
   // Backed by the indexed `facilityId` field on the ORDER item docs.
@@ -525,6 +536,7 @@ function mergeSearchOrderEnrichment(
   if (!enrichment) return { ...order, allocationSummary: undefined };
   return {
     ...order,
+    orderName: enrichment.orderName || order.orderName,
     externalId: enrichment.externalOrderId || order.externalId,
     customerName: enrichment.customerPartyName || order.customerName,
     carrierPartyId: enrichment.carrierPartyId || order.carrierPartyId,

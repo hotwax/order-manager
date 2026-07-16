@@ -55,6 +55,14 @@ describe('buildOrderLookupPayload facility filtering', () => {
     expect(filters).toContain('facilityId:(_NA_ OR REJECTED_PARKING)');
   });
 
+  it('finds operational parking items by excluding physical and archived facilities', () => {
+    const filters = filtersOf({ hasVirtualFacilityItems: true });
+
+    expect(filters).toContain('-facilityTypeId:(RETAIL_STORE OR WAREHOUSE)');
+    expect(filters).toContain('-facilityId:GENERAL_OPS_PARKING');
+    expect(filters).not.toContain('facilityTypeId:VIRTUAL_FACILITY');
+  });
+
   it("ignores the 'All' sentinel and empty facility values", () => {
     const filters = filtersOf({ facilityIds: ['All', '', 'UNFILLABLE_PARKING'] });
     expect(filters).toContain('facilityId:UNFILLABLE_PARKING');
@@ -112,6 +120,7 @@ describe('buildOrderLookupPayload facility filtering', () => {
               docs: [{
                 orderId: 'M100001',
                 orderName: '#100001',
+                externalOrderId: '5202667012349',
                 orderDate: '2026-06-12T10:00:00Z',
                 orderStatusId: 'ORDER_APPROVED',
                 customerPartyId: 'CUST_1',
@@ -146,6 +155,7 @@ describe('buildOrderLookupPayload facility filtering', () => {
     expect(result.orders).toHaveLength(1);
     expect(result.orders[0].parkingUnitCount).toBe(3.5);
     expect(result.orders[0]).toMatchObject({
+      orderName: '#100001',
       customerName: 'Angela Crutchfield',
       shippingAddress1: '602 White Oak Dr',
       shippingCity: 'Eufaula',

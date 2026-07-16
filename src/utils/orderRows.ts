@@ -42,7 +42,7 @@ export function summarizeOrderAllocation(
 export function toSearchOrderRowViewModel(order: Order): OrderRowViewModel {
   return createOrderRowViewModel({
     orderId: order.id,
-    orderReference: order.externalId || order.orderName || order.id,
+    orderName: order.orderName || order.id,
     customerName: order.customerName || order.customerId || 'Unknown customer',
     status: order.status,
     allocationSummary: order.allocationSummary,
@@ -60,7 +60,7 @@ export function toWorkflowOrderRowViewModel(
 ): OrderRowViewModel {
   return createOrderRowViewModel({
     orderId: order.orderId,
-    orderReference: order.orderName || enrichment?.orderName || order.externalId || enrichment?.externalOrderId || order.orderId,
+    orderName: order.orderName || enrichment?.orderName || order.orderId,
     customerName: enrichment?.customerPartyName || order.customerName?.trim() || order.customerPartyId || 'Unknown customer',
     allocationSummary: workflowAllocationSummary(order, enrichment),
     carrier: usableCarrier(order.carrierPartyId) || usableCarrier(enrichment?.carrierPartyId),
@@ -119,7 +119,7 @@ export function dateFromOrderValue(value?: string | null) {
 
 function createOrderRowViewModel(input: {
   orderId: string;
-  orderReference: string;
+  orderName: string;
   customerName: string;
   status?: string;
   allocationSummary?: OrderAllocationSummaryModel;
@@ -136,7 +136,7 @@ function createOrderRowViewModel(input: {
 
   return {
     orderId: input.orderId,
-    orderReference: input.orderReference,
+    orderName: input.orderName,
     customerName: input.customerName,
     status: input.status ? formatIdentifier(input.status) : undefined,
     allocationSummary: input.allocationSummary,
