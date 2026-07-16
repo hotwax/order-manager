@@ -30,13 +30,10 @@
           <ion-item lines="none">
             <ion-icon slot="start" :icon="timeOutline" />
             <h2>{{ translate('Timeline') }}</h2>
-            <ion-badge v-if="order.status" slot="end" :color="commonUtil.getStatusColor(order.statusId)">
-              {{ order.status }}
-            </ion-badge>
           </ion-item>
 
-          <ion-list class="ion-margin-start">
-            <ion-item v-for="event in orderTimeline" :key="event.id">
+          <ion-list>
+            <ion-item v-for="event in orderTimeline" :key="event.id" :router-link="event.route" :button="!!event.route" :detail="false">
               <ion-icon :icon="event.icon" slot="start" />
               <ion-label>
                 <p v-if="event.timeDiff">{{ event.timeDiff }}</p>
@@ -187,12 +184,28 @@
                   {{ order.channel || translate('Channel') }}
                 </ion-label>
               </ion-item>
-              <ion-item v-if="order.originFacilityId">
+              <ion-item v-if="order.salesChannelEnumId === 'POS_SALES_CHANNEL'">
                 <ion-label>
                   <p>{{ translate('Placed at') }}</p>
-                  {{ order.originFacilityName }}
+                  {{ order.originFacilityName || translate('Facility not available') }}
+                  <p>{{ order.originFacilityId }}</p>
                 </ion-label>
               </ion-item>
+              <template v-for="source in exchangeSources" :key="source.orderId">
+                <ion-item button :detail="true" :router-link="`/orders/${source.orderId}`">
+                  <ion-label>
+                    <p>{{ translate('Exchange of') }}</p>
+                    <ion-skeleton-text v-if="source.loading" animated style="width: 60%" />
+                    <template v-else>{{ source.orderName }}</template>
+                  </ion-label>
+                </ion-item>
+                <ion-item v-for="returnId in source.returnIds" :key="returnId" button :detail="true" :router-link="`/returns/${returnId}`">
+                  <ion-label>
+                    <p>{{ translate('Processed with return') }}</p>
+                    {{ returnId }}
+                  </ion-label>
+                </ion-item>
+              </template>
             </ion-list>
           </ion-card>
 
@@ -271,8 +284,10 @@
                 :selected="group.selected"
                 :quantity="group.totalQty"
                 :quantity-label="translate('qty')"
+                :facility-label="groupLocationLabel(group)"
+                :facility-disabled="true"
                 :status-label="group.status"
-                :status-color="commonUtil.getStatusColor(group.statusId)"
+                :status-color="group.statusColor"
                 :amount="money(group.totalPrice, order.currency)"
                 :adjustments="getGroupAdjustmentRows(group)"
                 @update:selected="group.selected = $event"
@@ -293,7 +308,7 @@
                     :facility-disabled="isItemFacilityActionDisabled(item)"
                     :attributes-label="attributeChipLabel(item.attributeCount)"
                     :status-label="item.status"
-                    :status-color="commonUtil.getStatusColor(item.statusId)"
+                    :status-color="item.statusColor"
                     :status-detail="itemStatusDetail(item)"
                     :amount="money(itemLineTotal(item), order.currency)"
                     :adjustments="getItemAdjustmentRows(item)"
@@ -317,19 +332,41 @@
         <!-- Totals Card -->
 
         <div class="order-summary">
-          <ion-card>
+          <ion-card class="payment-card">
             <ion-card-header>
               <ion-card-title>{{ translate('Payment') }}</ion-card-title>
+              <ion-card-subtitle v-if="order.payments.length" :color="paymentNetColor">
+                {{ translate('Net') }} {{ money(paymentNetAmount, order.currency) }}
+              </ion-card-subtitle>
             </ion-card-header>
             <ion-list lines="none">
-              <ion-item v-for="(payment, index) in order.payments" :key="payment.id || `${payment.paymentMethodTypeId}-${index}`">
-                <ion-label>
-                  <p class="overline">{{ payment.paymentMethodTypeId || payment.method }}</p>
-                  {{ payment.paymentMethodTypeDesc || payment.method }}
-                  <p>{{ payment.statusDesc || payment.status || payment.statusId }}</p>
-                </ion-label>
-                <ion-note slot="end">{{ money(payment.amount, order.currency) }}</ion-note>
-              </ion-item>
+              <template v-for="section in paymentSections" :key="section.statusId">
+                <ion-item-divider color="light">
+                  <ion-label>{{ section.label }}</ion-label>
+                  <ion-label slot="end">{{ money(section.total, order.currency) }}</ion-label>
+                </ion-item-divider>
+                <ion-item v-for="(payment, index) in section.payments" :key="payment.id || `${payment.paymentMethodTypeId}-${index}`">
+                  <ion-label>
+                    <p class="overline">{{ payment.paymentMethodTypeId || payment.method }}</p>
+                    {{ payment.paymentMethodTypeDesc || payment.method }}
+                    <p>{{ payment.statusDesc || payment.status || payment.statusId }}</p>
+                    <p v-if="payment.createdDate">{{ formatDateTime(payment.createdDate) }}</p>
+                    <ion-button
+                      v-for="returnId in carriedOverReturnIds(payment)"
+                      :key="returnId"
+                      fill="clear"
+                      size="small"
+                      class="payment-return-link"
+                      :router-link="`/returns/${returnId}`"
+                      @click.stop
+                    >
+                      <ion-icon slot="start" :icon="openOutline" />
+                      {{ translate('Return') }} {{ returnId }}
+                    </ion-button>
+                  </ion-label>
+                  <ion-label slot="end">{{ money(payment.amount, order.currency) }}</ion-label>
+                </ion-item>
+              </template>
               <ion-item v-if="!order.payments.length">
                 <ion-label>{{ translate('No payment preference records') }}</ion-label>
               </ion-item>
@@ -351,7 +388,7 @@
                 </ion-label>
                 <ion-label slot="end">{{ money(adjustment.amount, order.currency) }}</ion-label>
               </ion-item>
-              <ion-item>
+              <ion-item class="grand-total-row">
                 <ion-label>{{ translate('Grand total') }}</ion-label>
                 <ion-label slot="end" color="dark">{{ money(orderTotals.total, order.currency) }}</ion-label>
               </ion-item>
@@ -1012,14 +1049,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
+import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
+import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
+import router from '@/router';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import AddContactModal from '@/components/AddContactModal.vue';
@@ -1040,8 +1078,11 @@ import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
 import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
+import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
+import { getCustomerReturn } from '@/services/customer';
 import { showToast, isKit, riskLevelColor } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
+import { fulfillmentLineStatus, fulfillmentLineStatusColor } from '@/utils/fulfillmentLineStatus';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useUserStore } from '@/store/user';
@@ -1058,10 +1099,11 @@ const seed = useSeedStore();
 const productCache = useProductCacheStore();
 const customerStore = useCustomerStore();
 
-const { isLoading: loading, error } = storeToRefs(orderDetailStore);
+const loading = computed(() => orderDetailStore.loadingById(props.orderId));
+const error = computed(() => orderDetailStore.errorById(props.orderId));
 
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
-const customerPartyId = computed(() => orderDetailStore.customerPartyId);
+const customerPartyId = computed(() => orderDetailStore.customerPartyIdByOrderId(props.orderId));
 
 // Shopify Admin deep-link. Primary source is the order's own shopifyShopOrder record
 // (the shop it actually came from — same source CloneOrderModal uses). That endpoint
@@ -1079,7 +1121,7 @@ const shopifyOrderShopId = ref('');
 let resolvedShopifyShop = { orderId: '', shopId: '' };
 
 const shopifyOrderId = computed(() => {
-  const identifications = orderDetailStore.current?.identifications || [];
+  const identifications = orderDetailStore.orderById(props.orderId)?.identifications || [];
   return identifications.find((identification: any) => identification.orderIdentificationTypeId === 'SHOPIFY_ORD_ID')?.idValue ?? '';
 });
 
@@ -1090,7 +1132,7 @@ const shopifyOrderId = computed(() => {
 // once the boot-time shops load completes. Skipped once the record-based id is known.
 const fallbackShopIdByProductStore = computed(() => {
   if (shopifyOrderShopId.value) return '';
-  const productStoreId = orderDetailStore.current?.productStoreId;
+  const productStoreId = orderDetailStore.orderById(props.orderId)?.productStoreId;
   if (!productStoreId) return '';
   const shops = seed.shopifyShops.ids.map((id: string) => seed.shopifyShops.byId[id]);
   return singleShopIdForProductStore(shops, productStoreId);
@@ -1139,7 +1181,7 @@ async function resolveShopifyOrderShop(orderId: string) {
  * template graph and CSS are unchanged; only the data feeding it is real now.
  */
 const order = computed(() => {
-  const raw = orderDetailStore.current;
+  const raw = orderDetailStore.orderById(props.orderId);
   if (!raw) return null;
 
   return {
@@ -1149,13 +1191,14 @@ const order = computed(() => {
     status: seed.statusDescription(raw.statusId),
     statusId: raw.statusId,
     channel: seed.enumDescription(raw.salesChannelEnumId),
+    salesChannelEnumId: raw.salesChannelEnumId,
     productStoreName: seed.productStoreName(raw.productStoreId),
     // Origin/placed-at facility from the order header (set by the OMS order import for
     // POS/retail-location orders). Prefer a name from the payload, then the seed facility
-    // lookup, falling back to the raw id. Empty when the order has no origin facility.
-    // '_NA_' is the OMS "no origin facility" sentinel (common on non-POS orders) and
-    // resolves to a virtual "Brokering Queue" facility — treat it (and blanks) as no origin.
-    originFacilityId: raw.originFacilityId && raw.originFacilityId !== '_NA_' ? raw.originFacilityId : '',
+    // lookup, falling back to the raw id. The Source card shows this for POS-channel
+    // orders regardless of value — '_NA_' on a POS order is a data gap worth surfacing,
+    // not something to hide.
+    originFacilityId: raw.originFacilityId || '',
     originFacilityName: raw.originFacilityId && raw.originFacilityId !== '_NA_'
       ? (raw.originFacilityName || seed.facility(raw.originFacilityId)?.facilityName || raw.originFacilityId)
       : '',
@@ -1163,8 +1206,8 @@ const order = computed(() => {
     localeString: raw.localeString || raw.locale,
     riskRecommendationEnumId: raw.riskRecommendationEnumId,
     riskLevelEnumId: raw.riskLevelEnumId,
-    customerName: orderDetailStore.customerName,
-    history: orderDetailStore.headerStatuses.map((entry: any) => ({
+    customerName: orderDetailStore.customerNameByOrderId(props.orderId),
+    history: orderDetailStore.headerStatusesByOrderId(props.orderId).map((entry: any) => ({
       id: entry.orderStatusId,
       label: seed.statusDescription(entry.statusId),
       detail: entry.statusUserLogin || '',
@@ -1185,7 +1228,11 @@ const order = computed(() => {
       paymentMethodTypeDesc: seed.paymentMethodDescription(payment.paymentMethodTypeId),
       amount: payment.maxAmount ?? payment.presentmentAmount,
       statusId: payment.statusId,
-      statusDesc: seed.statusDescription(payment.statusId)
+      statusDesc: seed.statusDescription(payment.statusId),
+      createdDate: payment.createdDate || payment.createdStamp,
+      // Shopify carry-over lineage: on exchange orders this equals the manualRefNum of the
+      // original order's refunded OPP ('MATTR-<txn>' exchange credit, 'EPRA-<txn>' payment).
+      parentRefNum: payment.parentRefNum || ''
     })),
     attributes: orderAttributeRows(raw),
     shipGroups: (raw.shipGroups || []).map((shipGroup: any) => ({
@@ -1227,7 +1274,7 @@ const order = computed(() => {
 const customerProfile = computed(() => customerPartyId.value ? customerStore.getCustomer(customerPartyId.value) : null);
 
 const customer = computed(() => {
-  const raw = orderDetailStore.current;
+  const raw = orderDetailStore.orderById(props.orderId);
   if (!raw) return undefined;
 
   const emailContact = findOrderContact('EMAIL_ADDRESS', ['ORDER_EMAIL'])
@@ -1248,8 +1295,87 @@ const billingAddress = computed(() => {
   return lines.length ? { lines } : undefined;
 });
 
+// Return headers hydrate lazily per returnId to name the facility a return was processed
+// at (ReturnHeader.destinationFacilityId — the embedded ReturnItem rows don't carry it).
+// null = header unavailable (endpoint down or return not found); timeline wording degrades
+// to the facility-less variant.
+const returnHeadersById = ref<Record<string, any | null>>({});
+
+watch(() => {
+  const raw = orderDetailStore.orderById(props.orderId);
+  return [...new Set((raw?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[];
+}, (returnIds) => {
+  returnIds.forEach(async (returnId) => {
+    if (returnId in returnHeadersById.value) return;
+    returnHeadersById.value = { ...returnHeadersById.value, [returnId]: null };
+    try {
+      const header = await getCustomerReturn(returnId);
+      if (header) returnHeadersById.value = { ...returnHeadersById.value, [returnId]: header };
+    } catch (error) {
+      logger.debug(`Return header ${returnId} unavailable for timeline facility context`, error);
+    }
+  });
+}, { immediate: true });
+
+// Reverse exchange lineage: OrderItemAssoc EXCHANGE rows live only on the exchange order,
+// so an original order finds its exchanges by the EXC-<orderName>-N naming convention in
+// Solr, confirmed against each candidate's own itemAssocs before it may appear.
+const exchangeChildrenByOrderId = ref<Record<string, Array<{
+  orderId: string;
+  itemCount: number;
+  facilityName: string;
+  value: number;
+}>>>({});
+
+watch(() => orderDetailStore.orderById(props.orderId)?.orderName, () => discoverExchangeChildren(props.orderId), { immediate: true });
+
+async function discoverExchangeChildren(orderId: string) {
+  const raw = orderDetailStore.orderById(orderId);
+  if (!raw?.orderName || orderId in exchangeChildrenByOrderId.value) return;
+  exchangeChildrenByOrderId.value = { ...exchangeChildrenByOrderId.value, [orderId]: [] };
+
+  try {
+    const response = await useSolrSearch().runSolrQuery({
+      json: {
+        params: { rows: 50, q: '*:*' },
+        filter: ['docType: ORDER', `orderName: ${escapeSolrValue(`EXC-${raw.orderName}-`)}*`]
+      }
+    });
+    const candidateIds = [...new Set(
+      (response.data?.response?.docs || [])
+        .map((doc: any) => String(doc.orderId || ''))
+        .filter((candidateId: string) => candidateId && candidateId !== orderId)
+    )] as string[];
+
+    const children: Array<{ orderId: string; itemCount: number; facilityName: string; value: number }> = [];
+    await Promise.all(candidateIds.map(async (candidateId) => {
+      await orderDetailStore.fetchOrder(candidateId);
+      const payload = orderDetailStore.byOrderId[candidateId]?.payload;
+      const assoc = (payload?.itemAssocs || []).find(
+        (row: any) => row.orderItemAssocTypeId === 'EXCHANGE' && row.toOrderId === orderId
+      );
+      if (!assoc) return;
+
+      const itemCount = (payload.shipGroups || [])
+        .flatMap((shipGroup: any) => shipGroup.items || [])
+        .reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+      children.push({
+        orderId: candidateId,
+        itemCount,
+        facilityName: payload.originFacilityId && payload.originFacilityId !== '_NA_'
+          ? seed.facilityName(payload.originFacilityId)
+          : '',
+        value: timelineMillis(assoc.createdStamp) || timelineMillis(payload.orderDate) || 0
+      });
+    }));
+    exchangeChildrenByOrderId.value = { ...exchangeChildrenByOrderId.value, [orderId]: children };
+  } catch (error) {
+    logger.error('Failed to discover exchange orders for timeline', error);
+  }
+}
+
 const orderTimeline = computed(() => {
-  const raw = orderDetailStore.current;
+  const raw = orderDetailStore.orderById(props.orderId);
   if (!raw) return [];
 
   const timeline = [] as Array<{
@@ -1260,6 +1386,7 @@ const orderTimeline = computed(() => {
     timeDiff?: string;
     value?: number;
     valueType: 'date-time-millis';
+    route?: string;
   }>;
   const usedStatusIds = new Set<string>();
   const orderDate = timelineMillis(raw.orderDate);
@@ -1278,6 +1405,75 @@ const orderTimeline = computed(() => {
     });
     usedStatusIds.add('ORDER_CREATED');
   }
+
+  // Exchange lineage: OrderItemAssoc rows of type EXCHANGE on this order point at the
+  // order it was exchanged from (toOrderId). One entry per distinct source order.
+  const exchangeSourceOrderIds = [...new Set(
+    (raw.itemAssocs || [])
+      .filter((assoc: any) => assoc.orderItemAssocTypeId === 'EXCHANGE' && assoc.toOrderId && assoc.toOrderId !== raw.orderId)
+      .map((assoc: any) => assoc.toOrderId as string)
+  )];
+  exchangeSourceOrderIds.forEach((toOrderId) => {
+    const assoc = (raw.itemAssocs || []).find((row: any) => row.toOrderId === toOrderId);
+    timeline.push({
+      label: 'Exchanged from',
+      id: `exchange-${toOrderId}`,
+      value: timelineMillis(assoc?.createdStamp) || orderDate,
+      icon: swapHorizontalOutline,
+      valueType: 'date-time-millis',
+      metaData: toOrderId,
+      route: `/${router.currentRoute.value.path.split('/')[1] || 'orders'}/${toOrderId}`
+    });
+  });
+
+  // Returns raised against this order: one entry per distinct returnId across the embedded
+  // ReturnItem rows. The processing facility comes from the lazily-hydrated return header
+  // and the wording drops the location while (or if) that never resolves.
+  const returnGroups: Record<string, { count: number; value: number }> = {};
+  (raw.returnItems || []).forEach((item: any) => {
+    if (!item.returnId) return;
+    if (!returnGroups[item.returnId]) returnGroups[item.returnId] = { count: 0, value: 0 };
+    const group = returnGroups[item.returnId];
+    group.count += Number(item.returnQuantity || 0) || 1;
+    const created = timelineMillis(item.createdStamp);
+    if (created && (!group.value || created < group.value)) group.value = created;
+  });
+  Object.entries(returnGroups).forEach(([returnId, group]) => {
+    const facilityId = returnHeadersById.value[returnId]?.destinationFacilityId;
+    const facilityName = facilityId ? seed.facilityName(facilityId) : '';
+    const itemWord = group.count === 1 ? translate('item') : translate('items');
+    const value = group.value || orderDate;
+    timeline.push({
+      label: 'Return created',
+      id: `return-${returnId}`,
+      value,
+      icon: arrowUndoOutline,
+      valueType: 'date-time-millis',
+      timeDiff: findTimeDiff(orderDate, value),
+      metaData: facilityName
+        ? `${group.count} ${itemWord} ${translate('returned at')} ${facilityName}`
+        : `${group.count} ${itemWord} ${translate('returned')}`,
+      route: `/returns/${returnId}`
+    });
+  });
+
+  // Exchange orders created from this order (reverse lineage discovered asynchronously).
+  (exchangeChildrenByOrderId.value[raw.orderId] || []).forEach((child) => {
+    const itemWord = child.itemCount === 1 ? translate('item') : translate('items');
+    const value = child.value || orderDate;
+    timeline.push({
+      label: 'Exchange created',
+      id: `exchange-child-${child.orderId}`,
+      value,
+      icon: swapHorizontalOutline,
+      valueType: 'date-time-millis',
+      timeDiff: findTimeDiff(orderDate, value),
+      metaData: child.facilityName
+        ? `${child.itemCount} ${itemWord} ${translate('purchased in exchange at')} ${child.facilityName}`
+        : `${child.itemCount} ${itemWord} ${translate('purchased in exchange')}`,
+      route: `/orders/${child.orderId}`
+    });
+  });
 
   if (entryDate) {
     timeline.push({
@@ -1351,7 +1547,7 @@ const orderTimeline = computed(() => {
   });
 });
 
-const timelineByShipGroup = computed(() => orderDetailStore.timelineByShipGroup);
+const timelineByShipGroup = computed(() => orderDetailStore.timelineByShipGroupByOrderId(props.orderId));
 const expandedShipGroupIds = ref<Set<string>>(new Set());
 const collapsibleObservers = new WeakMap<HTMLElement, ResizeObserver>();
 
@@ -1463,10 +1659,10 @@ function shippingMethodLabel(shipmentMethodTypeId: string): string {
 }
 
 // ── Holds segment — order-scoped task cards ───────────────────────────────────
-const orderAddressValidationTasks = computed(() => orderTaskStore.getOrderAddressValidationTasks);
-const orderSwapTasks = computed(() => orderTaskStore.getOrderSwapTasks);
-const orderFraudTasks = computed(() => orderTaskStore.getOrderFraudTasks);
-const orderHoldTasks = computed(() => orderTaskStore.getOrderHoldTasks);
+const orderAddressValidationTasks = computed(() => orderTaskStore.getOrderAddressValidationTasksByOrderId(props.orderId));
+const orderSwapTasks = computed(() => orderTaskStore.getOrderSwapTasksByOrderId(props.orderId));
+const orderFraudTasks = computed(() => orderTaskStore.getOrderFraudTasksByOrderId(props.orderId));
+const orderHoldTasks = computed(() => orderTaskStore.getOrderHoldTasksByOrderId(props.orderId));
 const hasOrderHoldTasks = computed(() =>
   orderAddressValidationTasks.value.length > 0
   || orderSwapTasks.value.length > 0
@@ -1499,7 +1695,7 @@ function reloadHoldTasks() {
   return orderTaskStore.fetchOrderHoldTasks(props.orderId);
 }
 
-const commEvents = computed(() => orderDetailStore.commEvents.map((ev: any) => ({
+const commEvents = computed(() => (orderDetailStore.commEventsByOrderId[props.orderId] || []).map((ev: any) => ({
   id: ev.communicationEventId,
   partyIdFrom: ev.partyIdFrom,
   partyIdTo: ev.partyIdTo,
@@ -1522,6 +1718,7 @@ const groupedItems = computed(() => {
     totalQty: number;
     totalPrice: number;
     status: string;
+    statusColor: string;
     selected: boolean;
     items: Array<{
       orderItemSeqId: string;
@@ -1532,6 +1729,7 @@ const groupedItems = computed(() => {
       quantity: number;
       statusId: string;
       status: string;
+      statusColor: string;
       selected: boolean;
       unitPrice: number;
       returnedQty: number;
@@ -1544,14 +1742,18 @@ const groupedItems = computed(() => {
 
   (order.value.shipGroups || []).forEach((sg: any) => {
     (sg.items || []).forEach((item: any) => {
-      const rawSg = orderDetailStore.current?.shipGroups?.find((g: any) => g.shipGroupSeqId === sg.id);
+      const rawSg = orderDetailStore.orderById(props.orderId)?.shipGroups?.find((g: any) => g.shipGroupSeqId === sg.id);
       const rawItem = rawSg?.items?.find((i: any) => i.orderItemSeqId === item.id);
 
       const externalId = rawItem?.externalId || item.sku || item.id;
       const unitPrice = Number(rawItem?.unitPrice || 0);
       const statusId = rawItem?.statusId || '';
-      const status = seed.statusDescription(statusId);
-      const returnedQty = orderDetailStore.returnedQtyByItemSeqId[item.id] || 0;
+      const lineStatus = fulfillmentLineStatus(timelineByShipGroup.value[sg.id]);
+      const status = lineStatus ? translate(lineStatus) : seed.statusDescription(statusId);
+      const statusColor = lineStatus
+        ? fulfillmentLineStatusColor(lineStatus)
+        : commonUtil.getStatusColor(statusId);
+      const returnedQty = orderDetailStore.returnedQtyByItemSeqIdByOrderId(props.orderId)[item.id] || 0;
       const returnableQty = Math.max(0, Number(item.quantity || 0) - returnedQty);
 
       if (!groups[externalId]) {
@@ -1566,6 +1768,7 @@ const groupedItems = computed(() => {
           totalPrice: orderDetailStore.totalsByExternalId[externalId] || 0,
           status,
           statusId,
+          statusColor,
           get selected() { return this.items.length > 0 && this.items.every((i: any) => selectedItemIds.value.has(i.orderItemSeqId)); },
           set selected(v: boolean) { this.items.forEach((i: any) => v ? selectedItemIds.value.add(i.orderItemSeqId) : selectedItemIds.value.delete(i.orderItemSeqId)); },
           items: []
@@ -1580,6 +1783,7 @@ const groupedItems = computed(() => {
         quantity: item.quantity,
         statusId,
         status,
+        statusColor,
         get selected() { return selectedItemIds.value.has(item.id); },
         set selected(v: boolean) { v ? selectedItemIds.value.add(item.id) : selectedItemIds.value.delete(item.id); },
         unitPrice,
@@ -1592,14 +1796,19 @@ const groupedItems = computed(() => {
     });
   });
 
-  return Object.values(groups);
+  return Object.values(groups).map((group) => {
+    const statuses = [...new Set(group.items.map((item) => item.status))];
+    group.status = statuses.join(' / ');
+    group.statusColor = statuses.length === 1 ? group.items[0].statusColor : 'medium';
+    return group;
+  });
 });
 
-const orderTotals = computed(() => orderDetailStore.totals);
+const orderTotals = computed(() => orderDetailStore.orderTotalsByOrderId(props.orderId));
 
-const riskAssessments = computed(() => orderDetailStore.riskAssessments);
-const riskAssessmentsStatus = computed(() => orderDetailStore.riskAssessmentsStatus);
-const riskAssessmentsError = computed(() => orderDetailStore.riskAssessmentsError);
+const riskAssessments = computed(() => orderDetailStore.riskAssessmentsByOrderId[props.orderId] || []);
+const riskAssessmentsStatus = computed(() => orderDetailStore.riskAssessmentsStatusByOrderId[props.orderId] || 'idle');
+const riskAssessmentsError = computed(() => orderDetailStore.riskAssessmentsErrorByOrderId[props.orderId] || '');
 
 const riskSummary = computed(() => {
   const recommendationEnumId = order.value?.riskRecommendationEnumId || '';
@@ -1625,15 +1834,81 @@ const hasRiskContext = computed(() =>
   || riskAssessments.value.length > 0
 );
 
-const paymentReceivedTotal = computed(() =>
-  (order.value?.payments || []).reduce((sum: number, payment: any) => sum + Number(payment.amount || 0), 0)
-);
+const PAYMENT_COLLECTED_STATUSES = new Set(['PAYMENT_AUTHORIZED', 'PAYMENT_SETTLED', 'PAYMENT_RECEIVED']);
+
+// Only preferences that actually collected money count — refunded, cancelled and
+// declined preferences would otherwise inflate this past the grand total.
+const paymentReceivedTotal = computed(() => {
+  const total = (order.value?.payments || []).reduce((sum: number, payment: any) =>
+    PAYMENT_COLLECTED_STATUSES.has(payment.statusId) ? sum + Number(payment.amount || 0) : sum, 0);
+  return Math.round(total * 100) / 100;
+});
+
+// Payment card sections: one divider per distinct preference status, in order of first
+// appearance, with refunded pinned to the bottom (stable sort keeps the rest in place).
+const paymentSections = computed(() => {
+  const sections: Array<{ statusId: string; label: string; payments: any[]; total: number }> = [];
+  const byStatus: Record<string, { statusId: string; label: string; payments: any[]; total: number }> = {};
+
+  (order.value?.payments || []).forEach((payment: any) => {
+    const statusId = payment.statusId || 'UNKNOWN';
+    if (!byStatus[statusId]) {
+      byStatus[statusId] = {
+        statusId,
+        label: payment.statusDesc || payment.status || statusId,
+        payments: [],
+        total: 0
+      };
+      sections.push(byStatus[statusId]);
+    }
+    byStatus[statusId].payments.push(payment);
+    byStatus[statusId].total += Number(payment.amount || 0);
+  });
+
+  sections.forEach((section) => { section.total = Math.round(section.total * 100) / 100; });
+  return sections.sort((left, right) =>
+    Number(left.statusId === 'PAYMENT_REFUNDED') - Number(right.statusId === 'PAYMENT_REFUNDED')
+  );
+});
+
+// Net collected right now: approved/settled/received preferences minus refunded ones.
+// Cancelled/declined/not-received preferences never contribute in either direction.
+const paymentNetAmount = computed(() => {
+  const net = (order.value?.payments || []).reduce((sum: number, payment: any) => {
+    if (PAYMENT_COLLECTED_STATUSES.has(payment.statusId)) return sum + Number(payment.amount || 0);
+    if (payment.statusId === 'PAYMENT_REFUNDED') return sum - Number(payment.amount || 0);
+    return sum;
+  }, 0);
+  return Math.round(net * 100) / 100;
+});
+
+// Every non-cancelled item fully returned (by quantity).
+const allItemsReturned = computed(() => {
+  const raw = orderDetailStore.orderById(props.orderId);
+  const items = (raw?.shipGroups || [])
+    .flatMap((shipGroup: any) => shipGroup.items || [])
+    .filter((item: any) => item.statusId !== 'ITEM_CANCELLED');
+  if (!items.length) return false;
+
+  const returnedBySeqId = orderDetailStore.returnedQtyByItemSeqIdByOrderId(props.orderId);
+  return items.every((item: any) => (returnedBySeqId[item.orderItemSeqId] || 0) >= Number(item.quantity || 0));
+});
+
+// Negative net = more refunded than collected. Positive net on a fully-returned order =
+// money still held for goods that all came back — likely a refund owed.
+const paymentNetColor = computed(() => {
+  if (paymentNetAmount.value < 0) return 'danger';
+  if (paymentNetAmount.value > 0 && allItemsReturned.value) return 'warning';
+  return undefined;
+});
 
 const orderAdjustmentRows = computed(() =>
+  // orderTotals.adjustments is already keyed by the resolved comment/description
+  // (see adjustmentDisplayLabel in the orderDetail store) — no further lookup needed here.
   Object.entries(orderTotals.value.adjustments)
-    .map(([typeId, amount]) => ({
-      label: seed.orderAdjustmentTypeDescription(typeId) || typeId,
-      detail: shippingAdjustmentDetail(typeId),
+    .map(([label, amount]) => ({
+      label,
+      detail: shippingAdjustmentDetail(label),
       amount: Number(amount)
     }))
     .filter((row) => row.amount !== 0)
@@ -1764,8 +2039,58 @@ function shipGroupProductIdentification(identificationPref: string, item: any): 
   return product ? commonUtil.getProductIdentificationValue(identificationPref, product) : '';
 }
 
-onMounted(() => loadOrder(props.orderId));
+// Ionic caches routed page instances: navigating /orders/A → /orders/B and back re-activates
+// A's instance without re-mounting, while the store's currentOrderId still points at B. Load on
+// every view activation (onIonViewWillEnter fires on first enter and on each re-enter; the store
+// skips the refetch when the order is already loaded) so the page re-asserts its own order.
+onIonViewWillEnter(() => loadOrder(props.orderId));
 watch(() => props.orderId, (orderId) => loadOrder(orderId));
+
+// Orders this one was exchanged from (OrderItemAssoc rows of type EXCHANGE, pointing at the
+// original via toOrderId). Distinct, and never the order itself.
+const exchangeSourceOrderIds = computed(() => [...new Set(
+  (orderDetailStore.current?.itemAssocs || [])
+    .filter((assoc: any) => assoc.orderItemAssocTypeId === 'EXCHANGE' && assoc.toOrderId && assoc.toOrderId !== orderDetailStore.current?.orderId)
+    .map((assoc: any) => assoc.toOrderId as string)
+)]);
+
+// Lazily hydrate each original order (cached in the store by id) so the Source card can show
+// its name and the returns that were processed as part of the exchange.
+watch(exchangeSourceOrderIds, (ids) => {
+  ids.forEach((id) => orderDetailStore.fetchOrder(id));
+}, { immediate: true });
+
+const exchangeSources = computed(() => exchangeSourceOrderIds.value.map((orderId) => {
+  const entry = orderDetailStore.byOrderId[orderId];
+  const payload = entry?.payload;
+  return {
+    orderId,
+    loading: !entry || entry.status === 'loading' || entry.status === 'idle',
+    orderName: payload?.orderName || payload?.externalId || orderId,
+    returnIds: [...new Set((payload?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[]
+  };
+}));
+
+// Returns behind an exchange-credit/payment OPP. The returnId is NOT derivable from the OPP's
+// ref numbers (they carry Shopify txn ids), so the source of truth is the original order's
+// returnItems. When this order was exchanged from several originals, an OPP with a
+// parentRefNum narrows to the original whose refunded OPP carries that same manualRefNum;
+// otherwise every source's returns are listed rather than guessing (amount/id-adjacency
+// heuristics proved unreliable against real data).
+function carriedOverReturnIds(payment: any): string[] {
+  if (!['EXCHANGE_CREDIT', 'EXCHANGE_PAYMENT'].includes(payment.paymentMethodTypeId)) return [];
+
+  let sources = exchangeSources.value;
+  if (payment.parentRefNum && sources.length > 1) {
+    const matching = sources.filter((source) =>
+      (orderDetailStore.byOrderId[source.orderId]?.payload?.paymentPreferences || []).some(
+        (opp: any) => opp.manualRefNum === payment.parentRefNum
+      )
+    );
+    if (matching.length) sources = matching;
+  }
+  return [...new Set(sources.flatMap((source) => source.returnIds))];
+}
 
 async function loadOrder(orderId: string, force = false) {
   if (force) {
@@ -1994,8 +2319,8 @@ const fetchDistancesForOrder = async (shipGroups: any[]) => {
   const zipsToLookup = new Set<string>();
   brokered.forEach((sg: any) => {
     const mech = sg.contactMechId
-      ? orderDetailStore.contactMechsById[sg.contactMechId]
-      : orderDetailStore.contactMechsByPurpose['SHIPPING_LOCATION'];
+      ? orderDetailStore.contactMechsByIdByOrderId(props.orderId)[sg.contactMechId]
+      : orderDetailStore.contactMechsByPurposeByOrderId(props.orderId)['SHIPPING_LOCATION'];
     const addr = mech?.postalAddress;
     const destLat = num(addr?.latitude);
     const destLon = num(addr?.longitude);
@@ -2213,8 +2538,8 @@ function shippingAddressView(shipGroup: any): { name: string; street: string; lo
 
 function shipGroupShippingContactMech(shipGroup: any) {
   return shipGroup.contactMechId
-    ? orderDetailStore.contactMechsById[shipGroup.contactMechId]
-    : orderDetailStore.contactMechsByPurpose['SHIPPING_LOCATION'];
+    ? orderDetailStore.contactMechsByIdByOrderId(props.orderId)[shipGroup.contactMechId]
+    : orderDetailStore.contactMechsByPurposeByOrderId(props.orderId)['SHIPPING_LOCATION'];
 }
 
 const editingShipGroupId = ref<string | null>(null);
@@ -2346,7 +2671,7 @@ function formatTelecomNumber(telecom: any) {
 }
 
 function findOrderContact(contactMechTypeId: string, purposeTypeIds: string[]) {
-  return (orderDetailStore.current?.contactMechs || []).find((contact: any) =>
+  return (orderDetailStore.orderById(props.orderId)?.contactMechs || []).find((contact: any) =>
     contactMechTypeId === contactMechTypeIdFromContact(contact, contactMechTypeId)
     && contactMatchesPurpose(contact, purposeTypeIds)
   );
@@ -2495,6 +2820,24 @@ function groupSecondaryIdentifier(group: any): string {
     || group.externalId;
 }
 
+// Same location-chip semantics as the Find Orders list rows: the group's items act as the
+// "docs" — the top physical facility wins the chip (+N for further splits), and virtual/parking
+// facilities only label the chip when nothing is brokered. Facility type comes from the seed
+// store since ship groups don't carry it.
+function groupLocationLabel(group: any): string {
+  const summary = summarizeBrokeredFacilities(group.items.map((item: any) => ({
+    facilityId: item.facilityId,
+    facilityName: seed.facilityName(item.facilityId) || item.facilityName,
+    facilityTypeId: seed.facility(item.facilityId)?.facilityTypeId
+  })));
+
+  const brokered = Boolean(summary.brokeredFacilityName);
+  const name = summary.brokeredFacilityName || summary.dominantVirtualFacilityName;
+  if (!name) return '';
+  const splitCount = brokered ? summary.brokeredFacilitySplitCount : summary.dominantVirtualFacilitySplitCount;
+  return splitCount > 0 ? `${name} +${splitCount}` : name;
+}
+
 function getGroupAdjustmentRows(group: any): Array<{ label: string; amount: string }> {
   return getGroupAdjustments(group).map((adjustment) => ({
     label: adjustment.comment,
@@ -2504,7 +2847,7 @@ function getGroupAdjustmentRows(group: any): Array<{ label: string; amount: stri
 
 function getItemAdjustmentRows(item: any): Array<{ label: string; amount: string }> {
   return (item.adjustments || []).map((adjustment: any) => ({
-    label: adjustment.comment,
+    label: itemAdjustmentLabel(adjustment),
     amount: money(adjustment.amount, order.value?.currency || 'USD')
   }));
 }
@@ -2522,7 +2865,12 @@ function attributeChipLabel(count: number): string {
 }
 
 function itemAdjustmentLabel(adj: any): string {
-  return adj.comments || adj.comment || adj.description || adj.orderAdjustmentTypeId || translate('Adjustment');
+  return adj.comments
+    || adj.comment
+    || adj.description
+    || seed.orderAdjustmentTypeDescription(adj.orderAdjustmentTypeId)
+    || adj.orderAdjustmentTypeId
+    || translate('Adjustment');
 }
 
 function itemAdjustmentKey(adj: any, fallbackSeqId = ""): string {
@@ -2539,7 +2887,7 @@ function itemAdjustmentSummaries(rawItem: any, orderItemSeqId: string): Array<{ 
   const totals: Record<string, number> = {};
   const seen = new Set<string>();
   const adjustments = [
-    ...(orderDetailStore.current?.adjustments || []).filter((adj: any) => adj.orderItemSeqId === orderItemSeqId),
+    ...(orderDetailStore.orderById(props.orderId)?.adjustments || []).filter((adj: any) => adj.orderItemSeqId === orderItemSeqId),
     ...(rawItem?.adjustments || [])
   ];
 
@@ -2659,7 +3007,7 @@ async function parkShipGroup(shipGroupSeqId: string) {
 }
 
 async function cancelOrderItems() {
-  const raw = orderDetailStore.current;
+  const raw = orderDetailStore.orderById(props.orderId);
   if (!raw || !selectedItems.value.length) return;
   const itemsSnapshot = [...selectedItems.value];
   const alert = await alertController.create({
@@ -2703,7 +3051,7 @@ async function rejectAndReleaseItem(item: any, productId: string) {
   // Step 1 — pick a facility with inventory to release to
   const facilityModal = await modalController.create({
     component: ItemFacilityInventoryModal,
-    componentProps: { productId, productStoreId: orderDetailStore.current?.productStoreId },
+    componentProps: { productId, productStoreId: orderDetailStore.orderById(props.orderId)?.productStoreId },
     cssClass: 'item-facility-inventory-modal'
   });
   await facilityModal.present();
@@ -2751,7 +3099,7 @@ async function rejectAndReleaseItem(item: any, productId: string) {
 }
 
 async function cancelSingleItem(item: any) {
-  const raw = orderDetailStore.current;
+  const raw = orderDetailStore.orderById(props.orderId);
   if (!raw) return;
   const alert = await alertController.create({
     header: translate('Cancel Item'),
@@ -3243,5 +3591,21 @@ ion-card-header ion-buttons {
   display: flex;
   gap: var(--spacer-xs);
   justify-content: space-between;
+}
+
+.grand-total-row {
+  --background: rgba(255, 255, 255, 0.06);
+}
+
+.payment-return-link {
+  margin-inline-start: calc(-1 * var(--spacer-xs, 8px));
+  text-transform: none;
+}
+
+/* Net amount sits across from the Payment title (the header grid's actions column). */
+.payment-card ion-card-header ion-card-subtitle {
+  grid-area: actions;
+  align-self: center;
+  margin: 0;
 }
 </style>
