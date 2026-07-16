@@ -269,6 +269,7 @@ export function normalizeOrderDoc(doc: any): Order {
 
   return {
     id: orderId,
+    orderName: toStringValue(doc.orderName),
     externalId: toStringValue(doc.orderName ?? doc.externalOrderId ?? doc.externalId, orderId),
     orderDate: toStringValue(doc.orderDate ?? doc.orderEntryDate),
     status: toStringValue(doc.orderStatusDesc ?? doc.orderStatusId ?? doc.statusId, 'Created') as Order['status'],
@@ -280,6 +281,7 @@ export function normalizeOrderDoc(doc: any): Order {
     paymentStatus: toStringValue(doc.paymentStatus ?? doc.paymentStatusDesc),
     fulfillmentStatus: toStringValue(doc.fulfillmentStatus ?? doc.orderStatusDesc ?? doc.orderStatusId ?? doc.statusId),
     deliveryMethod: toStringValue(doc.shipmentMethodDesc ?? doc.shipmentMethodTypeId),
+    carrierPartyId: toStringValue(doc.carrierPartyId),
     priority: toStringValue(doc.priority ?? doc.orderStatusDesc ?? doc.orderStatusId ?? doc.statusId),
     shippingAddress1: toStringValue(doc.shippingAddress1 ?? doc.address1),
     shippingCity: toStringValue(doc.shippingCity ?? doc.city),
@@ -287,6 +289,7 @@ export function normalizeOrderDoc(doc: any): Order {
     shippingPostalCode: toStringValue(doc.shippingPostalCode ?? doc.postalCode),
     shippingCountryGeoId: toStringValue(doc.shippingCountryGeoId ?? doc.countryGeoId),
     estimatedDeliveryDate: toStringValue(doc.estimatedDeliveryDate ?? doc.promisedDatetime),
+    promisedDatetime: toStringValue(doc.promisedDatetime),
     shipBeforeDate: toStringValue(doc.shipBeforeDate),
     shipByDate: toStringValue(doc.shipByDate),
     queueReason: toStringValue(doc.rejectionReasonDesc ?? doc.rejectionReason ?? doc.rejectionReasonId),

@@ -1,6 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
-import { commonUtil, useSolrSearch } from '@common';
-import { buildOrderLookupPayload, searchOrders } from '@/services/order';
+import { api, commonUtil, useSolrSearch } from '@common';
+import {
+  buildOrderLookupPayload,
+  buildOrderRowEnrichmentPayload,
+  buildUnfillableProductCandidatesPayload,
+  buildUnfillableShipGroupsForProductPayload,
+  buildVirtualLocationCountsPayload,
+  fetchUnfillableProductCandidates,
+  fetchUnfillableShipGroupsForProduct,
+  fetchVirtualLocationOrderCounts,
+  fetchWorkflowOrderTotals,
+  searchOrders
+} from '@/services/order';
 
 vi.mock('@common', () => ({
   api: vi.fn(),
@@ -45,6 +56,14 @@ describe('buildOrderLookupPayload facility filtering', () => {
     expect(filters).toContain('facilityId:(_NA_ OR REJECTED_PARKING)');
   });
 
+  it('finds operational parking items by excluding physical and archived facilities', () => {
+    const filters = filtersOf({ hasVirtualFacilityItems: true });
+
+    expect(filters).toContain('-facilityTypeId:(RETAIL_STORE OR WAREHOUSE)');
+    expect(filters).toContain('-facilityId:GENERAL_OPS_PARKING');
+    expect(filters).not.toContain('facilityTypeId:VIRTUAL_FACILITY');
+  });
+
   it("ignores the 'All' sentinel and empty facility values", () => {
     const filters = filtersOf({ facilityIds: ['All', '', 'UNFILLABLE_PARKING'] });
     expect(filters).toContain('facilityId:UNFILLABLE_PARKING');
@@ -80,14 +99,9 @@ describe('buildOrderLookupPayload facility filtering', () => {
     ]));
   });
 
-  it('requests the address, reason, and delivery fields used by queue list rows', () => {
+  it('requests the reason and delivery fields used by queue list rows', () => {
     const fields = fieldsOf();
     expect(fields).toEqual(expect.arrayContaining([
-      'address1',
-      'city',
-      'stateProvinceGeoId',
-      'postalCode',
-      'countryGeoId',
       'estimatedDeliveryDate',
       'shipBeforeDate',
       'rejectionReason',
@@ -107,6 +121,7 @@ describe('buildOrderLookupPayload facility filtering', () => {
               docs: [{
                 orderId: 'M100001',
                 orderName: '#100001',
+                externalOrderId: '5202667012349',
                 orderDate: '2026-06-12T10:00:00Z',
                 orderStatusId: 'ORDER_APPROVED',
                 customerPartyId: 'CUST_1',
@@ -141,6 +156,7 @@ describe('buildOrderLookupPayload facility filtering', () => {
     expect(result.orders).toHaveLength(1);
     expect(result.orders[0].parkingUnitCount).toBe(3.5);
     expect(result.orders[0]).toMatchObject({
+      orderName: '#100001',
       customerName: 'Angela Crutchfield',
       shippingAddress1: '602 White Oak Dr',
       shippingCity: 'Eufaula',
@@ -151,5 +167,261 @@ describe('buildOrderLookupPayload facility filtering', () => {
       queueReason: 'Inventory not available',
       ruleName: 'Rule name'
     });
+  });
+
+  it('summarizes brokered facilities from physical facility docs only', async () => {
+    mockSolrResponse({
+      grouped: {
+        orderId: {
+          ngroups: 1,
+          groups: [{
+            doclist: {
+              docs: [{
+                orderId: 'M100002',
+                orderName: '#100002',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: 'BROADWAY',
+                facilityName: 'Broadway',
+                facilityTypeId: 'RETAIL_STORE',
+                quantity: 1
+              }, {
+                orderId: 'M100002',
+                orderName: '#100002',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: 'BROADWAY',
+                facilityName: 'Broadway',
+                facilityTypeId: 'RETAIL_STORE',
+                quantity: 1
+              }, {
+                orderId: 'M100002',
+                orderName: '#100002',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: 'GARDEN_CITY',
+                facilityName: 'Garden City',
+                facilityTypeId: 'RETAIL_STORE',
+                quantity: 1
+              }, {
+                orderId: 'M100002',
+                orderName: '#100002',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: '_NA_',
+                facilityName: 'Brokering Queue',
+                facilityTypeId: 'VIRTUAL_FACILITY',
+                quantity: 1
+              }]
+            }
+          }]
+        }
+      }
+    });
+
+    const result = await searchOrders();
+
+    expect(result.orders[0]).toMatchObject({
+      brokeredFacilityName: 'Broadway',
+      brokeredFacilitySplitCount: 1,
+      dominantVirtualFacilityName: '',
+      brokeredItemCount: 3,
+      totalItemCount: 4
+    });
+  });
+
+  it('uses the dominant virtual facility when an order is fully unbrokered', async () => {
+    mockSolrResponse({
+      grouped: {
+        orderId: {
+          ngroups: 1,
+          groups: [{
+            doclist: {
+              docs: [{
+                orderId: 'M100003',
+                orderName: '#100003',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: '_NA_',
+                facilityName: 'Brokering Queue',
+                facilityTypeId: 'VIRTUAL_FACILITY',
+                quantity: 1
+              }, {
+                orderId: 'M100003',
+                orderName: '#100003',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: '_NA_',
+                facilityName: 'Brokering Queue',
+                facilityTypeId: 'VIRTUAL_FACILITY',
+                quantity: 1
+              }, {
+                orderId: 'M100003',
+                orderName: '#100003',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: '_NA_',
+                facilityName: 'Brokering Queue',
+                facilityTypeId: 'VIRTUAL_FACILITY',
+                quantity: 1
+              }, {
+                orderId: 'M100003',
+                orderName: '#100003',
+                orderStatusId: 'ORDER_APPROVED',
+                facilityId: 'REJECTED_PARKING',
+                facilityName: 'Rejected Queue',
+                facilityTypeId: 'VIRTUAL_FACILITY',
+                quantity: 1
+              }]
+            }
+          }]
+        }
+      }
+    });
+
+    const result = await searchOrders();
+
+    expect(result.orders[0]).toMatchObject({
+      brokeredFacilityName: '',
+      brokeredFacilitySplitCount: 0,
+      dominantVirtualFacilityName: 'Brokering Queue',
+      dominantVirtualFacilitySplitCount: 1,
+      brokeredItemCount: 0,
+      totalItemCount: 4
+    });
+  });
+});
+
+describe('order-row enrichment payload', () => {
+  it('deduplicates order IDs and requests the full grouped row contract in one query', () => {
+    const payload = buildOrderRowEnrichmentPayload(['M100001', 'M100002', 'M100001']);
+    const fields = String(payload.json.params.fl).split(' ');
+
+    expect(payload.json.params.rows).toBe(2);
+    expect(payload.json.params['group.field']).toBe('orderId');
+    expect(payload.json.filter).toContain('orderId:(M100001 OR M100002)');
+    expect(fields).toEqual(expect.arrayContaining([
+      'customerPartyName',
+      'carrierPartyId',
+      'salesChannelDesc',
+      'facilityId',
+      'facilityName',
+      'facilityTypeId',
+      'orderItemSeqId',
+      'shipmentMethodTypeId',
+      'estimatedDeliveryDate',
+      'promisedDatetime',
+      'shipBeforeDate',
+      'shipByDate'
+    ]));
+  });
+});
+
+describe('workflow order totals', () => {
+  it('requests only the total from each authoritative workflow queue in one batch', async () => {
+    const totalsByBucket = { open: 6440, inflight: 557, packed: 81 };
+    (api as any).mockReset();
+    (api as any).mockImplementation(({ url, params }: any) => {
+      const bucket = url.split('/').pop() as keyof typeof totalsByBucket;
+      expect(params).toMatchObject({ pageSize: 1, pageIndex: 0, productStoreId: 'STORE' });
+      return Promise.resolve({ data: { ordersCount: totalsByBucket[bucket], orders: [] } });
+    });
+
+    await expect(fetchWorkflowOrderTotals('STORE')).resolves.toEqual(totalsByBucket);
+    expect(api).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('proactive swap setup queries', () => {
+  it('facets approved active unfillable items by product count', () => {
+    const payload = buildUnfillableProductCandidatesPayload('STORE_1', 25);
+    expect(payload.json.filter).toEqual(expect.arrayContaining([
+      'orderStatusId:ORDER_APPROVED',
+      'orderItemStatusId:(ITEM_CREATED OR ITEM_APPROVED)',
+      'facilityId:UNFILLABLE_PARKING',
+      'productStoreId:STORE_1',
+    ]));
+    expect(payload.json.facet.products).toMatchObject({ field: 'productId', limit: 25, sort: 'count desc' });
+  });
+
+  it('normalizes product buckets in the server-provided count order', async () => {
+    mockSolrResponse({ facets: { products: { buckets: [
+      { val: 'SKU_A', count: 12 },
+      { val: 'SKU_B', count: 4 },
+    ] } } });
+    await expect(fetchUnfillableProductCandidates('STORE_1')).resolves.toEqual([
+      { productId: 'SKU_A', itemCount: 12 },
+      { productId: 'SKU_B', itemCount: 4 },
+    ]);
+  });
+
+  it('fetches and deduplicates affected ship groups for one product', async () => {
+    const payload = buildUnfillableShipGroupsForProductPayload('STORE_1', 'SKU_A');
+    expect(payload.json.filter).toContain('productId:SKU_A');
+    mockSolrResponse({ response: { docs: [
+      { orderId: 'ORDER_1', shipGroupSeqId: '00001' },
+      { orderId: 'ORDER_1', shipGroupSeqId: '00001' },
+      { orderId: 'ORDER_2', shipGroupSeqId: '00002' },
+    ] } });
+    await expect(fetchUnfillableShipGroupsForProduct('STORE_1', 'SKU_A')).resolves.toEqual([
+      { orderId: 'ORDER_1', shipGroupSeqId: '00001' },
+      { orderId: 'ORDER_2', shipGroupSeqId: '00002' },
+    ]);
+  });
+});
+
+describe('virtual location count payload', () => {
+  function virtualLocationFiltersOf(params: Parameters<typeof buildVirtualLocationCountsPayload>[0]) {
+    return buildVirtualLocationCountsPayload(params).json.filter as string[];
+  }
+
+  it('counts created and approved orders by virtual facility for the selected product store', () => {
+    const filters = virtualLocationFiltersOf({
+      productStoreId: 'STORE',
+      facilityIds: ['_NA_', 'REJECTED_ITM_PARKING', 'UNFILLABLE_PARKING']
+    });
+
+    expect(filters).toContain('docType: ORDER');
+    expect(filters).toContain('orderTypeId: SALES_ORDER');
+    expect(filters).toContain('orderStatusId:(ORDER_CREATED OR ORDER_APPROVED)');
+    expect(filters).toContain('productStoreId:STORE');
+    expect(filters).toContain('facilityId:(_NA_ OR REJECTED_ITM_PARKING OR UNFILLABLE_PARKING)');
+  });
+
+  it('adds an order-item status filter when itemStatus is provided', () => {
+    const filters = virtualLocationFiltersOf({
+      productStoreId: 'STORE',
+      facilityIds: ['UNFILLABLE_PARKING'],
+      itemStatus: ['ITEM_CREATED', 'ITEM_APPROVED']
+    });
+
+    expect(filters).toContain('orderItemStatusId:(ITEM_CREATED OR ITEM_APPROVED)');
+    // order-header status filter is still applied alongside the item filter
+    expect(filters).toContain('orderStatusId:(ORDER_CREATED OR ORDER_APPROVED)');
+  });
+
+  it('omits the order-item status filter when itemStatus is not provided', () => {
+    const filters = virtualLocationFiltersOf({
+      productStoreId: 'STORE',
+      facilityIds: ['_NA_']
+    });
+
+    expect(filters.some((filter) => filter.startsWith('orderItemStatusId:'))).toBe(false);
+  });
+
+  it('normalizes Solr facet buckets into facility order counts', async () => {
+    mockSolrResponse({
+      facets: {
+        facilityCounts: {
+          buckets: [
+            { val: '_NA_', count: 3, orders: 2 },
+            { val: 'UNFILLABLE_PARKING', count: 5, orders: '4' }
+          ]
+        }
+      }
+    });
+
+    const counts = await fetchVirtualLocationOrderCounts({
+      productStoreId: 'STORE',
+      facilityIds: ['_NA_', 'UNFILLABLE_PARKING']
+    });
+
+    expect(counts).toEqual([
+      { facilityId: '_NA_', count: 2 },
+      { facilityId: 'UNFILLABLE_PARKING', count: 4 }
+    ]);
   });
 });

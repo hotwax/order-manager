@@ -43,6 +43,20 @@ const popoverTitle = computed(() => {
     || translate("Item");
 });
 
+function firstText(...values: any[]): string {
+  return values.find((value) => typeof value === "string" && value.trim())?.trim() || "";
+}
+
+function defaultCustomSwapSearchTerm(item: any): string {
+  const product = item?.productId ? useProductCacheStore().getProduct(item.productId) : undefined;
+
+  return firstText(
+    product?.parentProductName,
+    item?.parentProductName,
+    item?.parentProductId
+  );
+}
+
 const closePopover = () => popoverController.dismiss();
 
 const viewInventory = async () => {
@@ -69,6 +83,7 @@ const customSwap = async () => {
       substituteProducts: originalItem?.substituteProducts ?? [],
       facilityId: props.task.facilityId,
       selectedProductId: props.item.productId,
+      defaultSearchKeyword: defaultCustomSwapSearchTerm(originalItem),
     },
   });
   await modal.present();

@@ -1,6 +1,6 @@
 import { DateTime, Settings } from "luxon";
 import { defineStore } from "pinia";
-import { api, commonUtil, logger, translate } from "@common";
+import { api, commonUtil, cookieHelper, logger, translate } from "@common";
 import { useAuth } from "@common/composables/useAuth";
 import { showToast } from "@/utils";
 import { useSeedStore } from "./seed";
@@ -70,34 +70,46 @@ export const useUserStore = defineStore("user", {
       }
     },
     async fetchPermissions() {
-      this.fetchStatus.permissions = "pending";
-      const serverPermissions = [] as string[];
-      const viewSize = 200;
-      let viewIndex = 0;
+      const permissionId = import.meta.env.VITE_APP_PERMISSION_ID
+      const serverPermissions = [] as string[]
+      const viewSize = 50
+      let viewIndex = 0
+
+      this.fetchStatus.permissions = "pending"
 
       try {
-        let resp;
+        let resp
         do {
           resp = await api({
-            url: commonUtil.isMoqui() ? "admin/user/permissions" : "getPermissions",
-            method: "GET",
-            baseURL: commonUtil.getOmsURL(),
+            url: "admin/user/permissions",
+            method: "get",
             params: { viewIndex, viewSize }
-          }) as any;
+          }) as any
 
           if (resp.status === 200 && resp.data.docs?.length && !commonUtil.hasError(resp)) {
-            serverPermissions.push(...resp.data.docs.map((permission: any) => permission.permissionId));
-            viewIndex++;
+            serverPermissions.push(...resp.data.docs.map((permission: any) => permission.permissionId))
+            viewIndex++
           } else {
-            resp = null;
+            resp = null
           }
-        } while (resp);
+        } while (resp)
 
-        this.permissions = serverPermissions;
-        this.fetchStatus.permissions = "success";
+        if(permissionId) {
+          const hasPermission = serverPermissions.includes(permissionId)
+          if(!hasPermission) {
+            const permissionError = "You do not have permission to access the app."
+            await showToast(translate(permissionError))
+            logger.error("error", permissionError)
+            this.fetchStatus.permissions = "error"
+            return Promise.reject(new Error(permissionError))
+          }
+        }
+
+        this.permissions = serverPermissions
+        this.fetchStatus.permissions = "success"
       } catch (error: any) {
-        this.fetchStatus.permissions = "error";
-        return Promise.reject(error);
+        this.fetchStatus.permissions = "error"
+        return Promise.reject(error)
       }
     },
     
@@ -147,6 +159,7 @@ export const useUserStore = defineStore("user", {
     async postLogin() {
       try {
         await this.fetchUserProfile();
+        this.oms = cookieHelper().get("oms") || "";
         await this.fetchPermissions();
         await useProductStore().fetchProductStores();
         await useProductStore().fetchProductStorePreference();

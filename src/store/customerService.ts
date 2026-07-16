@@ -1,19 +1,141 @@
 import { defineStore } from 'pinia';
 import { DateTime } from 'luxon';
 import { useOrderStore } from '@/store/order';
-import { api, commonUtil, translate } from '@common';
+import { api, commonUtil, logger, translate } from '@common';
 import type {
   BulkActionDefinition,
   WorkflowBucket,
   WorkflowFilters,
   WorkflowOrder,
   FulfillmentProgress,
-  FacilityFulfillmentProgress
+  FacilityFulfillmentProgress,
+  VirtualLocationWorkCount
 } from '@/types/customerService';
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
+import { getDashboardDateFilter } from '@/utils/dashboardDate';
+import { useUserStore } from '@/store/user';
+import { fetchVirtualLocationOrderCounts, searchOrders } from '@/services/order';
 
+const CHANNELS = ['WEB_SALES_CHANNEL', 'POS_SALES_CHANNEL', 'MOBILE_SALES_CHANNEL', 'MARKETPLACE_CHANNEL'];
+const BROKERABLE_ORDER_STATUSES = ['ORDER_CREATED', 'ORDER_APPROVED'];
+// The Unfillable queue should only count orders whose parked item is still active
+// (created/approved) — not items that were since cancelled or completed.
+const UNFILLABLE_FACILITY_ID = 'UNFILLABLE_PARKING';
+const UNFILLABLE_ITEM_STATUSES = ['ITEM_CREATED', 'ITEM_APPROVED'];
+const GENERAL_OPS_PARKING_FACILITY_ID = 'GENERAL_OPS_PARKING';
+const REQUIRED_VIRTUAL_LOCATION_GROUPS = [
+  { id: 'brokering', label: 'Brokering queue', facilityIds: ['_NA_'] },
+  { id: 'rejected', label: 'Rejected queue', facilityIds: ['REJECTED_ITM_PARKING', 'REJECTED_PARKING'] },
+  { id: 'unfillable', label: 'Unfillable queue', facilityIds: ['UNFILLABLE_PARKING'] }
+];
+const DEFAULT_VIRTUAL_LOCATION_NAMES: Record<string, string> = {
+  _NA_: 'Brokering queue',
+  REJECTED_ITM_PARKING: 'Rejected queue',
+  REJECTED_PARKING: 'Rejected queue',
+  UNFILLABLE_PARKING: 'Unfillable queue'
+};
+
+function getUserDashboardDateFilter() {
+  const userProfile = useUserStore().current;
+  return getDashboardDateFilter(userProfile?.timeZone || userProfile?.userTimeZone);
+}
+
+function facilityIdOf(facility: any) {
+  return facility?.facilityId || facility?.id || '';
+}
+
+function facilityNameOf(facility: any) {
+  const facilityId = facilityIdOf(facility);
+  return facility?.facilityName || facility?.name || DEFAULT_VIRTUAL_LOCATION_NAMES[facilityId] || facilityId;
+}
+
+function uniqueValues(values: string[]) {
+  return [...new Set(values.filter(Boolean))];
+}
+
+function normalizeVirtualFacilities(facilities: any[]) {
+  const byId = new Map<string, string>();
+
+  facilities.forEach((facility) => {
+    const facilityId = facilityIdOf(facility);
+    if (!facilityId || facilityId === GENERAL_OPS_PARKING_FACILITY_ID) return;
+    byId.set(facilityId, facilityNameOf(facility));
+  });
+
+  REQUIRED_VIRTUAL_LOCATION_GROUPS.flatMap((group) => group.facilityIds).forEach((facilityId) => {
+    if (!byId.has(facilityId)) {
+      byId.set(facilityId, DEFAULT_VIRTUAL_LOCATION_NAMES[facilityId] || facilityId);
+    }
+  });
+
+  return Array.from(byId.entries()).map(([facilityId, facilityName]) => ({ facilityId, facilityName }));
+}
+
+function buildVirtualLocationWorkCounts(facilities: { facilityId: string; facilityName: string }[], countMap: Map<string, number>): VirtualLocationWorkCount[] {
+  const requiredFacilityIds = new Set(REQUIRED_VIRTUAL_LOCATION_GROUPS.flatMap((group) => group.facilityIds));
+  const rows = REQUIRED_VIRTUAL_LOCATION_GROUPS.map((group) => ({
+    ...group,
+    count: group.facilityIds.reduce((total, facilityId) => total + (countMap.get(facilityId) || 0), 0)
+  }));
+
+  const dynamicRows = facilities
+    .filter((facility) => !requiredFacilityIds.has(facility.facilityId))
+    .map((facility) => ({
+      id: facility.facilityId,
+      label: facility.facilityName,
+      facilityIds: [facility.facilityId],
+      count: countMap.get(facility.facilityId) || 0
+    }))
+    .filter((row) => row.count > 0)
+    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
+
+  return [...rows, ...dynamicRows];
+}
+
+function responseListCount(response: any): number {
+  const headerCount = response?.headers?.get?.('x-total-count')
+    ?? response?.headers?.['x-total-count']
+    ?? response?.headers?.['X-Total-Count'];
+  const fallbackCount = Array.isArray(response?.data) ? response.data.length : 0;
+  const countValue = headerCount !== undefined && headerCount !== null && String(headerCount).trim() !== ''
+    ? headerCount
+    : fallbackCount;
+  const count = Number(countValue);
+
+  return Number.isFinite(count) ? count : fallbackCount;
+}
+
+// Load-status keys for the funnel dashboard metric groups. Each group's fetch
+// transitions its status loading -> success/error so the Funnel view can show
+// per-section loading affordances and surface errors instead of false zeros.
+export type DashboardStatusKey =
+  | 'fulfillmentProgress'
+  | 'openOrders'
+  | 'unfillable'
+  | 'holdTasks'
+  | 'facilityOrderVolume'
+  | 'facilityFulfillmentVelocity'
+  | 'facilityPartialFulfillments'
+  | 'facilityFulfillmentProgress'
+  | 'fulfillmentSyncData';
+
+export type LoadStatus = 'idle' | 'loading' | 'success' | 'error';
+
+function emptyDashboardStatus(): Record<DashboardStatusKey, LoadStatus> {
+  return {
+    fulfillmentProgress: 'idle',
+    openOrders: 'idle',
+    unfillable: 'idle',
+    holdTasks: 'idle',
+    facilityOrderVolume: 'idle',
+    facilityFulfillmentVelocity: 'idle',
+    facilityPartialFulfillments: 'idle',
+    facilityFulfillmentProgress: 'idle',
+    fulfillmentSyncData: 'idle'
+  };
+}
 
 function emptyFilters(): WorkflowFilters {
   return {
@@ -72,7 +194,8 @@ export const useCustomerServiceStore = defineStore('customerService', {
       oldestOpenOrderDate: null as number | null
     },
     unfillable: {
-      unfillableHourlyCounts: [] as { shipGroupDateHour: string; shipGroupCount: number }[]
+      unfillableHourlyCounts: [] as { shipGroupDateHour: string; shipGroupCount: number }[],
+      totalCount: 0
     },
     holdTasks: {
       holdTasksTotalCount: 0,
@@ -84,6 +207,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
     facilityFulfillmentVelocity: [] as any[],
     facilityPartialFulfillments: [] as any[],
     facilityFulfillmentProgress: null as FacilityFulfillmentProgress | null,
+    virtualLocationCounts: [] as VirtualLocationWorkCount[],
     pickProfileGroups: [] as any[],
     orders: [] as WorkflowOrder[],
     filters: {
@@ -101,9 +225,12 @@ export const useCustomerServiceStore = defineStore('customerService', {
       packed: [] as string[]
     } as Record<WorkflowBucket, string[]>,
     lastAction: '' as string,
-    fulfillmentSyncData: null as any
+    fulfillmentSyncData: null as any,
+    // Per-group load status for the funnel dashboard metric groups.
+    dashboardStatus: emptyDashboardStatus()
   }),
   getters: {
+    channels: () => CHANNELS,
     priorities: () => ['HIGH', 'NORMAL', 'LOW'],
     ordersInBucket: (state) => (bucket: WorkflowBucket) =>
       state.orders.filter((order) => inBucket(order, bucket)),
@@ -128,7 +255,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
       };
     },
     unfillableTrend(state): number[] {
-      const todayStr = DateTime.now().toFormat('yyyy-MM-dd');
+      const todayStr = getUserDashboardDateFilter();
       return Array.from({ length: 24 }, (_, h) => {
         const match = state.unfillable.unfillableHourlyCounts?.find((d) => {
           const parsed = DateTime.fromSQL(d.shipGroupDateHour).isValid
@@ -147,27 +274,35 @@ export const useCustomerServiceStore = defineStore('customerService', {
     getFacilityFulfillmentVelocity: (state) => state.facilityFulfillmentVelocity,
     getFacilityPartialFulfillments: (state) => state.facilityPartialFulfillments,
     getFacilityFulfillmentProgress: (state) => state.facilityFulfillmentProgress,
-    getFulfillmentSyncData: (state) => state.fulfillmentSyncData
+    getVirtualLocationCounts: (state) => state.virtualLocationCounts,
+    getFulfillmentSyncData: (state) => state.fulfillmentSyncData,
+    getDashboardStatus: (state) => (key: DashboardStatusKey) => state.dashboardStatus[key],
+    isDashboardGroupLoading: (state) => (key: DashboardStatusKey) => state.dashboardStatus[key] === 'loading',
+    isDashboardGroupError: (state) => (key: DashboardStatusKey) => state.dashboardStatus[key] === 'error'
   },
   actions: {
     async fetchFulfillmentProgress(productStoreId?: string) {
+      this.dashboardStatus.fulfillmentProgress = 'loading';
       try {
         const resp = await api({
           url: 'oms/orders/funnelDashboard/fulfillmentProgress',
           method: 'GET',
           params: {
             productStoreId: productStoreId,
-            dateFilter: DateTime.now().toFormat('yyyy-MM-dd')
+            dateFilter: getUserDashboardDateFilter()
           }
         });
         if (resp.data) {
           this.fulfillmentProgress = resp.data;
         }
+        this.dashboardStatus.fulfillmentProgress = 'success';
       } catch (error) {
         console.error('Failed to fetch fulfillment progress', error);
+        this.dashboardStatus.fulfillmentProgress = 'error';
       }
     },
     async fetchOpenOrders(productStoreId?: string) {
+      this.dashboardStatus.openOrders = 'loading';
       try {
         const params: any = {};
         if (productStoreId) params.productStoreId = productStoreId;
@@ -177,41 +312,150 @@ export const useCustomerServiceStore = defineStore('customerService', {
           params
         });
         if (resp.data) this.openOrders = resp.data;
+        this.dashboardStatus.openOrders = 'success';
       } catch (error) {
         console.error('Failed to fetch open orders', error);
+        this.dashboardStatus.openOrders = 'error';
       }
     },
     async fetchUnfillable(productStoreId?: string) {
+      this.dashboardStatus.unfillable = 'loading';
       try {
-        const params: any = {};
+        const todayStr = getUserDashboardDateFilter();
+        const params: any = { dateFilter: todayStr };
         if (productStoreId) params.productStoreId = productStoreId;
         const resp = await api({
           url: 'oms/orders/funnelDashboard/unfillable',
           method: 'GET',
           params
         });
-        if (resp.data) this.unfillable = resp.data;
+        if (resp.data) {
+          this.unfillable = {
+            ...this.unfillable,
+            ...resp.data,
+            unfillableHourlyCounts: resp.data.unfillableHourlyCounts || []
+          };
+        }
+
+        const solrParams: any = {
+          facilityIds: ['UNFILLABLE_PARKING'],
+          status: ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD'],
+          dateFrom: todayStr,
+          pageSize: 0
+        };
+        if (productStoreId && productStoreId !== 'All') {
+          solrParams.productStoreId = productStoreId;
+        }
+
+        const solrResult = await searchOrders(solrParams);
+        this.unfillable.totalCount = solrResult.total || 0;
+        this.dashboardStatus.unfillable = 'success';
       } catch (error) {
         console.error('Failed to fetch unfillable stats', error);
+        this.dashboardStatus.unfillable = 'error';
       }
     },
     async fetchHoldTasks(productStoreId?: string) {
+      this.dashboardStatus.holdTasks = 'loading';
       try {
-        const params: any = {};
-        if (productStoreId) params.productStoreId = productStoreId;
-        const resp = await api({
-          url: 'oms/orders/funnelDashboard/holdTasks',
-          method: 'GET',
-          params
-        });
-        if (resp.data) this.holdTasks = resp.data;
+        const [swapResp, addressResp, fraudResp] = await Promise.all([
+          api({
+            url: 'oms/orders/tasks/shipGroupTasks',
+            method: 'GET',
+            params: {
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+              workEffortPurposeTypeId: 'NEG_RES_REVIEW',
+              productStoreId,
+              pageSize: 10000,
+            }
+          }),
+          api({
+            url: 'oms/orders/tasks/shipGroupTasks',
+            method: 'GET',
+            params: {
+              statusId: 'TASK_CREATED',
+              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+              workEffortPurposeTypeId: 'INVALID_ADDRESS',
+              productStoreId,
+              pageSize: 10000,
+            }
+          }),
+          api({
+            url: 'oms/orders/tasks',
+            method: 'GET',
+            params: {
+              taskStatusId: 'TASK_CREATED',
+              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+              workEffortPurposeTypeId: 'REVIEW_RISK_ORDER',
+              productStoreId,
+              pageSize: 10000,
+            }
+          })
+        ]);
+
+        const swapCount = responseListCount(swapResp);
+        const addressCount = responseListCount(addressResp);
+        const fraudCount = responseListCount(fraudResp);
+
+        this.holdTasks = {
+          holdSubstituteCount: swapCount,
+          holdBadAddressCount: addressCount,
+          holdFraudRiskCount: fraudCount,
+          holdTasksTotalCount: swapCount + addressCount + fraudCount
+        };
+        this.dashboardStatus.holdTasks = 'success';
       } catch (error) {
         console.error('Failed to fetch hold task counts', error);
+        this.dashboardStatus.holdTasks = 'error';
+      }
+    },
+    async fetchVirtualLocationCounts(productStoreId?: string) {
+      let facilities: { facilityId: string; facilityName: string }[] = [];
+
+      try {
+        const facilityResp = await api({ url: 'admin/facilities', method: 'GET', params: { parentTypeId: 'VIRTUAL_FACILITY' } });
+        facilities = normalizeVirtualFacilities(Array.isArray(facilityResp.data) ? facilityResp.data : []);
+      } catch (error) {
+        logger.error('Failed to fetch virtual facilities', error);
+        facilities = normalizeVirtualFacilities([]);
+      }
+
+      try {
+        const allFacilityIds = uniqueValues(facilities.map((facility) => facility.facilityId));
+        // Unfillable is counted with an extra item-status filter (item must be created/approved);
+        // the remaining virtual locations keep the order-status-only count.
+        const otherFacilityIds = allFacilityIds.filter((facilityId) => facilityId !== UNFILLABLE_FACILITY_ID);
+
+        const [otherCounts, unfillableCounts] = await Promise.all([
+          otherFacilityIds.length
+            ? fetchVirtualLocationOrderCounts({
+                productStoreId,
+                facilityIds: otherFacilityIds,
+                status: BROKERABLE_ORDER_STATUSES
+              })
+            : Promise.resolve([]),
+          allFacilityIds.includes(UNFILLABLE_FACILITY_ID)
+            ? fetchVirtualLocationOrderCounts({
+                productStoreId,
+                facilityIds: [UNFILLABLE_FACILITY_ID],
+                status: BROKERABLE_ORDER_STATUSES,
+                itemStatus: UNFILLABLE_ITEM_STATUSES
+              })
+            : Promise.resolve([])
+        ]);
+
+        const countMap = new Map([...otherCounts, ...unfillableCounts].map((row) => [row.facilityId, row.count]));
+        this.virtualLocationCounts = buildVirtualLocationWorkCounts(facilities, countMap);
+      } catch (error) {
+        logger.error('Failed to fetch virtual location order counts', error);
+        this.virtualLocationCounts = buildVirtualLocationWorkCounts(facilities, new Map());
       }
     },
     async fetchFacilityOrderVolume(productStoreId?: string) {
+      this.dashboardStatus.facilityOrderVolume = 'loading';
       try {
-        const params: any = { dateFilter: DateTime.now().toFormat('yyyy-MM-dd') };
+        const params: any = { dateFilter: getUserDashboardDateFilter() };
         if (productStoreId) params.productStoreId = productStoreId;
         const resp = await api({
           url: 'oms/orders/funnelDashboard/facilityOrderVolume',
@@ -221,13 +465,16 @@ export const useCustomerServiceStore = defineStore('customerService', {
         if (resp.data) {
           this.facilityOrderVolume = resp.data.facilities || [];
         }
+        this.dashboardStatus.facilityOrderVolume = 'success';
       } catch (error) {
         console.error('Failed to fetch facility order volume', error);
+        this.dashboardStatus.facilityOrderVolume = 'error';
       }
     },
     async fetchFacilityFulfillmentVelocity(productStoreId?: string) {
+      this.dashboardStatus.facilityFulfillmentVelocity = 'loading';
       try {
-        const params: any = { dateFilter: DateTime.now().toFormat('yyyy-MM-dd') };
+        const params: any = { dateFilter: getUserDashboardDateFilter() };
         if (productStoreId) params.productStoreId = productStoreId;
         const resp = await api({
           url: 'oms/orders/funnelDashboard/facilityFulfillmentVelocity',
@@ -237,29 +484,36 @@ export const useCustomerServiceStore = defineStore('customerService', {
         if (resp.data) {
           this.facilityFulfillmentVelocity = resp.data.facilities || [];
         }
+        this.dashboardStatus.facilityFulfillmentVelocity = 'success';
       } catch (error) {
         console.error('Failed to fetch facility fulfillment velocity', error);
+        this.dashboardStatus.facilityFulfillmentVelocity = 'error';
       }
     },
     async fetchFacilityPartialFulfillments(productStoreId?: string) {
+      this.dashboardStatus.facilityPartialFulfillments = 'loading';
       try {
-        const params: any = { dateFilter: DateTime.now().toFormat('yyyy-MM-dd') };
+        const params: any = { dateFilter: getUserDashboardDateFilter() };
         if (productStoreId) params.productStoreId = productStoreId;
         const resp = await api({
           url: 'oms/orders/funnelDashboard/facilityPartialFulfillments',
           method: 'GET',
           params
         });
+
         if (resp.data) {
           this.facilityPartialFulfillments = resp.data.facilities || [];
         }
+        this.dashboardStatus.facilityPartialFulfillments = 'success';
       } catch (error) {
         console.error('Failed to fetch facility partial fulfillments', error);
+        this.dashboardStatus.facilityPartialFulfillments = 'error';
       }
     },
     async fetchFacilityFulfillmentProgress(facilityId: string, productStoreId?: string) {
+      this.dashboardStatus.facilityFulfillmentProgress = 'loading';
       try {
-        const dateFilter = DateTime.now().toFormat('yyyy-MM-dd'); // Default / demo date filter
+        const dateFilter = getUserDashboardDateFilter();
         const startOfDayStr = DateTime.fromISO(dateFilter).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss');
         const endOfDayStr = DateTime.fromISO(dateFilter).plus({ days: 1 }).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss');
 
@@ -287,20 +541,12 @@ export const useCustomerServiceStore = defineStore('customerService', {
 
         // 3. Fetch Rejections today
         const rejectionsPromise = api({
-          url: 'oms/dataDocumentView',
-          method: 'POST',
-          data: {
-            dataDocumentId: 'ORDER_FACILITY_CHANGE',
-            customParametersMap: {
-              fromFacilityId: facilityId,
-              facilityId: 'REJECTED_ITM_PARKING',
-              productStoreId,
-              pageNoLimit: true,
-              changeDatetime_from: startOfDayStr,
-              changeDatetime_thru: endOfDayStr
-            },
-            fieldsToSelect: 'orderId,shipGroupSeqId',
-            distinct: true
+          url: `oms/facilities/${facilityId}/facilityRejections`,
+          method: 'GET',
+          params: {
+            productStoreId,
+            changeDatetime_from: startOfDayStr,
+            changeDatetime_thru: endOfDayStr
           }
         }).catch(err => {
           console.error('Failed to fetch rejections', err);
@@ -380,9 +626,11 @@ export const useCustomerServiceStore = defineStore('customerService', {
           facilityTimeZone,
           carrierPickupTime
         };
+        this.dashboardStatus.facilityFulfillmentProgress = 'success';
 
       } catch (error) {
         console.error('Failed to fetch facility fulfillment progress', error);
+        this.dashboardStatus.facilityFulfillmentProgress = 'error';
       }
     },
     async fetchPickProfileGroups(facilityId?: string) {
@@ -542,6 +790,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
       }
     },
     async fetchFulfillmentSyncData(facilityId: string, productStoreId: string) {
+      this.dashboardStatus.fulfillmentSyncData = 'loading';
       try {
         const params: any = {};
         if (facilityId) params.facilityId = facilityId;
@@ -550,12 +799,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
         const group = this.pickProfileGroups.find((g: any) => g.facilityId === facilityId);
         if (!group) {
           this.fulfillmentSyncData = null;
+          this.dashboardStatus.fulfillmentSyncData = 'success';
           return;
         }
 
         const activeProfileBasic = group.profiles?.find((p: any) => p.statusId === 'PICK_PROF_ACTIVE');
         if (!activeProfileBasic) {
           this.fulfillmentSyncData = null;
+          this.dashboardStatus.fulfillmentSyncData = 'success';
           return;
         }
 
@@ -652,8 +903,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
           },
           rawOrderCountRecords: records
         };
+        this.dashboardStatus.fulfillmentSyncData = 'success';
       } catch (error) {
         console.error('Failed to fetch fulfillment sync data', error);
+        this.dashboardStatus.fulfillmentSyncData = 'error';
       }
     },
     async updateServiceJob(jobName: string, cronExpression: string, paused: string, facilityId: string, productStoreId: string) {

@@ -55,7 +55,17 @@
             {{ option.description || option.enumName || option.enumId }}
           </ion-select-option>
         </ion-select>
-        <ion-select v-model="searchSort" label="Sort by order date" label-placement="stacked" interface="popover">
+        <ion-item lines="none">
+          <ion-toggle v-model="searchFilters.hasVirtualFacilityItems" justify="space-between">
+            {{ translate('Items at virtual facilities') }}
+          </ion-toggle>
+        </ion-item>
+        <ion-item lines="none">
+          <ion-toggle v-model="searchFilters.archivedOnly" justify="space-between">
+            {{ translate('Archived orders') }}
+          </ion-toggle>
+        </ion-item>
+        <ion-select v-model="searchSort" :label="translate('Sort by order date')" label-placement="stacked" interface="popover">
           <ion-select-option value="orderDate desc">{{ translate('Newest first') }}</ion-select-option>
           <ion-select-option value="orderDate asc">{{ translate('Oldest first') }}</ion-select-option>
         </ion-select>
@@ -79,33 +89,22 @@
               @ionChange="toggleCurrentPageSelection($event.detail.checked)"
             />
           </span>
-          <ion-label>{{ translate("{loaded} of {total} orders", { loaded: searchResults.length, total: searchTotal }) }}</ion-label>
+          <ion-label>{{ translate("{loaded} of {total} matching orders", { loaded: searchResults.length, total: searchTotal }) }}</ion-label>
           <ion-button v-if="canUseBulkActions" fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
-        <ion-item
+        <OrderRow
           v-for="order in searchResults"
           :key="order.id"
-          button
-          @click="handleOrderRowClick(order, $event)"
-        >
-          <ion-checkbox
-            v-if="selectMode"
-            slot="start"
-            :checked="selectedOrderIds.includes(order.id)"
-            @click.stop
-            @ionChange="setOrderSelection(order.id, $event.detail.checked)"
-          />
-          <ion-label>
-            <h2>{{ order.externalId || order.id }}</h2>
-            <p>{{ order.id }} · {{ order.customerName || order.customerId || translate('Unknown customer') }}</p>
-            <p>{{ createdDateLabel(order.orderDate) }} · {{ translate('Ship') }} {{ shipTimeLeftLabel(order.orderDate) }}</p>
-          </ion-label>
-          <ion-badge :color="statusColor(order.status)" slot="end">
-            {{ statusDescription(order.status) }}
-          </ion-badge>
-        </ion-item>
+          :model="toSearchOrderRowViewModel(order)"
+          row-class="queue-order-row"
+          deadline-class="queue-delivery ion-text-end"
+          :select-mode="selectMode"
+          :selected="selectedOrderIds.includes(order.id)"
+          @activate="handleOrderRowClick(order)"
+          @selection-change="setOrderSelection(order.id, $event)"
+        />
       </ion-list>
 
       <EmptyState
@@ -134,7 +133,6 @@
 
 <script setup lang="ts">
 import {
-  IonBadge,
   IonButton,
   IonButtons,
   IonCheckbox,
@@ -144,29 +142,28 @@ import {
   IonInfiniteScroll,
   IonInfiniteScrollContent,
   IonInput,
-  IonItem,
   IonLabel,
   IonList,
   IonListHeader,
   IonMenuButton,
-  IonNote,
   IonPage,
   IonPopover,
   IonProgressBar,
   IonSelect,
   IonSelectOption,
   IonTitle,
+  IonToggle,
   IonToolbar,
   alertController,
   modalController,
 } from '@ionic/vue';
-import { commonUtil, translate } from '@common';
-import { DateTime } from 'luxon';
+import { translate } from '@common';
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrderStore } from '@/store/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
+import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import router from '@/router';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
@@ -174,6 +171,8 @@ import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethod
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import OrderRow from '@/components/orders/OrderRow.vue';
+import { toSearchOrderRowViewModel } from '@/utils/orderRows';
 import { showToast } from '@/utils';
 import {
   ORDER_CANCEL_PERMISSION,
@@ -184,10 +183,11 @@ import {
 const orderStore = useOrderStore();
 const orderDetailStore = useOrderDetailStore();
 const userStore = useUserStore();
+const productStore = useProductStore();
 const seedStore = useSeedStore();
 const { searchQuery, searchFilters, searchSort, searchResults, searchTotal, loading, error, hasMore } = storeToRefs(orderStore);
 
-function handleOrderRowClick(order: any, event: Event) {
+function handleOrderRowClick(order: any) {
   if (selectMode.value) {
     toggleOrderSelection(order.id);
   } else {
@@ -200,7 +200,7 @@ const selectedOrderIds = ref<string[]>([]);
 
 const orderStatuses = computed(() => seedStore.getStatusItemsByType('ORDER_STATUS'));
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
-const selectedProductStoreId = computed(() => userStore.currentProductStore?.productStoreId || 'All');
+const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const selectedStatusIds = computed(() => {
   const status = searchFilters.value.status as string[] | string;
   if (Array.isArray(status)) return status;
@@ -228,6 +228,10 @@ const canUseBulkActions = computed(() => canCancelOrders.value || canUpdateOrder
 onMounted(async () => {
   orderStore.searchFilters.productStoreId = selectedProductStoreId.value;
   await orderStore.runSearch();
+});
+
+watch(selectedProductStoreId, () => {
+  orderStore.searchFilters.productStoreId = selectedProductStoreId.value;
 });
 
 watch(searchQuery, () => {
@@ -318,6 +322,8 @@ function clearFilters() {
     productStoreId: selectedProductStoreId.value,
     dateFrom: '',
     dateThru: '',
+    hasVirtualFacilityItems: false,
+    archivedOnly: false,
   };
 }
 
@@ -383,50 +389,6 @@ function statusDescription(statusId: string) {
   return seedStore.statusDescription(statusId);
 }
 
-function statusColor(statusId: string) {
-  const label = statusDescription(statusId);
-  return commonUtil.getColorByDesc(label) || commonUtil.getColorByDesc(statusId) || commonUtil.getColorByDesc('default');
-}
-
-function createdDateLabel(value: string) {
-  const date = parseOrderDate(value);
-  if (!date?.isValid) return value || 'Date unavailable';
-
-  const now = DateTime.now();
-  if (date.hasSame(now, 'day')) {
-    const hoursAgo = Math.max(0, Math.floor(now.diff(date, 'hours').hours));
-    if (hoursAgo < 1) return 'Created less than 1h ago';
-    return `Created ${hoursAgo}h ago`;
-  }
-
-  return `Created ${date.toLocaleString(DateTime.DATE_MED)}`;
-}
-
-function shipTimeLeftLabel(value: string) {
-  const date = parseOrderDate(value);
-  if (!date?.isValid) return 'time unavailable';
-
-  const shipBy = date.plus({ hours: 24 });
-  const minutesLeft = Math.ceil(shipBy.diffNow('minutes').minutes);
-
-  if (minutesLeft <= 0) return 'overdue';
-  if (minutesLeft < 60) return `in ${minutesLeft}m`;
-
-  const hours = Math.floor(minutesLeft / 60);
-  const minutes = minutesLeft % 60;
-  return minutes ? `in ${hours}h ${minutes}m` : `in ${hours}h`;
-}
-
-function parseOrderDate(value: string) {
-  if (!value) return undefined;
-
-  if (/^\d+$/.test(value)) {
-    const numericValue = Number(value);
-    return DateTime.fromMillis(value.length <= 10 ? numericValue * 1000 : numericValue);
-  }
-
-  return DateTime.fromISO(value);
-}
 </script>
 
 <style scoped>
@@ -444,4 +406,30 @@ function parseOrderDate(value: string) {
 .bulk-action-buttons {
   overflow-x: auto;
 }
+
+.queue-order-row {
+  --columns-desktop: 5;
+  --columns-tablet: 5;
+  min-height: 5rem;
+  border-block-start: var(--border-medium);
+  padding-inline-end: var(--spacer-sm);
+}
+
+.queue-order-row > ion-label {
+  width: 100%;
+}
+
+.queue-order-row > ion-label.queue-delivery {
+  display: block;
+  justify-self: end;
+  max-width: 10rem;
+  min-width: 10rem;
+  width: 10rem;
+}
+
+.brokered-facility-chip {
+  margin-inline: 0;
+  max-width: 100%;
+}
+
 </style>

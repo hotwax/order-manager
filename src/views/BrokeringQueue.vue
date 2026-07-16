@@ -5,6 +5,7 @@
     empty-title="No orders awaiting brokering"
     empty-message="Approved orders awaiting brokering and items rejected by a facility will appear here."
     :facility-ids="facilityIds"
+    :status="['ORDER_CREATED', 'ORDER_APPROVED']"
     @clearFilters="clearFacilityFilter"
   >
     <template #filters>
@@ -30,9 +31,11 @@
 import { IonSelect, IonSelectOption } from '@ionic/vue';
 import { api, translate } from '@common';
 import { computed, onMounted, ref, watch } from 'vue';
+import router from '@/router';
 import OrderQueueList from '@/components/OrderQueueList.vue';
 
 const ALL_FACILITY_OPTION_ID = 'All';
+const GENERAL_OPS_PARKING_FACILITY_ID = 'GENERAL_OPS_PARKING';
 const FALLBACK_BROKERING_FACILITY_IDS = ['_NA_', 'REJECTED_ITM_PARKING', 'REJECTED_PARKING'];
 
 type FacilityOption = { id: string; name: string };
@@ -40,6 +43,7 @@ type FacilityOption = { id: string; name: string };
 const selectedFacilityIds = ref<string[]>([ALL_FACILITY_OPTION_ID]);
 const lastSelectedFacilityIds = ref<string[]>([ALL_FACILITY_OPTION_ID]);
 const virtualFacilities = ref<FacilityOption[]>([]);
+const route = router.currentRoute.value;
 const facilityIds = computed(() => {
   if (selectedFacilityIds.value.includes(ALL_FACILITY_OPTION_ID) || !selectedFacilityIds.value.length) {
     return virtualFacilityIds.value.length ? virtualFacilityIds.value : FALLBACK_BROKERING_FACILITY_IDS;
@@ -49,7 +53,7 @@ const facilityIds = computed(() => {
 });
 const virtualFacilityIds = computed(() => virtualFacilities.value
   .map((facility) => facility.id)
-  .filter((id) => id && id !== ALL_FACILITY_OPTION_ID));
+  .filter((id) => id && id !== ALL_FACILITY_OPTION_ID && !isUnfillableFacilityId(id)));
 
 function normalizeFacilityName(facility: any) {
   return facility?.facilityName || facility?.facilityId || facility?.name || facility?.id;
@@ -59,7 +63,7 @@ function buildFacilityList(facilities: any[]) {
   const map = new Map<string, string>();
   facilities.forEach((facility) => {
     const id = facility?.facilityId || facility?.id;
-    if (!id) return;
+    if (!id || id === GENERAL_OPS_PARKING_FACILITY_ID || isUnfillableFacility(facility)) return;
 
     map.set(id, normalizeFacilityName(facility));
   });
@@ -70,13 +74,36 @@ function buildFacilityList(facilities: any[]) {
 }
 
 function dedupeAndSort(values: string[]) {
-  return [...new Set(values.filter((value) => value && value !== ALL_FACILITY_OPTION_ID))].sort((left, right) =>
+  return [...new Set(values.filter((value) => value && value !== ALL_FACILITY_OPTION_ID && !isUnfillableFacilityId(value)))].sort((left, right) =>
     String(left).localeCompare(String(right))
   );
+}
+function isUnfillableFacilityId(facilityId: string) {
+  return facilityId.toUpperCase().includes('UNFILLABLE');
+}
+
+function isUnfillableFacility(facility: any) {
+  const id = facility?.facilityId || facility?.id || '';
+  const name = normalizeFacilityName(facility) || '';
+  return isUnfillableFacilityId(id) || String(name).toUpperCase().includes('UNFILLABLE');
 }
 function clearFacilityFilter() {
   selectedFacilityIds.value = [ALL_FACILITY_OPTION_ID];
 }
+
+function routeFacilityIds(value: unknown) {
+  const values = Array.isArray(value) ? value : [value];
+  return dedupeAndSort(values.filter((facilityId): facilityId is string => typeof facilityId === 'string'));
+}
+
+function applyRouteFacilityFilter() {
+  const facilities = routeFacilityIds(route.query.facilityId);
+  if (!facilities.length) return;
+
+  selectedFacilityIds.value = facilities;
+  lastSelectedFacilityIds.value = facilities;
+}
+
 function normalizeFacilitySelection(event?: any) {
   const emittedValues = Array.isArray(event)
     ? event
@@ -111,6 +138,7 @@ async function loadVirtualFacilities() {
 }
 
 watch(selectedFacilityIds, normalizeFacilitySelection, { deep: true, immediate: true });
+watch(() => route.query.facilityId, applyRouteFacilityFilter, { immediate: true });
 
 onMounted(loadVirtualFacilities);
 </script>

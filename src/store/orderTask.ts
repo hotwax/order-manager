@@ -10,6 +10,9 @@ interface TaskStatusCommunicationOptions {
   subject?: string;
 }
 
+const HOLD_TASK_TYPE_ID = 'RESOLVE_ONHOLD_ORDER';
+const FRAUD_RISK_PURPOSE_TYPE_ID = 'REVIEW_RISK_ORDER';
+
 // ── Per-task enrichment helpers ───────────────────────────────────────────────
 // Shared by both the queue list fetches and the order-scoped detail fetch so the
 // two paths stay in lockstep (no duplicated enrichment logic).
@@ -129,19 +132,32 @@ async function prefetchFraudTaskAssets(tasks: any[]) {
   }
 }
 
+// Load status for a task-list queue. `idle` before the first fetch, `loading`
+// while the first page (list + enrichment) is in flight, `success` once cards
+// can render stably, `error` when the fetch or enrichment failed.
+type TaskLoadStatus = 'idle' | 'loading' | 'success' | 'error';
+
 export const useOrderTaskStore = defineStore('orderTask', {
   state: () => ({
     holdTasks: [] as any[],
+    holdStatus: 'idle' as TaskLoadStatus,
+    holdError: '' as string,
     addressValidationTasks: [] as any[],
     swapTasks: [] as any[],
     fraudTasks: [] as any[],
-    orderHoldTasks: [] as any[],
-    orderAddressValidationTasks: [] as any[],
-    orderSwapTasks: [] as any[],
-    orderFraudTasks: [] as any[],
+    fraudStatus: 'idle' as TaskLoadStatus,
+    fraudError: '' as string,
+    orderHoldTasksByOrderId: {} as Record<string, any[]>,
+    orderAddressValidationTasksByOrderId: {} as Record<string, any[]>,
+    orderSwapTasksByOrderId: {} as Record<string, any[]>,
+    orderFraudTasksByOrderId: {} as Record<string, any[]>,
+    swapStatus: 'idle' as TaskLoadStatus,
+    swapError: '' as string,
   }),
   getters: {
     getHoldTasks: (state) => state.holdTasks,
+    getHoldStatus: (state) => state.holdStatus,
+    getHoldError: (state) => state.holdError,
     isHoldTasksScrollable: (state): boolean => {
       return (
         state.holdTasks?.length > 0 &&
@@ -162,20 +178,31 @@ export const useOrderTaskStore = defineStore('orderTask', {
         (state.swapTasks?.length % Number(import.meta.env.VITE_VIEW_SIZE) === 0)
       );
     },
+    getSwapStatus: (state) => state.swapStatus,
+    getSwapError: (state) => state.swapError,
     getFraudTasks: (state) => state.fraudTasks,
+    getFraudStatus: (state) => state.fraudStatus,
+    getFraudError: (state) => state.fraudError,
     isFraudTasksScrollable: (state): boolean => {
       return (
         state.fraudTasks?.length > 0 &&
         (state.fraudTasks?.length % Number(import.meta.env.VITE_VIEW_SIZE) === 0)
       );
     },
-    getOrderHoldTasks: (state) => state.orderHoldTasks,
-    getOrderAddressValidationTasks: (state) => state.orderAddressValidationTasks,
-    getOrderSwapTasks: (state) => state.orderSwapTasks,
-    getOrderFraudTasks: (state) => state.orderFraudTasks,
+    getOrderHoldTasksByOrderId: (state) => (orderId: string) => state.orderHoldTasksByOrderId[orderId] || [],
+    getOrderAddressValidationTasksByOrderId: (state) => (orderId: string) => state.orderAddressValidationTasksByOrderId[orderId] || [],
+    getOrderSwapTasksByOrderId: (state) => (orderId: string) => state.orderSwapTasksByOrderId[orderId] || [],
+    getOrderFraudTasksByOrderId: (state) => (orderId: string) => state.orderFraudTasksByOrderId[orderId] || [],
   },
   actions: {
     async fetchHoldTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
+      const isFirstPage = !(payload.pageIndex > 0);
+      // Loading status only gates the first-page fetch; page 2+ keeps the existing
+      // list visible and relies on the infinite-scroll indicator instead.
+      if (isFirstPage) {
+        this.holdStatus = 'loading';
+        this.holdError = '';
+      }
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({
@@ -190,10 +217,15 @@ export const useOrderTaskStore = defineStore('orderTask', {
           },
         });
         const tasks = listResponse.data ?? [];
-        const detailedTasks = await Promise.all(tasks.map((task: any) => enrichHoldTask(task)));
-        this.holdTasks = payload.pageIndex > 0 ? [...this.holdTasks, ...detailedTasks] : detailedTasks;
-      } catch (err) {
+        const detailedTasks = await Promise.all(tasks.map(enrichHoldTask));
+        this.holdTasks = isFirstPage ? detailedTasks : [...this.holdTasks, ...detailedTasks];
+        if (isFirstPage) this.holdStatus = 'success';
+      } catch (err: any) {
         console.error('Failed to fetch the hold tasks', err);
+        if (isFirstPage) {
+          this.holdStatus = 'error';
+          this.holdError = 'Failed to load hold tasks. Please try again.';
+        }
       }
     },
     async fetchAddressValidationTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
@@ -211,7 +243,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           },
         });
         const tasks = listResponse.data ?? [];
-        const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
+        const detailedTasks = await Promise.all(tasks.map(enrichShipGroupTask));
         this.addressValidationTasks = payload.pageIndex > 0 ? [...this.addressValidationTasks, ...detailedTasks] : detailedTasks;
         return true;
       } catch (err) {
@@ -220,6 +252,14 @@ export const useOrderTaskStore = defineStore('orderTask', {
       }
     },
     async fetchSwapTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; swappable?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string } = {}) {
+      // First-page fetches drive the page-level loading/error state. Pagination
+      // (pageIndex > 0) keeps the already-rendered cards visible and is handled
+      // by the infinite-scroll spinner instead, so it never flips swapStatus.
+      const isFirstPage = !(payload.pageIndex > 0);
+      if (isFirstPage) {
+        this.swapStatus = 'loading';
+        this.swapError = '';
+      }
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({
@@ -234,13 +274,28 @@ export const useOrderTaskStore = defineStore('orderTask', {
           },
         });
         const tasks = listResponse.data ?? [];
-        const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
-        this.swapTasks = payload.pageIndex > 0 ? [...this.swapTasks, ...detailedTasks] : detailedTasks;
+        const detailedTasks = await Promise.all(tasks.map(enrichShipGroupTask));
+        this.swapTasks = isFirstPage ? detailedTasks : [...this.swapTasks, ...detailedTasks];
+        // Only mark success once product master + stock enrichment have settled so
+        // the cards render their images/stock without flashing partial content.
+        await prefetchSwapTaskAssets(detailedTasks);
+        if (isFirstPage) this.swapStatus = 'success';
       } catch (err) {
         console.error('Failed to fetch the swap tasks', err);
+        if (isFirstPage) {
+          this.swapStatus = 'error';
+          this.swapError = 'Failed to load swap tasks. Please try again.';
+        }
       }
     },
     async fetchFraudTasks(payload: { pageSize?: any; pageIndex?: any; currentUserPartyId?: string; createdDate_from?: number; createdDate_thru?: number; orderName?: string; orderName_op?: string; salesChannelEnumId?: string; riskRecommendationEnumId?: string; riskLevelEnumId?: string } = {}) {
+      // Treat only first-page requests as the page-level load. Infinite-scroll
+      // pages (pageIndex > 0) append without touching the first-load status.
+      const isFirstPage = !payload.pageIndex;
+      if (isFirstPage) {
+        this.fraudStatus = 'loading';
+        this.fraudError = '';
+      }
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({
@@ -248,16 +303,23 @@ export const useOrderTaskStore = defineStore('orderTask', {
           method: 'GET',
           params: {
             ...payload,
-            statusId: 'TASK_CREATED',
-            workEffortTypeId: 'REVIEW_RISK_ORDER',
+            taskStatusId: 'TASK_CREATED',
+            workEffortTypeId: HOLD_TASK_TYPE_ID,
+            workEffortPurposeTypeId: FRAUD_RISK_PURPOSE_TYPE_ID,
             productStoreId,
           },
         });
         const tasks = listResponse.data ?? [];
-        const detailedTasks = await Promise.all(tasks.map((task: any) => enrichFraudTask(task)));
-        this.fraudTasks = payload.pageIndex > 0 ? [...this.fraudTasks, ...detailedTasks] : detailedTasks;
+        const detailedTasks = await Promise.all(tasks.map(enrichFraudTask));
+        this.fraudTasks = isFirstPage ? detailedTasks : [...this.fraudTasks, ...detailedTasks];
+        // Success only after both the list and the per-task enrichment have settled.
+        if (isFirstPage) this.fraudStatus = 'success';
       } catch (err) {
         console.error('Failed to fetch the fraud tasks', err);
+        if (isFirstPage) {
+          this.fraudStatus = 'error';
+          this.fraudError = 'Failed to load fraud tasks. Please try again.';
+        }
       }
     },
     /**
@@ -284,7 +346,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          this.orderHoldTasks = await Promise.all(tasks.map((task: any) => enrichHoldTask(task)));
+          this.orderHoldTasksByOrderId[orderId] = await Promise.all(tasks.map(enrichHoldTask));
         } catch (err) {
           console.error('Failed to fetch the order hold tasks', err);
         }
@@ -304,7 +366,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          this.orderAddressValidationTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
+          this.orderAddressValidationTasksByOrderId[orderId] = await Promise.all(tasks.map(enrichShipGroupTask));
         } catch (err) {
           console.error('Failed to fetch the order address validation tasks', err);
         }
@@ -324,8 +386,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
-          this.orderSwapTasks = detailedTasks;
+          const detailedTasks = await Promise.all(tasks.map(enrichShipGroupTask));
+          this.orderSwapTasksByOrderId[orderId] = detailedTasks;
           await prefetchSwapTaskAssets(detailedTasks);
         } catch (err) {
           console.error('Failed to fetch the order swap tasks', err);
@@ -339,14 +401,15 @@ export const useOrderTaskStore = defineStore('orderTask', {
             method: 'GET',
             params: {
               orderId,
-              statusId: 'TASK_CREATED',
-              workEffortTypeId: 'REVIEW_RISK_ORDER',
+              taskStatusId: 'TASK_CREATED',
+              workEffortTypeId: HOLD_TASK_TYPE_ID,
+              workEffortPurposeTypeId: FRAUD_RISK_PURPOSE_TYPE_ID,
               productStoreId,
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          const detailedTasks = await Promise.all(tasks.map((task: any) => enrichFraudTask(task)));
-          this.orderFraudTasks = detailedTasks;
+          const detailedTasks = await Promise.all(tasks.map(enrichFraudTask));
+          this.orderFraudTasksByOrderId[orderId] = detailedTasks;
           await prefetchFraudTaskAssets(detailedTasks);
         } catch (err) {
           console.error('Failed to fetch the order fraud tasks', err);
@@ -407,6 +470,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         });
       } catch (err) {
         console.error('Failed to change the task status', err);
+        throw err;
       }
     },
     async parkOrder(orderId: string, shipGroupSeqId: string, facilityId: string, workEffortId?: string) {

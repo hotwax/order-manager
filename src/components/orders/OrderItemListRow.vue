@@ -9,7 +9,7 @@
         @keydown.stop
         @ionChange="emit('update:selected', $event.detail.checked)"
       />
-      <ion-thumbnail v-if="imageUrl" slot="start" v-image-preview="previewProduct" :key="imageUrl">
+      <ion-thumbnail slot="start" v-image-preview="previewProduct" :key="imageUrl">
         <DxpShopifyImg :src="imageUrl" :key="imageUrl" size="small" />
       </ion-thumbnail>
       <ion-label>

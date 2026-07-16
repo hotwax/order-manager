@@ -11,6 +11,9 @@ describe('suggested product action popover', () => {
     expect(source).toContain('popoverTitle');
     expect(source).toContain('commonUtil.getProductIdentificationValue');
     expect(source).toContain('productIdentificationPref.value.primaryId');
+    expect(source).toContain('function defaultCustomSwapSearchTerm');
+    expect(source).toContain('product?.parentProductName');
+    expect(source).toContain('defaultSearchKeyword: defaultCustomSwapSearchTerm(originalItem)');
     expect(source).toContain('translate("Cancel item")');
     expect(source).toContain('translate("Custom swap")');
     expect(source).toContain('translate("View inventory")');

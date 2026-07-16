@@ -8,7 +8,11 @@ vi.mock('@common', () => ({
 }));
 
 vi.mock('@/store/productStore', () => ({
-  useProductStore: vi.fn(() => ({})),
+  useProductStore: vi.fn(() => ({
+    getCurrentProductStore: {
+      productStoreId: 'STORE',
+    },
+  })),
 }));
 
 vi.mock('@/composables/useProductMaster', () => ({
@@ -89,5 +93,47 @@ describe('order task store', () => {
     });
     expect(errorSpy).toHaveBeenCalledWith('Failed to cancel the order', error);
     errorSpy.mockRestore();
+  });
+
+  it('fetches fraud queue tasks as hold tasks with the risk review purpose', async () => {
+    const store = useOrderTaskStore();
+    vi.mocked(api).mockResolvedValueOnce({ data: [] });
+
+    await store.fetchFraudTasks({ pageSize: 20, pageIndex: 0, riskLevelEnumId: 'RISK_HIGH' });
+
+    expect(api).toHaveBeenCalledWith({
+      url: 'oms/orders/tasks',
+      method: 'GET',
+      params: {
+        pageSize: 20,
+        pageIndex: 0,
+        riskLevelEnumId: 'RISK_HIGH',
+        taskStatusId: 'TASK_CREATED',
+        workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+        workEffortPurposeTypeId: 'REVIEW_RISK_ORDER',
+        productStoreId: 'STORE',
+      },
+    });
+  });
+
+  it('fetches order fraud tasks with the hold type and risk review purpose', async () => {
+    const store = useOrderTaskStore();
+    vi.mocked(api).mockResolvedValue({ data: [] });
+
+    await store.fetchOrderHoldTasks('ORDER_1');
+
+    expect(vi.mocked(api).mock.calls).toEqual(expect.arrayContaining([
+      [{
+        url: 'oms/orders/tasks',
+        method: 'GET',
+        params: {
+          orderId: 'ORDER_1',
+          taskStatusId: 'TASK_CREATED',
+          workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+          workEffortPurposeTypeId: 'REVIEW_RISK_ORDER',
+          productStoreId: 'STORE',
+        },
+      }],
+    ]));
   });
 });

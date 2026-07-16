@@ -2,11 +2,13 @@ import { api, logger } from '@common';
 import { defineStore } from 'pinia';
 import {
   searchOrders as searchOrderService,
+  fetchOrderRowEnrichment,
   type OrderSearchParams
 } from '@/services/order';
 import { toStringValue, toNumberValue } from '@/services/OrderService';
 import type { Customer, Order, ReturnRecord, Shipment } from '@/types/order';
 import type { WorkflowOrder, WorkflowFilters } from '@/types/customerService';
+import type { OrderRowEnrichment } from '@/types/orderRow';
 import { useSeedStore } from '@/store/seed';
 import { useProductStore } from './productStore';
 
@@ -87,6 +89,8 @@ export interface OrderSearchFilters {
   productStoreId: string;
   dateFrom: string;
   dateThru: string;
+  hasVirtualFacilityItems: boolean;
+  archivedOnly: boolean;
 }
 
 export const useOrderStore = defineStore('orders', {
@@ -98,6 +102,8 @@ export const useOrderStore = defineStore('orders', {
       productStoreId: 'All',
       dateFrom: '',
       dateThru: '',
+      hasVirtualFacilityItems: false,
+      archivedOnly: false,
     } as OrderSearchFilters,
     searchSort: 'orderDate desc',
     searchResults: [] as Order[],
@@ -130,6 +136,11 @@ export const useOrderStore = defineStore('orders', {
       inflight: 0,
       packed: 0
     },
+    workflowOrderEnrichment: {
+      open: {} as Record<string, OrderRowEnrichment>,
+      inflight: {} as Record<string, OrderRowEnrichment>,
+      packed: {} as Record<string, OrderRowEnrichment>
+    }
   }),
   getters: {
     filteredOrders: (state) => state.searchResults,
@@ -145,6 +156,8 @@ export const useOrderStore = defineStore('orders', {
     getCustomerOrders: (state) => (customerId: string) => Object.values(state.cache).filter((order) => order.customerId === customerId),
     workflowOrdersHasMore: (state) => (bucket: 'open' | 'inflight' | 'packed') =>
       state.workflowOrders[bucket].length < state.workflowOrdersTotal[bucket],
+    workflowEnrichment: (state) => (bucket: 'open' | 'inflight' | 'packed', orderId: string) =>
+      state.workflowOrderEnrichment[bucket][orderId],
   },
   actions: {
     async runSearch() {
@@ -190,6 +203,8 @@ export const useOrderStore = defineStore('orders', {
         productStoreId: this.searchFilters.productStoreId,
         dateFrom: this.searchFilters.dateFrom,
         dateThru: this.searchFilters.dateThru,
+        hasVirtualFacilityItems: this.searchFilters.hasVirtualFacilityItems,
+        archivedOnly: this.searchFilters.archivedOnly,
         sort: this.searchSort,
         pageSize: this.pageSize,
         pageIndex,
@@ -220,6 +235,7 @@ export const useOrderStore = defineStore('orders', {
       try {
         const nextPage = this.workflowOrdersPageIndex[bucket] + 1;
         const { orders, total } = await fetchWorkflowPage(bucket, filters, nextPage);
+        await this.enrichWorkflowOrderPage(bucket, orders);
         this.workflowOrders[bucket] = [...this.workflowOrders[bucket], ...orders];
         this.workflowOrdersTotal[bucket] = total;
         this.workflowOrdersPageIndex[bucket] = nextPage;
@@ -235,8 +251,10 @@ export const useOrderStore = defineStore('orders', {
       this.workflowOrders[bucket] = [];
       this.workflowOrdersTotal[bucket] = 0;
       this.workflowOrdersPageIndex[bucket] = 0;
+      this.workflowOrderEnrichment[bucket] = {};
       try {
         const { orders, total } = await fetchWorkflowPage(bucket, filters, 0);
+        await this.enrichWorkflowOrderPage(bucket, orders);
         this.workflowOrders[bucket] = orders;
         this.workflowOrdersTotal[bucket] = total;
         this.workflowOrdersPageIndex[bucket] = 0;
@@ -244,6 +262,19 @@ export const useOrderStore = defineStore('orders', {
         logger.error(`Failed to fetch ${bucket} orders`, error);
       } finally {
         this.workflowOrdersLoading[bucket] = false;
+      }
+    },
+    async enrichWorkflowOrderPage(bucket: 'open' | 'inflight' | 'packed', orders: WorkflowOrder[]) {
+      const orderIds = [...new Set(orders.map((order) => order.orderId).filter(Boolean))];
+      if (!orderIds.length) return;
+      try {
+        const enrichment = await fetchOrderRowEnrichment(orderIds);
+        this.workflowOrderEnrichment[bucket] = {
+          ...this.workflowOrderEnrichment[bucket],
+          ...enrichment
+        };
+      } catch (error: any) {
+        logger.error(`Failed to enrich ${bucket} order rows`, error);
       }
     },
     async shipPackedWorkflowOrders(orderIds: string[]) {
@@ -273,7 +304,8 @@ export const useOrderStore = defineStore('orders', {
       'workflowOrders',
       'workflowOrdersLoading',
       'workflowOrdersTotal',
-      'workflowOrdersPageIndex'
+      'workflowOrdersPageIndex',
+      'workflowOrderEnrichment'
     ]
   },
 });

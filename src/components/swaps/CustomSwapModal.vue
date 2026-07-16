@@ -40,7 +40,7 @@
             <p>{{ translate('SKU') }}: {{ getProduct(product.productId)?.internalName || product.internalName }}</p>
             <p>{{ money(product.price) }}</p>
           </ion-label>
-          <ion-note slot="end">{{ getSubstituteStock(product.productId)?.computedAtp ?? 0 }}</ion-note>
+          <ion-note class="facility-label ion-no-padding" slot="end">{{ facilityStockLabel(getSubstituteStock(product.productId)?.computedAtp) }}</ion-note>
         </ion-item>
       </ion-radio-group>
     </ion-list>
@@ -80,7 +80,7 @@
               <p>{{ product.productName }}</p>
               <p>{{ translate('SKU') }}: {{ product.internalName || product.sku }}</p>
             </ion-label>
-            <ion-note slot="end">{{ product.inventoryConfig?.computedLastInventoryCount ?? 0 }}</ion-note>
+            <ion-note class="facility-label ion-no-padding" slot="end">{{ facilityStockLabel(product.inventoryConfig?.computedLastInventoryCount) }}</ion-note>
             <ion-icon v-if="selectedProductId === product.productId" slot="end" :icon="checkmarkCircle" color="primary" />
           </ion-item>
         </template>
@@ -106,16 +106,18 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonRadio, IonRadioGroup, IonSearchbar, IonSegment, IonSegmentButton, IonSpinner, IonThumbnail, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
+import { checkmarkCircle, closeOutline, saveOutline } from 'ionicons/icons';
 import { api, DxpShopifyImg, translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
+import { useSeedStore } from '@/store/seed';
 
 const props = defineProps<{
   substituteProducts: any[];
   facilityId: string;
   selectedProductId?: string;
+  defaultSearchKeyword?: string;
 }>();
 
 const PAGE_SIZE = 20;
@@ -127,15 +129,18 @@ const selectedProductData = ref<any>(
 );
 
 // Search state
-const searchKeyword = ref('');
+const searchKeyword = ref((props.defaultSearchKeyword ?? '').trim());
 const searchResults = ref<any[]>([]);
 const isSearching = ref(false);
 const searchPageIndex = ref(0);
 const searchTotalCount = ref(0);
+const seedStore = useSeedStore();
 
 const isSearchScrollable = computed(() =>
   searchResults.value.length > 0 && searchResults.value.length < searchTotalCount.value
 );
+
+const facilityLabel = computed(() => seedStore.facilityName(props.facilityId) || props.facilityId);
 
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);
@@ -151,6 +156,16 @@ function hasSubstituteStock(productId: string): boolean {
 
 function hasSearchStock(product: any): boolean {
   return (product.inventoryConfig?.computedLastInventoryCount ?? 0) > 0;
+}
+
+function facilityStockLabel(count?: number | string | null) {
+  const quantity = Number(count ?? 0);
+  if (!facilityLabel.value) return translate('Available: {count}', { count: quantity });
+
+  return translate('Available at {facility}: {count}', {
+    facility: facilityLabel.value,
+    count: quantity,
+  });
 }
 
 function money(value: number) {
@@ -238,10 +253,17 @@ function save() {
 
 onMounted(async () => {
   const productIds = props.substituteProducts.map((p: any) => p.productId).filter(Boolean);
-  if (productIds.length) {
-    useProductMaster().init();
-    await useProductMaster().prefetch(productIds);
-  }
+  await Promise.all([
+    seedStore.loadFacilities(),
+    productIds.length
+      ? (async () => {
+          useProductMaster().init();
+          await useProductMaster().prefetch(productIds);
+        })()
+      : Promise.resolve()
+  ]);
+
+  if (searchKeyword.value.trim()) await searchProducts(0, false);
 });
 </script>
 
@@ -257,5 +279,9 @@ ion-content {
   padding: 32px 16px;
   text-align: center;
   color: var(--ion-color-medium);
+}
+
+.facility-label {
+  align-self: center;
 }
 </style>
