@@ -2,6 +2,12 @@ import { api, commonUtil, useSolrSearch } from '@common';
 import { getActivePinia } from 'pinia';
 import { useSeedStore } from '@/store/seed';
 import type { Order } from '@/types/order';
+import type {
+  AllocationItemDocument,
+  AllocationSummaryOptions,
+  OrderRowEnrichment
+} from '@/types/orderRow';
+import { summarizeOrderAllocation } from '@/utils/orderRows';
 import {
   allDocs,
   normalizeOrderDoc,
@@ -28,6 +34,7 @@ export interface OrderSearchParams {
   sort?: string;
   pageSize?: number;
   pageIndex?: number;
+  allocationSummary?: AllocationSummaryOptions;
 }
 
 export interface VirtualLocationCountParams {
@@ -74,6 +81,7 @@ const orderSolrFields = [
   'customerName',
   'customerEmailId',
   'contactPhoneNumbers',
+  'carrierPartyId',
   'partyId',
   'salesChannelEnumId',
   'salesChannelDesc',
@@ -188,7 +196,67 @@ export async function searchOrders(params: OrderSearchParams = {}): Promise<Orde
 
   if (commonUtil.hasError(response)) return Promise.reject(response.data);
 
-  return normalizeOrderSolrResponse(response.data);
+  const result = normalizeOrderSolrResponse(response.data, params.allocationSummary);
+  if (params.allocationSummary?.mode !== 'queue-first' || !result.orders.length) return result;
+
+  const enrichment = await fetchOrderRowEnrichment(result.orders.map((order) => order.id));
+  return {
+    ...result,
+    orders: result.orders.map((order) => mergeSearchOrderEnrichment(order, enrichment[order.id], params.allocationSummary!))
+  };
+}
+
+const orderRowEnrichmentFields = [
+  'orderId',
+  'externalOrderId',
+  'orderName',
+  'customerPartyName',
+  'customerEmailId',
+  'contactPhoneNumbers',
+  'carrierPartyId',
+  'salesChannelDesc',
+  'salesChannelEnumId',
+  'facilityId',
+  'facilityName',
+  'facilityTypeId',
+  'orderItemSeqId',
+  'shipmentMethodTypeId',
+  'estimatedDeliveryDate',
+  'promisedDatetime',
+  'shipBeforeDate',
+  'shipByDate'
+];
+
+export function buildOrderRowEnrichmentPayload(orderIds: readonly string[]) {
+  const uniqueOrderIds = [...new Set(orderIds.filter(Boolean))];
+  return {
+    json: {
+      params: {
+        rows: uniqueOrderIds.length,
+        start: 0,
+        group: true,
+        'group.field': 'orderId',
+        'group.limit': 10000,
+        'group.ngroups': true,
+        'q.op': 'AND',
+        fl: orderRowEnrichmentFields.join(' ')
+      },
+      query: '*:*',
+      filter: [
+        'docType: ORDER',
+        'orderTypeId: SALES_ORDER',
+        `orderId:(${uniqueOrderIds.map(escapeSolrValue).join(' OR ')})`
+      ]
+    }
+  };
+}
+
+export async function fetchOrderRowEnrichment(orderIds: readonly string[]): Promise<Record<string, OrderRowEnrichment>> {
+  const uniqueOrderIds = [...new Set(orderIds.filter(Boolean))];
+  if (!uniqueOrderIds.length) return {};
+  const response = await useSolrSearch().runSolrQuery(buildOrderRowEnrichmentPayload(uniqueOrderIds));
+  if (commonUtil.hasError(response)) return Promise.reject(response.data);
+  return normalizeOrderRowEnrichment(response.data);
 }
 
 export function buildVirtualLocationCountsPayload(params: VirtualLocationCountParams) {
@@ -330,13 +398,13 @@ function normalizeVirtualLocationCountResponse(data: any): VirtualLocationOrderC
     .filter((row: VirtualLocationOrderCount) => row.facilityId);
 }
 
-function normalizeOrderSolrResponse(data: any): OrderSearchResult {
+function normalizeOrderSolrResponse(data: any, allocationSummary?: AllocationSummaryOptions): OrderSearchResult {
   const groupedOrders = data?.grouped?.orderId;
 
   if (groupedOrders) {
     return {
       orders: (groupedOrders.groups || [])
-        .map(normalizeGroupedOrder)
+        .map((group: any) => normalizeGroupedOrder(group, allocationSummary))
         .filter(Boolean),
       total: Number(groupedOrders.ngroups ?? groupedOrders.matches ?? (groupedOrders.groups?.length || 0))
     };
@@ -345,25 +413,27 @@ function normalizeOrderSolrResponse(data: any): OrderSearchResult {
   const docs = allDocs(data);
   return {
     orders: docs
-      .map((doc: any) => normalizeOrderWithParkingUnits([doc]))
+      .map((doc: any) => normalizeOrderWithParkingUnits([doc], allocationSummary))
       .filter(Boolean) as Order[],
     total: Number(data?.response?.numFound ?? docs.length)
   };
 }
 
-function normalizeGroupedOrder(group: any) {
+function normalizeGroupedOrder(group: any, allocationSummary?: AllocationSummaryOptions) {
   const docs = allDocs(group?.doclist);
-  return normalizeOrderWithParkingUnits(docs);
+  return normalizeOrderWithParkingUnits(docs, allocationSummary);
 }
 
-function normalizeOrderWithParkingUnits(docs: any[]) {
+function normalizeOrderWithParkingUnits(docs: any[], allocationSummary?: AllocationSummaryOptions) {
   const primaryDoc = docs[0];
   if (!primaryDoc) return undefined;
 
+  const itemDocuments = allocationDocuments(docs);
   return {
     ...normalizeOrderDoc(primaryDoc),
     parkingUnitCount: sumParkingUnits(docs),
-    ...summarizeBrokeredFacilities(docs)
+    ...summarizeBrokeredFacilities(docs),
+    allocationSummary: summarizeOrderAllocation(itemDocuments, allocationSummary || { mode: 'physical-first' })
   };
 }
 
@@ -371,60 +441,25 @@ function sumParkingUnits(docs: any[]) {
   return docs.reduce((total, doc) => total + toNumberValue(doc.quantity), 0);
 }
 
-type FacilityItemCount = { name: string; count: number };
-
 // Derives the location summary purely from the per-item ORDER docs the grouped
 // search already returns (no per-row detail fetch). Physical facilities drive
 // the brokered numerator/chip. When none are brokered, virtual/parking facilities
 // provide the fallback location chip without contributing to the numerator.
 // Exported so OrderDetail can summarize a grouped item's locations the same way.
 export function summarizeBrokeredFacilities(docs: any[]) {
-  const itemsByPhysicalFacility = new Map<string, { name: string; count: number }>();
-  const itemsByVirtualFacility = new Map<string, { name: string; count: number }>();
-  let brokeredItemCount = 0;
-
-  docs.forEach((doc) => {
-    const facilityId = toStringValue(doc.facilityId);
-    if (!facilityId) return;
-
-    const name = toStringValue(doc.facilityName) || facilityId;
-    if (isVirtualFacilityDoc(doc)) {
-      addFacilityItemCount(itemsByVirtualFacility, facilityId, name);
-      return;
-    }
-
-    addFacilityItemCount(itemsByPhysicalFacility, facilityId, name);
-    brokeredItemCount += 1;
-  });
-
-  const rankedPhysical = rankFacilityItemCounts(itemsByPhysicalFacility);
-  const rankedVirtual = brokeredItemCount === 0 ? rankFacilityItemCounts(itemsByVirtualFacility) : [];
-  const topPhysicalFacility = rankedPhysical[0];
-  const topVirtualFacility = rankedVirtual[0];
+  const itemDocuments = allocationDocuments(docs);
+  const summary = summarizeOrderAllocation(itemDocuments, { mode: 'physical-first' });
+  const selectedDocument = itemDocuments.find((document) => document.facilityId === summary?.facilityId);
+  const selectedIsVirtual = selectedDocument ? isVirtualFacilityDoc(selectedDocument) : false;
 
   return {
-    brokeredFacilityName: topPhysicalFacility?.name ?? '',
-    brokeredFacilitySplitCount: rankedPhysical.length > 1 ? rankedPhysical.length - 1 : 0,
-    dominantVirtualFacilityName: topVirtualFacility?.name ?? '',
-    dominantVirtualFacilitySplitCount: rankedVirtual.length > 1 ? rankedVirtual.length - 1 : 0,
-    brokeredItemCount,
-    totalItemCount: docs.length
+    brokeredFacilityName: !selectedIsVirtual ? summary?.facilityName ?? '' : '',
+    brokeredFacilitySplitCount: !selectedIsVirtual ? summary?.additionalFacilityCount ?? 0 : 0,
+    dominantVirtualFacilityName: selectedIsVirtual ? summary?.facilityName ?? '' : '',
+    dominantVirtualFacilitySplitCount: selectedIsVirtual ? summary?.additionalFacilityCount ?? 0 : 0,
+    brokeredItemCount: summary?.brokeredItemCount ?? 0,
+    totalItemCount: itemDocuments.length
   };
-}
-
-function addFacilityItemCount(counts: Map<string, FacilityItemCount>, facilityId: string, name: string) {
-  const existing = counts.get(facilityId);
-  if (existing) {
-    existing.count += 1;
-    if (!existing.name) existing.name = name;
-    return;
-  }
-
-  counts.set(facilityId, { name, count: 1 });
-}
-
-function rankFacilityItemCounts(counts: Map<string, FacilityItemCount>) {
-  return [...counts.values()].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 }
 
 function isVirtualFacilityDoc(doc: any) {
@@ -436,6 +471,71 @@ function isVirtualFacilityDoc(doc: any) {
   if (!facilityTypeId || !getActivePinia()) return false;
   const parentTypeId = useSeedStore().facilityType(facilityTypeId)?.parentTypeId;
   return parentTypeId === 'VIRTUAL_FACILITY';
+}
+
+function allocationDocuments(docs: readonly any[]): AllocationItemDocument[] {
+  const seedStore = getActivePinia() ? useSeedStore() : undefined;
+  return docs.map((doc) => {
+    const facilityTypeId = toStringValue(doc.facilityTypeId);
+    return {
+      orderId: toStringValue(doc.orderId),
+      orderItemSeqId: toStringValue(doc.orderItemSeqId),
+      facilityId: toStringValue(doc.facilityId),
+      facilityName: toStringValue(doc.facilityName),
+      facilityTypeId,
+      facilityParentTypeId: seedStore?.facilityType(facilityTypeId)?.parentTypeId
+    };
+  });
+}
+
+function normalizeOrderRowEnrichment(data: any): Record<string, OrderRowEnrichment> {
+  const groups = data?.grouped?.orderId?.groups || [];
+  return groups.reduce((byOrderId: Record<string, OrderRowEnrichment>, group: any) => {
+    const docs = allDocs(group?.doclist);
+    const primary = docs[0];
+    const orderId = toStringValue(group?.groupValue ?? primary?.orderId);
+    if (!orderId || !primary) return byOrderId;
+    byOrderId[orderId] = {
+      orderId,
+      orderName: toStringValue(primary.orderName),
+      externalOrderId: toStringValue(primary.externalOrderId),
+      customerPartyName: toStringValue(primary.customerPartyName),
+      customerEmailId: toStringValue(primary.customerEmailId),
+      contactPhoneNumbers: Array.isArray(primary.contactPhoneNumbers)
+        ? primary.contactPhoneNumbers.map((value: any) => toStringValue(value)).filter(Boolean)
+        : [toStringValue(primary.contactPhoneNumbers)].filter(Boolean),
+      carrierPartyId: toStringValue(primary.carrierPartyId),
+      salesChannelDesc: toStringValue(primary.salesChannelDesc ?? primary.salesChannelEnumId),
+      shipmentMethodTypeId: toStringValue(primary.shipmentMethodTypeId),
+      estimatedDeliveryDate: toStringValue(primary.estimatedDeliveryDate),
+      promisedDatetime: toStringValue(primary.promisedDatetime),
+      shipBeforeDate: toStringValue(primary.shipBeforeDate),
+      shipByDate: toStringValue(primary.shipByDate),
+      itemDocuments: allocationDocuments(docs)
+    };
+    return byOrderId;
+  }, {});
+}
+
+function mergeSearchOrderEnrichment(
+  order: Order,
+  enrichment: OrderRowEnrichment | undefined,
+  allocationSummary: AllocationSummaryOptions
+): Order {
+  if (!enrichment) return { ...order, allocationSummary: undefined };
+  return {
+    ...order,
+    externalId: enrichment.externalOrderId || order.externalId,
+    customerName: enrichment.customerPartyName || order.customerName,
+    carrierPartyId: enrichment.carrierPartyId || order.carrierPartyId,
+    channel: enrichment.salesChannelDesc || order.channel,
+    deliveryMethod: enrichment.shipmentMethodTypeId || order.deliveryMethod,
+    estimatedDeliveryDate: enrichment.estimatedDeliveryDate || order.estimatedDeliveryDate,
+    promisedDatetime: enrichment.promisedDatetime || order.promisedDatetime,
+    shipBeforeDate: enrichment.shipBeforeDate || order.shipBeforeDate,
+    shipByDate: enrichment.shipByDate || order.shipByDate,
+    allocationSummary: summarizeOrderAllocation(enrichment.itemDocuments, allocationSummary)
+  };
 }
 
 function buildOrderSearchQuery(searchTerm: string) {

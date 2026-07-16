@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { commonUtil, useSolrSearch } from '@common';
 import {
   buildOrderLookupPayload,
+  buildOrderRowEnrichmentPayload,
   buildUnfillableProductCandidatesPayload,
   buildUnfillableShipGroupsForProductPayload,
   buildVirtualLocationCountsPayload,
@@ -270,6 +271,31 @@ describe('buildOrderLookupPayload facility filtering', () => {
       brokeredItemCount: 0,
       totalItemCount: 4
     });
+  });
+});
+
+describe('order-row enrichment payload', () => {
+  it('deduplicates order IDs and requests the full grouped row contract in one query', () => {
+    const payload = buildOrderRowEnrichmentPayload(['M100001', 'M100002', 'M100001']);
+    const fields = String(payload.json.params.fl).split(' ');
+
+    expect(payload.json.params.rows).toBe(2);
+    expect(payload.json.params['group.field']).toBe('orderId');
+    expect(payload.json.filter).toContain('orderId:(M100001 OR M100002)');
+    expect(fields).toEqual(expect.arrayContaining([
+      'customerPartyName',
+      'carrierPartyId',
+      'salesChannelDesc',
+      'facilityId',
+      'facilityName',
+      'facilityTypeId',
+      'orderItemSeqId',
+      'shipmentMethodTypeId',
+      'estimatedDeliveryDate',
+      'promisedDatetime',
+      'shipBeforeDate',
+      'shipByDate'
+    ]));
   });
 });
 
