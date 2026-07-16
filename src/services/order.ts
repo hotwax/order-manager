@@ -58,6 +58,32 @@ export interface VirtualLocationOrderCount {
   count: number;
 }
 
+export type WorkflowOrderBucket = 'open' | 'inflight' | 'packed';
+
+export interface WorkflowOrderTotals {
+  open: number;
+  inflight: number;
+  packed: number;
+}
+
+export async function fetchWorkflowOrderTotals(productStoreId?: string): Promise<WorkflowOrderTotals> {
+  const buckets: WorkflowOrderBucket[] = ['open', 'inflight', 'packed'];
+  const totals = await Promise.all(buckets.map(async (bucket) => {
+    const resp = await api({
+      url: `oms/orders/salesOrders/${bucket}`,
+      method: 'get',
+      params: {
+        pageSize: 1,
+        pageIndex: 0,
+        ...(productStoreId && productStoreId !== 'All' ? { productStoreId } : {})
+      }
+    });
+
+    return [bucket, Number(resp.data?.ordersCount ?? 0)] as const;
+  }));
+
+  return Object.fromEntries(totals) as unknown as WorkflowOrderTotals;
+}
 export interface UnfillableProductCandidate {
   productId: string;
   itemCount: number;
