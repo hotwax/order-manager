@@ -49,57 +49,30 @@ describe('customer service hold task counts', () => {
     vi.mocked(api).mockResolvedValue({ headers: {}, data: [] });
   });
 
-  it('fetches hold task counts from the matching task queues', async () => {
-    const axiosHeaders = {
-      get: vi.fn((name: string) => name === 'x-total-count' ? '3' : undefined)
-    };
-    vi.mocked(api)
-      .mockResolvedValueOnce({ headers: { 'x-total-count': '12' }, data: [{}] })
-      .mockResolvedValueOnce({ headers: {}, data: [{}, {}] })
-      .mockResolvedValueOnce({ headers: axiosHeaders, data: [] });
+  it('fetches canonical open hold counts from the OMS dashboard service', async () => {
+    vi.mocked(api).mockResolvedValueOnce({
+      data: {
+        holdSubstituteCount: '12',
+        holdBadAddressCount: '2',
+        holdFraudRiskCount: '3',
+        holdTasksTotalCount: '19'
+      }
+    });
 
     const store = useCustomerServiceStore();
 
     await store.fetchHoldTasks('STORE_1');
 
-    expect(api).toHaveBeenNthCalledWith(1, {
-      url: 'oms/orders/tasks/shipGroupTasks',
+    expect(api).toHaveBeenCalledWith({
+      url: 'oms/orders/funnelDashboard/holdTasks',
       method: 'GET',
-      params: {
-        statusId: 'TASK_CREATED',
-        workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-        workEffortPurposeTypeId: 'NEG_RES_REVIEW',
-        productStoreId: 'STORE_1',
-        pageSize: 10000,
-      }
+      params: { productStoreId: 'STORE_1' }
     });
-    expect(api).toHaveBeenNthCalledWith(2, {
-      url: 'oms/orders/tasks/shipGroupTasks',
-      method: 'GET',
-      params: {
-        statusId: 'TASK_CREATED',
-        workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-        workEffortPurposeTypeId: 'INVALID_ADDRESS',
-        productStoreId: 'STORE_1',
-        pageSize: 10000,
-      }
-    });
-    expect(api).toHaveBeenNthCalledWith(3, {
-      url: 'oms/orders/tasks',
-      method: 'GET',
-      params: {
-        taskStatusId: 'TASK_CREATED',
-        workEffortTypeId: 'REVIEW_RISK_ORDER',
-        productStoreId: 'STORE_1',
-        pageSize: 10000,
-      }
-    });
-    expect(axiosHeaders.get).toHaveBeenCalledWith('x-total-count');
     expect(store.holdTasks).toEqual({
       holdSubstituteCount: 12,
       holdBadAddressCount: 2,
       holdFraudRiskCount: 3,
-      holdTasksTotalCount: 17,
+      holdTasksTotalCount: 19,
     });
     expect(store.dashboardStatus.holdTasks).toBe('success');
   });

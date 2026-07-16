@@ -2,6 +2,7 @@ import { defineStore } from "pinia";
 import { api, commonUtil, logger} from "@common";
 import { useOrderDetail } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
+import { useSeedStore } from "./seed";
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error";
 
@@ -16,8 +17,17 @@ const HEADER_SEQ_ID = "_NA_";
 
 const newEntry = (): OrderEntry => ({ payload: null, status: "idle", loadedAt: "", error: "" });
 
+// Order adjustments (e.g. tax) commonly carry only an orderAdjustmentTypeId, no free-text
+// comment/description — fall back to the seeded enum description so rows show "Sales Tax"
+// rather than the raw "SALES_TAX" id. This also backs the rollup grouping key below, so
+// adjustments only merge under their human-readable label, not the raw type id.
 const adjustmentDisplayLabel = (adj: any) =>
-  adj.comments || adj.comment || adj.description || adj.orderAdjustmentTypeId || "OTHER_ADJUSTMENT";
+  adj.comments
+  || adj.comment
+  || adj.description
+  || useSeedStore().orderAdjustmentTypeDescription(adj.orderAdjustmentTypeId)
+  || adj.orderAdjustmentTypeId
+  || "OTHER_ADJUSTMENT";
 
 const adjustmentUniqueKey = (adj: any, fallbackSeqId = "") =>
   adj.orderAdjustmentId || [
@@ -63,19 +73,157 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     byOrderId: {} as Record<string, OrderEntry>,
     currentOrderId: "",
     orderHeaderWorkEfforts: [] as any[],
+    orderHeaderWorkEffortsByOrderId: {} as Record<string, any[]>,
     riskAssessmentsByOrderId: {} as Record<string, any[]>,
     riskAssessmentsStatusByOrderId: {} as Record<string, LoadStatus>,
     riskAssessmentsErrorByOrderId: {} as Record<string, string>,
     commEvents: [] as any[],
+    commEventsByOrderId: {} as Record<string, any[]>,
     shippingMethods: [] as any[],
     carrierParties: [] as any[],
     fulfillmentTimeline: [] as any[],
+    fulfillmentTimelineByOrderId: {} as Record<string, any[]>,
   }),
   getters: {
     current: (state) => state.byOrderId[state.currentOrderId]?.payload || null,
     currentEntry: (state) => state.byOrderId[state.currentOrderId] || null,
     isLoading: (state) => state.byOrderId[state.currentOrderId]?.status === "loading",
     error: (state) => state.byOrderId[state.currentOrderId]?.error || "",
+
+    orderById: (state) => (orderId: string) => state.byOrderId[orderId]?.payload || null,
+    loadingById: (state) => (orderId: string) => state.byOrderId[orderId]?.status === "loading",
+    errorById: (state) => (orderId: string) => state.byOrderId[orderId]?.error || "",
+
+    placingCustomerRoleByOrderId: (state) => (orderId: string) => {
+      const current = state.byOrderId[orderId]?.payload;
+      return (current?.roles || []).find((role: any) => role.roleTypeId === "PLACING_CUSTOMER") || null;
+    },
+
+    customerPartyIdByOrderId(): (orderId: string) => string {
+      return (orderId: string) => this.placingCustomerRoleByOrderId(orderId)?.partyId || "";
+    },
+
+    customerNameByOrderId(): (orderId: string) => string {
+      return (orderId: string) => {
+        const role = this.placingCustomerRoleByOrderId(orderId);
+        const person = role?.person;
+        if (person && (person.firstName || person.lastName)) {
+          return [person.firstName, person.lastName].filter(Boolean).join(" ");
+        }
+        if (role?.partyGroup?.groupName) return role.partyGroup.groupName;
+
+        const current = this.orderById(orderId);
+        const shipping = (current?.contactMechs || []).find(
+          (mech: any) => mech.contactMechPurposeTypeId === "SHIPPING_LOCATION"
+        );
+        return shipping?.postalAddress?.toName || "";
+      };
+    },
+
+    headerStatusesByOrderId: (state) => (orderId: string) => {
+      const current = state.byOrderId[orderId]?.payload;
+      const statuses = current?.statuses || [];
+      return statuses
+        .filter((status: any) => (status.orderItemSeqId || HEADER_SEQ_ID) === HEADER_SEQ_ID)
+        .slice()
+        .sort((left: any, right: any) => Number(right.statusDatetime || 0) - Number(left.statusDatetime || 0));
+    },
+
+    contactMechsByPurposeByOrderId: (state) => (orderId: string) => {
+      const current = state.byOrderId[orderId]?.payload;
+      const index: Record<string, any> = {};
+      (current?.contactMechs || []).forEach((mech: any) => {
+        if (mech.contactMechPurposeTypeId) index[mech.contactMechPurposeTypeId] = mech;
+      });
+      return index;
+    },
+
+    contactMechsByIdByOrderId: (state) => (orderId: string) => {
+      const current = state.byOrderId[orderId]?.payload;
+      const index: Record<string, any> = {};
+      (current?.contactMechs || []).forEach((mech: any) => {
+        if (mech.contactMechId) index[mech.contactMechId] = mech;
+      });
+      return index;
+    },
+
+    returnedQtyByItemSeqIdByOrderId: (state) => (orderId: string) => {
+      const current = state.byOrderId[orderId]?.payload;
+      const totals: Record<string, number> = {};
+      (current?.returnItems || []).forEach((item: any) => {
+        const seqId = item.orderItemSeqId;
+        if (seqId) totals[seqId] = (totals[seqId] || 0) + Number(item.returnQuantity || 0);
+      });
+      return totals;
+    },
+
+    orderTotalsByOrderId: (state) => (orderId: string) => {
+      const current = state.byOrderId[orderId]?.payload;
+      if (!current) return { subtotal: 0, adjustments: {}, total: 0 };
+
+      let subtotal = 0;
+      (current.shipGroups || []).forEach((sg: any) => {
+        (sg.items || []).forEach((item: any) => {
+          subtotal += Number(item.unitPrice || 0) * Number(item.quantity || 0);
+        });
+      });
+
+      const adjustments: Record<string, number> = {};
+      let adjustmentsTotal = 0;
+      const seenAdjustments = new Set<string>();
+
+      const recordAdjustment = (adj: any, fallbackSeqId = "") => {
+        const uniqueKey = adjustmentUniqueKey(adj, fallbackSeqId);
+        if (seenAdjustments.has(uniqueKey)) return;
+        seenAdjustments.add(uniqueKey);
+
+        const amount = Number(adj.amount || 0);
+        adjustmentsTotal += amount;
+
+        const label = adjustmentDisplayLabel(adj);
+        adjustments[label] = (adjustments[label] || 0) + amount;
+      };
+
+      (current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
+
+      (current.shipGroups || []).forEach((sg: any) => {
+        (sg.items || []).forEach((item: any) => {
+          (item.adjustments || []).forEach((adj: any) => recordAdjustment(adj, item.orderItemSeqId));
+        });
+      });
+
+      // Filter out zero-sum adjustments
+      Object.keys(adjustments).forEach((key) => {
+        if (adjustments[key] === 0) {
+          delete adjustments[key];
+        }
+      });
+
+      const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
+      const total = computedTotal || current.grandTotal || 0;
+
+      return { subtotal, adjustments, total };
+    },
+
+    allItemsByOrderId: (state) => (orderId: string) => {
+      const current = state.byOrderId[orderId]?.payload;
+      return (current?.shipGroups || []).flatMap((shipGroup: any) =>
+        (shipGroup.items || []).map((item: any) => ({
+          ...item,
+          shipGroupSeqId: shipGroup.shipGroupSeqId,
+          facilityId: shipGroup.facilityId
+        }))
+      );
+    },
+
+    timelineByShipGroupByOrderId: (state) => (orderId: string) => {
+      const index: Record<string, any> = {};
+      const timeline = state.fulfillmentTimelineByOrderId[orderId] || [];
+      timeline.forEach((entry: any) => {
+        if (entry.shipGroupSeqId) index[entry.shipGroupSeqId] = entry;
+      });
+      return index;
+    },
 
     /** Order-header timeline: status rows that are NOT item-scoped, newest first. */
     headerStatuses(): any[] {
@@ -278,7 +426,11 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         }
       });
 
-      const total = this.current.grandTotal || (subtotal + adjustmentsTotal);
+      // Sum the rows actually displayed (subtotal + every adjustment, including tax) rather than
+      // trusting the backend's grandTotal, which has been observed to exclude tax. Round to avoid
+      // floating-point drift (e.g. 59 + 1.53 + 0.59 + 2.86 = 63.980000000000004).
+      const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
+      const total = computedTotal || this.current.grandTotal || 0;
 
       return { subtotal, adjustments, total };
     },
@@ -352,7 +504,9 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       try {
         const resp = await useOrderDetail().getWorkEfforts(orderId);
         if (commonUtil.hasError(resp)) throw resp.data;
-        this.orderHeaderWorkEfforts = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
+        const docs = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
+        this.orderHeaderWorkEffortsByOrderId[orderId] = docs;
+        this.orderHeaderWorkEfforts = docs;
       } catch (error: any) {
         logger.error("Failed to load work efforts", error);
       }
@@ -363,7 +517,9 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       try {
         const resp = await api({ url: `oms/orders/${orderId}/fulfillmentTimeline`, method: 'GET' });
         if (commonUtil.hasError(resp)) throw resp.data;
-        this.fulfillmentTimeline = Array.isArray(resp.data) ? resp.data : (resp.data?.timeline ?? resp.data?.docs ?? []);
+        const docs = Array.isArray(resp.data) ? resp.data : (resp.data?.timeline ?? resp.data?.docs ?? []);
+        this.fulfillmentTimelineByOrderId[orderId] = docs;
+        this.fulfillmentTimeline = docs;
       } catch (error: any) {
         logger.error('Failed to load fulfillment timeline', error);
       }
@@ -374,7 +530,9 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       try {
         const resp = await useOrderDetail().getCommunicationEvents(orderId);
         if (commonUtil.hasError(resp)) throw resp.data;
-        this.commEvents = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
+        const docs = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
+        this.commEventsByOrderId[orderId] = docs;
+        this.commEvents = docs;
       } catch (error: any) {
         logger.error("Failed to load communication events", error);
       }
@@ -433,12 +591,19 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         orderIds.map(async (orderId) => {
           const resp = await api({ url: `oms/orders/${orderId}/shipGroups`, method: 'GET' });
           const shipGroups: any[] = Array.isArray(resp.data) ? resp.data : (resp.data?.docs ?? []);
-          return { orderId, shipGroupSeqId: shipGroups[0]?.shipGroupSeqId };
+          return {
+            orderId,
+            shipGroupSeqIds: shipGroups.map((shipGroup) => shipGroup.shipGroupSeqId).filter(Boolean)
+          };
         })
       );
       const payload = shipGroupsByOrder
-        .filter((item) => item.shipGroupSeqId)
-        .map((item) => ({ ...item, ...taskData, statusId: 'TASK_CREATED' }));
+        .flatMap(({ orderId, shipGroupSeqIds }) => shipGroupSeqIds.map((shipGroupSeqId) => ({
+          orderId,
+          shipGroupSeqId,
+          ...taskData,
+          statusId: 'TASK_CREATED'
+        })));
       return api({ url: 'oms/orders/tasks', method: 'POST', data: payload });
     },
     async bulkCancelOrders(orderIds: string[]) {

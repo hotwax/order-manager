@@ -13,6 +13,8 @@ interface TaskStatusCommunicationOptions {
 
 const HOLD_TASK_TYPE_ID = 'RESOLVE_ONHOLD_ORDER';
 const FRAUD_RISK_PURPOSE_TYPE_ID = 'REVIEW_RISK_ORDER';
+const OPEN_TASK_STATUS_IDS = 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD';
+const USER_HOLD_PURPOSE_TYPE_IDS = 'ORD_HOLD_MANUAL,ORD_HOLD_CUST_REQ';
 
 // ── Per-task enrichment helpers ───────────────────────────────────────────────
 // Shared by both the queue list fetches and the order-scoped detail fetch so the
@@ -161,7 +163,7 @@ function canLoadMore(tasks: any[], total: number, totalKnown: boolean): boolean 
 export const useOrderTaskStore = defineStore('orderTask', {
   state: () => ({
     holdTasks: [] as any[],
-    holdStatus: 'idle' as 'idle' | 'loading' | 'success' | 'error',
+    holdStatus: 'idle' as TaskLoadStatus,
     holdError: '' as string,
     holdTotal: 0,
     holdTotalKnown: false,
@@ -174,12 +176,12 @@ export const useOrderTaskStore = defineStore('orderTask', {
     fraudTasks: [] as any[],
     fraudTotal: 0,
     fraudTotalKnown: false,
-    fraudStatus: 'idle' as 'idle' | 'loading' | 'success' | 'error',
+    fraudStatus: 'idle' as TaskLoadStatus,
     fraudError: '' as string,
-    orderHoldTasks: [] as any[],
-    orderAddressValidationTasks: [] as any[],
-    orderSwapTasks: [] as any[],
-    orderFraudTasks: [] as any[],
+    orderHoldTasksByOrderId: {} as Record<string, any[]>,
+    orderAddressValidationTasksByOrderId: {} as Record<string, any[]>,
+    orderSwapTasksByOrderId: {} as Record<string, any[]>,
+    orderFraudTasksByOrderId: {} as Record<string, any[]>,
     swapStatus: 'idle' as TaskLoadStatus,
     swapError: '' as string,
   }),
@@ -210,10 +212,10 @@ export const useOrderTaskStore = defineStore('orderTask', {
     isFraudTasksScrollable: (state): boolean => {
       return canLoadMore(state.fraudTasks, state.fraudTotal, state.fraudTotalKnown);
     },
-    getOrderHoldTasks: (state) => state.orderHoldTasks,
-    getOrderAddressValidationTasks: (state) => state.orderAddressValidationTasks,
-    getOrderSwapTasks: (state) => state.orderSwapTasks,
-    getOrderFraudTasks: (state) => state.orderFraudTasks,
+    getOrderHoldTasksByOrderId: (state) => (orderId: string) => state.orderHoldTasksByOrderId[orderId] || [],
+    getOrderAddressValidationTasksByOrderId: (state) => (orderId: string) => state.orderAddressValidationTasksByOrderId[orderId] || [],
+    getOrderSwapTasksByOrderId: (state) => (orderId: string) => state.orderSwapTasksByOrderId[orderId] || [],
+    getOrderFraudTasksByOrderId: (state) => (orderId: string) => state.orderFraudTasksByOrderId[orderId] || [],
   },
   actions: {
     async fetchHoldTasks(payload: TaskQueueRequestParams = {}) {
@@ -227,18 +229,22 @@ export const useOrderTaskStore = defineStore('orderTask', {
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({
-          url: 'oms/orders/tasks/shipGroupTasks',
+          // The order-task view retains concrete ship-group fields but also includes null-scope
+          // customer-request holds, so the queue matches the complete blocking population.
+          url: 'oms/orders/tasks',
           method: 'GET',
           params: {
             ...payload,
-            statusId: 'TASK_CREATED',
+            taskStatusId: OPEN_TASK_STATUS_IDS,
+            taskStatusId_op: 'in',
             workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-            workEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+            workEffortPurposeTypeId: USER_HOLD_PURPOSE_TYPE_IDS,
+            workEffortPurposeTypeId_op: 'in',
             productStoreId,
           },
         });
         const tasks = listResponse.data ?? [];
-        const detailedTasks = await Promise.all(tasks.map((task: any) => enrichHoldTask(task)));
+        const detailedTasks = await Promise.all(tasks.map(enrichHoldTask));
         this.holdTasks = isFirstPage ? detailedTasks : [...this.holdTasks, ...detailedTasks];
         const total = responseTotal(listResponse);
         this.holdTotalKnown = total !== null;
@@ -260,7 +266,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
           method: 'GET',
           params: {
             ...payload,
-            statusId: 'TASK_CREATED',
+            taskStatusId: OPEN_TASK_STATUS_IDS,
+            taskStatusId_op: 'in',
             workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
             workEffortPurposeTypeId: 'INVALID_ADDRESS',
             productStoreId,
@@ -294,14 +301,15 @@ export const useOrderTaskStore = defineStore('orderTask', {
           method: 'GET',
           params: {
             ...payload,
-            statusId: 'TASK_CREATED',
+            taskStatusId: OPEN_TASK_STATUS_IDS,
+            taskStatusId_op: 'in',
             workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
             workEffortPurposeTypeId: 'NEG_RES_REVIEW',
             productStoreId,
           },
         });
         const tasks = listResponse.data ?? [];
-        const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
+        const detailedTasks = await Promise.all(tasks.map(enrichShipGroupTask));
         this.swapTasks = isFirstPage ? detailedTasks : [...this.swapTasks, ...detailedTasks];
         const total = responseTotal(listResponse);
         this.swapTotalKnown = total !== null;
@@ -333,14 +341,15 @@ export const useOrderTaskStore = defineStore('orderTask', {
           method: 'GET',
           params: {
             ...payload,
-            taskStatusId: 'TASK_CREATED',
+            taskStatusId: OPEN_TASK_STATUS_IDS,
+            taskStatusId_op: 'in',
             workEffortTypeId: HOLD_TASK_TYPE_ID,
             workEffortPurposeTypeId: FRAUD_RISK_PURPOSE_TYPE_ID,
             productStoreId,
           },
         });
         const tasks = listResponse.data ?? [];
-        const detailedTasks = await Promise.all(tasks.map((task: any) => enrichFraudTask(task)));
+        const detailedTasks = await Promise.all(tasks.map(enrichFraudTask));
         this.fraudTasks = isFirstPage ? detailedTasks : [...this.fraudTasks, ...detailedTasks];
         const total = responseTotal(listResponse);
         this.fraudTotalKnown = total !== null;
@@ -368,18 +377,20 @@ export const useOrderTaskStore = defineStore('orderTask', {
       const fetchHold = async () => {
         try {
           const listResponse = await api({
-            url: 'oms/orders/tasks/shipGroupTasks',
+            url: 'oms/orders/tasks',
             method: 'GET',
             params: {
               orderId,
-              statusId: 'TASK_CREATED',
+              taskStatusId: OPEN_TASK_STATUS_IDS,
+              taskStatusId_op: 'in',
               workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+              workEffortPurposeTypeId: USER_HOLD_PURPOSE_TYPE_IDS,
+              workEffortPurposeTypeId_op: 'in',
               productStoreId,
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          this.orderHoldTasks = await Promise.all(tasks.map((task: any) => enrichHoldTask(task)));
+          this.orderHoldTasksByOrderId[orderId] = await Promise.all(tasks.map(enrichHoldTask));
         } catch (err) {
           console.error('Failed to fetch the order hold tasks', err);
         }
@@ -392,14 +403,15 @@ export const useOrderTaskStore = defineStore('orderTask', {
             method: 'GET',
             params: {
               orderId,
-              statusId: 'TASK_CREATED',
+              taskStatusId: OPEN_TASK_STATUS_IDS,
+              taskStatusId_op: 'in',
               workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
               workEffortPurposeTypeId: 'INVALID_ADDRESS',
               productStoreId,
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          this.orderAddressValidationTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
+          this.orderAddressValidationTasksByOrderId[orderId] = await Promise.all(tasks.map(enrichShipGroupTask));
         } catch (err) {
           console.error('Failed to fetch the order address validation tasks', err);
         }
@@ -412,15 +424,16 @@ export const useOrderTaskStore = defineStore('orderTask', {
             method: 'GET',
             params: {
               orderId,
-              statusId: 'TASK_CREATED',
+              taskStatusId: OPEN_TASK_STATUS_IDS,
+              taskStatusId_op: 'in',
               workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
               workEffortPurposeTypeId: 'NEG_RES_REVIEW',
               productStoreId,
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
-          this.orderSwapTasks = detailedTasks;
+          const detailedTasks = await Promise.all(tasks.map(enrichShipGroupTask));
+          this.orderSwapTasksByOrderId[orderId] = detailedTasks;
           await prefetchSwapTaskAssets(detailedTasks);
         } catch (err) {
           console.error('Failed to fetch the order swap tasks', err);
@@ -434,15 +447,16 @@ export const useOrderTaskStore = defineStore('orderTask', {
             method: 'GET',
             params: {
               orderId,
-              taskStatusId: 'TASK_CREATED',
+              taskStatusId: OPEN_TASK_STATUS_IDS,
+              taskStatusId_op: 'in',
               workEffortTypeId: HOLD_TASK_TYPE_ID,
               workEffortPurposeTypeId: FRAUD_RISK_PURPOSE_TYPE_ID,
               productStoreId,
             },
           });
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
-          const detailedTasks = await Promise.all(tasks.map((task: any) => enrichFraudTask(task)));
-          this.orderFraudTasks = detailedTasks;
+          const detailedTasks = await Promise.all(tasks.map(enrichFraudTask));
+          this.orderFraudTasksByOrderId[orderId] = detailedTasks;
           await prefetchFraudTaskAssets(detailedTasks);
         } catch (err) {
           console.error('Failed to fetch the order fraud tasks', err);
