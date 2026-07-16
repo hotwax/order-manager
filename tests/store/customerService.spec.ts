@@ -52,10 +52,27 @@ describe('customer service hold task counts', () => {
   it('fetches canonical open hold counts from the OMS dashboard service', async () => {
     vi.mocked(api).mockResolvedValueOnce({
       data: {
-        holdSubstituteCount: '12',
-        holdBadAddressCount: '2',
-        holdFraudRiskCount: '3',
-        holdTasksTotalCount: '19'
+        holdTasksTotalCount: '19',
+        holdTaskCounts: [
+          {
+            workEffortPurposeTypeId: 'NEG_RES_REVIEW',
+            description: 'Negative Reservation Review',
+            sequenceNum: '10',
+            taskCount: '12'
+          },
+          {
+            workEffortPurposeTypeId: 'INVALID_ADDRESS',
+            description: 'Invalid Address',
+            sequenceNum: '20',
+            taskCount: '7'
+          },
+          {
+            workEffortPurposeTypeId: 'FUTURE_HOLD',
+            description: 'Future Hold',
+            sequenceNum: null,
+            taskCount: '0'
+          }
+        ]
       }
     });
 
@@ -69,11 +86,30 @@ describe('customer service hold task counts', () => {
       params: { productStoreId: 'STORE_1' }
     });
     expect(store.holdTasks).toEqual({
-      holdSubstituteCount: 12,
-      holdBadAddressCount: 2,
-      holdFraudRiskCount: 3,
       holdTasksTotalCount: 19,
+      holdTaskCounts: [
+        {
+          workEffortPurposeTypeId: 'NEG_RES_REVIEW',
+          description: 'Negative Reservation Review',
+          sequenceNum: 10,
+          taskCount: 12
+        },
+        {
+          workEffortPurposeTypeId: 'INVALID_ADDRESS',
+          description: 'Invalid Address',
+          sequenceNum: 20,
+          taskCount: 7
+        },
+        {
+          workEffortPurposeTypeId: 'FUTURE_HOLD',
+          description: 'Future Hold',
+          sequenceNum: null,
+          taskCount: 0
+        }
+      ],
     });
+    expect(store.holdTasks.holdTaskCounts.reduce((total, count) => total + count.taskCount, 0))
+      .toBe(store.holdTasks.holdTasksTotalCount);
     expect(store.dashboardStatus.holdTasks).toBe('success');
   });
 
@@ -84,19 +120,25 @@ describe('customer service hold task counts', () => {
 
     const store = useCustomerServiceStore();
     store.holdTasks = {
-      holdSubstituteCount: 1,
-      holdBadAddressCount: 2,
-      holdFraudRiskCount: 3,
       holdTasksTotalCount: 6,
+      holdTaskCounts: [{
+        workEffortPurposeTypeId: 'INVALID_ADDRESS',
+        description: 'Invalid Address',
+        sequenceNum: 20,
+        taskCount: 6
+      }]
     };
 
     await store.fetchHoldTasks('STORE_1');
 
     expect(store.holdTasks).toEqual({
-      holdSubstituteCount: 1,
-      holdBadAddressCount: 2,
-      holdFraudRiskCount: 3,
       holdTasksTotalCount: 6,
+      holdTaskCounts: [{
+        workEffortPurposeTypeId: 'INVALID_ADDRESS',
+        description: 'Invalid Address',
+        sequenceNum: 20,
+        taskCount: 6
+      }]
     });
     expect(store.dashboardStatus.holdTasks).toBe('error');
     expect(errorSpy).toHaveBeenCalledWith('Failed to fetch hold task counts', error);

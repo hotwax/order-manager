@@ -254,23 +254,40 @@ function validate(): string | null {
   return validateAddress(state[state.selectedAddressType]);
 }
 
-async function submitSaveAndRelease() {
+async function submitSaveAndReleaseDomain() {
   hydrate();
   const task = props.task;
   const state = addressState.value!;
   const address = state[state.selectedAddressType];
   await orderTaskStore.updateShippingInformation(task.orderId, task.shipGroupSeqId, address);
-  await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_COMPLETED');
 }
 
-async function submitCancel() {
+async function submitCancelDomain() {
   const task = props.task;
   const items = (task.items ?? []).map((item: any) => ({
     orderItemSeqId: item.orderItemSeqId,
     shipGroupSeqId: task.shipGroupSeqId,
   }));
   await orderTaskStore.cancelOrder(task.orderId, items);
-  await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED');
+}
+
+async function submitParkDomain(facilityId: string) {
+  const task = props.task;
+  await orderTaskStore.parkOrder(task.orderId, task.shipGroupSeqId, facilityId);
+}
+
+async function submitTaskStatus(statusId: 'TASK_COMPLETED' | 'TASK_CANCELLED') {
+  await orderTaskStore.changeTaskStatus(props.task.workEffortId, statusId);
+}
+
+async function submitSaveAndRelease() {
+  await submitSaveAndReleaseDomain();
+  await submitTaskStatus('TASK_COMPLETED');
+}
+
+async function submitCancel() {
+  await submitCancelDomain();
+  await submitTaskStatus('TASK_CANCELLED');
 }
 
 async function submitPark(facilityId: string) {
@@ -345,6 +362,10 @@ defineExpose({
   submitSaveAndRelease,
   submitCancel,
   submitPark,
+  submitSaveAndReleaseDomain,
+  submitCancelDomain,
+  submitParkDomain,
+  submitTaskStatus,
 });
 </script>
 

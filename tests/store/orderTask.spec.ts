@@ -134,7 +134,7 @@ describe('order task store', () => {
 
     expect(store.getSwapTotal).toBe(42);
     expect(api).toHaveBeenCalledWith({
-      url: 'oms/orders/tasks/shipGroupTasks',
+      url: 'oms/orders/tasks',
       method: 'GET',
       params: {
         pageSize: 20,
@@ -204,6 +204,46 @@ describe('order task store', () => {
     expect(store.getFraudTasks[0].workEffortCreatedDate).toBe(1784023200000);
   });
 
+  it('preserves null fraud scope while retaining each item ship group', async () => {
+    const store = useOrderTaskStore();
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        data: [{
+          workEffortId: 'TASK_1',
+          orderId: 'ORDER_1',
+          shipGroupSeqId: null,
+          workEffortCreatedDate: 1784023200000,
+        }],
+      })
+      .mockResolvedValueOnce({
+        data: [{
+          orderId: 'ORDER_1',
+          roles: [],
+          contactMechs: [],
+          paymentPreferences: [],
+          shipGroups: [
+            {
+              shipGroupSeqId: '00001',
+              items: [{ orderItemSeqId: '01', productId: 'PRODUCT_1' }],
+            },
+            {
+              shipGroupSeqId: '00002',
+              items: [{ orderItemSeqId: '02', productId: 'PRODUCT_2' }],
+            },
+          ],
+        }],
+      })
+      .mockResolvedValueOnce({ data: [] });
+
+    await store.fetchFraudTasks({ pageSize: 20, pageIndex: 0 });
+
+    expect(store.getFraudTasks[0].shipGroupSeqId).toBeNull();
+    expect(store.getFraudTasks[0].items).toEqual([
+      expect.objectContaining({ orderItemSeqId: '01', shipGroupSeqId: '00001' }),
+      expect.objectContaining({ orderItemSeqId: '02', shipGroupSeqId: '00002' }),
+    ]);
+  });
+
   it('fetches order fraud tasks with the hold type and risk review purpose', async () => {
     const store = useOrderTaskStore();
     vi.mocked(api).mockResolvedValue({ data: [] });
@@ -237,6 +277,8 @@ describe('order task store', () => {
         },
       }],
     ]));
+    expect(vi.mocked(api).mock.calls).toHaveLength(4);
+    expect(vi.mocked(api).mock.calls.every(([request]) => request.url === 'oms/orders/tasks')).toBe(true);
   });
 
   it('keeps ship-group and order-level operator holds visible through every blocking status', async () => {
@@ -259,5 +301,51 @@ describe('order task store', () => {
         productStoreId: 'STORE',
       },
     });
+  });
+
+  it('filters the Hold queue to one purpose when the route supplies a purpose', async () => {
+    const store = useOrderTaskStore();
+    vi.mocked(api).mockResolvedValueOnce({ data: [] });
+
+    await store.fetchHoldTasks({ pageSize: 20, pageIndex: 0 }, 'FUTURE_HOLD');
+
+    expect(api).toHaveBeenCalledWith({
+      url: 'oms/orders/tasks',
+      method: 'GET',
+      params: {
+        pageSize: 20,
+        pageIndex: 0,
+        taskStatusId: 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD',
+        taskStatusId_op: 'in',
+        workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+        workEffortPurposeTypeId: 'FUTURE_HOLD',
+        productStoreId: 'STORE',
+      },
+    });
+  });
+
+  it('keeps repeated tasks as separate rows by workEffortId', async () => {
+    const store = useOrderTaskStore();
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        data: [
+          {
+            workEffortId: 'TASK_1',
+            orderId: 'ORDER_1',
+            workEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+          },
+          {
+            workEffortId: 'TASK_2',
+            orderId: 'ORDER_1',
+            workEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ data: { task: {} } })
+      .mockResolvedValueOnce({ data: { task: {} } });
+
+    await store.fetchHoldTasks({ pageSize: 20, pageIndex: 0 });
+
+    expect(store.getHoldTasks.map((task) => task.workEffortId)).toEqual(['TASK_1', 'TASK_2']);
   });
 });

@@ -9,7 +9,8 @@ import type {
   WorkflowOrder,
   FulfillmentProgress,
   FacilityFulfillmentProgress,
-  VirtualLocationWorkCount
+  VirtualLocationWorkCount,
+  HoldTaskCounts
 } from '@/types/customerService';
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
@@ -186,10 +187,8 @@ export const useCustomerServiceStore = defineStore('customerService', {
     },
     holdTasks: {
       holdTasksTotalCount: 0,
-      holdSubstituteCount: 0,
-      holdBadAddressCount: 0,
-      holdFraudRiskCount: 0
-    },
+      holdTaskCounts: []
+    } as HoldTaskCounts,
     facilityOrderVolume: [] as any[],
     facilityFulfillmentVelocity: [] as any[],
     facilityPartialFulfillments: [] as any[],
@@ -351,12 +350,16 @@ export const useCustomerServiceStore = defineStore('customerService', {
           params: { productStoreId }
         });
         const counts = resp.data || {};
+        const holdTaskCounts = Array.isArray(counts.holdTaskCounts) ? counts.holdTaskCounts : [];
 
         this.holdTasks = {
-          holdSubstituteCount: Number(counts.holdSubstituteCount) || 0,
-          holdBadAddressCount: Number(counts.holdBadAddressCount) || 0,
-          holdFraudRiskCount: Number(counts.holdFraudRiskCount) || 0,
-          holdTasksTotalCount: Number(counts.holdTasksTotalCount) || 0
+          holdTasksTotalCount: Number(counts.holdTasksTotalCount) || 0,
+          holdTaskCounts: holdTaskCounts.map((count: any) => ({
+            workEffortPurposeTypeId: count.workEffortPurposeTypeId,
+            description: count.description || count.workEffortPurposeTypeId,
+            sequenceNum: count.sequenceNum == null ? null : Number(count.sequenceNum),
+            taskCount: Number(count.taskCount) || 0
+          }))
         };
         this.dashboardStatus.holdTasks = 'success';
       } catch (error) {

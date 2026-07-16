@@ -42,7 +42,12 @@ describe('swap task card Figma routing block', () => {
     expect(source).toContain('?? task.completionPercentage');
     expect(source).toContain('async function submitPark(facilityId: string)');
     expect(source).toContain('async function submitCancel()');
-    expect(source).toContain('defineExpose({ task: props.task, submitCancel, submitPark })');
+    expect(source).toContain('async function submitParkDomain(facilityId: string)');
+    expect(source).toContain('async function submitCancelDomain()');
+    expect(source).toContain("async function submitTaskStatus(statusId: 'TASK_COMPLETED' | 'TASK_CANCELLED')");
+    expect(source).toContain('submitCancelDomain,');
+    expect(source).toContain('submitParkDomain,');
+    expect(source).toContain('submitTaskStatus,');
     expect(source).toContain(":title=\"taskOrderTitle(task)\"");
     expect(source).toContain(":subtitle=\"taskOrderSubtitle(task.orderDate, translate('Ordered'))\"");
     expect(source).toContain(":amount=\"formatTaskAmount(task.grandTotal)\"");

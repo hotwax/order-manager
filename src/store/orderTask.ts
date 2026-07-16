@@ -76,14 +76,12 @@ async function enrichFraudTask(task: any) {
   }));
 
   // Items — flatten across all shipGroups
-  const shipGroupSeqId = task.shipGroupSeqId || '00001';
   const items = (order.shipGroups || []).flatMap((sg: any) =>
     (sg.items || []).map((item: any) => ({ ...item, shipGroupSeqId: sg.shipGroupSeqId }))
   );
 
   return {
     ...task,
-    shipGroupSeqId,
     order,
     customer,
     billingEmail: email,
@@ -218,7 +216,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
     getOrderFraudTasksByOrderId: (state) => (orderId: string) => state.orderFraudTasksByOrderId[orderId] || [],
   },
   actions: {
-    async fetchHoldTasks(payload: TaskQueueRequestParams = {}) {
+    async fetchHoldTasks(payload: TaskQueueRequestParams = {}, workEffortPurposeTypeId = USER_HOLD_PURPOSE_TYPE_IDS) {
       const isFirstPage = !(Number(payload.pageIndex || 0) > 0);
       // Loading status only gates the first-page fetch; page 2+ keeps the existing
       // list visible and relies on the infinite-scroll indicator instead.
@@ -238,8 +236,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
             taskStatusId: OPEN_TASK_STATUS_IDS,
             taskStatusId_op: 'in',
             workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-            workEffortPurposeTypeId: USER_HOLD_PURPOSE_TYPE_IDS,
-            workEffortPurposeTypeId_op: 'in',
+            workEffortPurposeTypeId,
+            ...(workEffortPurposeTypeId === USER_HOLD_PURPOSE_TYPE_IDS ? { workEffortPurposeTypeId_op: 'in' } : {}),
             productStoreId,
           },
         });
@@ -262,7 +260,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({
-          url: 'oms/orders/tasks/shipGroupTasks',
+          url: 'oms/orders/tasks',
           method: 'GET',
           params: {
             ...payload,
@@ -297,7 +295,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
       try {
         const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
         const listResponse = await api({
-          url: 'oms/orders/tasks/shipGroupTasks',
+          url: 'oms/orders/tasks',
           method: 'GET',
           params: {
             ...payload,
@@ -399,7 +397,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
       const fetchAddress = async () => {
         try {
           const listResponse = await api({
-            url: 'oms/orders/tasks/shipGroupTasks',
+            url: 'oms/orders/tasks',
             method: 'GET',
             params: {
               orderId,
@@ -420,7 +418,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
       const fetchSwap = async () => {
         try {
           const listResponse = await api({
-            url: 'oms/orders/tasks/shipGroupTasks',
+            url: 'oms/orders/tasks',
             method: 'GET',
             params: {
               orderId,
