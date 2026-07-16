@@ -94,65 +94,17 @@
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
-        <div
+        <OrderRow
           v-for="order in searchResults"
           :key="order.id"
-          class="list-item queue-order-row"
-          :role="selectMode ? 'button' : 'link'"
-          tabindex="0"
-          @click="handleOrderRowClick(order, $event)"
-          @keydown.enter.prevent="handleOrderRowClick(order, $event)"
-          @keydown.space.prevent="handleOrderRowClick(order, $event)"
-        >
-          <ion-item lines="none">
-            <ion-checkbox
-              v-if="selectMode"
-              slot="start"
-              :checked="selectedOrderIds.includes(order.id)"
-              @click.stop
-              @keydown.stop
-              @ionChange="setOrderSelection(order.id, $event.detail.checked)"
-            />
-            <ion-label>
-              <p class="overline">{{ order.id }}</p>
-              {{ order.externalId || order.orderName || order.id }}
-              <p>
-                <ion-badge :color="statusColor(order.status)">{{ statusDescription(order.status) }}</ion-badge>
-              </p>
-            </ion-label>
-          </ion-item>
-
-          <ion-label class="tablet">
-            {{ order.customerName || translate('Unknown customer') }}
-            <p v-if="order.customerId">{{ order.customerId }}</p>
-          </ion-label>
-
-          <ion-label class="tablet">
-            <template v-if="locationChipName(order)">
-              <ion-chip class="brokered-facility-chip" outline>
-                <ion-label>{{ locationChipLabel(order) }}</ion-label>
-              </ion-chip>
-              <p>{{ brokeredProgressLabel(order) }}</p>
-            </template>
-            <template v-else>
-              <ion-note>{{ translate('Not brokered') }}</ion-note>
-            </template>
-          </ion-label>
-
-          <ion-label class="tablet">
-            <p class="overline">{{ translate('Ordered') }}</p>
-            {{ formatDateTime(order.orderDate) }}
-            <p v-if="orderedRelativeLabel(order.orderDate)">{{ orderedRelativeLabel(order.orderDate) }}</p>
-          </ion-label>
-
-          <ion-label class="queue-delivery ion-text-end">
-            <p class="overline">{{ translate('Estimated delivery date') }}</p>
-            {{ estimatedDeliveryDateLabel(order) }}
-            <p v-if="estimatedDeliveryRelativeLabel(order)">
-              {{ isDeliveryOverdue(order) ? translate('Overdue') : '' }} {{ estimatedDeliveryRelativeLabel(order) }}
-            </p>
-          </ion-label>
-        </div>
+          :model="toSearchOrderRowViewModel(order)"
+          row-class="queue-order-row"
+          deadline-class="queue-delivery ion-text-end"
+          :select-mode="selectMode"
+          :selected="selectedOrderIds.includes(order.id)"
+          @activate="handleOrderRowClick(order)"
+          @selection-change="setOrderSelection(order.id, $event)"
+        />
       </ion-list>
 
       <EmptyState
@@ -181,23 +133,19 @@
 
 <script setup lang="ts">
 import {
-  IonBadge,
   IonButton,
   IonButtons,
   IonCheckbox,
-  IonChip,
   IonContent,
   IonFooter,
   IonHeader,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
   IonInput,
-  IonItem,
   IonLabel,
   IonList,
   IonListHeader,
   IonMenuButton,
-  IonNote,
   IonPage,
   IonPopover,
   IonProgressBar,
@@ -209,8 +157,7 @@ import {
   alertController,
   modalController,
 } from '@ionic/vue';
-import { commonUtil, translate } from '@common';
-import { DateTime } from 'luxon';
+import { translate } from '@common';
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
 import { useOrderStore } from '@/store/order';
@@ -224,6 +171,8 @@ import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethod
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import OrderRow from '@/components/orders/OrderRow.vue';
+import { toSearchOrderRowViewModel } from '@/utils/orderRows';
 import { showToast } from '@/utils';
 import {
   ORDER_CANCEL_PERMISSION,
@@ -238,7 +187,7 @@ const productStore = useProductStore();
 const seedStore = useSeedStore();
 const { searchQuery, searchFilters, searchSort, searchResults, searchTotal, loading, error, hasMore } = storeToRefs(orderStore);
 
-function handleOrderRowClick(order: any, event: Event) {
+function handleOrderRowClick(order: any) {
   if (selectMode.value) {
     toggleOrderSelection(order.id);
   } else {
@@ -440,80 +389,6 @@ function statusDescription(statusId: string) {
   return seedStore.statusDescription(statusId);
 }
 
-function statusColor(statusId: string) {
-  const label = statusDescription(statusId);
-  return commonUtil.getColorByDesc(label) || commonUtil.getColorByDesc(statusId) || commonUtil.getColorByDesc('default');
-}
-
-function locationChipName(order: any) {
-  return order.brokeredFacilityName || order.dominantVirtualFacilityName || '';
-}
-
-function locationChipLabel(order: any) {
-  const splitCount = Number(
-    order.brokeredFacilityName
-      ? order.brokeredFacilitySplitCount
-      : order.dominantVirtualFacilitySplitCount
-  ) || 0;
-  const facilityName = locationChipName(order);
-  return splitCount > 0 ? `${facilityName} +${splitCount}` : facilityName;
-}
-
-function brokeredProgressLabel(order: any) {
-  const brokered = Number(order.brokeredItemCount) || 0;
-  const total = Number(order.totalItemCount) || 0;
-  return translate('{brokered}/{total} brokered', { brokered, total });
-}
-
-// Urgency is derived from a REAL indexed date (estimatedDeliveryDate, falling back to
-// promisedDatetime when present) — not orderDate+24h, which was the order-created date.
-function estimatedDeliveryValue(order: any) {
-  return order.estimatedDeliveryDate || order.promisedDatetime || '';
-}
-
-function estimatedDeliveryDateLabel(order: any) {
-  const date = dateFromValue(estimatedDeliveryValue(order));
-  // Neutral placeholder rather than "No delivery date" — the order-search response
-  // often omits delivery dates, and a per-row sentence reads as noise.
-  return date ? date.toFormat('MM-dd-yyyy') : '—';
-}
-
-function estimatedDeliveryRelativeLabel(order: any) {
-  const date = dateFromValue(estimatedDeliveryValue(order));
-  return date?.toRelative() || '';
-}
-
-function isDeliveryOverdue(order: any) {
-  const date = dateFromValue(estimatedDeliveryValue(order));
-  return Boolean(date && date < DateTime.now());
-}
-
-function orderedRelativeLabel(orderDateValue: string) {
-  // The column already carries an "Ordered" overline, so this is just the relative delta.
-  const date = dateFromValue(orderDateValue);
-  return date?.toRelative() || '';
-}
-
-function formatDateTime(value: string) {
-  const date = dateFromValue(value);
-  return date ? date.toFormat('MM-dd-yyyy hh:mm a') : '';
-}
-
-function dateFromValue(value?: string | null) {
-  if (!value) return undefined;
-
-  const numericValue = Number(value);
-  if (Number.isFinite(numericValue) && numericValue > 0) {
-    const numericDate = DateTime.fromMillis(value.length <= 10 ? numericValue * 1000 : numericValue);
-    if (numericDate.isValid) return numericDate;
-  }
-
-  const sqlDate = DateTime.fromSQL(value);
-  if (sqlDate.isValid) return sqlDate;
-
-  const isoDate = DateTime.fromISO(value);
-  return isoDate.isValid ? isoDate : undefined;
-}
 </script>
 
 <style scoped>

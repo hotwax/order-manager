@@ -76,22 +76,22 @@
           </ion-list>
         </StatCard>
 
-        <StatCard v-if="!fulfillmentProgressError" :title="translate('Brokered')" :stat="fulfillmentProgressLoading ? '' : fulfillmentStats.brokeredShipGroups">
-          <template v-if="fulfillmentProgressLoading" #stat>
+        <StatCard v-if="!brokeredWorkloadError" :title="translate('Brokered')" :stat="brokeredWorkloadLoading ? '' : brokeredWorkloadTotal">
+          <template v-if="brokeredWorkloadLoading" #stat>
             <ion-spinner name="crescent" />
           </template>
-          <ion-list v-if="!fulfillmentProgressLoading" lines="none" class="hold-tasks-list">
+          <ion-list v-if="!brokeredWorkloadLoading" lines="none" class="hold-tasks-list">
             <ion-item button :detail="true" router-link="/open">
               <ion-label>{{ translate("Open") }}</ion-label>
-              <p slot="end">{{ formatCount(fulfillmentStats.brokeredOpenShipGroups) }} {{ translate("ship groups") }}</p>
+              <p slot="end">{{ formatCount(brokeredWorkload.open) }} {{ translate(brokeredWorkload.open === 1 ? "order" : "orders") }}</p>
             </ion-item>
             <ion-item button :detail="true" router-link="/inflight">
               <ion-label>{{ translate("Picked") }}</ion-label>
-              <p slot="end">{{ formatCount(fulfillmentStats.pickedShipGroups) }} {{ translate("ship groups") }}</p>
+              <p slot="end">{{ formatCount(brokeredWorkload.inflight) }} {{ translate(brokeredWorkload.inflight === 1 ? "order" : "orders") }}</p>
             </ion-item>
             <ion-item button :detail="true" router-link="/packed">
               <ion-label>{{ translate("Packed and shipped") }}</ion-label>
-              <p slot="end">{{ formatCount(fulfillmentStats.packedAndShippedShipGroups) }} {{ translate("ship groups") }}</p>
+              <p slot="end">{{ formatCount(brokeredWorkload.packed) }} {{ translate(brokeredWorkload.packed === 1 ? "order" : "orders") }}</p>
             </ion-item>
           </ion-list>
         </StatCard>
@@ -101,7 +101,7 @@
           </template>
           <div class="card-error">
             <p>{{ translate("Couldn't load this section") }}</p>
-            <ion-button fill="outline" size="small" @click="retryFulfillmentProgress">
+            <ion-button fill="outline" size="small" @click="retryBrokeredWorkload">
               <ion-icon slot="start" :icon="refreshOutline" />
               {{ translate("Retry") }}
             </ion-button>
@@ -586,6 +586,7 @@ import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import { getDashboardDateFilter } from '@/utils/dashboardDate';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
+import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 
 const store = useCustomerServiceStore();
 const productStore = useProductStore() as any;
@@ -610,6 +611,12 @@ const syncDataLoading = isLoading('fulfillmentSyncData');
 const syncDataError = isError('fulfillmentSyncData');
 
 const fulfillmentProgress = computed(() => store.getFulfillmentProgress);
+const brokeredWorkload = ref<WorkflowOrderTotals>({ open: 0, inflight: 0, packed: 0 });
+const brokeredWorkloadLoading = ref(false);
+const brokeredWorkloadError = ref(false);
+const brokeredWorkloadTotal = computed(() =>
+  brokeredWorkload.value.open + brokeredWorkload.value.inflight + brokeredWorkload.value.packed
+);
 const holdTasks = computed(() => store.getHoldTasks);
 const facilityFulfillmentProgress = computed(() => store.getFacilityFulfillmentProgress);
 const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
@@ -808,12 +815,26 @@ function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {
 
 function fetchStoreDashboardData(productStoreId: string) {
   store.fetchFulfillmentProgress(productStoreId);
+  fetchBrokeredWorkload(productStoreId);
   store.fetchUnfillable(productStoreId);
   store.fetchVirtualLocationCounts(productStoreId);
   store.fetchFacilityOrderVolume(productStoreId);
   store.fetchFacilityFulfillmentVelocity(productStoreId);
   store.fetchFacilityPartialFulfillments(productStoreId);
   store.fetchHoldTasks(productStoreId);
+}
+
+async function fetchBrokeredWorkload(productStoreId: string) {
+  brokeredWorkloadLoading.value = true;
+  brokeredWorkloadError.value = false;
+  try {
+    brokeredWorkload.value = await fetchWorkflowOrderTotals(productStoreId);
+  } catch (error) {
+    console.error('Failed to fetch brokered workload totals', error);
+    brokeredWorkloadError.value = true;
+  } finally {
+    brokeredWorkloadLoading.value = false;
+  }
 }
 
 function fetchSelectedFacilityDashboardData(productStoreId: string) {
@@ -931,6 +952,9 @@ onIonViewWillEnter(() => {
 // Per-section retry handlers for failed dashboard groups.
 function retryFulfillmentProgress() {
   store.fetchFulfillmentProgress(selectedProductStoreId.value);
+}
+function retryBrokeredWorkload() {
+  fetchBrokeredWorkload(selectedProductStoreId.value);
 }
 function retryUnfillable() {
   store.fetchUnfillable(selectedProductStoreId.value);
