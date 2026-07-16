@@ -18,7 +18,8 @@ describe('swap queue standardization', () => {
     expect(source).toContain("singular-label=\"swap task\"");
     expect(source).toContain("translate('Cancel orders')");
     expect(source).toContain("translate('Park')");
-    expect(source).toContain("Promise.allSettled");
+    expect(source).toContain('runGroupedTaskMutation(');
+    expect(source).toContain('shipGroupTaskTarget');
     expect(source).not.toContain('bulkApplySwap');
   });
 });

@@ -340,6 +340,7 @@ export interface Order {
   paymentStatus: string;
   fulfillmentStatus: string;
   deliveryMethod: string;
+  carrierPartyId?: string;
   priority: string;
   parkingUnitCount?: number;
   brokeredFacilityName?: string;
@@ -348,6 +349,7 @@ export interface Order {
   dominantVirtualFacilitySplitCount?: number;
   brokeredItemCount?: number;
   totalItemCount?: number;
+  allocationSummary?: import('./orderRow').OrderAllocationSummaryModel;
   shippingAddress1?: string;
   shippingCity?: string;
   shippingStateProvinceGeoId?: string;

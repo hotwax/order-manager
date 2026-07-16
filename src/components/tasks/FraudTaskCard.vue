@@ -196,7 +196,7 @@ function getEmailHref(task: any): string {
 
 async function resolveTask() {
   try {
-    await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED');
+    await submitTaskStatus('TASK_COMPLETED');
     await showToast(translate('Task resolved successfully.'));
     emit('completed');
   } catch {
@@ -217,7 +217,7 @@ async function cancelOrder() {
           try {
             const items = (props.task.items ?? []).map((item: any) => ({
               orderItemSeqId: item.orderItemSeqId,
-              shipGroupSeqId: props.task.shipGroupSeqId,
+              shipGroupSeqId: item.shipGroupSeqId,
             }));
             await orderTaskStore.cancelOrder(props.task.orderId, items);
             await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_CANCELLED');
@@ -239,23 +239,34 @@ function handleAction(actionId: string) {
 
 // No-confirm variant for bulk resolve. Parent does not confirm resolve (matches original bulkResolve).
 async function submitResolve(): Promise<void> {
-  await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED');
+  await submitTaskStatus('TASK_COMPLETED');
 }
 
-// No-confirm variant for bulk cancel. Parent confirms once before invoking.
-async function submitCancel(): Promise<void> {
+async function submitCancelDomain(): Promise<void> {
   const items = (props.task.items ?? []).map((item: any) => ({
     orderItemSeqId: item.orderItemSeqId,
-    shipGroupSeqId: props.task.shipGroupSeqId,
+    shipGroupSeqId: item.shipGroupSeqId,
   }));
   await orderTaskStore.cancelOrder(props.task.orderId, items);
-  await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_CANCELLED');
+}
+
+async function submitTaskStatus(statusId: 'TASK_COMPLETED' | 'TASK_CANCELLED'): Promise<void> {
+  await orderTaskStore.changeTaskStatus(props.task.workEffortId, statusId);
+}
+
+// No-confirm variant used by the single-card flow. Bulk orchestration invokes
+// the target mutation and each WorkEffort transition as separate phases.
+async function submitCancel(): Promise<void> {
+  await submitCancelDomain();
+  await submitTaskStatus('TASK_CANCELLED');
 }
 
 defineExpose({
   task: props.task,
   submitResolve,
   submitCancel,
+  submitCancelDomain,
+  submitTaskStatus,
 });
 </script>
 

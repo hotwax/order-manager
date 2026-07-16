@@ -140,6 +140,7 @@ import { useSeedStore } from '@/store/seed';
 import { PRODUCT_ASSOCIATION_UPDATE_PERMISSION } from '@/authorization/permissions';
 import { fetchUnfillableProductCandidates, fetchUnfillableShipGroupsForProduct } from '@/services/order';
 import { showToast } from '@/utils';
+import { countTaskTargets, runGroupedTaskMutation, shipGroupTaskTarget } from '@/utils/orderTaskBulk';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
@@ -258,9 +259,13 @@ async function runBulkAction(action: 'submitCancel' | 'submitPark', facilityId?:
   if (!cards.length) return;
   bulkActionRunning.value = true;
   try {
-    const results = await Promise.allSettled(cards.map((card: any) => (
-      action === 'submitPark' ? card.submitPark(facilityId) : card.submitCancel()
-    )));
+    const taskStatusId = action === 'submitPark' ? 'TASK_COMPLETED' : 'TASK_CANCELLED';
+    const results = await runGroupedTaskMutation(
+      cards,
+      shipGroupTaskTarget,
+      (card: any) => action === 'submitPark' ? card.submitParkDomain(facilityId) : card.submitCancelDomain(),
+      (card: any) => card.submitTaskStatus(taskStatusId),
+    );
     const failed = results.filter((result) => result.status === 'rejected').length;
     const succeeded = results.length - failed;
     if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));
@@ -272,9 +277,12 @@ async function runBulkAction(action: 'submitCancel' | 'submitPark', facilityId?:
 }
 
 async function bulkCancelOrders() {
+  const cards = selectedCards();
+  if (!cards.length) return;
+  const shipGroupCount = countTaskTargets(cards, shipGroupTaskTarget);
   const alert = await alertController.create({
     header: translate('Cancel orders'),
-    message: translate('Are you sure you want to cancel {count} selected order(s)? This action cannot be undone.', { count: selectedTaskIds.value.length }),
+    message: translate('Are you sure you want to cancel {count} selected ship group(s)? This action cannot be undone.', { count: shipGroupCount }),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       { text: translate('Cancel orders'), role: 'confirm', handler: () => runBulkAction('submitCancel') },

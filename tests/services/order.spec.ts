@@ -1,13 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { commonUtil, useSolrSearch } from '@common';
+import { api, commonUtil, useSolrSearch } from '@common';
 import {
   buildOrderLookupPayload,
+  buildOrderRowEnrichmentPayload,
   buildUnfillableProductCandidatesPayload,
   buildUnfillableShipGroupsForProductPayload,
   buildVirtualLocationCountsPayload,
   fetchUnfillableProductCandidates,
   fetchUnfillableShipGroupsForProduct,
   fetchVirtualLocationOrderCounts,
+  fetchWorkflowOrderTotals,
   searchOrders
 } from '@/services/order';
 
@@ -52,6 +54,14 @@ describe('buildOrderLookupPayload facility filtering', () => {
   it('builds the Brokering queue filter (brokering OR rejected parking)', () => {
     const filters = filtersOf({ facilityIds: ['_NA_', 'REJECTED_PARKING'] });
     expect(filters).toContain('facilityId:(_NA_ OR REJECTED_PARKING)');
+  });
+
+  it('finds operational parking items by excluding physical and archived facilities', () => {
+    const filters = filtersOf({ hasVirtualFacilityItems: true });
+
+    expect(filters).toContain('-facilityTypeId:(RETAIL_STORE OR WAREHOUSE)');
+    expect(filters).toContain('-facilityId:GENERAL_OPS_PARKING');
+    expect(filters).not.toContain('facilityTypeId:VIRTUAL_FACILITY');
   });
 
   it("ignores the 'All' sentinel and empty facility values", () => {
@@ -111,6 +121,7 @@ describe('buildOrderLookupPayload facility filtering', () => {
               docs: [{
                 orderId: 'M100001',
                 orderName: '#100001',
+                externalOrderId: '5202667012349',
                 orderDate: '2026-06-12T10:00:00Z',
                 orderStatusId: 'ORDER_APPROVED',
                 customerPartyId: 'CUST_1',
@@ -145,6 +156,7 @@ describe('buildOrderLookupPayload facility filtering', () => {
     expect(result.orders).toHaveLength(1);
     expect(result.orders[0].parkingUnitCount).toBe(3.5);
     expect(result.orders[0]).toMatchObject({
+      orderName: '#100001',
       customerName: 'Angela Crutchfield',
       shippingAddress1: '602 White Oak Dr',
       shippingCity: 'Eufaula',
@@ -270,6 +282,46 @@ describe('buildOrderLookupPayload facility filtering', () => {
       brokeredItemCount: 0,
       totalItemCount: 4
     });
+  });
+});
+
+describe('order-row enrichment payload', () => {
+  it('deduplicates order IDs and requests the full grouped row contract in one query', () => {
+    const payload = buildOrderRowEnrichmentPayload(['M100001', 'M100002', 'M100001']);
+    const fields = String(payload.json.params.fl).split(' ');
+
+    expect(payload.json.params.rows).toBe(2);
+    expect(payload.json.params['group.field']).toBe('orderId');
+    expect(payload.json.filter).toContain('orderId:(M100001 OR M100002)');
+    expect(fields).toEqual(expect.arrayContaining([
+      'customerPartyName',
+      'carrierPartyId',
+      'salesChannelDesc',
+      'facilityId',
+      'facilityName',
+      'facilityTypeId',
+      'orderItemSeqId',
+      'shipmentMethodTypeId',
+      'estimatedDeliveryDate',
+      'promisedDatetime',
+      'shipBeforeDate',
+      'shipByDate'
+    ]));
+  });
+});
+
+describe('workflow order totals', () => {
+  it('requests only the total from each authoritative workflow queue in one batch', async () => {
+    const totalsByBucket = { open: 6440, inflight: 557, packed: 81 };
+    (api as any).mockReset();
+    (api as any).mockImplementation(({ url, params }: any) => {
+      const bucket = url.split('/').pop() as keyof typeof totalsByBucket;
+      expect(params).toMatchObject({ pageSize: 1, pageIndex: 0, productStoreId: 'STORE' });
+      return Promise.resolve({ data: { ordersCount: totalsByBucket[bucket], orders: [] } });
+    });
+
+    await expect(fetchWorkflowOrderTotals('STORE')).resolves.toEqual(totalsByBucket);
+    expect(api).toHaveBeenCalledTimes(3);
   });
 });
 

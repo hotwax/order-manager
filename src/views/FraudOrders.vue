@@ -58,7 +58,7 @@
         <FraudTaskCard
           v-for="task in fraudTasks"
           :key="task.workEffortId"
-          :ref="setCardRef"
+          :ref="(element) => setCardRef(task.workEffortId, element)"
           :task="task"
           :selectable="selectMode"
           :selected="!!selectedOrders[task.workEffortId]"
@@ -99,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUpdate } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonMenuButton, IonPage, IonProgressBar, IonSpinner, IonTitle, IonToolbar, IonInfiniteScroll, IonInfiniteScrollContent, alertController, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
 import { showToast } from '@/utils';
@@ -113,6 +113,7 @@ import { useSeedStore } from '@/store/seed';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
+import { countTaskTargets, orderTaskTarget, runGroupedTaskMutation, selectedTaskCardsById } from '@/utils/orderTaskBulk';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
@@ -129,14 +130,11 @@ const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
 const bulkActionRunning = ref(false);
 
-// Card component instances, collected in render order to map back to fraudTasks.
-const cardRefs = ref<any[]>([]);
-const setCardRef = (el: any) => {
-  if (el) cardRefs.value.push(el);
-};
-onBeforeUpdate(() => {
-  cardRefs.value = [];
-});
+const cardRefs = ref<Record<string, any>>({});
+function setCardRef(workEffortId: string, element: any) {
+  if (element) cardRefs.value[workEffortId] = element;
+  else delete cardRefs.value[workEffortId];
+}
 
 const fraudTasks = computed(() => orderTaskStore.getFraudTasks);
 const fraudTotal = computed(() => orderTaskStore.getFraudTotal);
@@ -244,11 +242,8 @@ async function loadMoreFraudTasks(event: any) {
   await event.target.complete();
 }
 
-// Collect the card instances for the currently-selected tasks, in fraudTasks order.
 function selectedCards(): any[] {
-  return fraudTasks.value
-    .map((task: any, index: number) => (selectedOrders.value[task.workEffortId] ? cardRefs.value[index] : null))
-    .filter(Boolean);
+  return selectedTaskCardsById(fraudTasks.value, selectedOrders.value, cardRefs.value);
 }
 
 async function bulkResolve() {
@@ -260,16 +255,22 @@ async function bulkResolve() {
 async function bulkCancel() {
   const cards = selectedCards();
   if (!cards.length) return;
+  const orderCount = countTaskTargets(cards, orderTaskTarget);
   const alert = await alertController.create({
     header: translate('Cancel orders'),
-    message: translate('Are you sure you want to cancel {count} orders? This action cannot be undone.', { count: cards.length }),
+    message: translate('Are you sure you want to cancel {count} orders? This action cannot be undone.', { count: orderCount }),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
         text: translate('Cancel orders'),
         role: 'confirm',
         handler: async () => {
-          await runBulkCards(cards, (card) => card.submitCancel());
+          await runBulkResults(() => runGroupedTaskMutation(
+            cards,
+            orderTaskTarget,
+            (card: any) => card.submitCancelDomain(),
+            (card: any) => card.submitTaskStatus('TASK_CANCELLED'),
+          ));
         }
       }
     ]
@@ -278,9 +279,13 @@ async function bulkCancel() {
 }
 
 async function runBulkCards(cards: any[], operation: (card: any) => Promise<unknown>) {
+  return runBulkResults(() => Promise.allSettled(cards.map(operation)));
+}
+
+async function runBulkResults(getResults: () => Promise<PromiseSettledResult<unknown>[]>) {
   bulkActionRunning.value = true;
   try {
-    const results = await Promise.allSettled(cards.map(operation));
+    const results = await getResults();
     const failed = results.filter((result) => result.status === 'rejected').length;
     const succeeded = results.length - failed;
     if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));

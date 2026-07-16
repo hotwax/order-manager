@@ -141,6 +141,11 @@ const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions()
 const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
 const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions);
 const sortOptions = taskSortOptions('hold');
+const purposeFilter = computed(() => {
+  const purpose = router.currentRoute.value.query.purpose;
+  if (Array.isArray(purpose)) return typeof purpose[0] === 'string' ? purpose[0] : '';
+  return typeof purpose === 'string' ? purpose : '';
+});
 const canCreateHoldTasks = computed(() => userStore.hasPermission(ORDER_TASK_CREATE_PERMISSION));
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
@@ -189,6 +194,7 @@ watch(() => [
   filters.value.facilityId,
   filters.value.shipmentMethodTypeId,
   filters.value.sort,
+  purposeFilter.value,
 ], () => {
   if (!suppressAutomaticFetch) replaceHoldTasks();
 }, { flush: 'sync' });
@@ -267,12 +273,15 @@ const fetchHoldTasks = async (pageSize?: any, pageIndex?: any) => {
   const isFirstPage = !Number(pageIndex || 0);
   if (isFirstPage) resetSelection();
   // The store owns loading/error status and keeps failures in state.
-  await orderTaskStore.fetchHoldTasks(buildTaskQueueRequest(
-    'hold',
-    filters.value,
-    pageSize ?? import.meta.env.VITE_VIEW_SIZE,
-    pageIndex ?? 0,
-  ));
+  await orderTaskStore.fetchHoldTasks(
+    buildTaskQueueRequest(
+      'hold',
+      filters.value,
+      pageSize ?? import.meta.env.VITE_VIEW_SIZE,
+      pageIndex ?? 0,
+    ),
+    purposeFilter.value || undefined
+  );
 };
 
 function replaceHoldTasks() {

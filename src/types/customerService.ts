@@ -62,6 +62,18 @@ export interface VirtualLocationWorkCount {
   count: number;
 }
 
+export interface HoldTaskCount {
+  workEffortPurposeTypeId: string;
+  description: string;
+  sequenceNum: number | null;
+  taskCount: number;
+}
+
+export interface HoldTaskCounts {
+  holdTasksTotalCount: number;
+  holdTaskCounts: HoldTaskCount[];
+}
+
 export interface ProductStore {
   productStoreId: string;
   storeName: string;

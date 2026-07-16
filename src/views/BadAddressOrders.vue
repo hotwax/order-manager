@@ -111,6 +111,7 @@ import { useSeedStore } from '@/store/seed';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
+import { countTaskTargets, groupTaskCardsByTarget, runGroupedTaskMutation, shipGroupTaskTarget } from '@/utils/orderTaskBulk';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
@@ -239,22 +240,24 @@ async function bulkSaveAndReleaseHold() {
   const cards = getSelectedCards();
   if (!cards.length) return;
 
-  const invalidCard = cards.find((card: any) => !!card.validate());
+  const representativeCards = groupTaskCardsByTarget(cards, shipGroupTaskTarget).map(([card]) => card);
+  const invalidCard = representativeCards.find((card: any) => !!card.validate());
   if (invalidCard) {
     await showToast(invalidCard.validate()!);
     return;
   }
+  const shipGroupCount = countTaskTargets(cards, shipGroupTaskTarget);
 
   const alert = await alertController.create({
     header: translate('Save and release hold'),
-    message: translate('Are you sure you want to save address and release hold for {count} selected order(s)?').replace('{count}', String(cards.length)),
+    message: translate('Are you sure you want to save address and release hold for {count} selected ship group(s)?').replace('{count}', String(shipGroupCount)),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
         text: translate('Save and release hold'),
         role: 'confirm',
         handler: async () => {
-          await runBulkCards(cards, (card) => card.submitSaveAndRelease());
+          await runGroupedBulkCards(cards, (card) => card.submitSaveAndReleaseDomain(), 'TASK_COMPLETED');
         }
       }
     ]
@@ -265,17 +268,18 @@ async function bulkSaveAndReleaseHold() {
 async function bulkCancelOrder() {
   const cards = getSelectedCards();
   if (!cards.length) return;
+  const shipGroupCount = countTaskTargets(cards, shipGroupTaskTarget);
 
   const alert = await alertController.create({
     header: translate('Cancel orders'),
-    message: translate('Are you sure you want to cancel {count} selected order(s)? This action cannot be undone.').replace('{count}', String(cards.length)),
+    message: translate('Are you sure you want to cancel {count} selected ship group(s)? This action cannot be undone.').replace('{count}', String(shipGroupCount)),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
         text: translate('Cancel orders'),
         role: 'confirm',
         handler: async () => {
-          await runBulkCards(cards, (card) => card.submitCancel());
+          await runGroupedBulkCards(cards, (card) => card.submitCancelDomain(), 'TASK_CANCELLED');
         }
       }
     ]
@@ -292,13 +296,22 @@ async function bulkParkOrder() {
   const { data: facilityId } = await modal.onWillDismiss();
   if (!facilityId) return;
 
-  await runBulkCards(cards, (card) => card.submitPark(facilityId));
+  await runGroupedBulkCards(cards, (card) => card.submitParkDomain(facilityId), 'TASK_COMPLETED');
 }
 
-async function runBulkCards(cards: any[], operation: (card: any) => Promise<unknown>) {
+async function runGroupedBulkCards(
+  cards: any[],
+  operation: (card: any) => Promise<unknown>,
+  duplicateStatusId: 'TASK_COMPLETED' | 'TASK_CANCELLED',
+) {
   bulkActionRunning.value = true;
   try {
-    const results = await Promise.allSettled(cards.map(operation));
+    const results = await runGroupedTaskMutation(
+      cards,
+      shipGroupTaskTarget,
+      operation,
+      (card: any) => card.submitTaskStatus(duplicateStatusId),
+    );
     const failed = results.filter((result) => result.status === 'rejected').length;
     const succeeded = results.length - failed;
     if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));

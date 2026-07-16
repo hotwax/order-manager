@@ -7,7 +7,7 @@
 
 ## Objective
 
-Standardize filters and sorting on the four Hold-task queue pages using the same Ionic treatment as the order-list pages while exposing only fields supported by each task API.
+Standardize filters and sorting on the four Hold-task queue pages using the same Ionic treatment as the order-list pages while exposing only fields supported by the canonical task API.
 
 The shared experience should be:
 
@@ -29,15 +29,15 @@ Sorting is part of this plan, but it remains a result-list action and is never r
 | Topic | Decision |
 |---|---|
 | Common filters | Order date range, task-created date range, and Sales channel appear on all four task pages. |
-| Facility and method filters | Facility and Shipping method filters appear on Swap and Bad Address through `shipGroupTasks`, and on Hold through optional ship-group aliases on the mixed-scope task view. They do not appear as filters on Fraud. |
+| Facility and method filters | Facility and Shipping method filters appear on Swap, Bad Address, and Hold through optional ship-group aliases on the canonical task view. They do not appear as filters on Fraud. |
 | Fraud filters | Order status, Risk recommendation, and Risk level appear only on Fraud because `orders/tasks` exposes those order-level fields. |
-| Assignee | Remove Assignee from this filter surface. `currentUserPartyId` is not exposed by either task view and is currently ignored by the API. |
-| Swappable | Remove Swappable from this filter surface. `swappable` is not exposed by `shipGroupTasks` and is currently ignored by the API. |
+| Assignee | Remove Assignee from this filter surface. `currentUserPartyId` is not exposed by the canonical task view and is currently ignored by the API. |
+| Swappable | Remove Swappable from this filter surface. `swappable` is not exposed by the canonical task view and is currently ignored by the API. |
 | Search | Keep order-name search and change the operator from `like` to `contains` so partial order names work without callers supplying wildcard characters. |
 | Date meaning | Order date filters map to `orderDate`. Task-created filters map to `workEffortCreatedDate`, projected from `WorkEffort.createdDate`. Labels must state which date is being filtered. |
 | Filter ordering | The complete common filter block always comes first. Page-specific filters append after it and never interrupt or reorder the common controls. |
 | Sort placement | Sort appears in the result header after the result count and before Select. It is not part of the filter sequence. |
-| Initial shared sort scope | Expose task date, order date, and order total. These fields have meaningful operational ascending and descending behavior on every task endpoint. |
+| Initial shared sort scope | Expose task date, order date, and order total. These fields have meaningful operational ascending and descending behavior across every task queue. |
 | Fraud-specific sorts | Append Risk severity and Risk recommendation after the six shared options on Fraud only. Severity uses the risk-level enumeration sequence; recommendation uses displayed-label order. |
 | Fraud sort API contract | Extend `orders/tasks` with server-sortable severity-rank and recommendation-label fields. Do not sort the loaded client-side page or expose raw enum-ID ordering. |
 | Deferred sort fields | Order name does not help operators prioritize queue work. Sales channel, Facility, and Order status remain deferred because the API sorts their IDs rather than their displayed labels or business rank. |
@@ -99,19 +99,24 @@ Queue membership remains fixed by task status, task type, task purpose, and the 
 
 All four queues include the blocking open statuses (`TASK_CREATED`, `TASK_IN_PROGRESS`, and `TASK_ON_HOLD`). The Hold queue and generic creation modal include both operator-created purposes (`ORD_HOLD_MANUAL` and `ORD_HOLD_CUST_REQ`); automated address, reservation, and order-level fraud purposes retain their dedicated producer flows and queues.
 
+All four queues and the order-detail Holds segment use `GET oms/orders/tasks`. The earlier
+ship-group-only task resource is removed rather than retained as a compatibility resource. The
+Hold route accepts an optional `purpose` query parameter; without it the queue uses
+the two operator-created purposes, and with it the queue filters to that exact enum ID.
+
 ## API parameter mapping
 
 | UI field | API parameter | Notes |
 |---|---|---|
-| Search | `orderName` with `orderName_op=contains` | Available on both task endpoints. |
-| Sales channel | `salesChannelEnumId` | Available on both task endpoints. |
+| Search | `orderName` with `orderName_op=contains` | Available on the canonical task view. |
+| Sales channel | `salesChannelEnumId` | Available on the canonical task view. |
 | Order date from | `orderDate_from` | Convert the selected date to the beginning of the local day. |
 | Order date through | `orderDate_thru` | Convert the selected date to the end of the local day so the selected day is inclusive. |
 | Task created from | `workEffortCreatedDate_from` | Convert the selected date to the beginning of the local day. |
 | Task created through | `workEffortCreatedDate_thru` | Convert the selected date to the end of the local day so the selected day is inclusive. |
-| Facility | `facilityId` | Available on `shipGroupTasks`. |
-| Shipping method | `shipmentMethodTypeId` | Available on `shipGroupTasks`. |
-| Order status | `orderStatusId` | Available only on the Fraud `orders/tasks` view. |
+| Facility | `facilityId` | Available through the optional ship-group aliases. |
+| Shipping method | `shipmentMethodTypeId` | Available through the optional ship-group aliases. |
+| Order status | `orderStatusId` | Exposed by `orders/tasks`; intentionally offered as a filter only on Fraud. |
 | Risk recommendation | `riskRecommendationEnumId` | Available only on Fraud. |
 | Risk level | `riskLevelEnumId` | Available only on Fraud. |
 
@@ -280,7 +285,18 @@ Read `response.headers.get?.('x-total-count') ?? response.headers['x-total-count
 | Fraud | Resolve, Cancel orders | Preserve the existing capabilities and standardize completion behavior. |
 | Hold | Resolve | Preserve the existing capability. |
 
-For Swap, expose bulk-safe `submitCancel()` and `submitPark(facilityId)` operations from `SwapTaskCard`. These methods perform the domain operation without opening their own confirmation UI. The page owns one cancellation confirmation for the batch, or one `FacilityModal` choice for Park, and then applies that decision to every selected card.
+For bulk actions, expose separate domain methods such as `submitCancelDomain()` and
+`submitParkDomain(facilityId)`, plus a task-status method, from each card. The existing combined
+methods remain the single-card contract. The page owns one cancellation confirmation for the
+batch, or one `FacilityModal` choice for Park.
+
+Multiple open tasks may represent the same business target. Bulk mutation must therefore group Fraud
+tasks by `orderId`, and Bad Address or Swap tasks by `orderId + shipGroupSeqId`. Run the order or
+ship-group mutation once using the first selected card in each group, then independently transition
+every selected WorkEffort in that group, including the representative, without repeating the
+business mutation. Resolve-only actions remain one status transition per WorkEffort. Confirmation
+copy counts grouped business targets and uses the matching noun: orders for Fraud and ship groups
+for Bad Address or Swap. Post-action success and failure messages count selected tasks.
 
 Use the existing Ionic footer pattern:
 
@@ -472,7 +488,7 @@ The responsive layout determines the actual number of tracks from available widt
 7. Add `TaskQueueListHeader.vue` with the shared total, sort, and selection contract.
 8. Add the shared route-state composable and clear behavior for filters and sort.
 9. Update the store payload types and stop sending unsupported Assignee and Swappable parameters.
-10. Migrate Swap and Bad Address first because they share the same endpoint and control set; add Swap selection and safe bulk actions.
+10. Migrate Swap and Bad Address first because they share the same control set; use the canonical endpoint for every queue and add Swap selection and safe bulk actions.
 11. Migrate Hold using the same ship-group filter configuration.
 12. Migrate Fraud with its order-status and risk-specific controls plus the appended severity and recommendation sorts.
 13. Normalize selection reset, bulk completion, and partial-failure reporting across all four pages.

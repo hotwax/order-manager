@@ -480,13 +480,29 @@ async function parkOrder(task: any) {
   }
 }
 
-async function submitCancel() {
+async function submitCancelDomain() {
   const items = (props.task.items ?? []).map((item: any) => ({
     orderItemSeqId: item.orderItemSeqId,
     shipGroupSeqId: props.task.shipGroupSeqId,
   }));
   await orderTaskStore.cancelOrder(props.task.orderId, items);
-  await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_CANCELLED');
+}
+
+async function submitParkDomain(facilityId: string) {
+  await orderTaskStore.parkOrder(
+    props.task.orderId,
+    props.task.shipGroupSeqId,
+    facilityId,
+  );
+}
+
+async function submitTaskStatus(statusId: 'TASK_COMPLETED' | 'TASK_CANCELLED') {
+  await orderTaskStore.changeTaskStatus(props.task.workEffortId, statusId);
+}
+
+async function submitCancel() {
+  await submitCancelDomain();
+  await submitTaskStatus('TASK_CANCELLED');
 }
 
 async function submitPark(facilityId: string) {
@@ -504,5 +520,12 @@ function handleAction(actionId: string) {
   if (actionId === 'cancel') return cancelOrder(props.task);
 }
 
-defineExpose({ task: props.task, submitCancel, submitPark });
+defineExpose({
+  task: props.task,
+  submitCancel,
+  submitPark,
+  submitCancelDomain,
+  submitParkDomain,
+  submitTaskStatus,
+});
 </script>
