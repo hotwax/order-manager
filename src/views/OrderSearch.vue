@@ -13,62 +13,94 @@
       <SearchFilterCard
         v-model="searchQuery"
         :placeholder="translate('Order, external ID, customer, email')"
+        :show-clear="false"
         @clear="clearFilters"
       >
-        <ion-item id="order-status-filter-trigger" button lines="none">
-          <ion-label>
-            <p>Status</p>
-            <h3>{{ statusFilterLabel }}</h3>
-          </ion-label>
-        </ion-item>
-        <ion-popover trigger="order-status-filter-trigger" trigger-action="click">
-          <ion-content>
-            <ion-list>
-              <ion-item lines="none">
-                <ion-checkbox
-                  :checked="!selectedStatusIds.length"
-                  justify="start"
-                  label-placement="end"
-                  @ionChange="setAllStatusesFilter(Boolean($event.detail.checked))"
-                >
-                  {{ translate('All statuses') }}
-                </ion-checkbox>
-              </ion-item>
-              <ion-item v-for="option in orderStatuses" :key="option.statusId" lines="none">
-                <ion-checkbox
-                  :checked="selectedStatusIds.includes(option.statusId)"
-                  justify="start"
-                  label-placement="end"
-                  @ionChange="setStatusFilter(option.statusId, Boolean($event.detail.checked))"
-                >
-                  {{ option.description || option.statusId }}
-                </ion-checkbox>
-              </ion-item>
-            </ion-list>
-          </ion-content>
-        </ion-popover>
-        <ion-input v-model="searchFilters.dateFrom" label="Order date from" label-placement="stacked" type="date" />
-        <ion-input v-model="searchFilters.dateThru" label="Order date thru" label-placement="stacked" type="date" />
-        <ion-select v-model="searchFilters.channel" label="Channel" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">All channels</ion-select-option>
-          <ion-select-option v-for="option in salesChannels" :key="option.enumId" :value="option.enumId">
-            {{ option.description || option.enumName || option.enumId }}
-          </ion-select-option>
-        </ion-select>
-        <ion-item lines="none">
-          <ion-toggle v-model="searchFilters.hasVirtualFacilityItems" justify="space-between">
-            {{ translate('Items at virtual facilities') }}
-          </ion-toggle>
-        </ion-item>
-        <ion-item lines="none">
-          <ion-toggle v-model="searchFilters.archivedOnly" justify="space-between">
-            {{ translate('Archived orders') }}
-          </ion-toggle>
-        </ion-item>
-        <ion-select v-model="searchSort" :label="translate('Sort by order date')" label-placement="stacked" interface="popover">
-          <ion-select-option value="orderDate desc">{{ translate('Newest first') }}</ion-select-option>
-          <ion-select-option value="orderDate asc">{{ translate('Oldest first') }}</ion-select-option>
-        </ion-select>
+        <UniformFilterLayout @clear="clearFilters">
+          <ion-item id="order-status-filter-trigger" button lines="none">
+            <ion-label>
+              <p>Status</p>
+              <h3>{{ statusFilterLabel }}</h3>
+            </ion-label>
+          </ion-item>
+          <ion-popover trigger="order-status-filter-trigger" trigger-action="click">
+            <ion-content>
+              <ion-list>
+                <ion-item lines="none">
+                  <ion-checkbox
+                    :checked="!selectedStatusIds.length"
+                    justify="start"
+                    label-placement="end"
+                    @ionChange="setAllStatusesFilter(Boolean($event.detail.checked))"
+                  >
+                    {{ translate('All statuses') }}
+                  </ion-checkbox>
+                </ion-item>
+                <ion-item v-for="option in orderStatuses" :key="option.statusId" lines="none">
+                  <ion-checkbox
+                    :checked="selectedStatusIds.includes(option.statusId)"
+                    justify="start"
+                    label-placement="end"
+                    @ionChange="setStatusFilter(option.statusId, Boolean($event.detail.checked))"
+                  >
+                    {{ option.description || option.statusId }}
+                  </ion-checkbox>
+                </ion-item>
+              </ion-list>
+            </ion-content>
+          </ion-popover>
+
+          <ion-select
+            v-model="searchFilters.allocationState"
+            label="Allocation state"
+            label-placement="stacked"
+            fill="outline"
+            interface="popover"
+          >
+            <ion-select-option value="All">All locations</ion-select-option>
+            <ion-select-option value="Allocated">Allocated</ion-select-option>
+            <ion-select-option value="AwaitingBrokering">Awaiting brokering</ion-select-option>
+            <ion-select-option value="Unfillable">Unfillable</ion-select-option>
+            <ion-select-option value="Archived">Archived</ion-select-option>
+          </ion-select>
+
+          <ion-select
+            v-model="searchFilters.channel"
+            label="Sales channel"
+            label-placement="stacked"
+            fill="outline"
+            interface="popover"
+          >
+            <ion-select-option value="All">All channels</ion-select-option>
+            <ion-select-option v-for="option in salesChannels" :key="option.enumId" :value="option.enumId">
+              {{ option.description || option.enumName || option.enumId }}
+            </ion-select-option>
+          </ion-select>
+
+          <ion-select
+            v-model="searchFilters.shipmentMethodTypeId"
+            label="Shipping method"
+            label-placement="stacked"
+            fill="outline"
+            interface="popover"
+          >
+            <ion-select-option value="All">All methods</ion-select-option>
+            <ion-select-option v-for="option in shipmentMethodOptions" :key="option.id" :value="option.id">
+              {{ option.label }}
+            </ion-select-option>
+          </ion-select>
+
+          <DateFilterSelect
+            v-model="searchFilters.dateFrom"
+            :label="translate('Order date from')"
+            outlined
+          />
+          <DateFilterSelect
+            v-model="searchFilters.dateThru"
+            :label="translate('Order date through')"
+            outlined
+          />
+        </UniformFilterLayout>
       </SearchFilterCard>
 
       <ion-progress-bar v-if="loading" type="indeterminate" />
@@ -90,6 +122,7 @@
             />
           </span>
           <ion-label>{{ translate("{loaded} of {total} matching orders", { loaded: searchResults.length, total: searchTotal }) }}</ion-label>
+          <OrderSortPopover v-model="searchSort" trigger-id="find-order-sort-trigger" />
           <ion-button v-if="canUseBulkActions" fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
@@ -221,9 +254,12 @@ import { useSeedStore } from '@/store/seed';
 import router from '@/router';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
+import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import UniformFilterLayout from '@/components/common/UniformFilterLayout.vue';
+import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { showToast } from '@/utils';
 import {
   ORDER_CANCEL_PERMISSION,
@@ -251,6 +287,7 @@ const selectedOrderIds = ref<string[]>([]);
 
 const orderStatuses = computed(() => seedStore.getStatusItemsByType('ORDER_STATUS'));
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
+const shipmentMethodOptions = computed(() => seedStore.getShipmentMethodOptions);
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const selectedStatusIds = computed(() => {
   const status = searchFilters.value.status as string[] | string;

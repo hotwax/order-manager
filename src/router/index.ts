@@ -9,13 +9,16 @@ import {
   CUSTOMER_VIEW_PERMISSION,
   ORDER_CANCEL_PERMISSION,
   ORDER_CREATE_PERMISSION,
+  ORDER_RETURN_PERMISSION,
   ORDER_UPDATE_PERMISSION,
   ORDER_VIEW_PERMISSION,
   SWAP_ORDER_PERMISSION
 } from '@/authorization/permissions';
 import OrderSearch from '@/views/OrderSearch.vue';
 import OrderDetail from '@/views/OrderDetail.vue';
+import Returns from '@/views/Returns.vue';
 import ReturnDetail from '@/views/ReturnDetail.vue';
+import CreateReturn from '@/views/CreateReturn.vue';
 import Customers from '@/views/Customers.vue';
 import CustomerDetail from '@/views/CustomerDetail.vue';
 import Settings from '@/views/Settings.vue';
@@ -66,6 +69,16 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/orders/:orderId/return',
+    name: 'CreateReturn',
+    component: CreateReturn,
+    props: true,
+    beforeEnter: authGuard,
+    meta: {
+      permissionId: ORDER_RETURN_PERMISSION
+    }
+  },
+  {
     path: '/orders/:orderId',
     name: 'OrderDetail',
     component: OrderDetail,
@@ -73,6 +86,15 @@ const routes: RouteRecordRaw[] = [
     beforeEnter: authGuard,
     meta: {
       permissionId: ORDER_VIEW_PERMISSION
+    }
+  },
+  {
+    path: '/returns',
+    name: 'Returns',
+    component: Returns,
+    beforeEnter: authGuard,
+    meta: {
+      permissionId: `${ORDER_VIEW_PERMISSION} OR ${CUSTOMER_VIEW_PERMISSION}`
     }
   },
   {

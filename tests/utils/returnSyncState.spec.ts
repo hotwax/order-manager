@@ -1,0 +1,104 @@
+import { describe, it, expect, vi } from "vitest";
+import { resolveExchangeSyncState, resolveOrigin, resolveShopifyCloseState, resolveShopifySyncState } from "@/utils/returnSyncState";
+
+// Stub @common so importing the util doesn't pull in the auth-heavy barrel; these tests never
+// touch the translated labels (syncLabel/completionLabel), only the pure resolve* functions.
+vi.mock("@common", () => ({
+  translate: (s: string) => s,
+}));
+
+describe("resolveOrigin", () => {
+  it("is shopify when a SHOPIFY_RTN_ID identification exists", () => {
+    expect(resolveOrigin([{ returnIdentificationTypeId: "SHOPIFY_RTN_ID", idValue: "gid://1" }])).toBe("shopify");
+  });
+  it("is pwa when no shopify identification exists", () => {
+    expect(resolveOrigin([])).toBe("pwa");
+  });
+});
+
+describe("resolveShopifySyncState", () => {
+  it("is not_synced when shopifySync is null", () => {
+    expect(resolveShopifySyncState(null)).toBe("not_synced");
+  });
+  it("is synced on PUSH_OK", () => {
+    expect(resolveShopifySyncState({ pushStatusId: "PUSH_OK", shopifyReturnId: "gid://1" })).toBe("synced");
+  });
+  it("is pending on PUSH_PENDING", () => {
+    expect(resolveShopifySyncState({ pushStatusId: "PUSH_PENDING", shopifyReturnId: null })).toBe("pending");
+  });
+  it("is failed on PUSH_FAILED", () => {
+    expect(resolveShopifySyncState({ pushStatusId: "PUSH_FAILED", shopifyReturnId: null })).toBe("failed");
+  });
+  it("is synced for an inbound return with a Shopify id but no push status", () => {
+    expect(resolveShopifySyncState({ pushStatusId: null, shopifyReturnId: "gid://shopify/Return/123" })).toBe("synced");
+  });
+  it("is not_synced when present but empty (no push status, no id)", () => {
+    expect(resolveShopifySyncState({ pushStatusId: null, shopifyReturnId: null })).toBe("not_synced");
+  });
+  it("is synced for an appeasement refund (PUSH_OK + shopifyRefundId)", () => {
+    expect(resolveShopifySyncState({ pushStatusId: "PUSH_OK", shopifyRefundId: "gid://shopify/Refund/9" })).toBe("synced");
+  });
+  it("is synced for a refund mirror with an id but no push status", () => {
+    expect(resolveShopifySyncState({ pushStatusId: null, shopifyRefundId: "gid://shopify/Refund/9" })).toBe("synced");
+  });
+});
+
+describe("resolveShopifyCloseState", () => {
+  it("is skipped when never synced to Shopify (null / no shopifyReturnId)", () => {
+    expect(resolveShopifyCloseState(null)).toBe("skipped");
+    expect(resolveShopifyCloseState({ synced: true, shopifyReturnId: null })).toBe("skipped");
+  });
+  it("is completed when returnStatusId is CLOSED (authoritative)", () => {
+    expect(resolveShopifyCloseState({ shopifyReturnId: "gid://1", returnStatusId: "CLOSED", closePushStatusId: "CLOSE_PENDING" })).toBe("completed");
+  });
+  it("is completed on CLOSE_OK", () => {
+    expect(resolveShopifyCloseState({ shopifyReturnId: "gid://1", closePushStatusId: "CLOSE_OK" })).toBe("completed");
+  });
+  it("is pending on CLOSE_PENDING", () => {
+    expect(resolveShopifyCloseState({ shopifyReturnId: "gid://1", returnStatusId: "OPEN", closePushStatusId: "CLOSE_PENDING" })).toBe("pending");
+  });
+  it("is pending when the close was just triggered (synced, no close status yet)", () => {
+    expect(resolveShopifyCloseState({ shopifyReturnId: "gid://1", returnStatusId: "OPEN" })).toBe("pending");
+  });
+  it("is failed on CLOSE_FAILED", () => {
+    expect(resolveShopifyCloseState({ shopifyReturnId: "gid://1", closePushStatusId: "CLOSE_FAILED", closePushErrorMessage: "boom" })).toBe("failed");
+  });
+});
+
+describe("resolveExchangeSyncState", () => {
+  it("is not_synced when shopifySync is null", () => {
+    expect(resolveExchangeSyncState(null)).toBe("not_synced");
+  });
+  it("is not_synced when shopifySync is undefined", () => {
+    expect(resolveExchangeSyncState(undefined)).toBe("not_synced");
+  });
+  it("is synced only on PROC_OK (authoritative confirmed)", () => {
+    expect(resolveExchangeSyncState({ exchangePushStatusId: "PUSH_OK", exchangeProcessStatusId: "PROC_OK" })).toBe("synced");
+  });
+  it("is pending on PUSH_OK while the process step has not completed", () => {
+    expect(resolveExchangeSyncState({ exchangePushStatusId: "PUSH_OK", exchangeProcessStatusId: "PROC_PENDING" })).toBe("pending");
+  });
+  it("treats PUSH_OK with no process status as still pending (awaiting process)", () => {
+    expect(resolveExchangeSyncState({ exchangePushStatusId: "PUSH_OK", exchangeProcessStatusId: null })).toBe("pending");
+  });
+  it("is pending on PUSH_PENDING", () => {
+    expect(resolveExchangeSyncState({ exchangePushStatusId: "PUSH_PENDING" })).toBe("pending");
+  });
+  it("is failed on PUSH_FAILED", () => {
+    expect(resolveExchangeSyncState({ exchangePushStatusId: "PUSH_FAILED" })).toBe("failed");
+  });
+  it("is failed on PROC_FAILED", () => {
+    expect(resolveExchangeSyncState({ exchangePushStatusId: "PUSH_OK", exchangeProcessStatusId: "PROC_FAILED" })).toBe("failed");
+  });
+  it("is failed on PROC_FAILED even when exchangePushStatusId is absent", () => {
+    expect(resolveExchangeSyncState({ exchangeProcessStatusId: "PROC_FAILED" })).toBe("failed");
+  });
+  it("is not_synced when present but empty", () => {
+    expect(resolveExchangeSyncState({ exchangePushStatusId: null, exchangeProcessStatusId: null })).toBe("not_synced");
+  });
+  it("ignores the plain return-half push fields on an exchange (no phantom failed/synced)", () => {
+    // The return-half's pushStatusId/closePushStatusId must NOT leak into the exchange's collapsed state.
+    expect(resolveExchangeSyncState({ pushStatusId: "PUSH_FAILED", exchangePushStatusId: "PUSH_OK", exchangeProcessStatusId: "PROC_PENDING" })).toBe("pending");
+    expect(resolveExchangeSyncState({ pushStatusId: "PUSH_OK", closePushStatusId: "CLOSE_OK" })).toBe("not_synced");
+  });
+});

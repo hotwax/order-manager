@@ -10,77 +10,13 @@
     </ion-header>
 
     <ion-content>
-      <SearchFilterCard
-        v-model="filters.query"
-        :placeholder="translate('Order name, order ID, external ID')"
+      <WorkflowOrderFilterCard
+        v-model="filters"
+        :channel-options="channelOptions"
+        :facility-options="facilityOptions"
+        :shipment-method-options="shipmentMethodOptions"
         @clear="clearFilters"
-      >
-        <ion-input v-model="filters.customerName" label="Customer name" :placeholder="translate('Search by name')" label-placement="stacked" :clear-input="true" />
-        <ion-select v-model="filters.priority" label="Priority" label-placement="stacked" interface="popover">
-          <ion-select-option :value="null">All</ion-select-option>
-          <ion-select-option :value="true">High priority</ion-select-option>
-          <ion-select-option :value="false">Normal / no priority</ion-select-option>
-        </ion-select>
-        <ion-select v-model="filters.salesChannelEnumId" label="Channel" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">All channels</ion-select-option>
-          <ion-select-option v-for="channel in channelOptions" :key="channel" :value="channel">
-            {{ formatChannel(channel) }}
-          </ion-select-option>
-        </ion-select>
-        <ion-select v-model="filters.facilityId" label="Facility" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">All facilities</ion-select-option>
-          <ion-select-option v-for="facility in facilityOptions" :key="facility.id" :value="facility.id">
-            {{ facility.name }}
-          </ion-select-option>
-        </ion-select>
-        <ion-select v-model="filters.shipmentMethodTypeId" label="Shipment method" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">All methods</ion-select-option>
-          <ion-select-option v-for="method in shipmentMethodOptions" :key="method.id" :value="method.id">
-            {{ method.label }}
-          </ion-select-option>
-        </ion-select>
-        <ion-item
-          id="inflight-order-date-from-trigger"
-          class="inflight-order-date-filter inflight-order-date-filter-fixed"
-          button
-          detail="false"
-          lines="none"
-        >
-          <ion-label>
-            <p>{{ translate('Order date from') }}</p>
-            {{ dateFilterLabel(filters.dateFrom) }}
-          </ion-label>
-        </ion-item>
-        <ion-item
-          id="inflight-order-date-thru-trigger"
-          class="inflight-order-date-filter inflight-order-date-filter-fixed"
-          button
-          detail="false"
-          lines="none"
-        >
-          <ion-label>
-            <p>{{ translate('Order date thru') }}</p>
-            {{ dateFilterLabel(filters.dateThru) }}
-          </ion-label>
-        </ion-item>
-      </SearchFilterCard>
-
-      <ion-popover trigger="inflight-order-date-from-trigger" trigger-action="click" :show-backdrop="false">
-        <ion-datetime
-          presentation="date"
-          :value="filters.dateFrom || undefined"
-          :show-default-buttons="true"
-          @ionChange="setDateFilter('dateFrom', $event.detail.value)"
-        />
-      </ion-popover>
-      <ion-popover trigger="inflight-order-date-thru-trigger" trigger-action="click" :show-backdrop="false">
-        <ion-datetime
-          presentation="date"
-          :value="filters.dateThru || undefined"
-          :show-default-buttons="true"
-          @ionChange="setDateFilter('dateThru', $event.detail.value)"
-        />
-      </ion-popover>
+      />
 
       <ion-list>
         <ion-list-header>
@@ -92,6 +28,7 @@
             @ion-change="toggleCurrentPageSelection($event.detail.checked)"
           />
           <ion-label>{{ resultsSummary }}</ion-label>
+          <OrderSortPopover v-model="filters.sort" trigger-id="inflight-orders-sort-trigger" />
           <ion-button fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
@@ -229,7 +166,9 @@ import { useOrderStore } from '@/store/order';
 import { useSeedStore } from '@/store/seed';
 import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
-import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
+import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
+import { useWorkflowOrderRouteState } from '@/composables/useWorkflowOrderRouteState';
 import { api, translate } from '@common';
 import router from '@/router';
 
@@ -246,16 +185,19 @@ const filters = computed({
   get: () => store.filters[bucket],
   set: (value) => (store.filters[bucket] = value)
 });
+useWorkflowOrderRouteState(filters);
 const physicalFacilities = ref<FacilityOption[]>([]);
 
 const channelOptions = computed(() =>
   (seedStore.enumsByType['ORDER_SALES_CHANNEL']?.ids || []).map((enumId) => {
     const enumeration: any = seedStore.enumsByType['ORDER_SALES_CHANNEL'].byId[enumId];
-    return enumeration?.enumId || enumId;
+    return { id: enumId, label: enumeration?.description || enumeration?.enumName || formatChannel(enumId) };
   })
 );
 
-const facilityOptions = computed(() => physicalFacilities.value);
+const facilityOptions = computed(() =>
+  physicalFacilities.value.map((f) => ({ id: f.id, label: f.name }))
+);
 
 const shipmentMethodOptions = computed(() =>
   seedStore.shipmentMethodTypes.ids.map((id) => {

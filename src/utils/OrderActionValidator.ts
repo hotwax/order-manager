@@ -42,10 +42,8 @@
  *      gates on holds.
  *
  * ── Remediation & lifecycle-restart actions (product decisions 2026-06-11) ──
- *   - RETURN becomes available as soon as the order has ≥1 item in
- *     ITEM_COMPLETED. Before that, the remediation actions are APPEASEMENT
- *     and RESHIP (these may have been dropped in the OFBiz→Moqui migration;
- *     surfacing them here so the UI exposes them — server wiring TBD).
+ *   - RETURN becomes available only on a completed order when the backend
+ *     reports at least one item with returnableQuantity > 0.
  *   - CLONE is available at ALL times, including on cancelled/completed
  *     orders. It copies the order + items + logically related details into a
  *     NEW order at the start of its lifecycle, optionally posting to Shopify.
@@ -357,11 +355,6 @@ export const OrderActionValidator = {
     return TERMINAL_ITEM_STATUSES.includes(item?.statusId);
   },
 
-  /** Item has been fulfilled (terminal completed). */
-  isItemFulfilled(item: any): boolean {
-    return item?.statusId === 'ITEM_COMPLETED';
-  },
-
   /** Order header is terminal (cancelled/completed only — see D4 note above). */
   isOrderTerminal(order: any): boolean {
     return TERMINAL_ORDER_STATUSES.includes(order?.statusId);
@@ -372,16 +365,12 @@ export const OrderActionValidator = {
   },
 
   /**
-   * RETURN eligibility driver: the order has at least one completed item.
-   * An ORDER_COMPLETED header short-circuits true (all items completed).
-   * Otherwise prefers ctx.allItems (rows that carry statusId); the fallback
-   * scan of order.shipGroups[].items only works on payloads whose item rows
-   * carry statusId — the mapped view model's do NOT, so pass ctx.allItems.
+   * RETURN eligibility driver: trust the backend-calculated remaining
+   * quantity on the real nested shipGroups[].items payload.
    */
-  hasAnyCompletedItem(order: any, ctx?: OrderLifecycleContext): boolean {
-    if (order?.statusId === 'ORDER_COMPLETED') return true;
+  hasAnyReturnableItem(order: any, ctx?: OrderLifecycleContext): boolean {
     const pool = ctx?.allItems ?? (order?.shipGroups || []).flatMap((sg: any) => sg.items || []);
-    return pool.some((item: any) => this.isItemFulfilled(item));
+    return pool.some((item: any) => Number(item?.returnableQuantity) > 0);
   },
 
   /**
@@ -549,16 +538,15 @@ export const OrderActionValidator = {
 
       /**
        * RETURN — footer "Return" (OrderDetail.vue:730).
-       * Product decision 2026-06-11: returns open up as soon as the order has
-       * at least one ITEM_COMPLETED item. Before that, remediation happens via
-       * APPEASEMENT / RESHIP instead.
+       * Returns require a completed order and at least one line whose
+       * backend-calculated returnableQuantity is positive.
        */
       case 'RETURN': {
-        if (order?.statusId === 'ORDER_CANCELLED') {
-          return { allowed: false, reason: 'Returns are not available for a cancelled order.' };
+        if (order?.statusId !== 'ORDER_COMPLETED') {
+          return { allowed: false, reason: 'Returns are available only for completed orders.' };
         }
-        if (!this.hasAnyCompletedItem(order, ctx)) {
-          return { allowed: false, reason: 'Returns become available once at least one item is completed. Until then, issue an appeasement or reship.' };
+        if (!this.hasAnyReturnableItem(order, ctx)) {
+          return { allowed: false, reason: 'No items have a remaining returnable quantity.' };
         }
         return { allowed: true };
       }

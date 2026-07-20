@@ -17,6 +17,9 @@ export default defineConfig({
     legacy(),
     localApiServerDiscoveryPlugin()
   ],
+  server: {
+    port: 8100
+  },
   define: {
     'import.meta.env.VITE_VERSION_INFO': JSON.stringify(JSON.stringify(versionInfoUtil.getVersionInfo(pkg.version)))
   },

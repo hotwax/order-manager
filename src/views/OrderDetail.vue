@@ -1012,6 +1012,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
+import router from '@/router';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
@@ -1045,6 +1046,8 @@ import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useUserStore } from '@/store/user';
+import { ORDER_RETURN_PERMISSION } from '@/authorization/permissions';
+import { getOrderForReturn } from '@/services/returns';
 import { useProductStore } from '@/store/productStore';
 import { useCustomerStore } from '@/store/customer';
 import type { CustomerContactMech } from '@/types/customer';
@@ -1773,6 +1776,7 @@ async function loadOrder(orderId: string, force = false) {
   } else {
     await orderDetailStore.setCurrentOrder(orderId);
   }
+  void loadReturnEligibility(orderId);
   // Fire-and-forget: the Shopify Admin link hydrates when it resolves; the page
   // never waits on it.
   resolveShopifyOrderShop(orderId);
@@ -1787,6 +1791,23 @@ async function loadOrder(orderId: string, force = false) {
     orderDetailStore.fetchShippingMethods(),
     orderDetailStore.fetchCarrierParties(),
   ]);
+}
+
+async function loadReturnEligibility(orderId: string) {
+  const requestVersion = ++returnEligibilityRequestVersion;
+  returnEligibilityOrderId.value = '';
+  returnEligibilityItems.value = [];
+
+  if (!canCreateReturn.value || order.value?.statusId !== 'ORDER_COMPLETED') return;
+
+  try {
+    const returnableOrder = await getOrderForReturn(orderId);
+    if (requestVersion !== returnEligibilityRequestVersion || props.orderId !== orderId) return;
+    returnEligibilityOrderId.value = orderId;
+    returnEligibilityItems.value = returnableOrder.items;
+  } catch (returnEligibilityError) {
+    logger.error('Failed to load return eligibility', returnEligibilityError);
+  }
 }
 
 async function openCustomerContactModal(contactMechTypeId: string, contactMechPurposeTypeId: string) {
@@ -2819,16 +2840,27 @@ async function openCloneOrderModal() {
  * simply isn't shown.
  */
 const DISPATCHABLE_FOOTER_IDS = new Set(['CLONE', 'CANCEL_ITEMS', 'RETURN']);
+const canCreateReturn = computed(() => userStore.hasPermission(ORDER_RETURN_PERMISSION));
+const returnEligibilityOrderId = ref('');
+const returnEligibilityItems = ref<any[]>([]);
+let returnEligibilityRequestVersion = 0;
+const hasReturnableItems = computed(() =>
+  returnEligibilityOrderId.value === order.value?.id
+  && returnEligibilityItems.value.some((item: any) => Number(item.returnableQty) > 0)
+);
 const footerActions = computed(() => {
   if (!order.value) return [];
   const allowedTransitions = seed.allowedTransitions(order.value.statusId);
   const ctx = {
-    allItems: groupedItems.value.flatMap((group: any) => group.items),
+    allItems: returnEligibilityOrderId.value === order.value.id
+      ? returnEligibilityItems.value.map((item: any) => ({ returnableQuantity: item.returnableQty }))
+      : [],
     orderAllowedToStatusIds: new Set(allowedTransitions.map((transition: any) => transition.toStatusId))
   };
   return OrderActionValidator
     .getOrderFooterActions(order.value, allowedTransitions, selectedItems.value, ctx)
-    .filter((action: any) => action.kind === 'status' || DISPATCHABLE_FOOTER_IDS.has(action.id));
+    .filter((action: any) => action.kind === 'status' || DISPATCHABLE_FOOTER_IDS.has(action.id))
+    .filter((action: any) => action.id !== 'RETURN' || canCreateReturn.value);
 });
 
 function runFooterAction(action: any) {
@@ -2851,9 +2883,9 @@ function footerActionLabel(action: any): string {
 }
 
 async function startReturn() {
-  // Returns are a separate workstream (docs/ReturnsMigrationExecution.md); this
-  // button only appears once the order has a completed (returnable) item.
-  await showToast(translate('Returns are not available here yet.'));
+  const orderId = order.value?.id;
+  if (!orderId || !canCreateReturn.value || !hasReturnableItems.value) return;
+  await router.push(`/orders/${encodeURIComponent(orderId)}/return`);
 }
 
 async function runOrderStatusAction(action: any) {

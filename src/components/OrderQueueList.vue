@@ -13,35 +13,40 @@
       <SearchFilterCard
         v-model="searchQuery"
         :placeholder="translate(searchPlaceholder)"
+        :show-clear="false"
         @clear="clearFilters"
       >
-        <slot name="filters" />
-        <ion-select
-          v-model="searchFilters.channel"
-          label="Sales channel"
-          label-placement="stacked"
-          interface="popover"
-          :interface-options="{ showBackdrop: false }"
-        >
-          <ion-select-option value="All">All sales channels</ion-select-option>
-          <ion-select-option v-for="option in salesChannels" :key="option.enumId" :value="option.enumId">
-            {{ option.description || option.enumName || option.enumId }}
-          </ion-select-option>
-        </ion-select>
-        <ion-select
-          v-model="searchFilters.shipmentMethodTypeId"
-          label="Shipping method"
-          label-placement="stacked"
-          interface="popover"
-          :interface-options="{ showBackdrop: false }"
-        >
-          <ion-select-option value="All">All methods</ion-select-option>
-          <ion-select-option v-for="option in shipmentMethodOptions" :key="option.id" :value="option.id">
-            {{ option.label }}
-          </ion-select-option>
-        </ion-select>
-        <DateFilterSelect v-model="searchFilters.dateFrom" :label="translate('Order date from')" />
-        <DateFilterSelect v-model="searchFilters.dateThru" :label="translate('Order date thru')" />
+        <UniformFilterLayout @clear="clearFilters">
+          <ion-select
+            v-model="searchFilters.channel"
+            label="Sales channel"
+            label-placement="stacked"
+            fill="outline"
+            interface="popover"
+            :interface-options="{ showBackdrop: false }"
+          >
+            <ion-select-option value="All">All channels</ion-select-option>
+            <ion-select-option v-for="option in salesChannels" :key="option.enumId" :value="option.enumId">
+              {{ option.description || option.enumName || option.enumId }}
+            </ion-select-option>
+          </ion-select>
+          <slot name="filters" />
+          <ion-select
+            v-model="searchFilters.shipmentMethodTypeId"
+            label="Shipping method"
+            label-placement="stacked"
+            fill="outline"
+            interface="popover"
+            :interface-options="{ showBackdrop: false }"
+          >
+            <ion-select-option value="All">All methods</ion-select-option>
+            <ion-select-option v-for="option in shipmentMethodOptions" :key="option.id" :value="option.id">
+              {{ option.label }}
+            </ion-select-option>
+          </ion-select>
+          <DateFilterSelect v-model="searchFilters.dateFrom" :label="translate('Order date from')" outlined />
+          <DateFilterSelect v-model="searchFilters.dateThru" :label="translate('Order date through')" outlined />
+        </UniformFilterLayout>
       </SearchFilterCard>
 
       <ion-progress-bar v-if="loading" type="indeterminate" />
@@ -185,6 +190,7 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import UniformFilterLayout from '@/components/common/UniformFilterLayout.vue';
 import { showToast } from '@/utils';
 
 type QueueGlobalAction = 'brokerSelected';

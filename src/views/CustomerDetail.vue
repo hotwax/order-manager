@@ -125,7 +125,7 @@
                       <template v-else>Merge</template>
                     </ion-button>
                   </ion-item>
-                  <ion-item v-if="!duplicateRelationships.some((d: { active: boolean }) => d.active) && !mergableDuplicates.length" lines="none">
+                  <ion-item v-if="!duplicateRelationships.some((d) => d.active) && !mergableDuplicates.length" lines="none">
                     <ion-label color="medium"><em>No Merged Contacts</em></ion-label>
                   </ion-item>
                 </ion-list>
