@@ -29,8 +29,6 @@ export const defaultDataDocuments = {
   noteDataLookup: 'OrderManagerNoteDataLookup',
   orderStatusLookup: 'OrderManagerOrderStatusLookup',
   shipmentLookup: 'OrderManagerShipmentLookup',
-  returnLookup: 'OrderManagerReturnLookup',
-  returnItemLookup: 'OrderManagerReturnItemLookup',
   customerLookup: 'OrderManagerCustomerLookup',
   customerContactLookup: 'OrderManagerCustomerContactLookup'
 };
@@ -119,39 +117,7 @@ export const orderStatusLookupFields = [
   'statusUserLogin'
 ];
 
-export const returnLookupFields = [
-  'returnId',
-  'externalId',
-  'statusId',
-  'returnHeaderTypeId',
-  'fromPartyId',
-  'toPartyId',
-  'entryDate',
-  'createdDate',
-  'receivedDate',
-  'currencyUomId',
-  'createdBy',
-  'orderId',
-  'returnTotal',
-  'grandTotal'
-];
 
-export const returnItemLookupFields = [
-  'returnId',
-  'returnItemSeqId',
-  'returnReasonId',
-  'returnTypeId',
-  'returnItemTypeId',
-  'productId',
-  'description',
-  'orderId',
-  'orderItemSeqId',
-  'statusId',
-  'returnQuantity',
-  'receivedQuantity',
-  'returnPrice',
-  'returnItemResponseId'
-];
 
 export const customerLookupFields = [
   'partyId',
@@ -371,29 +337,7 @@ export function normalizeShipmentDoc(doc: any, fallbackId = ''): Shipment {
   };
 }
 
-export function normalizeReturnDoc(doc: any, fallbackId = ''): ReturnRecord {
-  const externalId = toStringValue(doc.externalId);
-  return {
-    id: toStringValue(doc.returnId, fallbackId),
-    externalId: externalId || undefined,
-    orderId: toStringValue(doc.orderId),
-    status: toStringValue(doc.statusId ?? doc.status),
-    reason: toStringValue(doc.returnReasonId ?? doc.returnHeaderTypeId ?? doc.reason),
-    requestedDate: toStringValue(doc.entryDate ?? doc.createdDate),
-    receivedDate: toStringValue(doc.receivedDate) || undefined,
-    returnDate: toStringValue(doc.returnDate) || undefined,
-    returnHeaderTypeId: toStringValue(doc.returnHeaderTypeId),
-    fromPartyId: toStringValue(doc.fromPartyId),
-    toPartyId: toStringValue(doc.toPartyId),
-    destinationFacilityId: toStringValue(doc.destinationFacilityId),
-    destinationFacilityName: toStringValue(doc.destinationFacilityName),
-    entryDate: toStringValue(doc.entryDate),
-    currencyUomId: toStringValue(doc.currencyUomId),
-    createdBy: toStringValue(doc.createdBy),
-    itemIds: toStringList(doc.returnItemSeqId ?? doc.orderItemSeqId),
-    refundTotal: toNumberValue(doc.returnTotal ?? doc.grandTotal)
-  };
-}
+
 
 export function normalizeCustomerDoc(doc: any, fallbackId = ''): Customer {
   const personalTitle = toStringValue(doc.personalTitle);

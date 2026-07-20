@@ -21,6 +21,12 @@
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
+          <ion-item v-if="hasPermission(`${ORDER_VIEW_PERMISSION} OR ${CUSTOMER_VIEW_PERMISSION}`)" button router-link="/returns" router-direction="root" :class="{ selected: selectedPage === '/returns' }">
+            <ion-icon slot="start" :icon="refreshCircleOutline" />
+            <ion-label>{{ translate("Find returns") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+        <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(CUSTOMER_VIEW_PERMISSION)" button router-link="/customers" router-direction="root" :class="{ selected: selectedPage === '/customers' }">
             <ion-icon slot="start" :icon="peopleOutline" />
             <ion-label>{{ translate("Find customers") }}</ion-label>
@@ -144,6 +150,7 @@ import {
   pauseCircleOutline,
   peopleOutline,
   playCircleOutline,
+  refreshCircleOutline,
   searchOutline,
   settingsOutline,
   shieldHalfOutline

@@ -28,6 +28,7 @@
             @ion-change="toggleCurrentPageSelection($event.detail.checked)"
           />
           <ion-label>{{ resultsSummary }}</ion-label>
+          <OrderSortPopover v-model="filters.sort" trigger-id="packed-orders-sort-trigger" />
           <ion-button fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
@@ -121,10 +122,11 @@ import { useSeedStore } from '@/store/seed';
 import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
+import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
+import { useWorkflowOrderRouteState } from '@/composables/useWorkflowOrderRouteState';
 import { api, translate } from '@common';
-import router from '@/router';
 
 const bucket = 'packed';
 const VIRTUAL_FACILITY_TYPE_ID = 'VIRTUAL_FACILITY';
@@ -139,6 +141,7 @@ const filters = computed({
   get: () => store.filters[bucket],
   set: (value) => (store.filters[bucket] = value)
 });
+useWorkflowOrderRouteState(filters);
 const physicalFacilities = ref<FacilityOption[]>([]);
 
 const channelOptions = computed(() =>
@@ -186,21 +189,6 @@ type FacilityOption = {
   name: string;
 };
 
-function applyRouteFilters() {
-  const facilityId = router.currentRoute.value.query.facilityId;
-  const dateFrom = router.currentRoute.value.query.dateFrom;
-
-  if (typeof facilityId === 'string' && facilityId) {
-    filters.value.facilityId = facilityId;
-  }
-  if (typeof dateFrom === 'string' && dateFrom) {
-    filters.value.dateFrom = dateFrom;
-  } else {
-    filters.value.dateFrom = '';
-  }
-}
-
-watch(() => [router.currentRoute.value.query.facilityId, router.currentRoute.value.query.dateFrom], applyRouteFilters, { immediate: true });
 watch(selectedProductStoreId, () => {
   filters.value.productStoreId = selectedProductStoreId.value;
 }, { immediate: true });

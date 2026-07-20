@@ -114,12 +114,44 @@ describe('getOrderFooterActions (unified footer)', () => {
     expect(withSelection.find((a) => a.id === 'CANCEL_ITEMS')!.kind).toBe('status');
   });
 
-  it('surfaces Return once the order has a completed item', () => {
+  it('surfaces Return for a completed order with backend-calculated returnable quantity', () => {
     const actions = OrderActionValidator.getOrderFooterActions(
-      createdOrder,
+      { statusId: 'ORDER_COMPLETED' },
       createdOrderTransitions(),
       [],
-      { allItems: [{ statusId: 'ITEM_COMPLETED' }] }
+      { allItems: [{ returnableQuantity: 1 }] }
+    );
+    expect(actions.map((a) => a.id)).toContain('RETURN');
+  });
+
+  it('does not surface Return before the order is completed', () => {
+    const actions = OrderActionValidator.getOrderFooterActions(
+      { statusId: 'ORDER_APPROVED' },
+      createdOrderTransitions(),
+      [],
+      { allItems: [{ returnableQuantity: 1 }] }
+    );
+    expect(actions.map((a) => a.id)).not.toContain('RETURN');
+  });
+
+  it('does not surface Return when all backend-calculated returnable quantities are zero', () => {
+    const actions = OrderActionValidator.getOrderFooterActions(
+      { statusId: 'ORDER_COMPLETED' },
+      createdOrderTransitions(),
+      [],
+      { allItems: [{ returnableQuantity: 0 }, { returnableQuantity: undefined }] }
+    );
+    expect(actions.map((a) => a.id)).not.toContain('RETURN');
+  });
+
+  it('reads returnability from nested shipGroups items when no context is supplied', () => {
+    const actions = OrderActionValidator.getOrderFooterActions(
+      {
+        statusId: 'ORDER_COMPLETED',
+        shipGroups: [{ items: [{ returnableQuantity: 0 }] }, { items: [{ returnableQuantity: 2 }] }]
+      },
+      createdOrderTransitions(),
+      []
     );
     expect(actions.map((a) => a.id)).toContain('RETURN');
   });
