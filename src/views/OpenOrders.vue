@@ -34,55 +34,17 @@
           </ion-button>
         </ion-list-header>
 
-        <div
+        <OrderRow
           v-for="order in orders"
           :key="order.orderId"
-          class="list-item open-order-row"
-          :role="selectMode ? 'button' : 'link'"
-          tabindex="0"
-          @click="handleOrderRowClick(order)"
-          @keydown.enter.prevent="handleOrderRowClick(order)"
-          @keydown.space.prevent="handleOrderRowClick(order)"
-        >
-          <ion-item
-            lines="none"
-          >
-            <ion-checkbox
-              v-if="selectMode"
-              slot="start"
-              :checked="selectedIds.has(order.orderId)"
-              @click.stop
-              @keydown.stop
-              @ion-change="setOrderSelection(order.orderId, $event.detail.checked)"
-            />
-            <ion-label>
-              <p class="overline">{{ order.orderId }}</p>
-              {{ order.orderName || order.externalId || order.orderId }}
-              <p>{{ formatStatus(order.statusId) }}</p>
-            </ion-label>
-          </ion-item>
-
-          <ion-label class="tablet">
-            {{ order.customerName || translate('Customer') }}
-            <p>{{ order.externalId }}</p>
-          </ion-label>
-
-          <ion-label class="tablet">
-            <p class="overline">{{ order.facilityName || order.facilityId || translate('Facility') }}</p>
-            {{ order.shipmentMethodDesc || order.shippingMethodTypeId }}
-            <p>{{ formatChannel(order.salesChannelEnumId) }}</p>
-          </ion-label>
-
-          <ion-label class="tablet">
-            {{ formatDateTime(order.orderDate) }}
-            <p>{{ formatRelativeDate(order.orderDate) }}</p>
-          </ion-label>
-
-          <ion-label class="open-order-total ion-text-end">
-            {{ formatCurrency(order.grandTotal, order.currencyUomId) }}
-            <p>{{ itemCountLabel(order) }}</p>
-          </ion-label>
-        </div>
+          :model="orderRow(order)"
+          row-class="open-order-row"
+          deadline-class="open-order-total ion-text-end"
+          :select-mode="selectMode"
+          :selected="selectedIds.has(order.orderId)"
+          @activate="handleOrderRowClick(order)"
+          @selection-change="setOrderSelection(order.orderId, $event)"
+        />
       </ion-list>
 
       <div v-if="isLoading && !orders.length" class="ion-text-center ion-padding">
@@ -168,6 +130,9 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { useWorkflowOrderRouteState } from '@/composables/useWorkflowOrderRouteState';
+import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import OrderRow from '@/components/orders/OrderRow.vue';
+import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, commonUtil, translate } from '@common';
 import router from '@/router';
 
@@ -177,7 +142,6 @@ const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore();
 const seedStore = useSeedStore();
-const route = router.currentRoute.value;
 const ionRouter = useIonRouter();
 const toastMessage = ref('');
 
@@ -223,6 +187,10 @@ const resultsSummary = computed(() =>
 );
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 
+function orderRow(order: WorkflowOrder) {
+  return toWorkflowOrderRowViewModel(order, orderStore.workflowEnrichment(bucket, order.orderId));
+}
+
 type DateFilterField = 'dateFrom' | 'dateThru';
 type FacilityOption = {
   id: string;
@@ -247,14 +215,14 @@ function normalizeDateFilterValue(value: string | string[] | null | undefined) {
 }
 
 function applyRouteFilters() {
-  const facilityId = route.query.facilityId;
+  const facilityId = router.currentRoute.value.query.facilityId;
 
   if (typeof facilityId === 'string' && facilityId) {
     filters.value.facilityId = facilityId;
   }
 }
 
-watch(() => route.query.facilityId, applyRouteFilters, { immediate: true });
+watch(() => router.currentRoute.value.query.facilityId, applyRouteFilters, { immediate: true });
 watch(selectedProductStoreId, () => {
   filters.value.productStoreId = selectedProductStoreId.value;
 }, { immediate: true });
@@ -410,7 +378,7 @@ async function runAction(action: BulkActionDefinition) {
   const count = selectedIds.value.size;
   try {
     await store.runBulkAction(bucket, action.id);
-    toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+    toastMessage.value = `${action.label}: ${count} ${count === 1 ? translate('order') : translate('orders')}`;
   } catch {
     toastMessage.value = translate('Failed to complete bulk action. Please try again.');
   }
@@ -425,37 +393,6 @@ function formatChannel(channel: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function formatStatus(statusId: string) {
-  return statusId
-    .replace(/^ORDER_/, '')
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function orderDate(orderDate: string) {
-  if (!orderDate) return null;
-  const date = DateTime.fromMillis(Number(orderDate));
-  return date.isValid ? date : null;
-}
-
-function formatDateTime(orderDateValue: string) {
-  const date = orderDate(orderDateValue);
-  return date ? date.toFormat('MM-dd-yyyy hh:mm a') : '';
-}
-
-function formatRelativeDate(orderDateValue: string) {
-  const date = orderDate(orderDateValue);
-  return date?.toRelative() || '';
-}
-
-function itemCountLabel(order: WorkflowOrder) {
-  return `${order.itemCount} ${order.itemCount === 1 ? translate('item') : translate('items')}`;
-}
-
-function formatCurrency(amount: number, currency: string) {
-  return commonUtil.formatCurrency(amount, currency);
-}
 </script>
 
 <style scoped>

@@ -34,55 +34,17 @@
           </ion-button>
         </ion-list-header>
 
-        <div
+        <OrderRow
           v-for="order in orders"
           :key="packedOrderKey(order)"
-          class="list-item packed-order-row"
-          :role="selectMode ? 'button' : 'link'"
-          tabindex="0"
-          @click="handleOrderRowClick(order)"
-          @keydown.enter.prevent="handleOrderRowClick(order)"
-          @keydown.space.prevent="handleOrderRowClick(order)"
-        >
-          <ion-item lines="none">
-            <ion-checkbox
-              v-if="selectMode"
-              slot="start"
-              :checked="selectedIds.has(order.orderId)"
-              @click.stop
-              @keydown.stop
-              @ion-change="setOrderSelection(order.orderId, $event.detail.checked)"
-            />
-            <ion-label>
-              <p class="overline">{{ order.orderId }}</p>
-              {{ order.orderName || order.externalId || order.orderId }}
-              <p>{{ packedStatusLabel(order) }}</p>
-            </ion-label>
-          </ion-item>
-
-          <ion-label class="tablet ion-text-start">
-            {{ order.customerName || translate('Customer') }}
-            <p>{{ order.externalId || order.productStoreName }}</p>
-          </ion-label>
-
-          <ion-label class="tablet ion-text-start">
-            <p class="overline">{{ order.facilityName || order.facilityId || translate('Facility') }}</p>
-            {{ order.shipmentMethodDesc || order.shippingMethodTypeId || translate('Shipment method') }}
-            <p>{{ carrierLabel(order) }}</p>
-          </ion-label>
-
-          <ion-label class="tablet">
-            {{ workflowDateLabel(order) }}
-            <p>{{ workflowDateCaption(order) }}</p>
-            <p v-if="workflowDateRelativeLabel(order)">{{ workflowDateRelativeLabel(order) }}</p>
-          </ion-label>
-
-          <ion-label class="packed-order-total ion-text-end">
-            {{ formatCurrency(order.grandTotal, order.currencyUomId) }}
-            <p>{{ itemCountLabel(order) }}</p>
-            <p v-if="shipmentContextLabel(order)">{{ shipmentContextLabel(order) }}</p>
-          </ion-label>
-        </div>
+          :model="orderRow(order)"
+          row-class="packed-order-row"
+          deadline-class="packed-order-total ion-text-end"
+          :select-mode="selectMode"
+          :selected="selectedIds.has(order.orderId)"
+          @activate="handleOrderRowClick(order)"
+          @selection-change="setOrderSelection(order.orderId, $event)"
+        />
       </ion-list>
 
       <div v-if="isLoading && !orders.length" class="ion-text-center ion-padding">
@@ -168,6 +130,9 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { useWorkflowOrderRouteState } from '@/composables/useWorkflowOrderRouteState';
+import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import OrderRow from '@/components/orders/OrderRow.vue';
+import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, commonUtil, translate } from '@common';
 import router from '@/router';
 
@@ -177,7 +142,6 @@ const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore();
 const seedStore = useSeedStore();
-const route = router.currentRoute.value;
 const ionRouter = useIonRouter();
 const toastMessage = ref('');
 
@@ -223,6 +187,10 @@ const resultsSummary = computed(() =>
 );
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 
+function orderRow(order: WorkflowOrder) {
+  return toWorkflowOrderRowViewModel(order, orderStore.workflowEnrichment(bucket, order.orderId));
+}
+
 type DateFilterField = 'dateFrom' | 'dateThru';
 type FacilityOption = {
   id: string;
@@ -247,14 +215,14 @@ function normalizeDateFilterValue(value: string | string[] | null | undefined) {
 }
 
 function applyRouteFilters() {
-  const facilityId = route.query.facilityId;
+  const facilityId = router.currentRoute.value.query.facilityId;
 
   if (typeof facilityId === 'string' && facilityId) {
     filters.value.facilityId = facilityId;
   }
 }
 
-watch(() => route.query.facilityId, applyRouteFilters, { immediate: true });
+watch(() => router.currentRoute.value.query.facilityId, applyRouteFilters, { immediate: true });
 watch(selectedProductStoreId, () => {
   filters.value.productStoreId = selectedProductStoreId.value;
 }, { immediate: true });
@@ -411,7 +379,7 @@ async function runAction(action: BulkActionDefinition) {
   try {
     await store.runBulkAction(bucket, action.id);
     await loadWorkflowOrders();
-    toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+    toastMessage.value = `${action.label}: ${count} ${count === 1 ? translate('order') : translate('orders')}`;
   } catch {
     toastMessage.value = translate('Failed to complete bulk action. Please try again.');
   }
@@ -421,62 +389,11 @@ function packedOrderKey(order: WorkflowOrder) {
   return `${order.orderId}-${order.shipGroupSeqId || order.shipmentId || 'packed'}`;
 }
 
-function packedStatusLabel(order: WorkflowOrder) {
-  const status = formatStatus(order.shipmentStatusId || order.statusId);
-  const priority = order.priority && order.priority !== 'NORMAL' ? formatStatus(order.priority) : '';
-  return [status, priority].filter(Boolean).join(' · ');
-}
-
-function carrierLabel(order: WorkflowOrder) {
-  return order.carrierPartyId || formatChannel(order.salesChannelEnumId);
-}
-
-function workflowDateValue(order: WorkflowOrder) {
-  return order.shipBeforeDate || order.estimatedDeliveryDate || order.orderDate;
-}
-
-function workflowDateCaption(order: WorkflowOrder) {
-  if (order.shipBeforeDate) return translate('Ship by');
-  if (order.estimatedDeliveryDate) return translate('Estimated delivery date');
-  return translate('Ordered');
-}
-
-function workflowDateLabel(order: WorkflowOrder) {
-  const date = dateFromValue(workflowDateValue(order));
-  return date ? date.toFormat('MM-dd-yyyy hh:mm a') : translate('No date');
-}
-
-function workflowDateRelativeLabel(order: WorkflowOrder) {
-  const date = dateFromValue(workflowDateValue(order));
-  return date?.toRelative() || '';
-}
-
-function shipmentContextLabel(order: WorkflowOrder) {
-  if (order.shipmentId) return `${translate('Shipment')} ${order.shipmentId}`;
-  if (order.shipmentStatusId) return formatStatus(order.shipmentStatusId);
-  return '';
-}
-
-function itemCountLabel(order: WorkflowOrder) {
-  return `${order.itemCount} ${order.itemCount === 1 ? translate('item') : translate('items')}`;
-}
-
 function formatChannel(channel: string) {
   if (!channel) return '';
   return channel
     .replace(/_SALES_CHANNEL$/, '')
     .replace(/_CHANNEL$/, '')
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function formatStatus(statusId?: string | null) {
-  if (!statusId) return '';
-  return statusId
-    .replace(/^ORDER_/, '')
-    .replace(/^ITEM_/, '')
-    .replace(/^SHIPMENT_/, '')
     .replace(/_/g, ' ')
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -498,9 +415,6 @@ function dateFromValue(value?: string | null) {
   return isoDate.isValid ? isoDate : null;
 }
 
-function formatCurrency(amount: number, currency: string) {
-  return commonUtil.formatCurrency(amount, currency);
-}
 </script>
 
 <style scoped>

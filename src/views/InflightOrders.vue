@@ -34,57 +34,17 @@
           </ion-button>
         </ion-list-header>
 
-        <div
+        <OrderRow
           v-for="order in orders"
           :key="`${order.orderId}-${order.shipGroupSeqId}`"
-          class="list-item inflight-order-row"
-          :role="selectMode ? 'button' : 'link'"
-          tabindex="0"
-          @click="handleOrderRowClick(order)"
-          @keydown.enter.prevent="handleOrderRowClick(order)"
-          @keydown.space.prevent="handleOrderRowClick(order)"
-        >
-          <ion-item
-            lines="none"
-          >
-            <ion-checkbox
-              v-if="selectMode"
-              slot="start"
-              :checked="selectedIds.has(order.orderId)"
-              @click.stop
-              @keydown.stop
-              @ion-change="setOrderSelection(order.orderId, $event.detail.checked)"
-            />
-            <ion-label>
-              <p class="overline">{{ order.orderId }}</p>
-              {{ order.orderName || order.externalId || order.orderId }}
-              <p>{{ formatStatus(order.statusId) }}</p>
-            </ion-label>
-          </ion-item>
-
-          <ion-label class="tablet ion-text-start">
-            {{ order.customerName || translate('Customer') }}
-            <p>{{ customerAddressLine(order) }}</p>
-            <p v-if="customerAddressTrailingLine(order)">{{ customerAddressTrailingLine(order) }}</p>
-          </ion-label>
-
-          <ion-label class="tablet ion-text-start">
-            <p class="overline">{{ order.facilityName || order.facilityId || translate('Facility name') }}</p>
-            {{ order.shipmentMethodDesc || order.shippingMethodTypeId || translate('Method name') }}
-            <p>{{ carrierLabel(order) }}</p>
-          </ion-label>
-
-          <ion-label class="tablet">
-            {{ formatDateTime(order.orderDate) }}
-            <p>{{ orderedRelativeLabel(order.orderDate) }}</p>
-          </ion-label>
-
-          <ion-label class="inflight-delivery ion-text-end">
-            {{ estimatedDeliveryDateLabel(order) }}
-            <p>{{ translate('Estimated delivery date') }}</p>
-            <p v-if="estimatedDeliveryRelativeLabel(order)">{{ estimatedDeliveryRelativeLabel(order) }}</p>
-          </ion-label>
-        </div>
+          :model="orderRow(order)"
+          row-class="inflight-order-row"
+          deadline-class="inflight-delivery ion-text-end"
+          :select-mode="selectMode"
+          :selected="selectedIds.has(order.orderId)"
+          @activate="handleOrderRowClick(order)"
+          @selection-change="setOrderSelection(order.orderId, $event)"
+        />
       </ion-list>
 
       <div v-if="isLoading && !orders.length" class="ion-text-center ion-padding">
@@ -169,6 +129,9 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { useWorkflowOrderRouteState } from '@/composables/useWorkflowOrderRouteState';
+import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import OrderRow from '@/components/orders/OrderRow.vue';
+import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, translate } from '@common';
 import router from '@/router';
 
@@ -177,7 +140,6 @@ const VIRTUAL_FACILITY_TYPE_ID = 'VIRTUAL_FACILITY';
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const seedStore = useSeedStore();
-const route = router.currentRoute.value;
 const ionRouter = useIonRouter();
 const toastMessage = ref('');
 
@@ -222,6 +184,10 @@ const resultsSummary = computed(() =>
   `${orders.value.length} of ${orderTotal.value} ${orderTotal.value === 1 ? translate('order') : translate('orders')}`
 );
 
+function orderRow(order: WorkflowOrder) {
+  return toWorkflowOrderRowViewModel(order, orderStore.workflowEnrichment(bucket, order.orderId));
+}
+
 type DateFilterField = 'dateFrom' | 'dateThru';
 type FacilityOption = {
   id: string;
@@ -246,14 +212,14 @@ function normalizeDateFilterValue(value: string | string[] | null | undefined) {
 }
 
 function applyRouteFilters() {
-  const facilityId = route.query.facilityId;
+  const facilityId = router.currentRoute.value.query.facilityId;
 
   if (typeof facilityId === 'string' && facilityId) {
     filters.value.facilityId = facilityId;
   }
 }
 
-watch(() => route.query.facilityId, applyRouteFilters, { immediate: true });
+watch(() => router.currentRoute.value.query.facilityId, applyRouteFilters, { immediate: true });
 
 function loadWorkflowOrders() {
   orderStore.fetchWorkflowOrders(bucket, filters.value);
@@ -404,46 +370,7 @@ async function runAction(action: BulkActionDefinition) {
 
   const count = selectedIds.value.size;
   store.runBulkAction(bucket, action.id);
-  toastMessage.value = `${action.label} · ${count} ${count === 1 ? translate('order') : translate('orders')}`;
-}
-
-function customerAddressLine(order: WorkflowOrder) {
-  return order.shippingAddress1 || order.productStoreName || '';
-}
-
-function customerAddressTrailingLine(order: WorkflowOrder) {
-  const parts = [
-    order.shippingCity,
-    order.shippingStateProvinceGeoId,
-    order.shippingPostalCode,
-    order.shippingCountryGeoId
-  ].filter(Boolean);
-
-  if (parts.length) return parts.join(' ');
-  return '';
-}
-
-function carrierLabel(order: WorkflowOrder) {
-  return order.carrierPartyId || formatChannel(order.salesChannelEnumId);
-}
-
-function orderedRelativeLabel(orderDateValue: string) {
-  const relative = formatRelativeDate(orderDateValue);
-  return relative ? `${translate('Ordered')} ${relative}` : '';
-}
-
-function estimatedDeliveryValue(order: WorkflowOrder) {
-  return order.estimatedDeliveryDate || order.shipBeforeDate;
-}
-
-function estimatedDeliveryDateLabel(order: WorkflowOrder) {
-  const date = dateFromValue(estimatedDeliveryValue(order));
-  return date ? date.toFormat('MM-dd-yyyy') : translate('No delivery date');
-}
-
-function estimatedDeliveryRelativeLabel(order: WorkflowOrder) {
-  const date = dateFromValue(estimatedDeliveryValue(order));
-  return date?.toRelative() || '';
+  toastMessage.value = `${action.label}: ${count} ${count === 1 ? translate('order') : translate('orders')}`;
 }
 
 function formatChannel(channel: string) {
@@ -451,16 +378,6 @@ function formatChannel(channel: string) {
   return channel
     .replace(/_SALES_CHANNEL$/, '')
     .replace(/_CHANNEL$/, '')
-    .replace(/_/g, ' ')
-    .toLowerCase()
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function formatStatus(statusId: string) {
-  if (!statusId) return '';
-  return statusId
-    .replace(/^ORDER_/, '')
-    .replace(/^ITEM_/, '')
     .replace(/_/g, ' ')
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
@@ -482,15 +399,6 @@ function dateFromValue(value?: string | null) {
   return isoDate.isValid ? isoDate : null;
 }
 
-function formatDateTime(orderDateValue: string) {
-  const date = dateFromValue(orderDateValue);
-  return date ? date.toFormat('MM-dd-yyyy hh:mm a') : '';
-}
-
-function formatRelativeDate(orderDateValue: string) {
-  const date = dateFromValue(orderDateValue);
-  return date?.toRelative() || '';
-}
 </script>
 
 <style scoped>

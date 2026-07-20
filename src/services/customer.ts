@@ -991,7 +991,7 @@ export async function deleteCustomerDetails(partyId: string): Promise<void> {
 
 export async function indexCustomer(partyId: string): Promise<void> {
   await api({
-    url: 'admin/solr/indexCustomer',
+    url: 'oms/search/index/customer',
     method: 'post',
     data: { partyId }
   });
