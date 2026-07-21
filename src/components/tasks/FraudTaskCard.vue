@@ -62,14 +62,22 @@
         </ion-label>
       </ion-item>
 
-      <ion-item v-for="risk in task.risks" :key="risk.providerId">
-        <ion-icon slot="start" :icon="informationCircleOutline" color="medium" />
-        <ion-label>
-          {{ risk.providerName }} · {{ seedStore.enumDescription(risk.riskLevelEnumId) }}
-          <template v-for="fact in risk.facts" :key="fact.factSeqId">
-            <p>{{ fact.description }} · {{ seedStore.enumDescription(fact.sentimentEnumId) }}</p>
-          </template>
-        </ion-label>
+      <ion-item v-for="fact in negativeFacts" :key="fact.factSeqId" lines="none">
+        <ion-icon slot="start" :icon="alertCircleOutline" color="danger" />
+        <ion-label class="ion-text-wrap">{{ fact.description }}</ion-label>
+      </ion-item>
+      <ion-item v-if="taskFacts.length && !negativeFacts.length" lines="none">
+        <ion-icon slot="start" :icon="checkmarkCircleOutline" color="success" />
+        <ion-label>{{ translate('No risk-increasing signals') }}</ion-label>
+      </ion-item>
+
+      <ion-item v-if="taskFacts.length" lines="none">
+        <div class="sentiment-chips">
+          <ion-chip color="danger" outline>{{ counts.negative }} {{ translate('negative') }}</ion-chip>
+          <ion-chip color="medium" outline>{{ counts.neutral }} {{ translate('neutral') }}</ion-chip>
+          <ion-chip color="success" outline>{{ counts.positive }} {{ translate('positive') }}</ion-chip>
+        </div>
+        <ion-button slot="end" fill="clear" size="small" @click="openRiskDetails">{{ translate('View details') }}</ion-button>
       </ion-item>
     </ion-list>
 
@@ -78,10 +86,11 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController } from '@ionic/vue';
-import { hardwareChipOutline, informationCircleOutline } from 'ionicons/icons';
+import { IonButton, IonChip, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController, modalController } from '@ionic/vue';
+import { alertCircleOutline, checkmarkCircleOutline, hardwareChipOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
-import { showToast } from '@/utils';
+import { showToast, sentimentCounts } from '@/utils';
+import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
@@ -109,6 +118,18 @@ const cardActions = computed<TaskCardAction[]>(() => [
   { id: 'resolve', label: translate('Resolve task'), kind: 'primary' },
   { id: 'cancel', label: translate('Cancel order'), kind: 'danger' },
 ]);
+
+const taskFacts = computed<any[]>(() => (props.task.risks || []).flatMap((risk: any) => risk.facts || []));
+const negativeFacts = computed(() => taskFacts.value.filter((fact) => fact.sentimentEnumId === 'SENT_NEGATIVE'));
+const counts = computed(() => sentimentCounts(taskFacts.value));
+
+async function openRiskDetails() {
+  const modal = await modalController.create({
+    component: RiskAssessmentModal,
+    componentProps: { risks: props.task.risks || [] },
+  });
+  await modal.present();
+}
 
 function money(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
@@ -273,5 +294,11 @@ defineExpose({
 <style scoped>
 .suggested-action {
   width: 100%;
+}
+
+.sentiment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacer-xs);
 }
 </style>

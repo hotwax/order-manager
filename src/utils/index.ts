@@ -1,4 +1,5 @@
 import { alertController, toastController } from '@ionic/vue';
+import { alertCircleOutline, checkmarkCircleOutline, removeCircleOutline } from 'ionicons/icons';
 import { translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 
@@ -68,6 +69,26 @@ export const factSentimentColor = (sentimentEnumId: string): string => {
   return map[sentimentEnumId] ?? 'medium';
 }
 
+export const factSentimentIcon = (sentimentEnumId: string): string => {
+  const map: Record<string, string> = {
+    SENT_NEGATIVE: alertCircleOutline,
+    SENT_NEUTRAL: removeCircleOutline,
+    SENT_POSITIVE: checkmarkCircleOutline,
+  };
+  return map[sentimentEnumId] ?? removeCircleOutline;
+}
+
 // Surface the risk-increasing facts first, then neutral, then reassuring.
 export const sortFactsBySentiment = <T extends { sentimentEnumId?: string }>(facts: T[]): T[] =>
   [...facts].sort((a, b) => (FACT_SENTIMENT_ORDER[a.sentimentEnumId ?? ''] ?? 1) - (FACT_SENTIMENT_ORDER[b.sentimentEnumId ?? ''] ?? 1));
+
+// Tally facts by sentiment for the summary chips.
+export const sentimentCounts = (facts: Array<{ sentimentEnumId?: string }> = []) => {
+  const counts = { negative: 0, neutral: 0, positive: 0 };
+  for (const fact of facts) {
+    if (fact.sentimentEnumId === 'SENT_NEGATIVE') counts.negative += 1;
+    else if (fact.sentimentEnumId === 'SENT_POSITIVE') counts.positive += 1;
+    else counts.neutral += 1;
+  }
+  return counts;
+}

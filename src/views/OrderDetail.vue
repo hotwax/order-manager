@@ -235,7 +235,7 @@
               <ion-card-title>{{ translate('Fraud risk') }}</ion-card-title>
             </ion-card-header>
             <ion-list lines="none">
-              <ion-item button detail @click="selectedSegment = 'holds'">
+              <ion-item lines="none">
                 <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(order.riskLevelEnumId)" />
                 <ion-label>
                   <p>{{ translate('Recommendation') }}</p>
@@ -244,6 +244,13 @@
                 <ion-badge slot="end" :color="riskLevelColor(order.riskLevelEnumId)">
                   {{ riskSummary.level }}
                 </ion-badge>
+              </ion-item>
+              <ion-item v-if="riskFactCount" button detail lines="none" @click="openRiskDetails">
+                <div class="sentiment-chips">
+                  <ion-chip color="danger" outline>{{ riskCounts.negative }} {{ translate('negative') }}</ion-chip>
+                  <ion-chip color="medium" outline>{{ riskCounts.neutral }} {{ translate('neutral') }}</ion-chip>
+                  <ion-chip color="success" outline>{{ riskCounts.positive }} {{ translate('positive') }}</ion-chip>
+                </div>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -887,63 +894,6 @@
       </div>
 
       <div v-if="selectedSegment === 'holds'">
-        <div v-if="hasRiskContext" class="risk-summary">
-          <ion-list>
-            <ion-list-header>
-              <ion-label>{{ translate('Fraud risk') }}</ion-label>
-            </ion-list-header>
-            <ion-item lines="none" v-if="riskSummary.hasRiskSignal">
-              <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(order.riskLevelEnumId)" />
-              <ion-label>
-                {{ riskSummary.recommendation }}
-                <p>{{ translate('Recommendation') }}</p>
-              </ion-label>
-              <ion-badge slot="end" :color="riskLevelColor(order.riskLevelEnumId)">{{ riskSummary.level }}</ion-badge>
-            </ion-item>
-          </ion-list>
-
-          <ion-list v-if="riskAssessmentsStatus === 'loading'">
-            <ion-item lines="none">
-              <ion-label>{{ translate('Loading risk assessments...') }}</ion-label>
-            </ion-item>
-          </ion-list>
-
-          <ErrorState
-            v-else-if="riskAssessmentsStatus === 'error'"
-            :title="translate('Risk assessments failed to load')"
-            :message="riskAssessmentsError"
-          />
-
-          <ion-list v-else-if="riskAssessments.length">
-            <ion-list-header>
-              <ion-label>{{ translate('Assessment details') }}</ion-label>
-            </ion-list-header>
-            <template v-for="risk in riskAssessments" :key="risk.providerId">
-              <ion-item lines="none">
-                <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(risk.riskLevelEnumId)" />
-                <ion-label>
-                  {{ risk.providerName || risk.providerId || translate('Risk provider') }}
-                  <p>{{ translate('Risk level') }}: {{ seed.enumDescription(risk.riskLevelEnumId) }}</p>
-                </ion-label>
-                <ion-note slot="end">{{ formatDate(risk.createdDate) }}</ion-note>
-              </ion-item>
-              <ion-item v-for="fact in sortFactsBySentiment(risk.facts || [])" :key="fact.factSeqId" lines="none">
-                <ion-icon slot="start" :icon="factSentimentIcon(fact.sentimentEnumId)" :color="factSentimentColor(fact.sentimentEnumId)" />
-                <ion-label class="ion-text-wrap">
-                  {{ fact.description }}
-                  <p>{{ seed.enumDescription(fact.sentimentEnumId) }}</p>
-                </ion-label>
-              </ion-item>
-            </template>
-          </ion-list>
-
-          <ion-list v-else>
-            <ion-item lines="none">
-              <ion-label>{{ translate('No risk assessments for this order') }}</ion-label>
-            </ion-item>
-          </ion-list>
-        </div>
-
         <template v-if="hasOrderHoldTasks">
           <BadAddressTaskCard v-for="task in orderAddressValidationTasks" :key="task.workEffortId" :task="task"
             :countries="seed.getCountries"
@@ -955,7 +905,7 @@
           <HoldTaskCard v-for="task in orderHoldTasks" :key="task.workEffortId" :task="task"
             @completed="reloadHoldTasks" />
         </template>
-        <template v-else-if="!hasRiskContext">
+        <template v-else>
           <EmptyState :title="translate('No holds')" :message="translate('No holds on this order')" />
           <div class="ion-text-center ion-padding">
             <ion-button fill="outline" @click="openCreateHoldTaskModal()">{{ translate('Create hold task') }}</ion-button>
@@ -1061,7 +1011,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { alertCircleOutline, arrowUndoOutline, calendarOutline, checkmarkCircleOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pulseOutline, removeCircleOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
+import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
@@ -1080,6 +1030,7 @@ import RoutingGroupModal from '@/components/fulfillment/RoutingGroupModal.vue';
 import OrderItemAttributesModal from '@/components/orders/OrderItemAttributesModal.vue';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import ManageOrderIdentificationsModal from '@/components/orders/ManageOrderIdentificationsModal.vue';
+import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import ItemFacilityInventoryModal from '@/components/fulfillment/ItemFacilityInventoryModal.vue';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
@@ -1090,7 +1041,7 @@ import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
 import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
 import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
 import { getCustomerReturn } from '@/services/customer';
-import { showToast, isKit, riskLevelColor, factSentimentColor, sortFactsBySentiment } from '@/utils';
+import { showToast, isKit, riskLevelColor, sentimentCounts } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { fulfillmentLineStatus, fulfillmentLineStatusColor } from '@/utils/fulfillmentLineStatus';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
@@ -1820,16 +1771,16 @@ const groupedItems = computed(() => {
 const orderTotals = computed(() => orderDetailStore.orderTotalsByOrderId(props.orderId));
 
 const riskAssessments = computed(() => orderDetailStore.riskAssessmentsByOrderId[props.orderId] || []);
-const riskAssessmentsStatus = computed(() => orderDetailStore.riskAssessmentsStatusByOrderId[props.orderId] || 'idle');
-const riskAssessmentsError = computed(() => orderDetailStore.riskAssessmentsErrorByOrderId[props.orderId] || '');
+const riskFacts = computed(() => riskAssessments.value.flatMap((risk: any) => risk.facts || []));
+const riskCounts = computed(() => sentimentCounts(riskFacts.value));
+const riskFactCount = computed(() => riskFacts.value.length);
 
-function factSentimentIcon(sentimentEnumId: string) {
-  const map: Record<string, string> = {
-    SENT_NEGATIVE: alertCircleOutline,
-    SENT_NEUTRAL: removeCircleOutline,
-    SENT_POSITIVE: checkmarkCircleOutline,
-  };
-  return map[sentimentEnumId] || removeCircleOutline;
+async function openRiskDetails() {
+  const modal = await modalController.create({
+    component: RiskAssessmentModal,
+    componentProps: { risks: riskAssessments.value },
+  });
+  await modal.present();
 }
 
 const riskSummary = computed(() => {
@@ -1842,19 +1793,6 @@ const riskSummary = computed(() => {
     level: levelEnumId ? seed.enumDescription(levelEnumId) : translate('No risk level')
   };
 });
-
-// Whether the merged Holds segment has any risk context to show (signal, in-flight/error
-// state, or assessments). Used to render the risk summary section and to suppress the
-// "No holds" empty state when only risk-review work exists.
-// Only treat an order as having risk context when there is a real risk signal (or
-// loaded assessments). The risk-assessment fetch runs on every Holds open, so counting
-// its transient loading/error state here would flash the risk section on non-risky
-// orders before settling to "No holds". The loading/error sub-states still render inside
-// the risk summary for genuinely risky orders (gated by hasRiskSignal there).
-const hasRiskContext = computed(() =>
-  riskSummary.value.hasRiskSignal
-  || riskAssessments.value.length > 0
-);
 
 const PAYMENT_COLLECTED_STATUSES = new Set(['PAYMENT_AUTHORIZED', 'PAYMENT_SETTLED', 'PAYMENT_RECEIVED']);
 
@@ -2123,6 +2061,9 @@ async function loadOrder(orderId: string, force = false) {
   // Fire-and-forget: the Shopify Admin link hydrates when it resolves; the page
   // never waits on it.
   resolveShopifyOrderShop(orderId);
+  // Load risk facts up front for risk-flagged orders so the header Fraud risk card
+  // can show its sentiment chips without waiting for the Holds tab.
+  if (riskSummary.value.hasRiskSignal) orderDetailStore.fetchRiskAssessments(orderId);
   if (customerPartyId.value) {
     await customerStore.loadCustomerProfile(customerPartyId.value, force);
   }
@@ -3518,6 +3459,12 @@ ion-card-header {
   display: grid;
   grid-template-columns: 1fr auto;
   grid-template-areas: "title actions" "subtitle actions";
+}
+
+.sentiment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacer-xs);
 }
 
 ion-card-header ion-card-title {
