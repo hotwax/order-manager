@@ -1253,7 +1253,7 @@ function handleBatchSizeChange(event: any) {
 .custom-progress-track {
   width: 100%;
   height: var(--spacer-lg);
-  background: #d4f2da; /* Light pale green for background */
+  background: var(--ion-color-light);
   border-radius: var(--spacer-xs);
   display: flex;
   overflow: hidden;
@@ -1431,8 +1431,8 @@ function handleBatchSizeChange(event: any) {
 
 .custom-progress-track {
   display: flex;
-  background-color: var(--ion-color-step-50, #ffffff);
-  border: 1px solid var(--ion-color-step-300, #b3b3b3);
+  background: var(--ion-color-light);
+  border: 1px solid var(--ion-color-medium);
   overflow: hidden;
 }
 
@@ -1449,7 +1449,7 @@ function handleBatchSizeChange(event: any) {
 }
 
 .progress-segment.allocated {
-  background-color: #d2e0fb;
+  background: var(--ion-color-primary);
 }
 
 
@@ -1483,9 +1483,9 @@ function handleBatchSizeChange(event: any) {
   height: 28px;
   border-radius: 6px;
   overflow: hidden;
-  border: 1px solid var(--ion-color-step-300, #b3b3b3);
+  border: 1px solid var(--ion-color-medium);
   margin-bottom: var(--spacer-base);
-  background-color: var(--ion-color-step-50, #ffffff);
+  background: var(--ion-color-light);
 }
 
 .queue-segment {
