@@ -29,7 +29,9 @@ describe('AddOrderTaskModal canonical hold WorkEffort model (#345)', () => {
   it('supports the canonical manual purpose as the selected modal default', () => {
     expect(modal).toContain('defaultWorkEffortPurposeTypeId?: string');
     expect(modal).toContain("workEffortPurposeTypeId: props.defaultWorkEffortPurposeTypeId || ''");
-    expect(modal).toContain(':value="option.enumId"');
+    // #399 renders the purpose picker as an icon popover (ion-select-option can't show
+    // icons), so each option sets the canonical purpose id on click instead of via :value.
+    expect(modal).toContain('@click="form.workEffortPurposeTypeId = option.enumId"');
   });
 
   it('only offers operator-created purposes in the ship-group modal', () => {

@@ -37,20 +37,35 @@
           @ionInput="handleTaskNameInput($event.detail.value)"
         />
       </ion-item>
-      <ion-item>
-        <ion-select
-          :label="requiredLabel('Task Purpose')"
-          label-placement="stacked"
-          interface="popover"
-          :placeholder="translate('Select Task Purpose')"
-          required
-          v-model="form.workEffortPurposeTypeId"
-        >
-          <ion-select-option v-for="option in taskPurposes" :key="option.enumId" :value="option.enumId">
-            {{ option.description || option.enumName || option.enumId }}
-          </ion-select-option>
-        </ion-select>
+      <!-- Task type is internal to the hold-task flow: when the caller supplies a
+           default type (e.g. RESOLVE_ONHOLD_ORDER), hide the selector and submit it
+           internally. The generic bulk "Add task" flow (no default) still shows it. -->
+      <!-- Task purpose picker with workflow icons: ion-select-option can't render
+           icons, so use an anchored popover list (icons centralized in taskPurposeIcons).
+           #391 fixes the work-effort type to a constant, so no type selector is shown. -->
+      <ion-item button detail="false" id="task-purpose-trigger">
+        <ion-icon v-if="selectedPurposeIcon" slot="start" :icon="selectedPurposeIcon" />
+        <ion-label>
+          <p>{{ requiredLabel('Task Purpose') }}</p>
+          <span :class="{ 'task-purpose-placeholder': !form.workEffortPurposeTypeId }">{{ selectedPurposeLabel }}</span>
+        </ion-label>
       </ion-item>
+      <ion-popover trigger="task-purpose-trigger" trigger-action="click" dismiss-on-select :show-backdrop="false">
+        <ion-content>
+          <ion-list>
+            <ion-item
+              v-for="option in taskPurposes"
+              :key="option.enumId"
+              button
+              detail="false"
+              @click="form.workEffortPurposeTypeId = option.enumId"
+            >
+              <ion-icon v-if="getTaskPurposeIcon(option.enumId)" slot="start" :icon="getTaskPurposeIcon(option.enumId)" />
+              <ion-label>{{ option.description || option.enumName || option.enumId }}</ion-label>
+            </ion-item>
+          </ion-list>
+        </ion-content>
+      </ion-popover>
       <ion-item>
         <ion-textarea
           :label="requiredLabel('Description')"
@@ -83,6 +98,7 @@ import {
   IonInput,
   IonItem,
   IonList,
+  IonPopover,
   IonSelect,
   IonSelectOption,
   IonTextarea,
@@ -94,6 +110,7 @@ import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
 import { useSeedStore } from '@/store/seed';
+import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
 
 const props = defineProps<{
   // Optional modal title (already localized by the caller); defaults to "Add Task".
@@ -126,6 +143,14 @@ const taskNameEdited = ref(false);
 // particular, fraud is order-scoped and must never be fanned out through this ship-group modal.
 const taskPurposes = computed(() => seedStore.getEnumsByType(WORK_EFFORT_TYPE_ID)
   .filter((purpose: any) => OPERATOR_HOLD_PURPOSE_IDS.has(purpose.enumId)));
+
+const selectedPurpose = computed(() => taskPurposes.value.find((option) => option.enumId === form.workEffortPurposeTypeId));
+const selectedPurposeLabel = computed(() =>
+  selectedPurpose.value
+    ? (selectedPurpose.value.description || selectedPurpose.value.enumName || selectedPurpose.value.enumId)
+    : translate('Select Task Purpose')
+);
+const selectedPurposeIcon = computed(() => getTaskPurposeIcon(form.workEffortPurposeTypeId));
 
 const generatedTaskName = computed(() => {
   if (!props.autoGenerateTaskName) return '';
@@ -171,3 +196,9 @@ function confirm() {
   modalController.dismiss(payload, 'confirm');
 }
 </script>
+
+<style scoped>
+.task-purpose-placeholder {
+  color: var(--ion-color-medium);
+}
+</style>
