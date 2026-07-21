@@ -6,6 +6,7 @@
     empty-message="Approved orders awaiting brokering and items rejected by a facility will appear here."
     :facility-ids="facilityIds"
     :status="['ORDER_CREATED', 'ORDER_APPROVED']"
+    count-key="brokering"
     @clearFilters="clearFacilityFilter"
   >
     <template #filters>

@@ -135,6 +135,7 @@ import { api, translate } from '@common';
 import { computed, onMounted, ref, watch } from 'vue';
 import { searchOrders } from '@/services/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
+import { useOrderStore } from '@/store/order';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
@@ -162,11 +163,15 @@ const props = defineProps<{
   globalActions?: QueueGlobalAction[];
   status?: string | string[];
   dateFrom?: string;
+  // When set, this queue's total is published to the shared nav-count map so the
+  // side menu can show it as a rollup badge (updated as a byproduct of searching).
+  countKey?: string;
 }>();
 const emit = defineEmits<{
   (e: 'clearFilters'): void;
 }>();
 const orderDetailStore = useOrderDetailStore();
+const orderStore = useOrderStore();
 const orderTaskStore = useOrderTaskStore();
 const productStore = useProductStore();
 const seedStore = useSeedStore();
@@ -251,6 +256,7 @@ async function runSearch() {
     pageIndex.value = 0;
     searchResults.value = result.orders;
     searchTotal.value = result.total;
+    if (props.countKey) orderStore.setNavCount(props.countKey, result.total);
   } catch (err: any) {
     error.value = err?.message || translate('Failed to load orders');
   } finally {

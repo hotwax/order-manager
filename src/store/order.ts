@@ -144,7 +144,10 @@ export const useOrderStore = defineStore('orders', {
       open: {} as Record<string, OrderRowEnrichment>,
       inflight: {} as Record<string, OrderRowEnrichment>,
       packed: {} as Record<string, OrderRowEnrichment>
-    }
+    },
+    // Shared queue totals surfaced as menu rollup badges. Written as a byproduct
+    // of each queue page fetching its own list; the menu reads them reactively.
+    navCounts: {} as Record<string, number | undefined>
   }),
   getters: {
     filteredOrders: (state) => state.searchResults,
@@ -164,6 +167,9 @@ export const useOrderStore = defineStore('orders', {
       state.workflowOrderEnrichment[bucket][orderId],
   },
   actions: {
+    setNavCount(key: string, total: number) {
+      this.navCounts[key] = total;
+    },
     async runSearch() {
       this.pageIndex = 0;
       const result = await this.fetchSearchPage(0);
@@ -264,6 +270,7 @@ export const useOrderStore = defineStore('orders', {
         this.workflowOrders[bucket] = orders;
         this.workflowOrdersTotal[bucket] = total;
         this.workflowOrdersPageIndex[bucket] = 0;
+        this.setNavCount(bucket, total);
       } catch (error: any) {
         logger.error(`Failed to fetch ${bucket} orders`, error);
       } finally {

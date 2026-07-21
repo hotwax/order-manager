@@ -8,6 +8,7 @@
     :global-actions="['brokerSelected']"
     :status="['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD']"
     :date-from="dateFrom"
+    count-key="unfillable"
   />
 </template>
 

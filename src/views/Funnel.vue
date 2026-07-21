@@ -581,6 +581,7 @@ import {
 } from 'ionicons/icons';
 import { translate, StatCard, Sparkline, commonUtil } from '@common';
 import { useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
+import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
@@ -589,6 +590,7 @@ import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 
 const store = useCustomerServiceStore();
+const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
 const seedStore = useSeedStore();
 const userStore = useUserStore();
@@ -829,6 +831,10 @@ async function fetchBrokeredWorkload(productStoreId: string) {
   brokeredWorkloadError.value = false;
   try {
     brokeredWorkload.value = await fetchWorkflowOrderTotals(productStoreId);
+    // Share the brokered totals with the side-menu rollup badges (first-come preload).
+    orderStore.setNavCount('open', brokeredWorkload.value.open);
+    orderStore.setNavCount('inflight', brokeredWorkload.value.inflight);
+    orderStore.setNavCount('packed', brokeredWorkload.value.packed);
   } catch (error) {
     console.error('Failed to fetch brokered workload totals', error);
     brokeredWorkloadError.value = true;

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { api } from '@common';
+import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
@@ -247,6 +248,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         const total = responseTotal(listResponse);
         this.holdTotalKnown = total !== null;
         this.holdTotal = total ?? this.holdTasks.length;
+        useOrderStore().setNavCount('hold', this.holdTotal);
         if (isFirstPage) this.holdStatus = 'success';
       } catch (err: any) {
         console.error('Failed to fetch the hold tasks', err);
@@ -277,6 +279,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         const total = responseTotal(listResponse);
         this.addressValidationTotalKnown = total !== null;
         this.addressValidationTotal = total ?? this.addressValidationTasks.length;
+        useOrderStore().setNavCount('badAddress', this.addressValidationTotal);
         return true;
       } catch (err) {
         console.error('Failed to fetch the address validation tasks', err);
@@ -312,6 +315,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         const total = responseTotal(listResponse);
         this.swapTotalKnown = total !== null;
         this.swapTotal = total ?? this.swapTasks.length;
+        useOrderStore().setNavCount('swap', this.swapTotal);
         // Only mark success once product master + stock enrichment have settled so
         // the cards render their images/stock without flashing partial content.
         await prefetchSwapTaskAssets(detailedTasks);
@@ -352,6 +356,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         const total = responseTotal(listResponse);
         this.fraudTotalKnown = total !== null;
         this.fraudTotal = total ?? this.fraudTasks.length;
+        useOrderStore().setNavCount('fraud', this.fraudTotal);
         // Success only after both the list and the per-task enrichment have settled.
         if (isFirstPage) this.fraudStatus = 'success';
       } catch (err) {
