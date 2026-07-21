@@ -139,6 +139,7 @@ import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { PRODUCT_ASSOCIATION_UPDATE_PERMISSION } from '@/authorization/permissions';
 import { fetchUnfillableProductCandidates, fetchUnfillableShipGroupsForProduct } from '@/services/order';
+import { fetchActiveSubstitutes } from '@/services/productAssociations';
 import { showToast } from '@/utils';
 import { countTaskTargets, runGroupedTaskMutation, shipGroupTaskTarget } from '@/utils/orderTaskBulk';
 
@@ -315,6 +316,19 @@ async function loadSetupCandidates() {
       ...candidate,
       ...(productCache.getProduct(candidate.productId) || {}),
     }));
+
+    // Fetch active substitute associations in parallel for all candidate products
+    const associationsResults = await Promise.allSettled(
+      candidates.map((candidate) => fetchActiveSubstitutes(candidate.productId))
+    );
+
+    const configuredIds: string[] = [];
+    associationsResults.forEach((result, idx) => {
+      if (result.status === 'fulfilled' && result.value.length > 0) {
+        configuredIds.push(candidates[idx].productId);
+      }
+    });
+    configuredProductIds.value = configuredIds;
   } catch (cause) {
     setupCandidates.value = [];
     setupError.value = translate('Failed to load unfillable products. Please try again.');

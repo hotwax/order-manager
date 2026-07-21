@@ -22,12 +22,12 @@
       <ion-list-header>
         <ion-label>{{ translate('Selected substitutes') }}</ion-label>
       </ion-list-header>
-      <ion-item lines="none">
-        <ion-chip v-for="product in selectedProducts" :key="product.productId">
+      <div class="selected-chips-container">
+        <ion-chip v-for="product in selectedProducts" :key="product.productId" @click="removeSelected(product.productId)">
           <ion-label>{{ productLabel(product) }}</ion-label>
-          <ion-icon :icon="closeCircle" @click="removeSelected(product.productId)" />
+          <ion-icon :icon="closeCircle" />
         </ion-chip>
-      </ion-item>
+      </div>
     </ion-list>
 
     <div v-if="loading" class="ion-text-center ion-padding">
@@ -241,3 +241,32 @@ function dismiss() {
 
 onMounted(initialize);
 </script>
+
+<style scoped>
+.selected-chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacer-xs, 8px);
+  padding: var(--spacer-xs, 8px) var(--spacer-sm, 16px) var(--spacer-sm, 16px);
+}
+
+ion-chip {
+  max-width: 100%;
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+
+ion-chip ion-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+ion-chip ion-icon {
+  flex-shrink: 0;
+  margin-inline-start: 4px;
+  font-size: 18px;
+  cursor: pointer;
+}
+</style>
