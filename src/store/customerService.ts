@@ -15,9 +15,9 @@ import type {
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
+import { fetchVirtualLocationOrderCounts, getActivePhysicalFacilityOrderVolume, searchOrders } from '@/services/order';
 import { getDashboardDateFilter } from '@/utils/dashboardDate';
 import { useUserStore } from '@/store/user';
-import { fetchVirtualLocationOrderCounts, searchOrders } from '@/services/order';
 
 const CHANNELS = ['WEB_SALES_CHANNEL', 'POS_SALES_CHANNEL', 'MOBILE_SALES_CHANNEL', 'MARKETPLACE_CHANNEL'];
 const BROKERABLE_ORDER_STATUSES = ['ORDER_CREATED', 'ORDER_APPROVED'];
@@ -37,10 +37,26 @@ const DEFAULT_VIRTUAL_LOCATION_NAMES: Record<string, string> = {
   REJECTED_PARKING: 'Rejected queue',
   UNFILLABLE_PARKING: 'Unfillable queue'
 };
+const VIRTUAL_OR_PARKING_FACILITY_IDS = new Set([
+  '_NA_',
+  'REJECTED_ITM_PARKING',
+  'REJECTED_PARKING',
+  'UNFILLABLE_PARKING',
+  GENERAL_OPS_PARKING_FACILITY_ID
+]);
 
 function getUserDashboardDateFilter() {
   const userProfile = useUserStore().current;
   return getDashboardDateFilter(userProfile?.timeZone || userProfile?.userTimeZone);
+}
+
+function getUserDashboardDateRange() {
+  const dateFilter = getUserDashboardDateFilter();
+  return {
+    dateFilter,
+    startOfDayStr: DateTime.fromISO(dateFilter).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss'),
+    endOfDayStr: DateTime.fromISO(dateFilter).plus({ days: 1 }).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss')
+  };
 }
 
 function facilityIdOf(facility: any) {
@@ -106,6 +122,7 @@ export type DashboardStatusKey =
   | 'facilityOrderVolume'
   | 'facilityFulfillmentVelocity'
   | 'facilityPartialFulfillments'
+  | 'facilityRejections'
   | 'facilityFulfillmentProgress'
   | 'fulfillmentSyncData';
 
@@ -120,6 +137,7 @@ function emptyDashboardStatus(): Record<DashboardStatusKey, LoadStatus> {
     facilityOrderVolume: 'idle',
     facilityFulfillmentVelocity: 'idle',
     facilityPartialFulfillments: 'idle',
+    facilityRejections: 'idle',
     facilityFulfillmentProgress: 'idle',
     fulfillmentSyncData: 'idle'
   };
@@ -163,6 +181,62 @@ function matchesFilters(order: WorkflowOrder, filters: WorkflowFilters): boolean
   return true;
 }
 
+function hasUsableFacilityOrderVolume(facilities: any[]) {
+  return facilities.some((facility) =>
+    facility?.facilityId
+    && Number(facility.lastOrderCount || facility.orderCount || facility.shipGroupCount || 0) > 0
+  );
+}
+
+function hasUsableFacilityFulfillmentVelocity(facilities: any[]) {
+  return facilities.some((facility) =>
+    facility?.facilityId
+    && (
+      Number(facility.fulfillmentVelocity || 0) > 0
+      || Number(facility.shipGroupCount || 0) > 0
+    )
+  );
+}
+
+function activeFacilityVelocityFallbackRows(facilities: any[]) {
+  return facilities.map((facility) => ({
+    ...facility,
+    activeFacilityFallback: true,
+    fulfillmentVelocity: null,
+    shipGroupCount: 0
+  }));
+}
+
+function buildFacilityRejectionCountMap(rows: any[]) {
+  const rejectedByFacility = new Map<string, Set<string>>();
+
+  rows.forEach((row) => {
+    const facilityId = row?.fromFacilityId;
+    if (!facilityId || VIRTUAL_OR_PARKING_FACILITY_IDS.has(facilityId)) return;
+
+    const rejectionKey = [row.orderId, row.shipGroupSeqId].filter(Boolean).join('::');
+    if (!rejectionKey) return;
+
+    if (!rejectedByFacility.has(facilityId)) rejectedByFacility.set(facilityId, new Set());
+    rejectedByFacility.get(facilityId)!.add(rejectionKey);
+  });
+
+  const rejectionCounts = new Map<string, number>();
+  rejectedByFacility.forEach((rejectedShipGroups, facilityId) => {
+    rejectionCounts.set(facilityId, rejectedShipGroups.size);
+  });
+  return rejectionCounts;
+}
+
+function activeFacilityRowsWithRejections(facilities: any[], rejectionRows: any[]) {
+  const rejectionCountByFacility = buildFacilityRejectionCountMap(rejectionRows);
+
+  return facilities.map((facility) => ({
+    ...facility,
+    rejectedShipGroupCount: rejectionCountByFacility.get(facility.facilityId) || 0
+  }));
+}
+
 function inBucket(order: WorkflowOrder, bucket: WorkflowBucket): boolean {
   return order.bucket === bucket;
 }
@@ -192,6 +266,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
     facilityOrderVolume: [] as any[],
     facilityFulfillmentVelocity: [] as any[],
     facilityPartialFulfillments: [] as any[],
+    facilityRejections: [] as any[],
     facilityFulfillmentProgress: null as FacilityFulfillmentProgress | null,
     virtualLocationCounts: [] as VirtualLocationWorkCount[],
     pickProfileGroups: [] as any[],
@@ -259,6 +334,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
     getFacilityOrderVolume: (state) => state.facilityOrderVolume,
     getFacilityFulfillmentVelocity: (state) => state.facilityFulfillmentVelocity,
     getFacilityPartialFulfillments: (state) => state.facilityPartialFulfillments,
+    getFacilityRejections: (state) => state.facilityRejections,
     getFacilityFulfillmentProgress: (state) => state.facilityFulfillmentProgress,
     getVirtualLocationCounts: (state) => state.virtualLocationCounts,
     getFulfillmentSyncData: (state) => state.fulfillmentSyncData,
@@ -420,7 +496,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
           params
         });
         if (resp.data) {
-          this.facilityOrderVolume = resp.data.facilities || [];
+          const facilities = Array.isArray(resp.data.facilities) ? resp.data.facilities : [];
+          this.facilityOrderVolume = hasUsableFacilityOrderVolume(facilities)
+            ? facilities
+            : await getActivePhysicalFacilityOrderVolume({ productStoreId });
         }
         this.dashboardStatus.facilityOrderVolume = 'success';
       } catch (error) {
@@ -439,7 +518,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
           params
         });
         if (resp.data) {
-          this.facilityFulfillmentVelocity = resp.data.facilities || [];
+          const facilities = Array.isArray(resp.data.facilities) ? resp.data.facilities : [];
+          this.facilityFulfillmentVelocity = hasUsableFacilityFulfillmentVelocity(facilities)
+            ? facilities
+            : activeFacilityVelocityFallbackRows(await getActivePhysicalFacilityOrderVolume({ productStoreId }));
         }
         this.dashboardStatus.facilityFulfillmentVelocity = 'success';
       } catch (error) {
@@ -467,12 +549,43 @@ export const useCustomerServiceStore = defineStore('customerService', {
         this.dashboardStatus.facilityPartialFulfillments = 'error';
       }
     },
+    async fetchFacilityRejections(productStoreId?: string) {
+      this.dashboardStatus.facilityRejections = 'loading';
+      try {
+        const { startOfDayStr, endOfDayStr } = getUserDashboardDateRange();
+        const customParametersMap: any = {
+          facilityId: 'REJECTED_ITM_PARKING',
+          pageNoLimit: true,
+          changeDatetime_from: startOfDayStr,
+          changeDatetime_thru: endOfDayStr
+        };
+        if (productStoreId) customParametersMap.productStoreId = productStoreId;
+
+        const [activeFacilities, resp] = await Promise.all([
+          getActivePhysicalFacilityOrderVolume({ productStoreId }),
+          api({
+            url: 'oms/dataDocumentView',
+            method: 'POST',
+            data: {
+              dataDocumentId: 'ORDER_FACILITY_CHANGE',
+              customParametersMap,
+              fieldsToSelect: 'fromFacilityId,orderId,shipGroupSeqId',
+              distinct: true
+            }
+          })
+        ]);
+
+        this.facilityRejections = activeFacilityRowsWithRejections(activeFacilities, resp.data?.entityValueList || []);
+        this.dashboardStatus.facilityRejections = 'success';
+      } catch (error) {
+        console.error('Failed to fetch facility rejections', error);
+        this.dashboardStatus.facilityRejections = 'error';
+      }
+    },
     async fetchFacilityFulfillmentProgress(facilityId: string, productStoreId?: string) {
       this.dashboardStatus.facilityFulfillmentProgress = 'loading';
       try {
-        const dateFilter = getUserDashboardDateFilter();
-        const startOfDayStr = DateTime.fromISO(dateFilter).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss');
-        const endOfDayStr = DateTime.fromISO(dateFilter).plus({ days: 1 }).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss');
+        const { dateFilter, startOfDayStr, endOfDayStr } = getUserDashboardDateRange();
 
         // 1. Fetch Facility Details
         const facilityPromise = api({

@@ -33,6 +33,17 @@ describe('Funnel product store scope', () => {
     expect(customerServiceSource).not.toContain('facilities: () => FACILITIES');
   });
 
+  it('keeps the facility metrics actionable when daily metric rows are empty', () => {
+    expect(customerServiceSource).toContain('hasUsableFacilityFulfillmentVelocity');
+    expect(customerServiceSource).toContain('activeFacilityVelocityFallbackRows(await getActivePhysicalFacilityOrderVolume({ productStoreId }))');
+    expect(funnelSource).toContain('<ion-segment-button value="rejections">');
+    expect(funnelSource).toContain('store.fetchFacilityRejections(productStoreId)');
+    expect(funnelSource).toContain('facilityRejections.value.map');
+    expect(funnelSource).toContain('item.lastOrderCount || 0');
+    expect(funnelSource).toContain('item.rejectedShipGroupCount');
+    expect(funnelSource).not.toContain('<ion-segment-button value="partial">');
+  });
+
   it('keeps workflow order pages scoped to the Settings product store', () => {
     for (const source of [openOrdersSource, packedOrdersSource]) {
       expect(source).toContain("import { useProductStore } from '@/store/productStore'");

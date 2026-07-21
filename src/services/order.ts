@@ -27,6 +27,14 @@ const PHYSICAL_FULFILLMENT_FACILITY_TYPE_IDS = [
   'WAREHOUSE'
 ];
 
+const VIRTUAL_OR_PARKING_FACILITY_IDS = [
+  '_NA_',
+  'REJECTED_ITM_PARKING',
+  'REJECTED_PARKING',
+  'UNFILLABLE_PARKING',
+  GENERAL_OPS_PARKING_FACILITY_ID
+];
+
 export interface OrderSearchParams {
   queryString?: string;
   status?: string | string[];
@@ -42,6 +50,13 @@ export interface OrderSearchParams {
   pageSize?: number;
   pageIndex?: number;
   allocationSummary?: AllocationSummaryOptions;
+}
+
+export interface ActiveFacilityOrderVolume {
+  facilityId: string;
+  facilityName: string;
+  lastOrderCount: number;
+  assignedItemQuantity: number;
 }
 
 export interface VirtualLocationCountParams {
@@ -296,6 +311,49 @@ export async function fetchOrderRowEnrichment(orderIds: readonly string[]): Prom
   return normalizeOrderRowEnrichment(response.data);
 }
 
+export function buildActivePhysicalFacilityOrderVolumePayload(params: { productStoreId?: string } = {}) {
+  const filters = [
+    'docType: ORDER',
+    'orderTypeId: SALES_ORDER',
+    'facilityId:[* TO *]',
+    '-facilityTypeId:VIRTUAL_FACILITY',
+    `-facilityId:(${VIRTUAL_OR_PARKING_FACILITY_IDS.map(escapeSolrValue).join(' OR ')})`,
+    '-orderStatusId:(ORDER_COMPLETED OR ORDER_CANCELLED)'
+  ];
+
+  if (params.productStoreId && params.productStoreId !== 'All') {
+    filters.push(`productStoreId:${escapeSolrValue(params.productStoreId)}`);
+  }
+
+  return {
+    json: {
+      params: {
+        rows: 0,
+        'q.op': 'AND'
+      } as Record<string, any>,
+      query: '*:*',
+      filter: filters,
+      facet: {
+        physicalFacilities: {
+          type: 'terms',
+          field: 'facilityId',
+          limit: 50,
+          sort: 'orderCount desc',
+          facet: {
+            orderCount: 'unique(orderId)',
+            itemQuantity: 'sum(quantity)',
+            facilityNames: {
+              type: 'terms',
+              field: 'facilityName',
+              limit: 1
+            }
+          }
+        }
+      }
+    }
+  };
+}
+
 export function buildVirtualLocationCountsPayload(params: VirtualLocationCountParams) {
   const filters = ['docType: ORDER', 'orderTypeId: SALES_ORDER'];
   const statusIds = selectedStatuses(params.status ?? ['ORDER_CREATED', 'ORDER_APPROVED']);
@@ -338,6 +396,14 @@ export function buildVirtualLocationCountsPayload(params: VirtualLocationCountPa
       }
     }
   };
+}
+
+export async function getActivePhysicalFacilityOrderVolume(params: { productStoreId?: string } = {}): Promise<ActiveFacilityOrderVolume[]> {
+  const response = await useSolrSearch().runSolrQuery(buildActivePhysicalFacilityOrderVolumePayload(params));
+
+  if (commonUtil.hasError(response)) return Promise.reject(response.data);
+
+  return normalizeActivePhysicalFacilityOrderVolume(response.data);
 }
 
 export async function fetchVirtualLocationOrderCounts(params: VirtualLocationCountParams): Promise<VirtualLocationOrderCount[]> {
@@ -477,6 +543,31 @@ function normalizeOrderWithParkingUnits(docs: any[], allocationSummary?: Allocat
 function sumParkingUnits(docs: any[]) {
   return docs.reduce((total, doc) => total + toNumberValue(doc.quantity), 0);
 }
+
+function normalizeActivePhysicalFacilityOrderVolume(data: any): ActiveFacilityOrderVolume[] {
+  const buckets = data?.facets?.physicalFacilities?.buckets
+    || data?.response?.facets?.physicalFacilities?.buckets
+    || [];
+
+  return buckets
+    .map((bucket: any) => {
+      const facilityId = toStringValue(bucket.val ?? bucket.value);
+      const facilityNameBucket = bucket.facilityNames?.buckets?.[0];
+      const facilityName = toStringValue(facilityNameBucket?.val ?? facilityNameBucket?.value) || facilityId;
+      const lastOrderCount = toNumberValue(bucket.orderCount ?? bucket.count);
+
+      return {
+        facilityId,
+        facilityName,
+        lastOrderCount,
+        assignedItemQuantity: toNumberValue(bucket.itemQuantity)
+      };
+    })
+    .filter((row: ActiveFacilityOrderVolume) => row.facilityId && row.lastOrderCount > 0 && row.assignedItemQuantity > 0)
+    .sort((a: ActiveFacilityOrderVolume, b: ActiveFacilityOrderVolume) => b.lastOrderCount - a.lastOrderCount || a.facilityName.localeCompare(b.facilityName));
+}
+
+type FacilityItemCount = { name: string; count: number };
 
 // Derives the location summary purely from the per-item ORDER docs the grouped
 // search already returns (no per-row detail fetch). Physical facilities drive
