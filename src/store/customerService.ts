@@ -297,7 +297,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         }
         this.dashboardStatus.fulfillmentProgress = 'success';
       } catch (error) {
-        console.error('Failed to fetch fulfillment progress', error);
+        logger.error('Failed to fetch fulfillment progress', error);
         this.dashboardStatus.fulfillmentProgress = 'error';
       }
     },
@@ -314,7 +314,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         if (resp.data) this.openOrders = resp.data;
         this.dashboardStatus.openOrders = 'success';
       } catch (error) {
-        console.error('Failed to fetch open orders', error);
+        logger.error('Failed to fetch open orders', error);
         this.dashboardStatus.openOrders = 'error';
       }
     },
@@ -351,7 +351,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         this.unfillable.totalCount = solrResult.total || 0;
         this.dashboardStatus.unfillable = 'success';
       } catch (error) {
-        console.error('Failed to fetch unfillable stats', error);
+        logger.error('Failed to fetch unfillable stats', error);
         this.dashboardStatus.unfillable = 'error';
       }
     },
@@ -406,7 +406,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         };
         this.dashboardStatus.holdTasks = 'success';
       } catch (error) {
-        console.error('Failed to fetch hold task counts', error);
+        logger.error('Failed to fetch hold task counts', error);
         this.dashboardStatus.holdTasks = 'error';
       }
     },
@@ -467,7 +467,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         }
         this.dashboardStatus.facilityOrderVolume = 'success';
       } catch (error) {
-        console.error('Failed to fetch facility order volume', error);
+        logger.error('Failed to fetch facility order volume', error);
         this.dashboardStatus.facilityOrderVolume = 'error';
       }
     },
@@ -486,7 +486,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         }
         this.dashboardStatus.facilityFulfillmentVelocity = 'success';
       } catch (error) {
-        console.error('Failed to fetch facility fulfillment velocity', error);
+        logger.error('Failed to fetch facility fulfillment velocity', error);
         this.dashboardStatus.facilityFulfillmentVelocity = 'error';
       }
     },
@@ -506,7 +506,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         }
         this.dashboardStatus.facilityPartialFulfillments = 'success';
       } catch (error) {
-        console.error('Failed to fetch facility partial fulfillments', error);
+        logger.error('Failed to fetch facility partial fulfillments', error);
         this.dashboardStatus.facilityPartialFulfillments = 'error';
       }
     },
@@ -522,7 +522,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
           url: `oms/facilities/${facilityId}`,
           method: 'GET'
         }).catch(err => {
-          console.error('Failed to fetch facility details', err);
+          logger.error('Failed to fetch facility details', err);
           return { data: {} };
         });
 
@@ -535,7 +535,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
             entryDate: dateFilter
           }
         }).catch(err => {
-          console.error('Failed to fetch allocations', err);
+          logger.error('Failed to fetch allocations', err);
           return { data: {} };
         });
 
@@ -549,7 +549,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
             changeDatetime_thru: endOfDayStr
           }
         }).catch(err => {
-          console.error('Failed to fetch rejections', err);
+          logger.error('Failed to fetch rejections', err);
           return { data: {} };
         });
 
@@ -563,7 +563,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
             dateFilter
           }
         }).catch(err => {
-          console.error('Failed to fetch facility fulfillment progress stats', err);
+          logger.error('Failed to fetch facility fulfillment progress stats', err);
           return { data: {} };
         });
 
@@ -629,7 +629,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         this.dashboardStatus.facilityFulfillmentProgress = 'success';
 
       } catch (error) {
-        console.error('Failed to fetch facility fulfillment progress', error);
+        logger.error('Failed to fetch facility fulfillment progress', error);
         this.dashboardStatus.facilityFulfillmentProgress = 'error';
       }
     },
@@ -639,7 +639,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         if (facilityId) params.facilityId = facilityId;
         this.pickProfileGroups = await getPickProfileGroups(params);
       } catch (error) {
-        console.error('Failed to fetch pick profile groups', error);
+        logger.error('Failed to fetch pick profile groups', error);
       }
     },
     async updateSortRulesOrder(facilityId: string, updatedSortRules: any[]) {
@@ -662,7 +662,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         await this.savePickProfile(activeProfile);
         await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
       } catch (error) {
-        console.error('Failed to update sort rules order', error);
+        logger.error('Failed to update sort rules order', error);
         commonUtil.showToast(translate('Failed to reorder sort rules.'));
       }
     },
@@ -696,7 +696,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         await this.savePickProfile(activeProfile);
         await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
       } catch (error) {
-        console.error('Failed to add sort rule', error);
+        logger.error('Failed to add sort rule', error);
         commonUtil.showToast(translate('Failed to add sort rule.'));
       }
     },
@@ -721,21 +721,21 @@ export const useCustomerServiceStore = defineStore('customerService', {
         }
         await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
       } catch (error) {
-        console.error('Failed to remove sort rule', error);
+        logger.error('Failed to remove sort rule', error);
         commonUtil.showToast(translate('Failed to remove sort rule.'));
       }
     },
     async updateBatchSize(facilityId: string, batchSize: number) {
-      console.log('updateBatchSize called with facilityId:', facilityId, 'batchSize:', batchSize);
+      logger.info('updateBatchSize called with facilityId:', facilityId, 'batchSize:', batchSize);
       const group = this.pickProfileGroups.find(g => g.facilityId === facilityId);
       if (!group) {
-        console.error('updateBatchSize: group not found for facilityId:', facilityId);
+        logger.error('updateBatchSize: group not found for facilityId:', facilityId);
         return;
       }
 
       const activeProfileBasic = group.profiles?.find((p: any) => p.statusId === 'PICK_PROF_ACTIVE');
       if (!activeProfileBasic) {
-        console.error('updateBatchSize: activeProfileBasic not found');
+        logger.error('updateBatchSize: activeProfileBasic not found');
         return;
       }
 
@@ -750,16 +750,15 @@ export const useCustomerServiceStore = defineStore('customerService', {
           activeProfile = profileResp.data;
         }
       } catch (error) {
-        console.error('Failed to fetch profile before updating batch size', error);
+        logger.error('Failed to fetch profile before updating batch size', error);
       }
 
       const filters = activeProfile.pickProfileFilters || [];
-      console.log('updateBatchSize - existing filters:', JSON.stringify(filters, null, 2));
 
       let batchSizeFilter = filters.find((f: any) => f.conditionTypeEnumId === 'PPF_BATCH_SIZE' || (f.conditionTypeEnumId === 'ENTCT_FILTER' && f.fieldName === 'orderLimit'));
 
       if (!batchSizeFilter) {
-        console.log('updateBatchSize - no existing batch size filter, creating a new one.');
+        logger.info('updateBatchSize - no existing batch size filter, creating a new one.');
         const maxSeqId = Math.max(0, ...filters.map((f: any) => parseInt(f.conditionSeqId) || 0));
         const nextSeqId = String(maxSeqId + 1).padStart(2, '0');
         const standardFilters = filters.filter((f: any) => f.conditionTypeEnumId !== 'ENTCT_SORT_BY');
@@ -776,7 +775,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         };
         filters.push(batchSizeFilter);
       } else {
-        console.log('updateBatchSize - found existing filter. Updating and normalizing type.', batchSizeFilter);
+        logger.info('updateBatchSize - found existing filter. Updating and normalizing type.', batchSizeFilter);
         batchSizeFilter.fieldValue = String(batchSize);
         batchSizeFilter.conditionTypeEnumId = 'PPF_BATCH_SIZE'; // ensure it is normalized to PPF_BATCH_SIZE
       }
@@ -785,7 +784,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         await this.savePickProfile(activeProfile);
         await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
       } catch (error) {
-        console.error('Failed to update batch size', error);
+        logger.error('Failed to update batch size', error);
         commonUtil.showToast(translate('Failed to update batch size.'));
       }
     },
@@ -821,7 +820,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
             activeProfile = profileResp.data;
           }
         } catch (error) {
-          console.error('Failed to fetch single pick profile details', error);
+          logger.error('Failed to fetch single pick profile details', error);
         }
 
         const filters = activeProfile.pickProfileFilters || [];
@@ -847,7 +846,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
               cronExpression = jobDetail.cronExpression || '0 */5 * ? * *';
             }
           } catch (error) {
-            console.error('Failed to fetch service job details', error);
+            logger.error('Failed to fetch service job details', error);
           }
         }
 
@@ -885,7 +884,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
             });
             records = countResp.data?.records || [];
           } catch (error) {
-            console.error('Failed to fetch pick profile order counts', error);
+            logger.error('Failed to fetch pick profile order counts', error);
           }
         }
 
@@ -905,7 +904,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         };
         this.dashboardStatus.fulfillmentSyncData = 'success';
       } catch (error) {
-        console.error('Failed to fetch fulfillment sync data', error);
+        logger.error('Failed to fetch fulfillment sync data', error);
         this.dashboardStatus.fulfillmentSyncData = 'error';
       }
     },
@@ -925,7 +924,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         await this.fetchFulfillmentSyncData(facilityId, productStoreId);
         commonUtil.showToast(translate('Fulfillment sync schedule updated successfully.'));
       } catch (error) {
-        console.error('Failed to update service job', error);
+        logger.error('Failed to update service job', error);
         commonUtil.showToast(translate('Failed to update fulfillment sync schedule.'));
       }
     },
@@ -940,7 +939,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
           throw new Error('Failed to save pick profile');
         }
       } catch (error) {
-        console.error('Failed to save pick profile', error);
+        logger.error('Failed to save pick profile', error);
         throw error;
       }
     },
