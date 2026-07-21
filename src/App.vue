@@ -14,12 +14,14 @@ import { IonApp, IonRouterOutlet, IonSplitPane, loadingController } from '@ionic
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Settings } from 'luxon';
 import { emitter, FastTravel, translate } from '@common';
+import { useAuth } from '@common/composables/useAuth';
 import Menu from '@/components/layout/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';
 import { useSeedStore } from '@/store/seed';
 
 const loader = ref<HTMLIonLoadingElement | null>(null);
+const { isAuthenticated } = useAuth();
 const userStore = useUserStore();
 const userProfile = computed(() => userStore.getUserProfile);
 
@@ -56,10 +58,15 @@ onMounted(async () => {
   const timeZone = userProfile.value?.timeZone || userProfile.value?.userTimeZone;
   if (timeZone) Settings.defaultZone = timeZone;
 
-  // Ensure seed reference data is loaded on an authenticated boot. postLogin only fires on a
-  // login transition, so a page reload with a persisted session would otherwise skip it and
-  // leave label datasets (statuses, enums, geo, types) unresolved. loadInitialSeedData is
-  // idempotent — already-loaded datasets are skipped.
+  // postLogin only fires on a login transition. Refresh permissions on a restored session so
+  // changes made by an administrator are reflected without forcing the user to log out.
+  if (isAuthenticated.value) {
+    await userStore.fetchPermissions().catch(() => undefined);
+  }
+
+  // Ensure seed reference data is loaded on an authenticated boot. A page reload with a
+  // persisted session would otherwise skip it and leave label datasets unresolved.
+  // loadInitialSeedData is idempotent — already-loaded datasets are skipped.
   const productStoreIds = (userStore.current?.stores || [])
     .map((store: any) => store.productStoreId)
     .filter(Boolean);
