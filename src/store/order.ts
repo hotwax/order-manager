@@ -205,6 +205,7 @@ export const useOrderStore = defineStore('orders', {
         status: this.searchFilters.status,
         channel: this.searchFilters.channel,
         shipmentMethodTypeId: this.searchFilters.shipmentMethodTypeId,
+        allocationState: this.searchFilters.allocationState,
         productStoreId: this.searchFilters.productStoreId,
         dateFrom: this.searchFilters.dateFrom,
         dateThru: this.searchFilters.dateThru,

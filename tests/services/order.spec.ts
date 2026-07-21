@@ -76,6 +76,18 @@ describe('buildOrderLookupPayload facility filtering', () => {
     expect(filters).not.toContain('facilityId:(All OR  OR UNFILLABLE_PARKING)');
   });
 
+  it('maps the Find Order allocation state to the matching indexed facility', () => {
+    expect(filtersOf({ allocationState: 'Allocated' })).toContain('facilityTypeId:(RETAIL_STORE OR WAREHOUSE)');
+    expect(filtersOf({ allocationState: 'AwaitingBrokering' })).toContain('facilityId:(_NA_ OR REJECTED_ITM_PARKING OR REJECTED_PARKING)');
+    expect(filtersOf({ allocationState: 'Unfillable' })).toContain('facilityId:UNFILLABLE_PARKING');
+    expect(filtersOf({ allocationState: 'Archived' })).toContain('facilityId:GENERAL_OPS_PARKING');
+  });
+
+  it("applies no allocation facility filter for 'All' or an unset allocation state", () => {
+    expect(filtersOf({ allocationState: 'All' }).some((filter) => filter.startsWith('facilityId') || filter.startsWith('facilityTypeId'))).toBe(false);
+    expect(filtersOf({}).some((filter) => filter.startsWith('facilityTypeId'))).toBe(false);
+  });
+
   it('combines a facility preset with status, sales channel, and shipping method filters', () => {
     const filters = filtersOf({
       facilityIds: ['UNFILLABLE_PARKING'],

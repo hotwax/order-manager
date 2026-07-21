@@ -42,6 +42,7 @@ export interface OrderSearchParams {
   shipmentMethodTypeId?: string;
   productStoreId?: string;
   facilityIds?: string[];
+  allocationState?: string;
   hasVirtualFacilityItems?: boolean;
   archivedOnly?: boolean;
   dateFrom?: string;
@@ -212,6 +213,28 @@ export function buildOrderLookupPayload(params: OrderSearchParams = {}) {
   // Archived orders = items parked in General Operations Parking.
   // Backed by the indexed `facilityId` field on the ORDER item docs.
   if (params.archivedOnly) filters.push(`facilityId:${escapeSolrValue(GENERAL_OPS_PARKING_FACILITY_ID)}`);
+
+  // Allocation state (Find Order): a single mutually-exclusive selector that replaces
+  // the separate virtual-facility and archived toggles. Each state narrows to the
+  // item docs' indexed facility, reusing the same facility vocabulary as above.
+  switch (params.allocationState) {
+    case 'Allocated':
+      // Assigned to a physical fulfillment location (retail store or warehouse).
+      filters.push(`facilityTypeId:(${PHYSICAL_FULFILLMENT_FACILITY_TYPE_IDS.map(escapeSolrValue).join(' OR ')})`);
+      break;
+    case 'AwaitingBrokering':
+      // Unbrokered or facility-rejected items parked awaiting (re)brokering.
+      filters.push(`facilityId:(${['_NA_', 'REJECTED_ITM_PARKING', 'REJECTED_PARKING'].map(escapeSolrValue).join(' OR ')})`);
+      break;
+    case 'Unfillable':
+      filters.push(`facilityId:${escapeSolrValue('UNFILLABLE_PARKING')}`);
+      break;
+    case 'Archived':
+      filters.push(`facilityId:${escapeSolrValue(GENERAL_OPS_PARKING_FACILITY_ID)}`);
+      break;
+    default:
+      break;
+  }
 
   const dateFilter = buildOrderDateSolrFilter(params.dateFrom, params.dateThru);
   if (dateFilter) filters.push(dateFilter);
