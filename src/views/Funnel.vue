@@ -81,15 +81,15 @@
             <ion-spinner name="crescent" />
           </template>
           <ion-list v-if="!brokeredWorkloadLoading" lines="none" class="hold-tasks-list">
-            <ion-item button :detail="true" :router-link="{ path: '/open', query: { dateFrom: todayDateStr } }">
+            <ion-item button :detail="true" router-link="/open">
               <ion-label>{{ translate("Open") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.open) }} {{ translate(brokeredWorkload.open === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" :router-link="{ path: '/inflight', query: { dateFrom: todayDateStr } }">
+            <ion-item button :detail="true" router-link="/inflight">
               <ion-label>{{ translate("Picked") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.inflight) }} {{ translate(brokeredWorkload.inflight === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" :router-link="{ path: '/packed', query: { dateFrom: todayDateStr } }">
+            <ion-item button :detail="true" router-link="/packed">
               <ion-label>{{ translate("Packed and shipped") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.packed) }} {{ translate(brokeredWorkload.packed === 1 ? "order" : "orders") }}</p>
             </ion-item>
