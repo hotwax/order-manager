@@ -726,16 +726,16 @@ export const useCustomerServiceStore = defineStore('customerService', {
       }
     },
     async updateBatchSize(facilityId: string, batchSize: number) {
-      console.log('updateBatchSize called with facilityId:', facilityId, 'batchSize:', batchSize);
+      logger.info(`updateBatchSize called`, { facilityId, batchSize });
       const group = this.pickProfileGroups.find(g => g.facilityId === facilityId);
       if (!group) {
-        console.error('updateBatchSize: group not found for facilityId:', facilityId);
+        logger.error('updateBatchSize: group not found', { facilityId });
         return;
       }
 
       const activeProfileBasic = group.profiles?.find((p: any) => p.statusId === 'PICK_PROF_ACTIVE');
       if (!activeProfileBasic) {
-        console.error('updateBatchSize: activeProfileBasic not found');
+        logger.error('updateBatchSize: activeProfileBasic not found');
         return;
       }
 
@@ -750,16 +750,16 @@ export const useCustomerServiceStore = defineStore('customerService', {
           activeProfile = profileResp.data;
         }
       } catch (error) {
-        console.error('Failed to fetch profile before updating batch size', error);
+        logger.error('Failed to fetch profile before updating batch size', error);
       }
 
       const filters = activeProfile.pickProfileFilters || [];
-      console.log('updateBatchSize - existing filters:', JSON.stringify(filters, null, 2));
+      logger.info('updateBatchSize - existing filters:', { filters });
 
       let batchSizeFilter = filters.find((f: any) => f.conditionTypeEnumId === 'PPF_BATCH_SIZE' || (f.conditionTypeEnumId === 'ENTCT_FILTER' && f.fieldName === 'orderLimit'));
 
       if (!batchSizeFilter) {
-        console.log('updateBatchSize - no existing batch size filter, creating a new one.');
+        logger.info('updateBatchSize - no existing batch size filter, creating a new one.');
         const maxSeqId = Math.max(0, ...filters.map((f: any) => parseInt(f.conditionSeqId) || 0));
         const nextSeqId = String(maxSeqId + 1).padStart(2, '0');
         const standardFilters = filters.filter((f: any) => f.conditionTypeEnumId !== 'ENTCT_SORT_BY');
@@ -776,7 +776,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         };
         filters.push(batchSizeFilter);
       } else {
-        console.log('updateBatchSize - found existing filter. Updating and normalizing type.', batchSizeFilter);
+        logger.info('updateBatchSize - found existing filter. Updating and normalizing type.', { batchSizeFilter });
         batchSizeFilter.fieldValue = String(batchSize);
         batchSizeFilter.conditionTypeEnumId = 'PPF_BATCH_SIZE'; // ensure it is normalized to PPF_BATCH_SIZE
       }
@@ -785,7 +785,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         await this.savePickProfile(activeProfile);
         await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
       } catch (error) {
-        console.error('Failed to update batch size', error);
+        logger.error('Failed to update batch size', error);
         commonUtil.showToast(translate('Failed to update batch size.'));
       }
     },
