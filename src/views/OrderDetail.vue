@@ -126,6 +126,48 @@
 
           <ion-card>
             <ion-card-header>
+              <ion-card-title>{{ translate('Source') }}</ion-card-title>
+            </ion-card-header>
+            <ion-list lines="none">
+              <ion-item>
+                <ion-label>
+                  <p>{{ translate('Brand') }}</p>
+                  {{ order.productStoreName }}
+                </ion-label>
+              </ion-item>
+              <ion-item>
+                <ion-label>
+                  <p>{{ translate('Channel') }}</p>
+                  {{ order.channel || translate('Channel') }}
+                </ion-label>
+              </ion-item>
+              <ion-item v-if="order.salesChannelEnumId === 'POS_SALES_CHANNEL'">
+                <ion-label>
+                  <p>{{ translate('Placed at') }}</p>
+                  {{ order.originFacilityName || translate('Facility not available') }}
+                  <p>{{ order.originFacilityId }}</p>
+                </ion-label>
+              </ion-item>
+              <template v-for="source in exchangeSources" :key="source.orderId">
+                <ion-item button :detail="true" :router-link="`/orders/${source.orderId}`">
+                  <ion-label>
+                    <p>{{ translate('Exchange of') }}</p>
+                    <ion-skeleton-text v-if="source.loading" animated style="width: 60%" />
+                    <template v-else>{{ source.orderName }}</template>
+                  </ion-label>
+                </ion-item>
+                <ion-item v-for="returnId in source.returnIds" :key="returnId" button :detail="true" :router-link="`/returns/${returnId}`">
+                  <ion-label>
+                    <p>{{ translate('Processed with return') }}</p>
+                    {{ returnId }}
+                  </ion-label>
+                </ion-item>
+              </template>
+            </ion-list>
+          </ion-card>
+
+          <ion-card>
+            <ion-card-header>
               <ion-card-title>{{ translate('Order identifications') }}</ion-card-title>
               <ion-button fill="clear" size="small" @click="openManageIdentificationsModal()">
                 {{ translate('Manage') }}
@@ -167,48 +209,6 @@
                   <ion-icon :icon="openOutline" />
                 </a>
               </ion-item>
-            </ion-list>
-          </ion-card>
-
-          <ion-card>
-            <ion-card-header>
-              <ion-card-title>{{ translate('Source') }}</ion-card-title>
-            </ion-card-header>
-            <ion-list lines="none">
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Brand') }}</p>
-                  {{ order.productStoreName }}
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Channel') }}</p>
-                  {{ order.channel || translate('Channel') }}
-                </ion-label>
-              </ion-item>
-              <ion-item v-if="order.salesChannelEnumId === 'POS_SALES_CHANNEL'">
-                <ion-label>
-                  <p>{{ translate('Placed at') }}</p>
-                  {{ order.originFacilityName || translate('Facility not available') }}
-                  <p>{{ order.originFacilityId }}</p>
-                </ion-label>
-              </ion-item>
-              <template v-for="source in exchangeSources" :key="source.orderId">
-                <ion-item button :detail="true" :router-link="`/orders/${source.orderId}`">
-                  <ion-label>
-                    <p>{{ translate('Exchange of') }}</p>
-                    <ion-skeleton-text v-if="source.loading" animated style="width: 60%" />
-                    <template v-else>{{ source.orderName }}</template>
-                  </ion-label>
-                </ion-item>
-                <ion-item v-for="returnId in source.returnIds" :key="returnId" button :detail="true" :router-link="`/returns/${returnId}`">
-                  <ion-label>
-                    <p>{{ translate('Processed with return') }}</p>
-                    {{ returnId }}
-                  </ion-label>
-                </ion-item>
-              </template>
             </ion-list>
           </ion-card>
 
@@ -918,17 +918,23 @@
             <ion-list-header>
               <ion-label>{{ translate('Assessment details') }}</ion-label>
             </ion-list-header>
-            <ion-item v-for="risk in riskAssessments" :key="risk.providerId">
-              <ion-icon slot="start" :icon="informationCircleOutline" :color="riskLevelColor(risk.riskLevelEnumId)" />
-              <ion-label>
-                {{ risk.providerName || risk.providerId || translate('Risk provider') }}
-                <p>{{ seed.enumDescription(risk.riskLevelEnumId) }}</p>
-                <template v-for="fact in risk.facts || []" :key="fact.factSeqId">
-                  <p>{{ fact.description }} · {{ seed.enumDescription(fact.sentimentEnumId) }}</p>
-                </template>
-              </ion-label>
-              <ion-note slot="end">{{ formatDate(risk.createdDate) }}</ion-note>
-            </ion-item>
+            <template v-for="risk in riskAssessments" :key="risk.providerId">
+              <ion-item lines="none">
+                <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(risk.riskLevelEnumId)" />
+                <ion-label>
+                  {{ risk.providerName || risk.providerId || translate('Risk provider') }}
+                  <p>{{ translate('Risk level') }}: {{ seed.enumDescription(risk.riskLevelEnumId) }}</p>
+                </ion-label>
+                <ion-note slot="end">{{ formatDate(risk.createdDate) }}</ion-note>
+              </ion-item>
+              <ion-item v-for="fact in sortFactsBySentiment(risk.facts || [])" :key="fact.factSeqId" lines="none">
+                <ion-icon slot="start" :icon="factSentimentIcon(fact.sentimentEnumId)" :color="factSentimentColor(fact.sentimentEnumId)" />
+                <ion-label class="ion-text-wrap">
+                  {{ fact.description }}
+                  <p>{{ seed.enumDescription(fact.sentimentEnumId) }}</p>
+                </ion-label>
+              </ion-item>
+            </template>
           </ion-list>
 
           <ion-list v-else>
@@ -1055,7 +1061,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, informationCircleOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
+import { alertCircleOutline, arrowUndoOutline, calendarOutline, checkmarkCircleOutline, checkmarkDoneOutline, checkmarkOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pulseOutline, removeCircleOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
@@ -1084,7 +1090,7 @@ import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
 import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
 import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
 import { getCustomerReturn } from '@/services/customer';
-import { showToast, isKit, riskLevelColor } from '@/utils';
+import { showToast, isKit, riskLevelColor, factSentimentColor, sortFactsBySentiment } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { fulfillmentLineStatus, fulfillmentLineStatusColor } from '@/utils/fulfillmentLineStatus';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
@@ -1816,6 +1822,15 @@ const orderTotals = computed(() => orderDetailStore.orderTotalsByOrderId(props.o
 const riskAssessments = computed(() => orderDetailStore.riskAssessmentsByOrderId[props.orderId] || []);
 const riskAssessmentsStatus = computed(() => orderDetailStore.riskAssessmentsStatusByOrderId[props.orderId] || 'idle');
 const riskAssessmentsError = computed(() => orderDetailStore.riskAssessmentsErrorByOrderId[props.orderId] || '');
+
+function factSentimentIcon(sentimentEnumId: string) {
+  const map: Record<string, string> = {
+    SENT_NEGATIVE: alertCircleOutline,
+    SENT_NEUTRAL: removeCircleOutline,
+    SENT_POSITIVE: checkmarkCircleOutline,
+  };
+  return map[sentimentEnumId] || removeCircleOutline;
+}
 
 const riskSummary = computed(() => {
   const recommendationEnumId = order.value?.riskRecommendationEnumId || '';

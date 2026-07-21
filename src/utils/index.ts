@@ -51,3 +51,23 @@ export const riskLevelColor = (riskLevelEnumId: string): string => {
   };
   return map[riskLevelEnumId] ?? 'medium';
 }
+
+// Risk-fact sentiment: a negative fact pushes risk up, a positive one reassures.
+const FACT_SENTIMENT_ORDER: Record<string, number> = {
+  SENT_NEGATIVE: 0,
+  SENT_NEUTRAL: 1,
+  SENT_POSITIVE: 2,
+};
+
+export const factSentimentColor = (sentimentEnumId: string): string => {
+  const map: Record<string, string> = {
+    SENT_NEGATIVE: 'danger',
+    SENT_NEUTRAL: 'medium',
+    SENT_POSITIVE: 'success',
+  };
+  return map[sentimentEnumId] ?? 'medium';
+}
+
+// Surface the risk-increasing facts first, then neutral, then reassuring.
+export const sortFactsBySentiment = <T extends { sentimentEnumId?: string }>(facts: T[]): T[] =>
+  [...facts].sort((a, b) => (FACT_SENTIMENT_ORDER[a.sentimentEnumId ?? ''] ?? 1) - (FACT_SENTIMENT_ORDER[b.sentimentEnumId ?? ''] ?? 1));
