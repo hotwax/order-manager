@@ -176,6 +176,14 @@ export const useSeedStore = defineStore("seed", {
     roleTypeDescription: (state) => (roleTypeId: string) => itemDescription(state.roleTypes.byId[roleTypeId], roleTypeId),
     orderAdjustmentTypeDescription: (state) => (orderAdjustmentTypeId: string) => itemDescription(state.orderAdjustmentTypes.byId[orderAdjustmentTypeId], orderAdjustmentTypeId),
     orderIdentificationTypeDescription: (state) => (orderIdentificationTypeId: string) => itemDescription(findEnum(state, orderIdentificationTypeId), orderIdentificationTypeId),
+    orderIdentificationTypeOptions: (state) => {
+      const typeDataset = state.enumsByType.ORDER_IDENTITY;
+      if (!typeDataset) return [];
+      return typeDataset.ids.map((enumId) => ({
+        enumId,
+        description: itemDescription(typeDataset.byId[enumId], enumId)
+      }));
+    },
     geoName: (state) => (geoId: string) => itemDescription(state.geos.byId[geoId], geoId, ["geoName"]),
     getGeoIdByCode: (state) => (code: string) => {
       if (!code) return '';
@@ -375,6 +383,16 @@ export const useSeedStore = defineStore("seed", {
         method: "GET",
         params: { enumTypeId, pageSize: 500, orderByField: "sequenceNum" }
       }, (enumeration) => enumeration.enumId);
+    },
+    async createOrderIdentificationType(payload: { enumId: string; description: string }) {
+      await api({
+        url: "admin/enums",
+        method: "POST",
+        data: { ...payload, enumTypeId: "ORDER_IDENTITY" }
+      });
+      const target = this.scopedDataset(this.enumsByType, "ORDER_IDENTITY");
+      target.status = "idle";
+      await this.loadEnumType("ORDER_IDENTITY");
     },
     async loadEnumsByParentType(parentTypeId: string) {
       const resp = await api({ url: 'admin/enumTypes', method: 'GET', params: { parentTypeId, pageSize: 200 } });
