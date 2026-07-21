@@ -14,17 +14,21 @@ describe('filter select resting state', () => {
     expect(source).toContain("props.placeholder || translate('Select')");
   });
 
-  it('is used for non-date queue filters that match Figma Select / Resting controls', () => {
+  it('uses shared outlined Ionic selects on every task queue', () => {
+    const taskFilters = readFileSync(resolve(process.cwd(), 'src/components/tasks/OrderTaskFilterCard.vue'), 'utf8');
     const fraudOrders = readFileSync(resolve(process.cwd(), 'src/views/FraudOrders.vue'), 'utf8');
     const holdOrders = readFileSync(resolve(process.cwd(), 'src/views/HoldOrders.vue'), 'utf8');
     const badAddressOrders = readFileSync(resolve(process.cwd(), 'src/views/BadAddressOrders.vue'), 'utf8');
     const swapOrders = readFileSync(resolve(process.cwd(), 'src/views/SwapOrders.vue'), 'utf8');
 
-    expect(fraudOrders.match(/<FilterSelect/g)?.length).toBe(4);
-    expect(holdOrders.match(/<FilterSelect/g)?.length).toBe(2);
-    expect(badAddressOrders.match(/<FilterSelect/g)?.length).toBe(2);
-    expect(swapOrders.match(/<FilterSelect/g)?.length).toBe(1);
-    expect(swapOrders).toContain('<FilterToggle v-model="swappable"');
-    expect(`${fraudOrders}\n${holdOrders}\n${badAddressOrders}\n${swapOrders}`).not.toContain('IonSelect,');
+    expect(taskFilters.match(/<ion-select(?:\s|>)/g)?.length).toBe(6);
+    expect(taskFilters.match(/fill="outline"/g)?.length).toBe(6);
+    expect(taskFilters.match(/<DateFilterSelect/g)?.length).toBe(4);
+    expect(taskFilters.match(/ outlined/g)?.length).toBe(4);
+    expect(fraudOrders).toContain('show-fraud-filters');
+    expect(holdOrders).toContain('show-ship-group-filters');
+    expect(badAddressOrders).toContain('show-ship-group-filters');
+    expect(swapOrders).toContain('show-ship-group-filters');
+    expect(`${taskFilters}\n${fraudOrders}\n${holdOrders}\n${badAddressOrders}\n${swapOrders}`).not.toContain('ion-grid');
   });
 });

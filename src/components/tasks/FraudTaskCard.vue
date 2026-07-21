@@ -1,9 +1,9 @@
 <template>
   <TaskCardShell
     :title="taskOrderTitle(task)"
-    :subtitle="formatTaskDate(task.orderDate)"
-    :amount="money(task.grandTotal)"
-    :chip-label="task.workEffortId"
+    :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
+    :amount="formatTaskAmount(task.grandTotal)"
+    :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
     :contact-phone-href="getPhoneHref(task)"
@@ -12,7 +12,10 @@
     content-layout="grid"
     :selectable="selectable"
     :selected="selected"
+    :actions="cardActions"
+    :view-order-link="showViewOrderAction && task.orderId ? `/orders/${task.orderId}` : ''"
     @update:selected="emit('update:selected', $event)"
+    @action="handleAction"
   >
     <ion-list lines="full">
       <ion-list-header>
@@ -51,6 +54,14 @@
         <ion-label>{{ translate('Risk analysis') }}</ion-label>
       </ion-list-header>
 
+      <ion-item lines="full" class="suggested-action">
+        <ion-icon slot="start" :icon="hardwareChipOutline" />
+        <ion-label>
+          {{ translate('Suggested action') }}:
+          <ion-text :color="suggestedActionColor(task)">{{ suggestedActionLabel(task) }}</ion-text>
+        </ion-label>
+      </ion-item>
+
       <ion-item v-for="risk in task.risks" :key="risk.providerId">
         <ion-icon slot="start" :icon="informationCircleOutline" color="medium" />
         <ion-label>
@@ -62,27 +73,12 @@
       </ion-item>
     </ion-list>
 
-    <template #actions>
-      <ion-button fill="clear" color="primary" @click="resolveTask()">{{ translate('Resolve task') }}</ion-button>
-      <ion-button fill="clear" color="danger" @click="cancelOrder()">{{ translate('Cancel order') }}</ion-button>
-      <ion-button v-if="showViewOrderAction && task.orderId" fill="clear" color="primary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
-    </template>
-
-    <template #actions-end>
-      <ion-item lines="none" class="suggested-action">
-        <ion-icon slot="start" :icon="hardwareChipOutline" />
-        <ion-label>
-          {{ translate('Suggested action') }}:
-          <ion-text :color="suggestedActionColor(task)">{{ suggestedActionLabel(task) }}</ion-text>
-        </ion-label>
-      </ion-item>
-    </template>
   </TaskCardShell>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonButton, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController } from '@ionic/vue';
+import { IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController } from '@ionic/vue';
 import { hardwareChipOutline, informationCircleOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { showToast } from '@/utils';
@@ -91,7 +87,8 @@ import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
-import { formatTaskDate, taskOrderTitle } from '@/utils/taskCardDisplay';
+import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
+import type { TaskCardAction } from '@/types/taskCard';
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean; showViewOrderAction?: boolean }>(), {
   selectable: false,
@@ -107,6 +104,11 @@ const emit = defineEmits<{
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+
+const cardActions = computed<TaskCardAction[]>(() => [
+  { id: 'resolve', label: translate('Resolve task'), kind: 'primary' },
+  { id: 'cancel', label: translate('Cancel order'), kind: 'danger' },
+]);
 
 function money(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
@@ -194,7 +196,7 @@ function getEmailHref(task: any): string {
 
 async function resolveTask() {
   try {
-    await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED');
+    await submitTaskStatus('TASK_COMPLETED');
     await showToast(translate('Task resolved successfully.'));
     emit('completed');
   } catch {
@@ -215,7 +217,7 @@ async function cancelOrder() {
           try {
             const items = (props.task.items ?? []).map((item: any) => ({
               orderItemSeqId: item.orderItemSeqId,
-              shipGroupSeqId: props.task.shipGroupSeqId,
+              shipGroupSeqId: item.shipGroupSeqId,
             }));
             await orderTaskStore.cancelOrder(props.task.orderId, items);
             await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_CANCELLED');
@@ -230,25 +232,41 @@ async function cancelOrder() {
   await alert.present();
 }
 
-// No-confirm variant for bulk resolve. Parent does not confirm resolve (matches original bulkResolve).
-async function submitResolve(): Promise<void> {
-  await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED');
+function handleAction(actionId: string) {
+  if (actionId === 'resolve') return resolveTask();
+  if (actionId === 'cancel') return cancelOrder();
 }
 
-// No-confirm variant for bulk cancel. Parent confirms once before invoking.
-async function submitCancel(): Promise<void> {
+// No-confirm variant for bulk resolve. Parent does not confirm resolve (matches original bulkResolve).
+async function submitResolve(): Promise<void> {
+  await submitTaskStatus('TASK_COMPLETED');
+}
+
+async function submitCancelDomain(): Promise<void> {
   const items = (props.task.items ?? []).map((item: any) => ({
     orderItemSeqId: item.orderItemSeqId,
-    shipGroupSeqId: props.task.shipGroupSeqId,
+    shipGroupSeqId: item.shipGroupSeqId,
   }));
   await orderTaskStore.cancelOrder(props.task.orderId, items);
-  await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_CANCELLED');
+}
+
+async function submitTaskStatus(statusId: 'TASK_COMPLETED' | 'TASK_CANCELLED'): Promise<void> {
+  await orderTaskStore.changeTaskStatus(props.task.workEffortId, statusId);
+}
+
+// No-confirm variant used by the single-card flow. Bulk orchestration invokes
+// the target mutation and each WorkEffort transition as separate phases.
+async function submitCancel(): Promise<void> {
+  await submitCancelDomain();
+  await submitTaskStatus('TASK_CANCELLED');
 }
 
 defineExpose({
   task: props.task,
   submitResolve,
   submitCancel,
+  submitCancelDomain,
+  submitTaskStatus,
 });
 </script>
 

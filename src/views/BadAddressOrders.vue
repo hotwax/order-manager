@@ -10,25 +10,15 @@
     </ion-header>
 
     <ion-content>
-      <SearchFilterCard
-        v-model="searchQuery"
-        :placeholder="translate('Search')"
-        @search="fetchAddressValidationTasks()"
+      <OrderTaskFilterCard
+        v-model="filters"
+        :channel-options="channelOptions"
+        :facility-options="facilityOptions"
+        :shipment-method-options="shipmentMethodOptions"
+        show-ship-group-filters
+        @search="replaceAddressValidationTasks"
         @clear="clearFilters"
-      >
-        <FilterSelect v-model="assignee" :label="translate('Assignee')">
-          <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
-          <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
-        </FilterSelect>
-        <DateFilterSelect v-model="dateAfter" :label="translate('Date after')" />
-        <DateFilterSelect v-model="dateBefore" :label="translate('Date before')" />
-        <FilterSelect v-model="orderChannel" :label="translate('Channel')">
-          <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
-          <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
-            {{ channel.description || channel.enumId }}
-          </ion-select-option>
-        </FilterSelect>
-      </SearchFilterCard>
+      />
 
       <div v-if="loading" class="ion-text-center ion-padding">
         <ion-spinner name="crescent" />
@@ -42,24 +32,21 @@
       </template>
 
       <template v-else>
-        <ion-list v-if="addressValidationTasks.length" lines="none">
-          <ion-list-header class="order-results-header">
-            <span class="order-results-header-start">
-              <ion-checkbox
-                v-if="selectMode"
-                :checked="allCurrentPageSelected"
-                :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
-                @ionChange="toggleCurrentPageSelection($event.detail.checked)"
-              />
-            </span>
-            <ion-label>
-              {{ addressValidationTasks.length }} {{ addressValidationTasks.length === 1 ? translate('bad address task') : translate('bad address tasks') }}
-            </ion-label>
-            <ion-button fill="clear" size="small" @click="toggleSelectMode">
-              {{ selectMode ? translate('Done') : translate('Select') }}
-            </ion-button>
-          </ion-list-header>
-        </ion-list>
+        <TaskQueueListHeader
+          :loaded-count="addressValidationTasks.length"
+          :total-count="addressValidationTotal"
+          singular-label="bad address task"
+          plural-label="bad address tasks"
+          :sort="filters.sort"
+          :sort-options="sortOptions"
+          trigger-id="bad-address-task-sort"
+          :select-mode="selectMode"
+          :all-loaded-selected="allCurrentPageSelected"
+          :some-loaded-selected="someCurrentPageSelected"
+          @update:sort="filters.sort = $event"
+          @toggle-select-mode="toggleSelectMode"
+          @toggle-loaded-selection="toggleCurrentPageSelection"
+        />
 
         <div class="bad-address-list">
           <BadAddressTaskCard
@@ -99,9 +86,9 @@
     <ion-footer v-if="selectMode">
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks" @click="bulkSaveAndReleaseHold()">{{ translate('Save and Release Hold') }}</ion-button>
-          <ion-button fill="outline" color="danger" :disabled="!hasSelectedTasks" @click="bulkCancelOrder()">{{ translate('Cancel Order') }}</ion-button>
-          <ion-button fill="outline" color="medium" :disabled="!hasSelectedTasks" @click="bulkParkOrder()">{{ translate('Park') }}</ion-button>
+          <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkSaveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
+          <ion-button fill="outline" color="danger" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkCancelOrder()">{{ translate('Cancel orders') }}</ion-button>
+          <ion-button fill="outline" color="medium" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkParkOrder()">{{ translate('Park') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
@@ -110,38 +97,38 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUpdate } from 'vue';
-import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonSelectOption, IonSpinner, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
+import { IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonMenuButton, IonPage, IonSpinner, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { buildAppUrl, translate } from '@common';
-import router from '@/router';
 import { showToast } from '@/utils';
-import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
-import FilterSelect from '@/components/common/FilterSelect.vue';
-import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import OrderTaskFilterCard from '@/components/tasks/OrderTaskFilterCard.vue';
+import TaskQueueListHeader from '@/components/tasks/TaskQueueListHeader.vue';
 import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
-import { useUserStore } from '@/store/user';
+import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
+import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
+import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
+import { countTaskTargets, groupTaskCardsByTarget, runGroupedTaskMutation, shipGroupTaskTarget } from '@/utils/orderTaskBulk';
+import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
-const userStore = useUserStore();
 
-const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
+const filters = ref(defaultOrderTaskFilters());
+useOrderTaskRouteState(filters, 'badAddress');
+const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
+const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
+const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions);
+const sortOptions = taskSortOptions('badAddress');
 // Computed once here and passed as a prop — avoids N per-card reactive subscriptions.
 const countries = computed(() => seedStore.getCountries);
-const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
 const companyCarrierUrl = buildAppUrl('company', '/carriers');
-
-const searchQuery = ref('');
-const assignee = ref('');
-const dateAfter = ref('');
-const dateBefore = ref('');
-const orderChannel = ref('');
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
+const bulkActionRunning = ref(false);
 // Initial-load state — covers the first task-list fetch. Cards then render their
 // own skeleton while each hydrates its address form lazily.
 const loading = ref(false);
@@ -156,9 +143,10 @@ onBeforeUpdate(() => {
 });
 
 const addressValidationTasks = computed(() => orderTaskStore.getAddressValidationTasks);
+const addressValidationTotal = computed(() => orderTaskStore.getAddressValidationTotal);
 const isScrollable = computed(() => orderTaskStore.isAddressValidationTasksScrollable);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
-const hasFilters = computed(() => !!(searchQuery.value || assignee.value || dateAfter.value || dateBefore.value || orderChannel.value));
+const hasFilters = computed(() => hasTaskFilters(filters.value));
 const currentPageTaskIds = computed(() => addressValidationTasks.value.map((task: any) => task.workEffortId));
 const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));
 const someCurrentPageSelected = computed(() => currentPageTaskIds.value.some((workEffortId: string) => selectedOrders.value[workEffortId]));
@@ -172,9 +160,19 @@ watch(addressValidationTasks, (tasks) => {
   });
 });
 
-watch([assignee, dateAfter, dateBefore, orderChannel], () => {
-  fetchAddressValidationTasks();
-});
+let suppressAutomaticFetch = false;
+watch(() => [
+  filters.value.salesChannelEnumId,
+  filters.value.orderDateFrom,
+  filters.value.orderDateThru,
+  filters.value.taskCreatedFrom,
+  filters.value.taskCreatedThru,
+  filters.value.facilityId,
+  filters.value.shipmentMethodTypeId,
+  filters.value.sort,
+], () => {
+  if (!suppressAutomaticFetch) replaceAddressValidationTasks();
+}, { flush: 'sync' });
 
 function toggleSelectMode() {
   if (selectMode.value) {
@@ -192,16 +190,15 @@ function toggleCurrentPageSelection(checked: boolean) {
 }
 
 function clearFilters() {
-  searchQuery.value = '';
-  assignee.value = '';
-  dateAfter.value = '';
-  dateBefore.value = '';
-  orderChannel.value = '';
-  router.replace({ query: {} });
-  fetchAddressValidationTasks();
+  suppressAutomaticFetch = true;
+  filters.value = defaultOrderTaskFilters();
+  suppressAutomaticFetch = false;
+  replaceAddressValidationTasks();
 }
 
 const fetchAddressValidationTasks = async (pageSize?: any, pageIndex?: any) => {
+  const isFirstPage = !Number(pageIndex || 0);
+  if (isFirstPage) resetSelection();
   // Show the full-page loading/error state only when there is nothing to show yet
   // (first open of the route). Infinite-scroll pages and reloads after an action
   // keep the existing, already-hydrated cards visible while they refresh.
@@ -211,15 +208,12 @@ const fetchAddressValidationTasks = async (pageSize?: any, pageIndex?: any) => {
     error.value = '';
   }
   try {
-    const ok = await orderTaskStore.fetchAddressValidationTasks({
-      pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
-      pageIndex: pageIndex ?? 0,
-      ...(dateAfter.value && { createdDate_from: new Date(dateAfter.value).getTime() }),
-      ...(dateBefore.value && { createdDate_thru: new Date(dateBefore.value).getTime() }),
-      ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
-      ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
-      ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
-    });
+    const ok = await orderTaskStore.fetchAddressValidationTasks(buildTaskQueueRequest(
+      'badAddress',
+      filters.value,
+      pageSize ?? import.meta.env.VITE_VIEW_SIZE,
+      pageIndex ?? 0,
+    ));
     if (!ok) {
       if (showFullLoading) error.value = translate('Failed to load bad address tasks. Please try again.');
       return;
@@ -229,6 +223,15 @@ const fetchAddressValidationTasks = async (pageSize?: any, pageIndex?: any) => {
   }
 };
 
+function replaceAddressValidationTasks() {
+  return fetchAddressValidationTasks(undefined, 0);
+}
+
+function resetSelection() {
+  selectedOrders.value = {};
+  selectMode.value = false;
+}
+
 function getSelectedCards() {
   return cardRefs.value.filter((card: any) => card && selectedOrders.value[card.task.workEffortId]);
 }
@@ -237,24 +240,24 @@ async function bulkSaveAndReleaseHold() {
   const cards = getSelectedCards();
   if (!cards.length) return;
 
-  const invalidCard = cards.find((card: any) => !!card.validate());
+  const representativeCards = groupTaskCardsByTarget(cards, shipGroupTaskTarget).map(([card]) => card);
+  const invalidCard = representativeCards.find((card: any) => !!card.validate());
   if (invalidCard) {
     await showToast(invalidCard.validate()!);
     return;
   }
+  const shipGroupCount = countTaskTargets(cards, shipGroupTaskTarget);
 
   const alert = await alertController.create({
     header: translate('Save and release hold'),
-    message: translate('Are you sure you want to save address and release hold for {count} selected order(s)?').replace('{count}', String(cards.length)),
+    message: translate('Are you sure you want to save address and release hold for {count} selected ship group(s)?').replace('{count}', String(shipGroupCount)),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
         text: translate('Save and release hold'),
         role: 'confirm',
         handler: async () => {
-          await Promise.all(cards.map((card: any) => card.submitSaveAndRelease()));
-          selectedOrders.value = {};
-          await fetchAddressValidationTasks();
+          await runGroupedBulkCards(cards, (card) => card.submitSaveAndReleaseDomain(), 'TASK_COMPLETED');
         }
       }
     ]
@@ -265,23 +268,18 @@ async function bulkSaveAndReleaseHold() {
 async function bulkCancelOrder() {
   const cards = getSelectedCards();
   if (!cards.length) return;
+  const shipGroupCount = countTaskTargets(cards, shipGroupTaskTarget);
 
   const alert = await alertController.create({
     header: translate('Cancel orders'),
-    message: translate('Are you sure you want to cancel {count} selected order(s)? This action cannot be undone.').replace('{count}', String(cards.length)),
+    message: translate('Are you sure you want to cancel {count} selected ship group(s)? This action cannot be undone.').replace('{count}', String(shipGroupCount)),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
         text: translate('Cancel orders'),
         role: 'confirm',
         handler: async () => {
-          try {
-            await Promise.all(cards.map((card: any) => card.submitCancel()));
-            selectedOrders.value = {};
-            await fetchAddressValidationTasks();
-          } catch {
-            await showToast(translate('Failed to cancel some orders. Please try again.'));
-          }
+          await runGroupedBulkCards(cards, (card) => card.submitCancelDomain(), 'TASK_CANCELLED');
         }
       }
     ]
@@ -298,13 +296,29 @@ async function bulkParkOrder() {
   const { data: facilityId } = await modal.onWillDismiss();
   if (!facilityId) return;
 
+  await runGroupedBulkCards(cards, (card) => card.submitParkDomain(facilityId), 'TASK_COMPLETED');
+}
+
+async function runGroupedBulkCards(
+  cards: any[],
+  operation: (card: any) => Promise<unknown>,
+  duplicateStatusId: 'TASK_COMPLETED' | 'TASK_CANCELLED',
+) {
+  bulkActionRunning.value = true;
   try {
-    await Promise.all(cards.map((card: any) => card.submitPark(facilityId)));
-    selectedOrders.value = {};
-    await showToast(translate('Orders successfully moved to parking.'));
-    await fetchAddressValidationTasks();
-  } catch {
-    await showToast(translate('Failed to park one or more orders. Please try again.'));
+    const results = await runGroupedTaskMutation(
+      cards,
+      shipGroupTaskTarget,
+      operation,
+      (card: any) => card.submitTaskStatus(duplicateStatusId),
+    );
+    const failed = results.filter((result) => result.status === 'rejected').length;
+    const succeeded = results.length - failed;
+    if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));
+    if (failed) await showToast(translate('{count} task(s) failed.', { count: failed }));
+    await replaceAddressValidationTasks();
+  } finally {
+    bulkActionRunning.value = false;
   }
 }
 
@@ -317,7 +331,8 @@ async function loadMoreAddressValidationTasks(event: any) {
 }
 
 onIonViewWillEnter(() => {
-  fetchAddressValidationTasks();
+  loadPhysicalFacilities();
+  replaceAddressValidationTasks();
 });
 </script>
 

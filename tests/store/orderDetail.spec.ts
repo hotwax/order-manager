@@ -158,6 +158,60 @@ describe('order detail store', () => {
       }
     });
   });
+
+  it('creates a bulk hold for every ship group on each selected order', async () => {
+    const store = useOrderDetailStore();
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        data: [
+          { shipGroupSeqId: '00001' },
+          { shipGroupSeqId: '00002' }
+        ]
+      })
+      .mockResolvedValueOnce({ data: [{ shipGroupSeqId: '00003' }] })
+      .mockResolvedValueOnce({ data: {} });
+
+    await store.bulkCreateOrderTasks(['ORDER_1', 'ORDER_2'], {
+      workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+      workEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+      workEffortName: 'Manual review',
+      description: 'Review before fulfillment'
+    });
+
+    expect(api).toHaveBeenNthCalledWith(3, {
+      url: 'oms/orders/tasks',
+      method: 'POST',
+      data: [
+        {
+          orderId: 'ORDER_1',
+          shipGroupSeqId: '00001',
+          workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+          workEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+          workEffortName: 'Manual review',
+          description: 'Review before fulfillment',
+          statusId: 'TASK_CREATED'
+        },
+        {
+          orderId: 'ORDER_1',
+          shipGroupSeqId: '00002',
+          workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+          workEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+          workEffortName: 'Manual review',
+          description: 'Review before fulfillment',
+          statusId: 'TASK_CREATED'
+        },
+        {
+          orderId: 'ORDER_2',
+          shipGroupSeqId: '00003',
+          workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+          workEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
+          workEffortName: 'Manual review',
+          description: 'Review before fulfillment',
+          statusId: 'TASK_CREATED'
+        }
+      ]
+    });
+  });
 });
 
 function taxAdjustment(orderAdjustmentId: string, orderItemSeqId: string, comments: string, amount: number) {

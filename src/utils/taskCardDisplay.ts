@@ -30,3 +30,41 @@ export function formatTaskDate(value?: string | number | null): string {
   const date = parseDate(value);
   return date.isValid ? date.toLocaleString(DateTime.DATE_MED) : displayValue(value);
 }
+
+export function taskOrderSubtitle(value: string | number | null | undefined, orderedLabel: string): string {
+  const orderDate = formatTaskDate(value);
+  return orderDate ? `${orderedLabel} ${orderDate}` : '';
+}
+
+export function formatTaskAmount(value?: string | number | null, currency = 'USD'): string {
+  if (value === undefined || value === null || value === '') return '';
+
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return '';
+
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+}
+
+export function taskAgeLabel(
+  value: string | number | null | undefined,
+  createdLabel: string,
+  base = DateTime.local(),
+): string {
+  if (value === undefined || value === null || value === '') return '';
+
+  const date = parseDate(value);
+  if (!date.isValid) return '';
+
+  const relativeAge = date.toRelative({ base });
+  return relativeAge ? `${createdLabel} ${relativeAge}` : '';
+}
+
+export function taskCreatedTimestampLabel(
+  value: string | number | null | undefined,
+  taskCreatedLabel: string,
+): string {
+  if (value === undefined || value === null || value === '') return '';
+
+  const date = parseDate(value);
+  return date.isValid ? `${taskCreatedLabel}: ${date.toLocaleString(DateTime.DATETIME_MED)}` : '';
+}

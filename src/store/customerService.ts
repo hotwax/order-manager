@@ -9,7 +9,8 @@ import type {
   WorkflowOrder,
   FulfillmentProgress,
   FacilityFulfillmentProgress,
-  VirtualLocationWorkCount
+  VirtualLocationWorkCount,
+  HoldTaskCounts
 } from '@/types/customerService';
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
@@ -92,19 +93,6 @@ function buildVirtualLocationWorkCounts(facilities: { facilityId: string; facili
     .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
 
   return [...rows, ...dynamicRows];
-}
-
-function responseListCount(response: any): number {
-  const headerCount = response?.headers?.get?.('x-total-count')
-    ?? response?.headers?.['x-total-count']
-    ?? response?.headers?.['X-Total-Count'];
-  const fallbackCount = Array.isArray(response?.data) ? response.data.length : 0;
-  const countValue = headerCount !== undefined && headerCount !== null && String(headerCount).trim() !== ''
-    ? headerCount
-    : fallbackCount;
-  const count = Number(countValue);
-
-  return Number.isFinite(count) ? count : fallbackCount;
 }
 
 // Load-status keys for the funnel dashboard metric groups. Each group's fetch
@@ -199,10 +187,8 @@ export const useCustomerServiceStore = defineStore('customerService', {
     },
     holdTasks: {
       holdTasksTotalCount: 0,
-      holdSubstituteCount: 0,
-      holdBadAddressCount: 0,
-      holdFraudRiskCount: 0
-    },
+      holdTaskCounts: []
+    } as HoldTaskCounts,
     facilityOrderVolume: [] as any[],
     facilityFulfillmentVelocity: [] as any[],
     facilityPartialFulfillments: [] as any[],
@@ -358,51 +344,22 @@ export const useCustomerServiceStore = defineStore('customerService', {
     async fetchHoldTasks(productStoreId?: string) {
       this.dashboardStatus.holdTasks = 'loading';
       try {
-        const [swapResp, addressResp, fraudResp] = await Promise.all([
-          api({
-            url: 'oms/orders/tasks/shipGroupTasks',
-            method: 'GET',
-            params: {
-              statusId: 'TASK_CREATED',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'NEG_RES_REVIEW',
-              productStoreId,
-              pageSize: 10000,
-            }
-          }),
-          api({
-            url: 'oms/orders/tasks/shipGroupTasks',
-            method: 'GET',
-            params: {
-              statusId: 'TASK_CREATED',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'INVALID_ADDRESS',
-              productStoreId,
-              pageSize: 10000,
-            }
-          }),
-          api({
-            url: 'oms/orders/tasks',
-            method: 'GET',
-            params: {
-              taskStatusId: 'TASK_CREATED',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'REVIEW_RISK_ORDER',
-              productStoreId,
-              pageSize: 10000,
-            }
-          })
-        ]);
-
-        const swapCount = responseListCount(swapResp);
-        const addressCount = responseListCount(addressResp);
-        const fraudCount = responseListCount(fraudResp);
+        const resp = await api({
+          url: 'oms/orders/funnelDashboard/holdTasks',
+          method: 'GET',
+          params: { productStoreId }
+        });
+        const counts = resp.data || {};
+        const holdTaskCounts = Array.isArray(counts.holdTaskCounts) ? counts.holdTaskCounts : [];
 
         this.holdTasks = {
-          holdSubstituteCount: swapCount,
-          holdBadAddressCount: addressCount,
-          holdFraudRiskCount: fraudCount,
-          holdTasksTotalCount: swapCount + addressCount + fraudCount
+          holdTasksTotalCount: Number(counts.holdTasksTotalCount) || 0,
+          holdTaskCounts: holdTaskCounts.map((count: any) => ({
+            workEffortPurposeTypeId: count.workEffortPurposeTypeId,
+            description: count.description || count.workEffortPurposeTypeId,
+            sequenceNum: count.sequenceNum == null ? null : Number(count.sequenceNum),
+            taskCount: Number(count.taskCount) || 0
+          }))
         };
         this.dashboardStatus.holdTasks = 'success';
       } catch (error) {

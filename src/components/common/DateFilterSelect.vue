@@ -1,6 +1,22 @@
 <template>
-  <div class="date-filter-select">
-    <ion-item :id="triggerId" button detail="false" lines="none">
+  <div
+    class="date-filter-select"
+    :id="outlined ? triggerId : undefined"
+    :role="outlined ? 'button' : undefined"
+    :tabindex="outlined ? 0 : undefined"
+    :aria-label="outlined ? `${label}: ${selectedDateLabel}` : undefined"
+    @keydown.enter="activateOutlinedTrigger"
+    @keydown.space.prevent="activateOutlinedTrigger"
+  >
+    <ion-input
+      v-if="outlined"
+      :value="selectedDateLabel"
+      :label="label"
+      label-placement="stacked"
+      fill="outline"
+      readonly
+    />
+    <ion-item v-else :id="triggerId" button detail="false" lines="none">
       <ion-label>
         <p>{{ label }}</p>
         {{ selectedDateLabel }}
@@ -24,15 +40,17 @@ let dateFilterSelectCounter = 0;
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonDatetime, IonItem, IonLabel, IonPopover } from '@ionic/vue';
+import { IonDatetime, IonInput, IonItem, IonLabel, IonPopover } from '@ionic/vue';
 import { DateTime } from 'luxon';
 import { translate } from '@common';
 
 const props = withDefaults(defineProps<{
   modelValue: string;
   label: string;
+  outlined?: boolean;
 }>(), {
   modelValue: '',
+  outlined: false,
 });
 
 const emit = defineEmits<{
@@ -52,6 +70,11 @@ function normalizeDate(value: string | string[] | null | undefined): string {
   if (!value) return '';
   const selectedValue = Array.isArray(value) ? value[0] : value;
   return selectedValue ? String(selectedValue).slice(0, 10) : '';
+}
+
+function activateOutlinedTrigger(event: KeyboardEvent) {
+  if (!props.outlined) return;
+  (event.currentTarget as HTMLElement)?.click();
 }
 </script>
 

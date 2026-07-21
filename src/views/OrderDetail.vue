@@ -426,7 +426,7 @@
             <ion-progress-bar :value="shipGroupProgress(shipGroup)"
               :color="shipGroupProgress(shipGroup) === 1 ? 'success' : 'primary'" />
 
-            <ion-item v-if="shipGroupHoldTask(shipGroup)" color="warning" lines="none">
+            <ion-item v-if="shipGroupHoldTaskCount(shipGroup)" color="warning" lines="none">
               <ion-icon slot="start" :icon="warningOutline" />
               <ion-label>{{ shipGroupHoldTaskLabel(shipGroup) }}</ion-label>
               <ion-button slot="end" fill="solid" color="dark" size="small" @click="showShipGroupHoldTask">
@@ -1083,6 +1083,7 @@ import { getCustomerReturn } from '@/services/customer';
 import { showToast, isKit, riskLevelColor } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { fulfillmentLineStatus, fulfillmentLineStatusColor } from '@/utils/fulfillmentLineStatus';
+import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useUserStore } from '@/store/user';
@@ -1677,14 +1678,13 @@ const orderShipGroupHoldTasks = computed(() => [
   ...orderHoldTasks.value,
 ]);
 
-function shipGroupHoldTask(shipGroup: any): any {
-  return orderShipGroupHoldTasks.value.find((task: any) => task.shipGroupSeqId === shipGroup.id);
+function shipGroupHoldTaskCount(shipGroup: any): number {
+  return countShipGroupHoldTasks(orderShipGroupHoldTasks.value, shipGroup.id);
 }
 
 function shipGroupHoldTaskLabel(shipGroup: any): string {
-  const task = shipGroupHoldTask(shipGroup);
-  const taskName = task?.purposeDescription || task?.workEffortName || task?.workEffortPurposeTypeId || task?.workEffortId;
-  return taskName ? `${translate('Hold task')}: ${taskName}` : translate('Hold task');
+  const count = shipGroupHoldTaskCount(shipGroup);
+  return `${count} ${translate(count === 1 ? 'hold task' : 'hold tasks')}`;
 }
 
 function showShipGroupHoldTask() {

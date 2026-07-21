@@ -130,41 +130,12 @@
           </div>
         </StatCard>
 
-        <!-- Card 3: Order Hold Tasks — drilldown follow-up -->
-        <!-- BUSINESS LOGIC COMMENT: Display list of tasks requiring resolution -->
-        <!-- stat: number of orders with hold tasks -->
+        <!-- Card 3: Order Hold Tasks -->
         <StatCard v-if="!holdTasksError" :title="translate('Order Hold Tasks')" :stat="holdTasksLoading ? '' : (holdTasks.holdTasksTotalCount || 0)">
           <template v-if="holdTasksLoading" #stat>
             <ion-spinner name="crescent" />
           </template>
-          <ion-list v-if="!holdTasksLoading" lines="none" class="hold-tasks-list">
-            <!-- Substitute workefforts -->
-            <ion-item button :detail="true" router-link="/swap">
-              <ion-label>
-                {{ translate("Substitute") }}
-                <!-- number of workefforts where purpose type is substitute -->
-              </ion-label>
-              <p slot="end">{{ holdTasks.holdSubstituteCount || 0 }} {{ translate("tasks") }}</p>
-            </ion-item>
-
-            <!-- Bad Address workefforts -->
-            <ion-item button :detail="true" router-link="/bad-address">
-              <ion-label>
-                {{ translate("Bad Address") }}
-                <!-- number of workefforts where purpose type is bad address -->
-              </ion-label>
-              <p slot="end">{{ holdTasks.holdBadAddressCount || 0 }} {{ translate("tasks") }}</p>
-            </ion-item>
-
-            <!-- Fraud Risk workefforts -->
-            <ion-item button :detail="true" router-link="/fraud">
-              <ion-label>
-                {{ translate("Fraud Risk") }}
-                <!-- number of workefforts where purpose type is fraud -->
-              </ion-label>
-              <p slot="end">{{ holdTasks.holdFraudRiskCount || 0 }} {{ translate("tasks") }}</p>
-            </ion-item>
-          </ion-list>
+          <HoldTaskCountList v-if="!holdTasksLoading" :hold-task-counts="holdTasks.holdTaskCounts" />
         </StatCard>
         <StatCard v-else :title="translate('Order Hold Tasks')">
           <template #stat>
@@ -614,6 +585,7 @@ import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import { getDashboardDateFilter } from '@/utils/dashboardDate';
+import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 
 const store = useCustomerServiceStore();
