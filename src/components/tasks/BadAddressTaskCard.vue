@@ -16,6 +16,15 @@
     @update:selected="emit('update:selected', $event)"
     @action="handleAction"
   >
+    <template #content-start>
+      <ion-item lines="full">
+        <ion-label>
+          {{ translate('Facility') }}: {{ brokeredFacilityName(task) }}
+          <p>{{ translate('Shipping method') }}: {{ carrierShippingMethodLabel(task) }}</p>
+        </ion-label>
+      </ion-item>
+    </template>
+
     <ion-radio-group v-if="addressState" v-model="addressState.selectedAddressType" class="address-task-addresses">
       <ion-list class="ion-no-padding" lines="full">
         <ion-list-header>
@@ -23,39 +32,27 @@
           <ion-radio class="ion-margin-end" value="original" label-placement="start">{{ translate('keep original') }}</ion-radio>
         </ion-list-header>
         <ion-item>
-          <ion-label class="geo-picker-field">
-            <span class="geo-picker-label">{{ translate('Address line 1') }}</span>
-            <span>{{ addressState.original.address1 }}</span>
-          </ion-label>
+          <ion-input :label="translate('Address line 1')" label-placement="stacked" :value="addressState.original.address1" readonly />
         </ion-item>
         <ion-item>
-          <ion-label class="geo-picker-field">
-            <span class="geo-picker-label">{{ translate('Address line 2') }}</span>
-            <span>{{ addressState.original.address2 }}</span>
-          </ion-label>
+          <ion-input :label="translate('Address line 2')" label-placement="stacked" :value="addressState.original.address2" readonly />
         </ion-item>
         <ion-item>
-          <ion-label class="geo-picker-field">
-            <span class="geo-picker-label">{{ translate('City') }}</span>
-            <span>{{ addressState.original.city }}</span>
-          </ion-label>
+          <ion-input :label="translate('City')" label-placement="stacked" :value="addressState.original.city" readonly />
         </ion-item>
         <ion-item>
-          <ion-label class="geo-picker-field">
-            <span class="geo-picker-label">{{ translate('Postal code') }}</span>
-            <span>{{ addressState.original.postalCode }}</span>
-          </ion-label>
+          <ion-input :label="translate('Postal code')" label-placement="stacked" :value="addressState.original.postalCode" readonly />
         </ion-item>
         <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('State') }}</span>
-            <span>{{ stateName(addressState.original) }}</span>
+            <span>{{ readOnlyAddressValue(stateName(addressState.original)) }}</span>
           </ion-label>
         </ion-item>
         <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('Country') }}</span>
-            <span>{{ countryName(addressState.original.countryGeoId) }}</span>
+            <span>{{ readOnlyAddressValue(countryName(addressState.original.countryGeoId)) }}</span>
           </ion-label>
         </ion-item>
       </ion-list>
@@ -191,6 +188,24 @@ function countryName(geoId: string): string {
 function stateName(address: AddressState['original']): string {
   if (!address.countryGeoId || !address.stateProvinceGeoId) return '';
   return seedStore.getStatesForCountry(address.countryGeoId).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
+}
+
+function readOnlyAddressValue(value: string): string {
+  return value || '\u00A0';
+}
+
+function brokeredFacilityName(task: any): string {
+  return task.facilityName
+    || seedStore.facilityName(task.facilityId)
+    || task.facilityId
+    || '-';
+}
+
+function carrierShippingMethodLabel(task: any): string {
+  const carrier = task.carrierPartyId ? seedStore.carrierName(task.carrierPartyId) : '';
+  const methodId = task.shipmentMethodTypeId || task.shippingMethodTypeId;
+  const method = methodId ? seedStore.shipmentMethodDescription(methodId) : '';
+  return [carrier, method].filter(Boolean).join(' - ') || '-';
 }
 
 async function openCountryPicker(address: AddressState['original']) {
