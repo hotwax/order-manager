@@ -270,13 +270,19 @@ function normalizeDateFilterValue(value: string | string[] | null | undefined) {
 
 function applyRouteFilters() {
   const facilityId = router.currentRoute.value.query.facilityId;
+  const dateFrom = router.currentRoute.value.query.dateFrom;
 
   if (typeof facilityId === 'string' && facilityId) {
     filters.value.facilityId = facilityId;
   }
+  if (typeof dateFrom === 'string' && dateFrom) {
+    filters.value.dateFrom = dateFrom;
+  } else {
+    filters.value.dateFrom = '';
+  }
 }
 
-watch(() => router.currentRoute.value.query.facilityId, applyRouteFilters, { immediate: true });
+watch(() => [router.currentRoute.value.query.facilityId, router.currentRoute.value.query.dateFrom], applyRouteFilters, { immediate: true });
 
 function loadWorkflowOrders() {
   orderStore.fetchWorkflowOrders(bucket, filters.value);
