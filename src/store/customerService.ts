@@ -399,10 +399,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
           };
         }
 
+        // Card count is the full unfillable queue (matches the Unfillable page), not today-scoped.
         const solrParams: any = {
           facilityIds: ['UNFILLABLE_PARKING'],
           status: ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD'],
-          dateFrom: todayStr,
           pageSize: 0
         };
         if (productStoreId && productStoreId !== 'All') {

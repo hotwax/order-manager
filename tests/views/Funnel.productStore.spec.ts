@@ -21,11 +21,12 @@ describe('Funnel product store scope', () => {
     expect(funnelSource).not.toContain('route.query.productStoreId');
   });
 
-  it('uses the dashboard date helper for the Unfillable Today route filter', () => {
-    expect(funnelSource).toContain("import { getDashboardDateFilter } from '@/utils/dashboardDate';");
-    expect(funnelSource).toContain('userStore.current?.timeZone || userStore.current?.userTimeZone');
-    expect(funnelSource).toContain("query: { dateFrom: todayDateStr }");
-    expect(funnelSource).not.toContain("DateTime.now().toFormat('yyyy-MM-dd')");
+  it('shows the full Unfillable queue on the dashboard card, not a today-scoped count', () => {
+    // Only the top fulfillment-progress banner is day-scoped; the queue-count cards
+    // (including Unfillable) show the full queue and link through unfiltered.
+    expect(funnelSource).toContain('router-link="/unfillable"');
+    expect(funnelSource).not.toContain("query: { dateFrom: todayDateStr }");
+    expect(funnelSource).not.toContain("import { getDashboardDateFilter } from '@/utils/dashboardDate';");
   });
 
   it('does not keep static fallback facilities in the customer service store', () => {

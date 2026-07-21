@@ -111,13 +111,13 @@
         <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard v-if="!unfillableError" button :router-link="{ path: '/unfillable', query: { dateFrom: todayDateStr } }" :title="translate('Unfillable today')" :stat="unfillableLoading ? '' : totalUnfillable">
+        <StatCard v-if="!unfillableError" button router-link="/unfillable" :title="translate('Unfillable')" :stat="unfillableLoading ? '' : totalUnfillable">
           <template v-if="unfillableLoading" #stat>
             <ion-spinner name="crescent" />
           </template>
           <Sparkline v-if="!unfillableLoading" :points="unfillableTrend" color="danger" />
         </StatCard>
-        <StatCard v-else :title="translate('Unfillable today')">
+        <StatCard v-else :title="translate('Unfillable')">
           <template #stat>
             <ion-icon :icon="alertCircleOutline" color="danger" />
           </template>
@@ -585,7 +585,6 @@ import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
-import { getDashboardDateFilter } from '@/utils/dashboardDate';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 
@@ -625,7 +624,6 @@ const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
 const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);
 const facilityRejections = computed(() => store.getFacilityRejections);
 const unfillableTrend = computed(() => store.unfillableTrend);
-const todayDateStr = computed(() => getDashboardDateFilter(userStore.current?.timeZone || userStore.current?.userTimeZone));
 const virtualLocationWorkRows = computed(() => store.getVirtualLocationCounts);
 
 const fulfillmentSyncData = computed(() => store.getFulfillmentSyncData);
