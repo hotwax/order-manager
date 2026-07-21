@@ -86,6 +86,8 @@ async function fetchWorkflowPage(
 export interface OrderSearchFilters {
   status: string[];
   channel: string;
+  shipmentMethodTypeId: string;
+  allocationState: string;
   productStoreId: string;
   dateFrom: string;
   dateThru: string;
@@ -99,6 +101,8 @@ export const useOrderStore = defineStore('orders', {
     searchFilters: {
       status: [],
       channel: 'All',
+      shipmentMethodTypeId: 'All',
+      allocationState: 'All',
       productStoreId: 'All',
       dateFrom: '',
       dateThru: '',
@@ -200,6 +204,7 @@ export const useOrderStore = defineStore('orders', {
         queryString: this.searchQuery,
         status: this.searchFilters.status,
         channel: this.searchFilters.channel,
+        shipmentMethodTypeId: this.searchFilters.shipmentMethodTypeId,
         productStoreId: this.searchFilters.productStoreId,
         dateFrom: this.searchFilters.dateFrom,
         dateThru: this.searchFilters.dateThru,

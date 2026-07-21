@@ -3,6 +3,7 @@
     :value="modelValue"
     :label="label"
     label-placement="stacked"
+    fill="outline"
     interface="popover"
     :placeholder="placeholderText"
     :selected-text="restingSelectedText"

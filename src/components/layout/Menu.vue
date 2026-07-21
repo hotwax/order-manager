@@ -32,7 +32,7 @@
             <ion-label>{{ translate("Create order") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
-        <ion-item-divider v-if="hasPermission(SWAP_ORDER_PERMISSION) || hasPermission(ORDER_UPDATE_PERMISSION) || hasPermission(ORDER_CANCEL_PERMISSION)">
+        <ion-item-divider color="light" v-if="hasPermission(SWAP_ORDER_PERMISSION) || hasPermission(ORDER_UPDATE_PERMISSION) || hasPermission(ORDER_CANCEL_PERMISSION)">
           <ion-label>{{ translate("Blocked") }}</ion-label>
         </ion-item-divider>
         <ion-menu-toggle :auto-hide="false">
@@ -65,7 +65,7 @@
             <ion-label>{{ translate("Hold") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
-        <ion-item-divider v-if="hasPermission(ORDER_VIEW_PERMISSION)">
+        <ion-item-divider color="light" v-if="hasPermission(ORDER_VIEW_PERMISSION)">
           <ion-label>{{ translate("In progress") }}</ion-label>
         </ion-item-divider>
         <ion-menu-toggle :auto-hide="false">
