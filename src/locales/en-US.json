@@ -499,6 +499,7 @@
   "Order date thru": "Order date thru",
   "Order date through": "Order date through",
   "Order details": "Order details",
+  "Order {orderId} was not found in the database. It may have been removed, or a stale search index is still listing it.": "Order {orderId} was not found in the database. It may have been removed, or a stale search index is still listing it.",
   "Order external ID": "Order external ID",
   "Order facility change": "Order facility change",
   "Order facility change routing": "Order facility change routing",
