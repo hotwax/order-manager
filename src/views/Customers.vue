@@ -40,10 +40,12 @@
           @keydown.enter.prevent="goToCustomer(customer)"
           @keydown.space.prevent="goToCustomer(customer)"
         >
-          <ion-label>
-            <p class="overline">{{ customer.partyId }}</p>
-            {{ customer.fullName || customer.partyId }}
-          </ion-label>
+          <ion-item lines="none">
+            <ion-label>
+              <p class="overline">{{ customer.partyId }}</p>
+              {{ customer.fullName || customer.partyId }}
+            </ion-label>
+          </ion-item>
           <ion-label class="tablet ion-text-start">
             {{ customer.emailAddress || translate('No email') }}
             <p>{{ translate('Email') }}</p>
@@ -69,7 +71,7 @@
 </template>
 
 <script setup lang="ts">
-import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonProgressBar, IonSearchbar, IonTitle, IonToolbar, useIonRouter } from '@ionic/vue';
+import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonProgressBar, IonSearchbar, IonTitle, IonToolbar, useIonRouter } from '@ionic/vue';
 import { computed, onMounted, ref, watch } from 'vue';
 import { searchCustomers } from '@/services/customer';
 import type { Customer } from '@/types/order';

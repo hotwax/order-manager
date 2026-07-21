@@ -40,7 +40,7 @@
           <ion-card-content>
             {{ translate("This is the name of the OMS you are connected to right now. Make sure that you are connected to the right instance before proceeding.") }}
           </ion-card-content>
-          <ion-button fill="clear" :disabled="!userStore.hasPermission('COMMERCEUSER_VIEW')" @click="commonUtil.goToOms()">
+          <ion-button v-if="!commonUtil.isMoqui()" fill="clear" :disabled="!userStore.hasPermission('COMMERCEUSER_VIEW')" @click="commonUtil.goToOms()">
             {{ translate("Go to OMS") }}
             <ion-icon slot="end" :icon="openOutline" />
           </ion-button>

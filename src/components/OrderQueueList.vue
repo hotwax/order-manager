@@ -67,54 +67,17 @@
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
-        <div
+        <OrderRow
           v-for="order in searchResults"
           :key="order.id"
-          class="list-item queue-order-row"
-          :role="selectMode ? 'button' : 'link'"
-          tabindex="0"
-          @click="handleOrderRowClick(order)"
-          @keydown.enter.prevent="handleOrderRowClick(order)"
-          @keydown.space.prevent="handleOrderRowClick(order)"
-        >
-          <ion-item lines="none">
-            <ion-checkbox
-              v-if="selectMode"
-              slot="start"
-              :checked="selectedOrderIds.includes(order.id)"
-              @click.stop
-              @keydown.stop
-              @ionChange="setOrderSelection(order.id, $event.detail.checked)"
-            />
-            <ion-label>
-              <p class="overline">{{ order.id }}</p>
-              {{ order.externalId || order.orderName || order.id }}
-              <p>{{ statusDescription(order.status) }}</p>
-            </ion-label>
-          </ion-item>
-
-          <ion-label class="tablet">
-            {{ order.customerName || order.customerId || translate('Unknown customer') }}
-            <p>{{ customerAddressLine(order) }}</p>
-            <p v-if="customerAddressTrailingLine(order)">{{ customerAddressTrailingLine(order) }}</p>
-          </ion-label>
-
-          <ion-label class="tablet">
-            {{ queueReasonLabel(order) }}
-            <p>{{ queueRuleLabel(order) }}</p>
-          </ion-label>
-
-          <ion-label class="tablet">
-            {{ formatDateTime(order.orderDate) }}
-            <p>{{ orderedRelativeLabel(order.orderDate) }}</p>
-          </ion-label>
-
-          <ion-label class="queue-delivery ion-text-end">
-            {{ estimatedDeliveryDateLabel(order) }}
-            <p>{{ translate('Estimated delivery date') }}</p>
-            <p v-if="estimatedDeliveryRelativeLabel(order)">{{ estimatedDeliveryRelativeLabel(order) }}</p>
-          </ion-label>
-        </div>
+          :model="toSearchOrderRowViewModel(order)"
+          row-class="queue-order-row"
+          deadline-class="queue-delivery ion-text-end"
+          :select-mode="selectMode"
+          :selected="selectedOrderIds.includes(order.id)"
+          @activate="handleOrderRowClick(order)"
+          @selection-change="setOrderSelection(order.id, $event)"
+        />
       </ion-list>
 
       <EmptyState
@@ -154,7 +117,6 @@ import {
   IonHeader,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
-  IonItem,
   IonLabel,
   IonList,
   IonListHeader,
@@ -170,7 +132,6 @@ import {
   useIonRouter,
 } from '@ionic/vue';
 import { api, translate } from '@common';
-import { DateTime } from 'luxon';
 import { computed, onMounted, ref, watch } from 'vue';
 import { searchOrders } from '@/services/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -185,6 +146,8 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import OrderRow from '@/components/orders/OrderRow.vue';
+import { toSearchOrderRowViewModel } from '@/utils/orderRows';
 import { showToast } from '@/utils';
 
 type QueueGlobalAction = 'brokerSelected';
@@ -273,6 +236,10 @@ function toSearchParams(page: number) {
     pageSize: PAGE_SIZE,
     pageIndex: page,
     status: props.status,
+    allocationSummary: {
+      mode: 'queue-first' as const,
+      queueFacilityIds: props.facilityIds
+    }
   };
 }
 
@@ -517,85 +484,6 @@ function statusDescription(statusId: string) {
   return seedStore.statusDescription(statusId);
 }
 
-function hasParkingUnitCount(order: Order) {
-  return Number(order.parkingUnitCount ?? 0) > 0;
-}
-
-function parkingUnitCountLabel(order: Order) {
-  const unitCount = Number(order.parkingUnitCount ?? 0);
-  const formattedUnitCount = Number.isInteger(unitCount) ? String(unitCount) : unitCount.toLocaleString(undefined, { maximumFractionDigits: 2 });
-  const unitLabel = unitCount === 1 ? translate('unit') : translate('units');
-
-  return `${formattedUnitCount} ${unitLabel} ${translate('in parking')}`;
-}
-
-function customerAddressLine(order: Order) {
-  return order.shippingAddress1 || order.customerId || '';
-}
-
-function customerAddressTrailingLine(order: Order) {
-  const parts = [
-    order.shippingCity,
-    order.shippingStateProvinceGeoId,
-    order.shippingPostalCode,
-    order.shippingCountryGeoId
-  ].filter(Boolean);
-
-  if (parts.length) return parts.join(' ');
-  return '';
-}
-
-function queueReasonLabel(order: Order) {
-  return order.queueReason || order.rejectionReason || translate('Reason unavailable');
-}
-
-function queueRuleLabel(order: Order) {
-  if (order.ruleName) return order.ruleName;
-  if (hasParkingUnitCount(order)) return parkingUnitCountLabel(order);
-
-  return translate('Rule name unavailable');
-}
-
-function estimatedDeliveryValue(order: Order) {
-  return order.estimatedDeliveryDate || order.shipBeforeDate || order.shipByDate || '';
-}
-
-function estimatedDeliveryDateLabel(order: Order) {
-  const date = dateFromValue(estimatedDeliveryValue(order));
-  return date ? date.toFormat('MM-dd-yyyy') : translate('No delivery date');
-}
-
-function estimatedDeliveryRelativeLabel(order: Order) {
-  const date = dateFromValue(estimatedDeliveryValue(order));
-  return date?.toRelative() || '';
-}
-
-function orderedRelativeLabel(orderDateValue: string) {
-  const date = dateFromValue(orderDateValue);
-  const relativeDate = date?.toRelative();
-  return relativeDate ? `${translate('Ordered')} ${relativeDate}` : '';
-}
-
-function formatDateTime(value: string) {
-  const date = dateFromValue(value);
-  return date ? date.toFormat('MM-dd-yyyy hh:mm a') : '';
-}
-
-function dateFromValue(value?: string | null) {
-  if (!value) return undefined;
-
-  const numericValue = Number(value);
-  if (Number.isFinite(numericValue) && numericValue > 0) {
-    const numericDate = DateTime.fromMillis(value.length <= 10 ? numericValue * 1000 : numericValue);
-    if (numericDate.isValid) return numericDate;
-  }
-
-  const sqlDate = DateTime.fromSQL(value);
-  if (sqlDate.isValid) return sqlDate;
-
-  const isoDate = DateTime.fromISO(value);
-  return isoDate.isValid ? isoDate : undefined;
-}
 </script>
 
 <style scoped>
