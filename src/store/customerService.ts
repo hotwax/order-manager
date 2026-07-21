@@ -256,7 +256,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
       oldestOpenOrderDate: null as number | null
     },
     unfillable: {
-      unfillableHourlyCounts: [] as { shipGroupDateHour: string; shipGroupCount: number }[],
+      unfillableHourlyCounts: [] as { entryDateHour: string; shipGroupCount: number }[],
       totalCount: 0
     },
     holdTasks: {
@@ -319,9 +319,9 @@ export const useCustomerServiceStore = defineStore('customerService', {
       const todayStr = getUserDashboardDateFilter();
       return Array.from({ length: 24 }, (_, h) => {
         const match = state.unfillable.unfillableHourlyCounts?.find((d) => {
-          const parsed = DateTime.fromSQL(d.shipGroupDateHour).isValid
-            ? DateTime.fromSQL(d.shipGroupDateHour)
-            : DateTime.fromISO(d.shipGroupDateHour);
+          const parsed = DateTime.fromSQL(d.entryDateHour).isValid
+            ? DateTime.fromSQL(d.entryDateHour)
+            : DateTime.fromISO(d.entryDateHour);
           return parsed.isValid && parsed.toFormat('yyyy-MM-dd') === todayStr && parsed.hour === h;
         });
         return match ? match.shipGroupCount : 0;
@@ -669,12 +669,12 @@ export const useCustomerServiceStore = defineStore('customerService', {
         const totalPending = openCount + inProgressCount;
         
         let oldestAssignedTime: number | null = null;
-        if (progressData.oldestShipGroupAssignedDatetime) {
-          const parsed = DateTime.fromISO(String(progressData.oldestShipGroupAssignedDatetime));
+        if (progressData.oldestOrderEntryDatetime) {
+          const parsed = DateTime.fromISO(String(progressData.oldestOrderEntryDatetime));
           if (parsed.isValid) {
             oldestAssignedTime = parsed.toMillis();
           } else {
-            const rawMillis = Date.parse(progressData.oldestShipGroupAssignedDatetime);
+            const rawMillis = Date.parse(progressData.oldestOrderEntryDatetime);
             if (!isNaN(rawMillis)) oldestAssignedTime = rawMillis;
           }
         }
