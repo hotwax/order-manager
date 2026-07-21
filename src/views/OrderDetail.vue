@@ -126,7 +126,7 @@
 
           <ion-card>
             <ion-card-header>
-              <ion-card-title>{{ translate('Order Identifications') }}</ion-card-title>
+              <ion-card-title>{{ translate('Order identifications') }}</ion-card-title>
               <ion-button fill="clear" size="small" @click="openManageIdentificationsModal()">
                 {{ translate('Manage') }}
               </ion-button>
