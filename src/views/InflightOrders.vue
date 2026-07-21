@@ -10,77 +10,13 @@
     </ion-header>
 
     <ion-content>
-      <SearchFilterCard
-        v-model="filters.query"
-        :placeholder="translate('Order name, order ID, external ID')"
+      <WorkflowOrderFilterCard
+        v-model="filters"
+        :channel-options="channelFilterOptions"
+        :facility-options="facilityFilterOptions"
+        :shipment-method-options="shipmentMethodOptions"
         @clear="clearFilters"
-      >
-        <ion-input v-model="filters.customerName" label="Customer name" :placeholder="translate('Search by name')" label-placement="stacked" :clear-input="true" />
-        <ion-select v-model="filters.priority" label="Priority" label-placement="stacked" interface="popover">
-          <ion-select-option :value="null">All</ion-select-option>
-          <ion-select-option :value="true">High priority</ion-select-option>
-          <ion-select-option :value="false">Normal / no priority</ion-select-option>
-        </ion-select>
-        <ion-select v-model="filters.salesChannelEnumId" label="Channel" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">All channels</ion-select-option>
-          <ion-select-option v-for="channel in channelOptions" :key="channel" :value="channel">
-            {{ formatChannel(channel) }}
-          </ion-select-option>
-        </ion-select>
-        <ion-select v-model="filters.facilityId" label="Facility" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">All facilities</ion-select-option>
-          <ion-select-option v-for="facility in facilityOptions" :key="facility.id" :value="facility.id">
-            {{ facility.name }}
-          </ion-select-option>
-        </ion-select>
-        <ion-select v-model="filters.shipmentMethodTypeId" label="Shipment method" label-placement="stacked" interface="popover">
-          <ion-select-option value="All">All methods</ion-select-option>
-          <ion-select-option v-for="method in shipmentMethodOptions" :key="method.id" :value="method.id">
-            {{ method.label }}
-          </ion-select-option>
-        </ion-select>
-        <ion-item
-          id="inflight-order-date-from-trigger"
-          class="inflight-order-date-filter inflight-order-date-filter-fixed"
-          button
-          detail="false"
-          lines="none"
-        >
-          <ion-label>
-            <p>{{ translate('Order date from') }}</p>
-            {{ dateFilterLabel(filters.dateFrom) }}
-          </ion-label>
-        </ion-item>
-        <ion-item
-          id="inflight-order-date-thru-trigger"
-          class="inflight-order-date-filter inflight-order-date-filter-fixed"
-          button
-          detail="false"
-          lines="none"
-        >
-          <ion-label>
-            <p>{{ translate('Order date thru') }}</p>
-            {{ dateFilterLabel(filters.dateThru) }}
-          </ion-label>
-        </ion-item>
-      </SearchFilterCard>
-
-      <ion-popover trigger="inflight-order-date-from-trigger" trigger-action="click" :show-backdrop="false">
-        <ion-datetime
-          presentation="date"
-          :value="filters.dateFrom || undefined"
-          :show-default-buttons="true"
-          @ionChange="setDateFilter('dateFrom', $event.detail.value)"
-        />
-      </ion-popover>
-      <ion-popover trigger="inflight-order-date-thru-trigger" trigger-action="click" :show-backdrop="false">
-        <ion-datetime
-          presentation="date"
-          :value="filters.dateThru || undefined"
-          :show-default-buttons="true"
-          @ionChange="setDateFilter('dateThru', $event.detail.value)"
-        />
-      </ion-popover>
+      />
 
       <ion-list>
         <ion-list-header>
@@ -160,21 +96,16 @@ import {
   IonButtons,
   IonCheckbox,
   IonContent,
-  IonDatetime,
   IonFooter,
   IonHeader,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
-  IonInput,
   IonItem,
   IonLabel,
   IonList,
   IonListHeader,
   IonMenuButton,
   IonPage,
-  IonPopover,
-  IonSelect,
-  IonSelectOption,
   IonSpinner,
   IonTitle,
   IonToast,
@@ -183,13 +114,12 @@ import {
   useIonRouter
 } from '@ionic/vue';
 import { computed, onMounted, ref, watch } from 'vue';
-import { DateTime } from 'luxon';
 import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useSeedStore } from '@/store/seed';
 import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
-import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, translate } from '@common';
@@ -225,6 +155,9 @@ const shipmentMethodOptions = computed(() =>
   })
 );
 
+const channelFilterOptions = computed(() => channelOptions.value.map((channel) => ({ id: channel, label: formatChannel(channel) })));
+const facilityFilterOptions = computed(() => facilityOptions.value.map((facility) => ({ id: facility.id, label: facility.name })));
+
 const orders = computed(() => store.filteredOrders(bucket));
 const selectedIds = computed(() => new Set(store.selection[bucket]));
 const actions = computed<BulkActionDefinition[]>(() => BULK_ACTIONS[bucket]);
@@ -245,28 +178,10 @@ function orderRow(order: WorkflowOrder) {
   return toWorkflowOrderRowViewModel(order, orderStore.workflowEnrichment(bucket, order.orderId));
 }
 
-type DateFilterField = 'dateFrom' | 'dateThru';
 type FacilityOption = {
   id: string;
   name: string;
 };
-
-function dateFilterLabel(value: string) {
-  if (!value) return translate('Select date');
-
-  const date = dateFromValue(value);
-  return date ? date.toFormat('MM/dd/yyyy') : value;
-}
-
-function setDateFilter(field: DateFilterField, value: string | string[] | null | undefined) {
-  filters.value[field] = normalizeDateFilterValue(value);
-}
-
-function normalizeDateFilterValue(value: string | string[] | null | undefined) {
-  if (!value) return '';
-  const selectedValue = Array.isArray(value) ? value[0] : value;
-  return selectedValue ? String(selectedValue).slice(0, 10) : '';
-}
 
 function applyRouteFilters() {
   const facilityId = router.currentRoute.value.query.facilityId;
@@ -330,7 +245,7 @@ onMounted(() => {
 const debounceTimer = ref<ReturnType<typeof setTimeout>>();
 
 watch(
-  () => [filters.value.query, filters.value.customerName],
+  () => filters.value.query,
   () => {
     if (debounceTimer.value) clearTimeout(debounceTimer.value);
     debounceTimer.value = setTimeout(loadWorkflowOrders, 300);
@@ -446,22 +361,6 @@ function formatChannel(channel: string) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function dateFromValue(value?: string | null) {
-  if (!value) return null;
-
-  const numericValue = Number(value);
-  if (Number.isFinite(numericValue) && numericValue > 0) {
-    const numericDate = DateTime.fromMillis(numericValue);
-    if (numericDate.isValid) return numericDate;
-  }
-
-  const sqlDate = DateTime.fromSQL(value);
-  if (sqlDate.isValid) return sqlDate;
-
-  const isoDate = DateTime.fromISO(value);
-  return isoDate.isValid ? isoDate : null;
-}
-
 </script>
 
 <style scoped>
@@ -485,18 +384,4 @@ function dateFromValue(value?: string | null) {
   width: 10rem;
 }
 
-.inflight-order-date-filter.inflight-order-date-filter-fixed {
-  flex: 0 0 11rem;
-  min-width: 11rem;
-  max-width: 11rem;
-}
-
-@media (max-width: 640px) {
-  .inflight-order-date-filter.inflight-order-date-filter-fixed {
-    flex: 1 1 auto;
-    max-width: none;
-    min-width: 0;
-    width: 100%;
-  }
-}
 </style>
