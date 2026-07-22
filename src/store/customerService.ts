@@ -27,12 +27,15 @@ const UNFILLABLE_FACILITY_ID = 'UNFILLABLE_PARKING';
 const UNFILLABLE_ITEM_STATUSES = ['ITEM_CREATED', 'ITEM_APPROVED'];
 const GENERAL_OPS_PARKING_FACILITY_ID = 'GENERAL_OPS_PARKING';
 const REQUIRED_VIRTUAL_LOCATION_GROUPS = [
-  { id: 'brokering', label: 'Brokering queue', facilityIds: ['_NA_'] },
+  // The _NA_ parking holds orders that have never been brokered. Labelled distinctly
+  // from the side-menu "Brokering queue" (the whole queue, incl. rejected items) so
+  // the same name never shows two different counts.
+  { id: 'brokering', label: 'Awaiting brokering', facilityIds: ['_NA_'] },
   { id: 'rejected', label: 'Rejected queue', facilityIds: ['REJECTED_ITM_PARKING', 'REJECTED_PARKING'] },
   { id: 'unfillable', label: 'Unfillable queue', facilityIds: ['UNFILLABLE_PARKING'] }
 ];
 const DEFAULT_VIRTUAL_LOCATION_NAMES: Record<string, string> = {
-  _NA_: 'Brokering queue',
+  _NA_: 'Awaiting brokering',
   REJECTED_ITM_PARKING: 'Rejected queue',
   REJECTED_PARKING: 'Rejected queue',
   UNFILLABLE_PARKING: 'Unfillable queue'

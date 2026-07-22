@@ -93,6 +93,7 @@
   "Available at {facility}: {count}": "Disponible en {facility}: {count}",
   "available to refund": "available to refund",
   "Available: {count}": "Disponible: {count}",
+  "Awaiting brokering": "Pendiente de asignación",
   "Bad address": "Bad address",
   "Bad Address": "Dirección incorrecta",
   "Barcode Identifier": "Identificador de código de barras",
