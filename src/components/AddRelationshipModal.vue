@@ -66,27 +66,18 @@
       <ion-spinner name="crescent" />
     </div>
 
-    <ion-list v-else-if="results.length" lines="full">
-      <ion-item
-        v-for="party in results"
-        :key="party.partyId"
-        :class="{ 'party-selected': selectedParty?.partyId === party.partyId }"
-        button
-        :detail="false"
-        @click="selectParty(party)"
-      >
-        <ion-label>
-          <h3>{{ party.name }}</h3>
-          <p>{{ party.partyId }}</p>
-        </ion-label>
-        <ion-icon
-          v-if="selectedParty?.partyId === party.partyId"
-          slot="end"
-          :icon="checkmarkCircle"
-          color="primary"
-        />
-      </ion-item>
-    </ion-list>
+    <ion-radio-group v-else-if="results.length" v-model="selectedPartyId">
+      <ion-list lines="full">
+        <ion-item v-for="party in results" :key="party.partyId">
+          <ion-radio label-placement="end" justify="start" :value="party.partyId">
+            <ion-label>
+              <h3>{{ party.name }}</h3>
+              <p>{{ party.partyId }}</p>
+            </ion-label>
+          </ion-radio>
+        </ion-item>
+      </ion-list>
+    </ion-radio-group>
 
     <div v-else-if="hasSearchTerm && !searching" class="ion-padding ion-text-center">
       <p>No parties found</p>
@@ -185,6 +176,8 @@ import {
   IonItem,
   IonLabel,
   IonList,
+  IonRadio,
+  IonRadioGroup,
   IonSegment,
   IonSegmentButton,
   IonSelect,
@@ -281,9 +274,12 @@ async function runSearch() {
   }
 }
 
-function selectParty(party: PartySearchResult) {
-  selectedParty.value = selectedParty.value?.partyId === party.partyId ? null : party;
-}
+const selectedPartyId = computed({
+  get: () => selectedParty.value?.partyId ?? '',
+  set: (partyId: string) => {
+    selectedParty.value = results.value.find((party) => party.partyId === partyId) ?? null;
+  }
+});
 
 function dismiss() {
   modalController.dismiss(null, 'cancel');
@@ -309,10 +305,6 @@ function confirm() {
 
 .name-search-row ion-input {
   flex: 1;
-}
-
-.party-selected {
-  --background: var(--ion-color-primary-tint, #e8f0fe);
 }
 
 .hint {

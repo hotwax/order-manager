@@ -33,4 +33,23 @@ describe('custom swap modal facility stock labels', () => {
     expect(source).not.toContain('<ion-row');
     expect(source).not.toContain('<ion-col');
   });
+
+  it('single-selects search results with a radio group whose whole row is the tap target', () => {
+    expect(source).toContain('<ion-radio-group v-else v-model="selectedProductId">');
+    expect(source).toContain('@click="selectSearchProduct(product)"');
+    expect(source).toContain('<ion-radio slot="start" :value="product.productId"');
+    expect(source).toContain('function selectSearchProduct');
+    // the entire ion-item row selects, not just the small radio control
+    expect(source).toContain('@click="selectSubstituteProduct(product.productId)"');
+    // the old ad-hoc single-select checkmark pattern is gone
+    expect(source).not.toContain('checkmarkCircle');
+    expect(source).not.toContain('@click="hasSearchStock(product) && selectProduct(toSubstituteShape(product))"');
+  });
+
+  it('live-filters the approved-swaps list from a toolbar searchbar', () => {
+    expect(source).toContain('v-model="substituteKeyword"');
+    expect(source).toContain('const filteredSubstitutes = computed(');
+    expect(source).toContain('v-for="product in filteredSubstitutes"');
+    expect(source).toContain("translate('No substitute products match your search.')");
+  });
 });
