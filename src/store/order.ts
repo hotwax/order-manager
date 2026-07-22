@@ -11,6 +11,7 @@ import type { WorkflowOrder, WorkflowFilters } from '@/types/customerService';
 import type { OrderRowEnrichment } from '@/types/orderRow';
 import { useSeedStore } from '@/store/seed';
 import { useProductStore } from './productStore';
+import { queueCountFetchers } from '@/services/navCounts';
 
 
 async function fetchWorkflowPage(
@@ -169,6 +170,24 @@ export const useOrderStore = defineStore('orders', {
   actions: {
     setNavCount(key: string, total: number) {
       this.navCounts[key] = total;
+    },
+    /**
+     * Prime the "Blocked" and brokering nav-badge counts from a landing page (the
+     * Funnel) so every queue lights up before it is visited. Each count uses the
+     * same query its queue page uses, so the badge always matches the page total.
+     * `open`/`inflight`/`packed` are primed by the Funnel's brokered-workload fetch.
+     */
+    async primeNavCounts(productStoreId?: string) {
+      const storeId = productStoreId && productStoreId !== 'All' ? productStoreId : undefined;
+      await Promise.all(
+        Object.entries(queueCountFetchers).map(async ([key, fetchCount]) => {
+          try {
+            this.setNavCount(key, await fetchCount(storeId));
+          } catch (error: any) {
+            logger.error(`Failed to prime the ${key} nav count`, error);
+          }
+        })
+      );
     },
     async runSearch() {
       this.pageIndex = 0;

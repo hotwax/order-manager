@@ -816,6 +816,9 @@ function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {
 function fetchStoreDashboardData(productStoreId: string) {
   store.fetchFulfillmentProgress(productStoreId);
   fetchBrokeredWorkload(productStoreId);
+  // Light up every side-menu queue badge (Blocked queues + brokering) on landing,
+  // each counted with the same query its queue page uses.
+  orderStore.primeNavCounts(productStoreId);
   store.fetchUnfillable(productStoreId);
   store.fetchVirtualLocationCounts(productStoreId);
   store.fetchFacilityOrderVolume(productStoreId);

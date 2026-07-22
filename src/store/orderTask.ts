@@ -5,17 +5,23 @@ import { useProductStore } from '@/store/productStore';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
 import type { TaskQueueRequestParams } from '@/types/orderTaskFilters';
+// Queue-defining task query constants live in a dependency-free module so the
+// nav-count priming (services/navCounts) can count the exact same populations
+// these queue-list fetches list, without importing the store.
+import {
+  ADDRESS_VALIDATION_PURPOSE_TYPE_ID,
+  FRAUD_RISK_PURPOSE_TYPE_ID,
+  HOLD_TASK_TYPE_ID,
+  OPEN_TASK_STATUS_IDS,
+  SWAP_PURPOSE_TYPE_ID,
+  USER_HOLD_PURPOSE_TYPE_IDS,
+} from '@/utils/taskQueues';
 
 interface TaskStatusCommunicationOptions {
   content?: string;
   communicationEventTypeId?: string;
   subject?: string;
 }
-
-const HOLD_TASK_TYPE_ID = 'RESOLVE_ONHOLD_ORDER';
-const FRAUD_RISK_PURPOSE_TYPE_ID = 'REVIEW_RISK_ORDER';
-const OPEN_TASK_STATUS_IDS = 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD';
-const USER_HOLD_PURPOSE_TYPE_IDS = 'ORD_HOLD_MANUAL,ORD_HOLD_CUST_REQ';
 
 // ── Per-task enrichment helpers ───────────────────────────────────────────────
 // Shared by both the queue list fetches and the order-scoped detail fetch so the
@@ -236,7 +242,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
             ...payload,
             taskStatusId: OPEN_TASK_STATUS_IDS,
             taskStatusId_op: 'in',
-            workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+            workEffortTypeId: HOLD_TASK_TYPE_ID,
             workEffortPurposeTypeId,
             ...(workEffortPurposeTypeId === USER_HOLD_PURPOSE_TYPE_IDS ? { workEffortPurposeTypeId_op: 'in' } : {}),
             productStoreId,
@@ -268,8 +274,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
             ...payload,
             taskStatusId: OPEN_TASK_STATUS_IDS,
             taskStatusId_op: 'in',
-            workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-            workEffortPurposeTypeId: 'INVALID_ADDRESS',
+            workEffortTypeId: HOLD_TASK_TYPE_ID,
+            workEffortPurposeTypeId: ADDRESS_VALIDATION_PURPOSE_TYPE_ID,
             productStoreId,
           },
         });
@@ -304,8 +310,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
             ...payload,
             taskStatusId: OPEN_TASK_STATUS_IDS,
             taskStatusId_op: 'in',
-            workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-            workEffortPurposeTypeId: 'NEG_RES_REVIEW',
+            workEffortTypeId: HOLD_TASK_TYPE_ID,
+            workEffortPurposeTypeId: SWAP_PURPOSE_TYPE_ID,
             productStoreId,
           },
         });
@@ -386,7 +392,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
               orderId,
               taskStatusId: OPEN_TASK_STATUS_IDS,
               taskStatusId_op: 'in',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+              workEffortTypeId: HOLD_TASK_TYPE_ID,
               workEffortPurposeTypeId: USER_HOLD_PURPOSE_TYPE_IDS,
               workEffortPurposeTypeId_op: 'in',
               productStoreId,
@@ -408,8 +414,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
               orderId,
               taskStatusId: OPEN_TASK_STATUS_IDS,
               taskStatusId_op: 'in',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'INVALID_ADDRESS',
+              workEffortTypeId: HOLD_TASK_TYPE_ID,
+              workEffortPurposeTypeId: ADDRESS_VALIDATION_PURPOSE_TYPE_ID,
               productStoreId,
             },
           });
@@ -429,8 +435,8 @@ export const useOrderTaskStore = defineStore('orderTask', {
               orderId,
               taskStatusId: OPEN_TASK_STATUS_IDS,
               taskStatusId_op: 'in',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'NEG_RES_REVIEW',
+              workEffortTypeId: HOLD_TASK_TYPE_ID,
+              workEffortPurposeTypeId: SWAP_PURPOSE_TYPE_ID,
               productStoreId,
             },
           });

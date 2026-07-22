@@ -30,14 +30,17 @@
 
 <script setup lang="ts">
 import { IonSelect, IonSelectOption } from '@ionic/vue';
-import { api, translate } from '@common';
+import { translate } from '@common';
 import { computed, onMounted, ref, watch } from 'vue';
 import router from '@/router';
 import OrderQueueList from '@/components/OrderQueueList.vue';
-
-const ALL_FACILITY_OPTION_ID = 'All';
-const GENERAL_OPS_PARKING_FACILITY_ID = 'GENERAL_OPS_PARKING';
-const FALLBACK_BROKERING_FACILITY_IDS = ['_NA_', 'REJECTED_ITM_PARKING', 'REJECTED_PARKING'];
+import {
+  ALL_FACILITY_OPTION_ID,
+  FALLBACK_BROKERING_FACILITY_IDS,
+  buildBrokeringFacilityOptions,
+  fetchBrokeringFacilities,
+  isUnfillableFacilityId,
+} from '@/utils/brokeringFacilities';
 
 type FacilityOption = { id: string; name: string };
 
@@ -56,38 +59,12 @@ const virtualFacilityIds = computed(() => virtualFacilities.value
   .map((facility) => facility.id)
   .filter((id) => id && id !== ALL_FACILITY_OPTION_ID && !isUnfillableFacilityId(id)));
 
-function normalizeFacilityName(facility: any) {
-  return facility?.facilityName || facility?.facilityId || facility?.name || facility?.id;
-}
-
-function buildFacilityList(facilities: any[]) {
-  const map = new Map<string, string>();
-  facilities.forEach((facility) => {
-    const id = facility?.facilityId || facility?.id;
-    if (!id || id === GENERAL_OPS_PARKING_FACILITY_ID || isUnfillableFacility(facility)) return;
-
-    map.set(id, normalizeFacilityName(facility));
-  });
-
-  return Array.from(map.entries())
-    .map(([id, name]) => ({ id, name }))
-    .sort((left, right) => left.name.localeCompare(right.name));
-}
-
 function dedupeAndSort(values: string[]) {
   return [...new Set(values.filter((value) => value && value !== ALL_FACILITY_OPTION_ID && !isUnfillableFacilityId(value)))].sort((left, right) =>
     String(left).localeCompare(String(right))
   );
 }
-function isUnfillableFacilityId(facilityId: string) {
-  return facilityId.toUpperCase().includes('UNFILLABLE');
-}
 
-function isUnfillableFacility(facility: any) {
-  const id = facility?.facilityId || facility?.id || '';
-  const name = normalizeFacilityName(facility) || '';
-  return isUnfillableFacilityId(id) || String(name).toUpperCase().includes('UNFILLABLE');
-}
 function clearFacilityFilter() {
   selectedFacilityIds.value = [ALL_FACILITY_OPTION_ID];
 }
@@ -128,14 +105,8 @@ function normalizeFacilitySelection(event?: any) {
 }
 
 async function loadVirtualFacilities() {
-  try {
-    const resp = await api({ url: 'admin/facilities', method: 'GET', params: { parentTypeId: 'VIRTUAL_FACILITY' } });
-    const facilities = Array.isArray(resp.data) ? resp.data : [];
-    const options = buildFacilityList(facilities);
-    virtualFacilities.value = [{ id: ALL_FACILITY_OPTION_ID, name: translate('All') }, ...options];
-  } catch {
-    virtualFacilities.value = [{ id: ALL_FACILITY_OPTION_ID, name: translate('All') }];
-  }
+  const options = buildBrokeringFacilityOptions(await fetchBrokeringFacilities());
+  virtualFacilities.value = [{ id: ALL_FACILITY_OPTION_ID, name: translate('All') }, ...options];
 }
 
 watch(selectedFacilityIds, normalizeFacilitySelection, { deep: true, immediate: true });
