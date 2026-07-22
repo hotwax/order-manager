@@ -2,7 +2,7 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button data-testid="viewmore-close-modal" @click="closeModal">
+        <ion-button data-testid="viewmore-close-modal" @click="closeModal" :aria-label="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
