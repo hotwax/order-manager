@@ -316,8 +316,9 @@ async function loadMoreAddressValidationTasks(event: any) {
   await event.target.complete();
 }
 
-onIonViewWillEnter(() => {
-  fetchAddressValidationTasks();
+onIonViewWillEnter(async () => {
+  await seedStore.loadGeos();
+  await fetchAddressValidationTasks();
 });
 </script>
 

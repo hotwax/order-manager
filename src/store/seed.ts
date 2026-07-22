@@ -11,6 +11,8 @@ type SeedDatasetState<T = any> = {
   error: string;
 };
 
+const datasetLoadPromises = new WeakMap<SeedDatasetState, Promise<void>>();
+
 const statusTypeIds = [
   "ORDER_STATUS",
   "ORDER_ITEM_STATUS",
@@ -308,18 +310,32 @@ export const useSeedStore = defineStore("seed", {
       ]);
     },
     async loadDataset(target: SeedDatasetState, request: any, keyFn: (record: any) => string) {
-      if (target.status === "loaded" || target.status === "loading") return;
+      if (target.status === "loaded") return;
+      if (target.status === "loading") {
+        const pendingLoad = datasetLoadPromises.get(target);
+        if (pendingLoad) return pendingLoad;
 
-      target.status = "loading";
-      target.error = "";
-
-      try {
-        const resp = await api(request);
-        setDataset(target, responseList(resp.data), keyFn);
-      } catch (error: any) {
-        logger.error("Failed to load seed data", error);
-        setDatasetError(target, error);
+        target.status = target.ids?.length ? "loaded" : "idle";
+        if (target.status === "loaded") return;
       }
+
+      const loadPromise = (async () => {
+        target.status = "loading";
+        target.error = "";
+
+        try {
+          const resp = await api(request);
+          setDataset(target, responseList(resp.data), keyFn);
+        } catch (error: any) {
+          logger.error("Failed to load seed data", error);
+          setDatasetError(target, error);
+        } finally {
+          datasetLoadPromises.delete(target);
+        }
+      })();
+
+      datasetLoadPromises.set(target, loadPromise);
+      return loadPromise;
     },
     async loadProductStores() {
       await this.loadDataset(this.productStores, {
