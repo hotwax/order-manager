@@ -29,7 +29,7 @@
           {{ seedStore.facilityName(entry.facilityId) }}
           <p>{{ entry.facilityId }}</p>
         </ion-label>
-        <ion-note slot="end" class="stock-col">{{ entry.lastInventoryCount ?? 0 }}</ion-note>
+        <ion-label slot="end" class="stock-col">{{ entry.lastInventoryCount ?? 0 }}</ion-label>
       </ion-item>
     </ion-list>
   </ion-content>
