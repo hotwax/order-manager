@@ -45,6 +45,37 @@ const VIRTUAL_OR_PARKING_FACILITY_IDS = new Set([
   GENERAL_OPS_PARKING_FACILITY_ID
 ]);
 
+// Map each hold-task purpose the dashboard reports to its side-menu badge. The
+// two user-hold purposes roll up into the single "Hold" queue, matching the page.
+const HOLD_TASK_PURPOSE_TO_NAV_KEY: Record<string, string> = {
+  INVALID_ADDRESS: 'badAddress',
+  NEG_RES_REVIEW: 'swap',
+  REVIEW_RISK_ORDER: 'fraud',
+  ORD_HOLD_MANUAL: 'hold',
+  ORD_HOLD_CUST_REQ: 'hold'
+};
+
+// Publish the badAddress/swap/hold/fraud badges from the hold-task breakdown the
+// Funnel already fetches. A purpose absent from the response leaves its badge
+// unset (rather than a misleading 0) until the API reports it.
+function publishHoldTaskNavCounts(holdTaskCounts: { workEffortPurposeTypeId: string; taskCount: number }[]) {
+  // Best-effort: publishing a badge must never break the dashboard fetch.
+  try {
+    const totals: Record<string, number> = {};
+    for (const { workEffortPurposeTypeId, taskCount } of holdTaskCounts) {
+      const navKey = HOLD_TASK_PURPOSE_TO_NAV_KEY[workEffortPurposeTypeId];
+      if (!navKey) continue;
+      totals[navKey] = (totals[navKey] ?? 0) + (Number(taskCount) || 0);
+    }
+    const orderStore = useOrderStore();
+    for (const [navKey, total] of Object.entries(totals)) {
+      orderStore.setNavCount(navKey, total);
+    }
+  } catch (error) {
+    logger.error('Failed to publish hold-task nav counts', error);
+  }
+}
+
 function getUserDashboardDateFilter() {
   const userProfile = useUserStore().current;
   return getDashboardDateFilter(userProfile?.timeZone || userProfile?.userTimeZone);
@@ -411,6 +442,13 @@ export const useCustomerServiceStore = defineStore('customerService', {
 
         const solrResult = await searchOrders(solrParams);
         this.unfillable.totalCount = solrResult.total || 0;
+        // Publish the Unfillable side-menu badge from the same full-queue count.
+        // Best-effort: a badge-publish failure must not fail the dashboard fetch.
+        try {
+          useOrderStore().setNavCount('unfillable', this.unfillable.totalCount);
+        } catch (error) {
+          logger.error('Failed to publish the unfillable nav count', error);
+        }
         this.dashboardStatus.unfillable = 'success';
       } catch (error) {
         console.error('Failed to fetch unfillable stats', error);
@@ -437,6 +475,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
             taskCount: Number(count.taskCount) || 0
           }))
         };
+        publishHoldTaskNavCounts(this.holdTasks.holdTaskCounts);
         this.dashboardStatus.holdTasks = 'success';
       } catch (error) {
         console.error('Failed to fetch hold task counts', error);

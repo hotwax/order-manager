@@ -172,10 +172,11 @@ export const useOrderStore = defineStore('orders', {
       this.navCounts[key] = total;
     },
     /**
-     * Prime the "Blocked" and brokering nav-badge counts from a landing page (the
-     * Funnel) so every queue lights up before it is visited. Each count uses the
-     * same query its queue page uses, so the badge always matches the page total.
-     * `open`/`inflight`/`packed` are primed by the Funnel's brokered-workload fetch.
+     * Prime the nav-badge counts that no Funnel dashboard fetch already produces —
+     * currently only brokering, which needs a distinct-order count over the whole
+     * awaiting-brokering facility set. unfillable + the hold-task purposes are
+     * published by the customer-service store; open/inflight/packed by the Funnel's
+     * brokered-workload fetch. Each count uses the same query its queue page uses.
      */
     async primeNavCounts(productStoreId?: string) {
       const storeId = productStoreId && productStoreId !== 'All' ? productStoreId : undefined;

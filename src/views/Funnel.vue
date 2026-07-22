@@ -816,8 +816,9 @@ function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {
 function fetchStoreDashboardData(productStoreId: string) {
   store.fetchFulfillmentProgress(productStoreId);
   fetchBrokeredWorkload(productStoreId);
-  // Light up every side-menu queue badge (Blocked queues + brokering) on landing,
-  // each counted with the same query its queue page uses.
+  // Brokering is the only badge not derivable from a dashboard fetch below, so it
+  // gets its own distinct-order count. Unfillable + the hold-task purposes
+  // (badAddress/swap/hold/fraud) are published by fetchUnfillable / fetchHoldTasks.
   orderStore.primeNavCounts(productStoreId);
   store.fetchUnfillable(productStoreId);
   store.fetchVirtualLocationCounts(productStoreId);
