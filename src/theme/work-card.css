@@ -61,7 +61,7 @@
   gap: var(--spacer-base);
   grid-template-columns: repeat(auto-fit, minmax(260px, 400px));
   padding-inline: var(--spacer-base);
-  padding-block-start: var(--spacer-base);
+  padding-block: var(--spacer-sm);
 }
 
 .ship-group-options,
