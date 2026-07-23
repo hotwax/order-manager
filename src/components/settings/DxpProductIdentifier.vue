@@ -34,7 +34,7 @@
           {{ getProductIdentificationValue(productIdentificationPref.primaryId, currentSampleProduct) ? getProductIdentificationValue(productIdentificationPref.primaryId, currentSampleProduct) : currentSampleProduct.productId }}
           <p>{{ getProductIdentificationValue(productIdentificationPref.secondaryId, currentSampleProduct) }}</p>
         </ion-label>
-        <ion-button size="default" fill="clear" @click="shuffle">  
+        <ion-button size="default" fill="clear" @click="shuffle" :aria-label="translate('Shuffle')">
           <ion-icon slot="icon-only" :icon="shuffleOutline"/>
         </ion-button>
       </ion-item>

@@ -427,7 +427,7 @@
 
               <div class="ship-group-status-toggle">
                 <p>{{ shipGroupStatusLabel(shipGroup) }}</p>
-                <ion-button fill="clear" color="medium" @click="toggleShipGroup(shipGroup.id)">
+                <ion-button fill="clear" color="medium" @click="toggleShipGroup(shipGroup.id)" :aria-label="translate('Toggle ship group')">
                   <ion-icon slot="icon-only" :icon="isShipGroupExpanded(shipGroup.id) ? chevronUp : chevronDown" />
                 </ion-button>
               </div>
@@ -642,7 +642,7 @@
                       <p>{{ shipGroupProductIdentification(productIdentificationPref.secondaryId, item) }}</p>
                     </ion-label>
 
-                    <ion-button slot="end" fill="clear" color="medium" @click.stop="viewInventory(item.productId)">
+                    <ion-button slot="end" fill="clear" color="medium" @click.stop="viewInventory(item.productId)" :aria-label="translate('View inventory')">
                       <ion-icon slot="icon-only" :icon="cubeOutline" />
                     </ion-button>
                   </ion-item>
@@ -712,7 +712,7 @@
                     <ion-header>
                       <ion-toolbar>
                         <ion-buttons slot="start">
-                          <ion-button @click="closeEditShippingAddress"><ion-icon slot="icon-only"
+                          <ion-button @click="closeEditShippingAddress" :aria-label="translate('Close')"><ion-icon slot="icon-only"
                               :icon="closeOutline" /></ion-button>
                         </ion-buttons>
                         <ion-title>{{ translate('Edit Shipping Address') }}</ion-title>
@@ -790,7 +790,7 @@
           <ion-modal :is-open="giftModalShipGroupId === shipGroup.id" @didDismiss="giftModalShipGroupId = null">
             <ion-header>
               <ion-toolbar>
-                <ion-buttons slot="start"><ion-button @click="giftModalShipGroupId = null"><ion-icon slot="icon-only"
+                <ion-buttons slot="start"><ion-button @click="giftModalShipGroupId = null" :aria-label="translate('Close')"><ion-icon slot="icon-only"
                       :icon="closeOutline" /></ion-button></ion-buttons>
                 <ion-title>{{ translate('Gift message') }}</ion-title>
               </ion-toolbar>
@@ -813,7 +813,7 @@
             @didDismiss="shippingDatesModalShipGroupId = null">
             <ion-header>
               <ion-toolbar>
-                <ion-buttons slot="start"><ion-button @click="shippingDatesModalShipGroupId = null"><ion-icon
+                <ion-buttons slot="start"><ion-button @click="shippingDatesModalShipGroupId = null" :aria-label="translate('Close')"><ion-icon
                       slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
                 <ion-title>{{ translate('Shipping dates') }}</ion-title>
               </ion-toolbar>
@@ -840,7 +840,7 @@
             @didDismiss="deliveryDatesModalShipGroupId = null">
             <ion-header>
               <ion-toolbar>
-                <ion-buttons slot="start"><ion-button @click="deliveryDatesModalShipGroupId = null"><ion-icon
+                <ion-buttons slot="start"><ion-button @click="deliveryDatesModalShipGroupId = null" :aria-label="translate('Close')"><ion-icon
                       slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
                 <ion-title>{{ translate('Delivery dates') }}</ion-title>
               </ion-toolbar>
@@ -867,7 +867,7 @@
             @didDismiss="instructionModalShipGroupId = null">
             <ion-header>
               <ion-toolbar>
-                <ion-buttons slot="start"><ion-button @click="instructionModalShipGroupId = null"><ion-icon
+                <ion-buttons slot="start"><ion-button @click="instructionModalShipGroupId = null" :aria-label="translate('Close')"><ion-icon
                       slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
                 <ion-title>{{ translate('Shipping instructions') }}</ion-title>
               </ion-toolbar>

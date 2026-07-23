@@ -1,0 +1,3 @@
+## 2026-07-22 - Missing ARIA Labels on Ionic Modals
+**Learning:** Found a widespread pattern across many modal components where `<ion-button>` elements containing only an `<ion-icon>` lacked `aria-label` attributes. This is a common accessibility trap in Ionic/Vue applications because visually the icon conveys the meaning (e.g. `closeOutline` for dismissing a modal, `trashOutline` for delete), but screen readers announce nothing useful for the button without the label.
+**Action:** Always add `:aria-label="translate('[Action]')"` (e.g. 'Close', 'Delete', 'Options') to `<ion-button>` elements that rely solely on an `<ion-icon>` for their visual representation to ensure proper accessibility for screen reader users.

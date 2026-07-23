@@ -2,7 +2,7 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="modalController.dismiss()">
+        <ion-button @click="modalController.dismiss()" :aria-label="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
@@ -63,7 +63,7 @@
         :description="attr.attrDescription"
       >
         <template #end>
-          <ion-button fill="clear" color="danger" :disabled="deletingAttr === attr.attrName" @click="deleteAttribute(attr)">
+          <ion-button fill="clear" color="danger" :disabled="deletingAttr === attr.attrName" @click="deleteAttribute(attr)" :aria-label="translate('Delete')">
             <ion-spinner v-if="deletingAttr === attr.attrName" slot="icon-only" name="crescent" />
             <ion-icon v-else slot="icon-only" :icon="trashOutline" />
           </ion-button>
