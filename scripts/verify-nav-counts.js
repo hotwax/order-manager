@@ -55,7 +55,5 @@
   await router.push('/funnel');
 
   const allPass = results.every((result) => result.match);
-  console.table(results);
-  console.log(allPass ? '✅ All nav badges match their queue pages' : '❌ Nav badge mismatch detected');
   return { allPass, results };
 })();
