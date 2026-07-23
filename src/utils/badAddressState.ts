@@ -40,10 +40,9 @@ function buildSuggestedForm(task: any): AddressForm {
 
 export function buildAddressState(task: any): AddressState {
   const suggested = buildSuggestedForm(task);
-  const hasSuggested = [suggested.address1, suggested.address2, suggested.city, suggested.postalCode, suggested.stateProvinceGeoId, suggested.countryGeoId].some(Boolean);
   const original = buildAddressForm(task.shippingAddress, task);
   return {
-    selectedAddressType: hasSuggested ? 'suggested' : 'original',
+    selectedAddressType: 'suggested',
     original,
     suggested,
   };

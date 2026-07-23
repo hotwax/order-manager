@@ -9,14 +9,15 @@ import type {
   WorkflowOrder,
   FulfillmentProgress,
   FacilityFulfillmentProgress,
-  VirtualLocationWorkCount
+  VirtualLocationWorkCount,
+  HoldTaskCounts
 } from '@/types/customerService';
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
+import { fetchVirtualLocationOrderCounts, getActivePhysicalFacilityOrderVolume, searchOrders } from '@/services/order';
 import { getDashboardDateFilter } from '@/utils/dashboardDate';
 import { useUserStore } from '@/store/user';
-import { fetchVirtualLocationOrderCounts, searchOrders } from '@/services/order';
 
 const CHANNELS = ['WEB_SALES_CHANNEL', 'POS_SALES_CHANNEL', 'MOBILE_SALES_CHANNEL', 'MARKETPLACE_CHANNEL'];
 const BROKERABLE_ORDER_STATUSES = ['ORDER_CREATED', 'ORDER_APPROVED'];
@@ -26,20 +27,70 @@ const UNFILLABLE_FACILITY_ID = 'UNFILLABLE_PARKING';
 const UNFILLABLE_ITEM_STATUSES = ['ITEM_CREATED', 'ITEM_APPROVED'];
 const GENERAL_OPS_PARKING_FACILITY_ID = 'GENERAL_OPS_PARKING';
 const REQUIRED_VIRTUAL_LOCATION_GROUPS = [
-  { id: 'brokering', label: 'Brokering queue', facilityIds: ['_NA_'] },
+  // The _NA_ parking holds orders that have never been brokered. Labelled distinctly
+  // from the side-menu "Brokering queue" (the whole queue, incl. rejected items) so
+  // the same name never shows two different counts.
+  { id: 'brokering', label: 'Awaiting brokering', facilityIds: ['_NA_'] },
   { id: 'rejected', label: 'Rejected queue', facilityIds: ['REJECTED_ITM_PARKING', 'REJECTED_PARKING'] },
   { id: 'unfillable', label: 'Unfillable queue', facilityIds: ['UNFILLABLE_PARKING'] }
 ];
 const DEFAULT_VIRTUAL_LOCATION_NAMES: Record<string, string> = {
-  _NA_: 'Brokering queue',
+  _NA_: 'Awaiting brokering',
   REJECTED_ITM_PARKING: 'Rejected queue',
   REJECTED_PARKING: 'Rejected queue',
   UNFILLABLE_PARKING: 'Unfillable queue'
 };
+const VIRTUAL_OR_PARKING_FACILITY_IDS = new Set([
+  '_NA_',
+  'REJECTED_ITM_PARKING',
+  'REJECTED_PARKING',
+  'UNFILLABLE_PARKING',
+  GENERAL_OPS_PARKING_FACILITY_ID
+]);
+
+// Map each hold-task purpose the dashboard reports to its side-menu badge. The
+// two user-hold purposes roll up into the single "Hold" queue, matching the page.
+const HOLD_TASK_PURPOSE_TO_NAV_KEY: Record<string, string> = {
+  INVALID_ADDRESS: 'badAddress',
+  NEG_RES_REVIEW: 'swap',
+  REVIEW_RISK_ORDER: 'fraud',
+  ORD_HOLD_MANUAL: 'hold',
+  ORD_HOLD_CUST_REQ: 'hold'
+};
+
+// Publish the badAddress/swap/hold/fraud badges from the hold-task breakdown the
+// Funnel already fetches. A purpose absent from the response leaves its badge
+// unset (rather than a misleading 0) until the API reports it.
+function publishHoldTaskNavCounts(holdTaskCounts: { workEffortPurposeTypeId: string; taskCount: number }[]) {
+  // Best-effort: publishing a badge must never break the dashboard fetch.
+  try {
+    const totals: Record<string, number> = {};
+    for (const { workEffortPurposeTypeId, taskCount } of holdTaskCounts) {
+      const navKey = HOLD_TASK_PURPOSE_TO_NAV_KEY[workEffortPurposeTypeId];
+      if (!navKey) continue;
+      totals[navKey] = (totals[navKey] ?? 0) + (Number(taskCount) || 0);
+    }
+    const orderStore = useOrderStore();
+    for (const [navKey, total] of Object.entries(totals)) {
+      orderStore.setNavCount(navKey, total);
+    }
+  } catch (error) {
+    logger.error('Failed to publish hold-task nav counts', error);
+  }
+}
 
 function getUserDashboardDateFilter() {
   const userProfile = useUserStore().current;
   return getDashboardDateFilter(userProfile?.timeZone || userProfile?.userTimeZone);
+}
+
+function getUserDashboardDateRange() {
+  const dateFilter = getUserDashboardDateFilter();
+  return {
+    dateFilter,
+    startOfDayStr: DateTime.fromISO(dateFilter).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss'),
+    endOfDayStr: DateTime.fromISO(dateFilter).plus({ days: 1 }).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss')
+  };
 }
 
 function facilityIdOf(facility: any) {
@@ -94,19 +145,6 @@ function buildVirtualLocationWorkCounts(facilities: { facilityId: string; facili
   return [...rows, ...dynamicRows];
 }
 
-function responseListCount(response: any): number {
-  const headerCount = response?.headers?.get?.('x-total-count')
-    ?? response?.headers?.['x-total-count']
-    ?? response?.headers?.['X-Total-Count'];
-  const fallbackCount = Array.isArray(response?.data) ? response.data.length : 0;
-  const countValue = headerCount !== undefined && headerCount !== null && String(headerCount).trim() !== ''
-    ? headerCount
-    : fallbackCount;
-  const count = Number(countValue);
-
-  return Number.isFinite(count) ? count : fallbackCount;
-}
-
 // Load-status keys for the funnel dashboard metric groups. Each group's fetch
 // transitions its status loading -> success/error so the Funnel view can show
 // per-section loading affordances and surface errors instead of false zeros.
@@ -118,6 +156,7 @@ export type DashboardStatusKey =
   | 'facilityOrderVolume'
   | 'facilityFulfillmentVelocity'
   | 'facilityPartialFulfillments'
+  | 'facilityRejections'
   | 'facilityFulfillmentProgress'
   | 'fulfillmentSyncData';
 
@@ -132,6 +171,7 @@ function emptyDashboardStatus(): Record<DashboardStatusKey, LoadStatus> {
     facilityOrderVolume: 'idle',
     facilityFulfillmentVelocity: 'idle',
     facilityPartialFulfillments: 'idle',
+    facilityRejections: 'idle',
     facilityFulfillmentProgress: 'idle',
     fulfillmentSyncData: 'idle'
   };
@@ -175,6 +215,62 @@ function matchesFilters(order: WorkflowOrder, filters: WorkflowFilters): boolean
   return true;
 }
 
+function hasUsableFacilityOrderVolume(facilities: any[]) {
+  return facilities.some((facility) =>
+    facility?.facilityId
+    && Number(facility.lastOrderCount || facility.orderCount || facility.shipGroupCount || 0) > 0
+  );
+}
+
+function hasUsableFacilityFulfillmentVelocity(facilities: any[]) {
+  return facilities.some((facility) =>
+    facility?.facilityId
+    && (
+      Number(facility.fulfillmentVelocity || 0) > 0
+      || Number(facility.shipGroupCount || 0) > 0
+    )
+  );
+}
+
+function activeFacilityVelocityFallbackRows(facilities: any[]) {
+  return facilities.map((facility) => ({
+    ...facility,
+    activeFacilityFallback: true,
+    fulfillmentVelocity: null,
+    shipGroupCount: 0
+  }));
+}
+
+function buildFacilityRejectionCountMap(rows: any[]) {
+  const rejectedByFacility = new Map<string, Set<string>>();
+
+  rows.forEach((row) => {
+    const facilityId = row?.fromFacilityId;
+    if (!facilityId || VIRTUAL_OR_PARKING_FACILITY_IDS.has(facilityId)) return;
+
+    const rejectionKey = [row.orderId, row.shipGroupSeqId].filter(Boolean).join('::');
+    if (!rejectionKey) return;
+
+    if (!rejectedByFacility.has(facilityId)) rejectedByFacility.set(facilityId, new Set());
+    rejectedByFacility.get(facilityId)!.add(rejectionKey);
+  });
+
+  const rejectionCounts = new Map<string, number>();
+  rejectedByFacility.forEach((rejectedShipGroups, facilityId) => {
+    rejectionCounts.set(facilityId, rejectedShipGroups.size);
+  });
+  return rejectionCounts;
+}
+
+function activeFacilityRowsWithRejections(facilities: any[], rejectionRows: any[]) {
+  const rejectionCountByFacility = buildFacilityRejectionCountMap(rejectionRows);
+
+  return facilities.map((facility) => ({
+    ...facility,
+    rejectedShipGroupCount: rejectionCountByFacility.get(facility.facilityId) || 0
+  }));
+}
+
 function inBucket(order: WorkflowOrder, bucket: WorkflowBucket): boolean {
   return order.bucket === bucket;
 }
@@ -194,18 +290,17 @@ export const useCustomerServiceStore = defineStore('customerService', {
       oldestOpenOrderDate: null as number | null
     },
     unfillable: {
-      unfillableHourlyCounts: [] as { shipGroupDateHour: string; shipGroupCount: number }[],
+      unfillableHourlyCounts: [] as { entryDateHour: string; shipGroupCount: number }[],
       totalCount: 0
     },
     holdTasks: {
       holdTasksTotalCount: 0,
-      holdSubstituteCount: 0,
-      holdBadAddressCount: 0,
-      holdFraudRiskCount: 0
-    },
+      holdTaskCounts: []
+    } as HoldTaskCounts,
     facilityOrderVolume: [] as any[],
     facilityFulfillmentVelocity: [] as any[],
     facilityPartialFulfillments: [] as any[],
+    facilityRejections: [] as any[],
     facilityFulfillmentProgress: null as FacilityFulfillmentProgress | null,
     virtualLocationCounts: [] as VirtualLocationWorkCount[],
     pickProfileGroups: [] as any[],
@@ -258,9 +353,9 @@ export const useCustomerServiceStore = defineStore('customerService', {
       const todayStr = getUserDashboardDateFilter();
       return Array.from({ length: 24 }, (_, h) => {
         const match = state.unfillable.unfillableHourlyCounts?.find((d) => {
-          const parsed = DateTime.fromSQL(d.shipGroupDateHour).isValid
-            ? DateTime.fromSQL(d.shipGroupDateHour)
-            : DateTime.fromISO(d.shipGroupDateHour);
+          const parsed = DateTime.fromSQL(d.entryDateHour).isValid
+            ? DateTime.fromSQL(d.entryDateHour)
+            : DateTime.fromISO(d.entryDateHour);
           return parsed.isValid && parsed.toFormat('yyyy-MM-dd') === todayStr && parsed.hour === h;
         });
         return match ? match.shipGroupCount : 0;
@@ -273,6 +368,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
     getFacilityOrderVolume: (state) => state.facilityOrderVolume,
     getFacilityFulfillmentVelocity: (state) => state.facilityFulfillmentVelocity,
     getFacilityPartialFulfillments: (state) => state.facilityPartialFulfillments,
+    getFacilityRejections: (state) => state.facilityRejections,
     getFacilityFulfillmentProgress: (state) => state.facilityFulfillmentProgress,
     getVirtualLocationCounts: (state) => state.virtualLocationCounts,
     getFulfillmentSyncData: (state) => state.fulfillmentSyncData,
@@ -337,10 +433,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
           };
         }
 
+        // Card count is the full unfillable queue (matches the Unfillable page), not today-scoped.
         const solrParams: any = {
           facilityIds: ['UNFILLABLE_PARKING'],
           status: ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD'],
-          dateFrom: todayStr,
           pageSize: 0
         };
         if (productStoreId && productStoreId !== 'All') {
@@ -349,6 +445,13 @@ export const useCustomerServiceStore = defineStore('customerService', {
 
         const solrResult = await searchOrders(solrParams);
         this.unfillable.totalCount = solrResult.total || 0;
+        // Publish the Unfillable side-menu badge from the same full-queue count.
+        // Best-effort: a badge-publish failure must not fail the dashboard fetch.
+        try {
+          useOrderStore().setNavCount('unfillable', this.unfillable.totalCount);
+        } catch (error) {
+          logger.error('Failed to publish the unfillable nav count', error);
+        }
         this.dashboardStatus.unfillable = 'success';
       } catch (error) {
         console.error('Failed to fetch unfillable stats', error);
@@ -358,52 +461,24 @@ export const useCustomerServiceStore = defineStore('customerService', {
     async fetchHoldTasks(productStoreId?: string) {
       this.dashboardStatus.holdTasks = 'loading';
       try {
-        const [swapResp, addressResp, fraudResp] = await Promise.all([
-          api({
-            url: 'oms/orders/tasks/shipGroupTasks',
-            method: 'GET',
-            params: {
-              statusId: 'TASK_CREATED',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'NEG_RES_REVIEW',
-              productStoreId,
-              pageSize: 10000,
-            }
-          }),
-          api({
-            url: 'oms/orders/tasks/shipGroupTasks',
-            method: 'GET',
-            params: {
-              statusId: 'TASK_CREATED',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'INVALID_ADDRESS',
-              productStoreId,
-              pageSize: 10000,
-            }
-          }),
-          api({
-            url: 'oms/orders/tasks',
-            method: 'GET',
-            params: {
-              taskStatusId: 'TASK_CREATED',
-              workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-              workEffortPurposeTypeId: 'REVIEW_RISK_ORDER',
-              productStoreId,
-              pageSize: 10000,
-            }
-          })
-        ]);
-
-        const swapCount = responseListCount(swapResp);
-        const addressCount = responseListCount(addressResp);
-        const fraudCount = responseListCount(fraudResp);
+        const resp = await api({
+          url: 'oms/orders/funnelDashboard/holdTasks',
+          method: 'GET',
+          params: { productStoreId }
+        });
+        const counts = resp.data || {};
+        const holdTaskCounts = Array.isArray(counts.holdTaskCounts) ? counts.holdTaskCounts : [];
 
         this.holdTasks = {
-          holdSubstituteCount: swapCount,
-          holdBadAddressCount: addressCount,
-          holdFraudRiskCount: fraudCount,
-          holdTasksTotalCount: swapCount + addressCount + fraudCount
+          holdTasksTotalCount: Number(counts.holdTasksTotalCount) || 0,
+          holdTaskCounts: holdTaskCounts.map((count: any) => ({
+            workEffortPurposeTypeId: count.workEffortPurposeTypeId,
+            description: count.description || count.workEffortPurposeTypeId,
+            sequenceNum: count.sequenceNum == null ? null : Number(count.sequenceNum),
+            taskCount: Number(count.taskCount) || 0
+          }))
         };
+        publishHoldTaskNavCounts(this.holdTasks.holdTaskCounts);
         this.dashboardStatus.holdTasks = 'success';
       } catch (error) {
         console.error('Failed to fetch hold task counts', error);
@@ -463,7 +538,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
           params
         });
         if (resp.data) {
-          this.facilityOrderVolume = resp.data.facilities || [];
+          const facilities = Array.isArray(resp.data.facilities) ? resp.data.facilities : [];
+          this.facilityOrderVolume = hasUsableFacilityOrderVolume(facilities)
+            ? facilities
+            : await getActivePhysicalFacilityOrderVolume({ productStoreId });
         }
         this.dashboardStatus.facilityOrderVolume = 'success';
       } catch (error) {
@@ -482,7 +560,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
           params
         });
         if (resp.data) {
-          this.facilityFulfillmentVelocity = resp.data.facilities || [];
+          const facilities = Array.isArray(resp.data.facilities) ? resp.data.facilities : [];
+          this.facilityFulfillmentVelocity = hasUsableFacilityFulfillmentVelocity(facilities)
+            ? facilities
+            : activeFacilityVelocityFallbackRows(await getActivePhysicalFacilityOrderVolume({ productStoreId }));
         }
         this.dashboardStatus.facilityFulfillmentVelocity = 'success';
       } catch (error) {
@@ -510,12 +591,43 @@ export const useCustomerServiceStore = defineStore('customerService', {
         this.dashboardStatus.facilityPartialFulfillments = 'error';
       }
     },
+    async fetchFacilityRejections(productStoreId?: string) {
+      this.dashboardStatus.facilityRejections = 'loading';
+      try {
+        const { startOfDayStr, endOfDayStr } = getUserDashboardDateRange();
+        const customParametersMap: any = {
+          facilityId: 'REJECTED_ITM_PARKING',
+          pageNoLimit: true,
+          changeDatetime_from: startOfDayStr,
+          changeDatetime_thru: endOfDayStr
+        };
+        if (productStoreId) customParametersMap.productStoreId = productStoreId;
+
+        const [activeFacilities, resp] = await Promise.all([
+          getActivePhysicalFacilityOrderVolume({ productStoreId }),
+          api({
+            url: 'oms/dataDocumentView',
+            method: 'POST',
+            data: {
+              dataDocumentId: 'ORDER_FACILITY_CHANGE',
+              customParametersMap,
+              fieldsToSelect: 'fromFacilityId,orderId,shipGroupSeqId',
+              distinct: true
+            }
+          })
+        ]);
+
+        this.facilityRejections = activeFacilityRowsWithRejections(activeFacilities, resp.data?.entityValueList || []);
+        this.dashboardStatus.facilityRejections = 'success';
+      } catch (error) {
+        console.error('Failed to fetch facility rejections', error);
+        this.dashboardStatus.facilityRejections = 'error';
+      }
+    },
     async fetchFacilityFulfillmentProgress(facilityId: string, productStoreId?: string) {
       this.dashboardStatus.facilityFulfillmentProgress = 'loading';
       try {
-        const dateFilter = getUserDashboardDateFilter();
-        const startOfDayStr = DateTime.fromISO(dateFilter).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss');
-        const endOfDayStr = DateTime.fromISO(dateFilter).plus({ days: 1 }).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss');
+        const { dateFilter, startOfDayStr, endOfDayStr } = getUserDashboardDateRange();
 
         // 1. Fetch Facility Details
         const facilityPromise = api({
@@ -599,12 +711,12 @@ export const useCustomerServiceStore = defineStore('customerService', {
         const totalPending = openCount + inProgressCount;
         
         let oldestAssignedTime: number | null = null;
-        if (progressData.oldestShipGroupAssignedDatetime) {
-          const parsed = DateTime.fromISO(String(progressData.oldestShipGroupAssignedDatetime));
+        if (progressData.oldestOrderEntryDatetime) {
+          const parsed = DateTime.fromISO(String(progressData.oldestOrderEntryDatetime));
           if (parsed.isValid) {
             oldestAssignedTime = parsed.toMillis();
           } else {
-            const rawMillis = Date.parse(progressData.oldestShipGroupAssignedDatetime);
+            const rawMillis = Date.parse(progressData.oldestOrderEntryDatetime);
             if (!isNaN(rawMillis)) oldestAssignedTime = rawMillis;
           }
         }

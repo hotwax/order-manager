@@ -11,6 +11,7 @@ import type { WorkflowOrder, WorkflowFilters } from '@/types/customerService';
 import type { OrderRowEnrichment } from '@/types/orderRow';
 import { useSeedStore } from '@/store/seed';
 import { useProductStore } from './productStore';
+import { queueCountFetchers } from '@/services/navCounts';
 
 
 async function fetchWorkflowPage(
@@ -86,6 +87,8 @@ async function fetchWorkflowPage(
 export interface OrderSearchFilters {
   status: string[];
   channel: string;
+  shipmentMethodTypeId: string;
+  allocationState: string;
   productStoreId: string;
   dateFrom: string;
   dateThru: string;
@@ -99,6 +102,8 @@ export const useOrderStore = defineStore('orders', {
     searchFilters: {
       status: [],
       channel: 'All',
+      shipmentMethodTypeId: 'All',
+      allocationState: 'All',
       productStoreId: 'All',
       dateFrom: '',
       dateThru: '',
@@ -140,7 +145,10 @@ export const useOrderStore = defineStore('orders', {
       open: {} as Record<string, OrderRowEnrichment>,
       inflight: {} as Record<string, OrderRowEnrichment>,
       packed: {} as Record<string, OrderRowEnrichment>
-    }
+    },
+    // Shared queue totals surfaced as menu rollup badges. Written as a byproduct
+    // of each queue page fetching its own list; the menu reads them reactively.
+    navCounts: {} as Record<string, number | undefined>
   }),
   getters: {
     filteredOrders: (state) => state.searchResults,
@@ -160,6 +168,28 @@ export const useOrderStore = defineStore('orders', {
       state.workflowOrderEnrichment[bucket][orderId],
   },
   actions: {
+    setNavCount(key: string, total: number) {
+      this.navCounts[key] = total;
+    },
+    /**
+     * Prime the nav-badge counts that no Funnel dashboard fetch already produces —
+     * currently only brokering, which needs a distinct-order count over the whole
+     * awaiting-brokering facility set. unfillable + the hold-task purposes are
+     * published by the customer-service store; open/inflight/packed by the Funnel's
+     * brokered-workload fetch. Each count uses the same query its queue page uses.
+     */
+    async primeNavCounts(productStoreId?: string) {
+      const storeId = productStoreId && productStoreId !== 'All' ? productStoreId : undefined;
+      await Promise.all(
+        Object.entries(queueCountFetchers).map(async ([key, fetchCount]) => {
+          try {
+            this.setNavCount(key, await fetchCount(storeId));
+          } catch (error: any) {
+            logger.error(`Failed to prime the ${key} nav count`, error);
+          }
+        })
+      );
+    },
     async runSearch() {
       this.pageIndex = 0;
       const result = await this.fetchSearchPage(0);
@@ -200,6 +230,8 @@ export const useOrderStore = defineStore('orders', {
         queryString: this.searchQuery,
         status: this.searchFilters.status,
         channel: this.searchFilters.channel,
+        shipmentMethodTypeId: this.searchFilters.shipmentMethodTypeId,
+        allocationState: this.searchFilters.allocationState,
         productStoreId: this.searchFilters.productStoreId,
         dateFrom: this.searchFilters.dateFrom,
         dateThru: this.searchFilters.dateThru,
@@ -258,6 +290,7 @@ export const useOrderStore = defineStore('orders', {
         this.workflowOrders[bucket] = orders;
         this.workflowOrdersTotal[bucket] = total;
         this.workflowOrdersPageIndex[bucket] = 0;
+        this.setNavCount(bucket, total);
       } catch (error: any) {
         logger.error(`Failed to fetch ${bucket} orders`, error);
       } finally {

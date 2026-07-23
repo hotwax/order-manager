@@ -6,8 +6,11 @@ describe('date filter select', () => {
   it('uses Ionic item and popover datetime primitives for the shared date filter', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/components/common/DateFilterSelect.vue'), 'utf8');
 
-    expect(source).toContain('<div class="date-filter-select">');
-    expect(source).toContain('<ion-item :id="triggerId" button detail="false" lines="none">');
+    expect(source).toContain('class="date-filter-select"');
+    expect(source).toContain('<ion-input');
+    expect(source).toContain('v-if="outlined"');
+    expect(source).toContain('fill="outline"');
+    expect(source).toContain('<ion-item v-else :id="triggerId" button detail="false" lines="none">');
     expect(source).toContain("{{ selectedDateLabel }}");
     expect(source).toContain('<ion-popover :trigger="triggerId" trigger-action="click" :show-backdrop="false">');
     expect(source).toContain('<ion-datetime');

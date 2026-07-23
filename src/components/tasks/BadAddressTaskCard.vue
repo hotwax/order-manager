@@ -1,7 +1,9 @@
 <template>
   <TaskCardShell
     :title="taskOrderTitle(task)"
-    :subtitle="taskItemSummary(task)"
+    :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
+    :amount="formatTaskAmount(task.grandTotal)"
+    :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
     :contact-phone-href="getPhoneHref(task)"
@@ -9,8 +11,20 @@
     :contact-email-href="getEmailHref(task)"
     :selectable="selectable"
     :selected="selected"
+    :actions="cardActions"
+    :view-order-link="showViewOrderAction && task.orderId ? `/orders/${task.orderId}` : ''"
     @update:selected="emit('update:selected', $event)"
+    @action="handleAction"
   >
+    <template #content-start>
+      <ion-item lines="full">
+        <ion-label>
+          {{ translate('Facility') }}: {{ brokeredFacilityName(task) }}
+          <p>{{ translate('Shipping method') }}: {{ carrierShippingMethodLabel(task) }}</p>
+        </ion-label>
+      </ion-item>
+    </template>
+
     <ion-radio-group v-if="addressState" v-model="addressState.selectedAddressType" class="address-task-addresses">
       <ion-list class="ion-no-padding" lines="full">
         <ion-list-header>
@@ -18,30 +32,28 @@
           <ion-radio class="ion-margin-end" value="original" label-placement="start">{{ translate('keep original') }}</ion-radio>
         </ion-list-header>
         <ion-item>
-          <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="addressState.original.address1" />
+          <ion-input :label="translate('Address line 1')" label-placement="stacked" :value="addressState.original.address1" readonly />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Address line 2')" label-placement="stacked" v-model="addressState.original.address2" />
+          <ion-input :label="translate('Address line 2')" label-placement="stacked" :value="addressState.original.address2" readonly />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('City')" label-placement="stacked" v-model="addressState.original.city" />
+          <ion-input :label="translate('City')" label-placement="stacked" :value="addressState.original.city" readonly />
         </ion-item>
         <ion-item>
-          <ion-input :label="translate('Postal code')" label-placement="stacked" v-model="addressState.original.postalCode" />
+          <ion-input :label="translate('Postal code')" label-placement="stacked" :value="addressState.original.postalCode" readonly />
         </ion-item>
-        <ion-item button :detail="false" :disabled="!addressState.original.countryGeoId" @click="openStatePicker(addressState.original)">
+        <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('State') }}</span>
-            <span :class="{ 'geo-picker-placeholder': !stateName(addressState.original) }">{{ stateName(addressState.original) || (addressState.original.countryGeoId ? translate('Select') : translate('Select country first')) }}</span>
+            <span>{{ readOnlyAddressValue(stateName(addressState.original)) }}</span>
           </ion-label>
-          <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
         </ion-item>
-        <ion-item button :detail="false" @click="openCountryPicker(addressState.original)">
+        <ion-item>
           <ion-label class="geo-picker-field">
             <span class="geo-picker-label">{{ translate('Country') }}</span>
-            <span :class="{ 'geo-picker-placeholder': !countryName(addressState.original.countryGeoId) }">{{ countryName(addressState.original.countryGeoId) || translate('Select') }}</span>
+            <span>{{ readOnlyAddressValue(countryName(addressState.original.countryGeoId)) }}</span>
           </ion-label>
-          <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
         </ion-item>
       </ion-list>
 
@@ -93,19 +105,12 @@
       </ion-list>
     </div>
 
-    <template #actions>
-      <ion-button fill="clear" color="primary" @click="saveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
-      <ion-button fill="clear" color="primary" @click="cancelOrder()">{{ translate('Cancel order') }}</ion-button>
-      <ion-button fill="clear" color="primary" @click="parkOrder()">{{ translate('Park') }}</ion-button>
-      <ion-button v-if="showViewOrderAction && task.orderId" fill="clear" color="primary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
-    </template>
   </TaskCardShell>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
-  IonButton,
   IonIcon,
   IonInput,
   IonItem,
@@ -126,9 +131,10 @@ import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
-import { taskOrderTitle } from '@/utils/taskCardDisplay';
+import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import { buildAddressState } from '@/utils/badAddressState';
 import type { AddressState } from '@/types/order';
+import type { TaskCardAction } from '@/types/taskCard';
 
 const props = withDefaults(defineProps<{
   task: any;
@@ -149,6 +155,12 @@ const emit = defineEmits<{
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
+
+const cardActions = computed<TaskCardAction[]>(() => [
+  { id: 'save-and-release', label: translate('Save and release hold'), kind: 'primary' },
+  { id: 'park', label: translate('Park'), kind: 'neutral' },
+  { id: 'cancel', label: translate('Cancel order'), kind: 'danger' },
+]);
 
 // Editable per-card address form. Built lazily (see onMounted) from the task so
 // the shell + skeleton paint first; stays null until then, which drives the
@@ -176,6 +188,24 @@ function countryName(geoId: string): string {
 function stateName(address: AddressState['original']): string {
   if (!address.countryGeoId || !address.stateProvinceGeoId) return '';
   return seedStore.getStatesForCountry(address.countryGeoId).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
+}
+
+function readOnlyAddressValue(value: string): string {
+  return value || '\u00A0';
+}
+
+function brokeredFacilityName(task: any): string {
+  return task.facilityName
+    || seedStore.facilityName(task.facilityId)
+    || task.facilityId
+    || '-';
+}
+
+function carrierShippingMethodLabel(task: any): string {
+  const carrier = task.carrierPartyId ? seedStore.carrierName(task.carrierPartyId) : '';
+  const methodId = task.shipmentMethodTypeId || task.shippingMethodTypeId;
+  const method = methodId ? seedStore.shipmentMethodDescription(methodId) : '';
+  return [carrier, method].filter(Boolean).join(' - ') || '-';
 }
 
 async function openCountryPicker(address: AddressState['original']) {
@@ -233,36 +263,46 @@ function getEmailHref(task: any): string {
   return email ? `mailto:${email}` : '';
 }
 
-function taskItemSummary(task: any): string {
-  const items = task.items ?? [];
-  const itemCount = items.length;
-  const unitCount = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
-  return `${itemCount} ${itemCount === 1 ? translate('item') : translate('items')} ${unitCount} ${unitCount === 1 ? translate('unit') : translate('units')}`;
-}
-
 function validate(): string | null {
   hydrate();
   const state = addressState.value!;
   return validateAddress(state[state.selectedAddressType]);
 }
 
-async function submitSaveAndRelease() {
+async function submitSaveAndReleaseDomain() {
   hydrate();
   const task = props.task;
   const state = addressState.value!;
   const address = state[state.selectedAddressType];
   await orderTaskStore.updateShippingInformation(task.orderId, task.shipGroupSeqId, address);
-  await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_COMPLETED');
 }
 
-async function submitCancel() {
+async function submitCancelDomain() {
   const task = props.task;
   const items = (task.items ?? []).map((item: any) => ({
     orderItemSeqId: item.orderItemSeqId,
     shipGroupSeqId: task.shipGroupSeqId,
   }));
   await orderTaskStore.cancelOrder(task.orderId, items);
-  await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED');
+}
+
+async function submitParkDomain(facilityId: string) {
+  const task = props.task;
+  await orderTaskStore.parkOrder(task.orderId, task.shipGroupSeqId, facilityId);
+}
+
+async function submitTaskStatus(statusId: 'TASK_COMPLETED' | 'TASK_CANCELLED') {
+  await orderTaskStore.changeTaskStatus(props.task.workEffortId, statusId);
+}
+
+async function submitSaveAndRelease() {
+  await submitSaveAndReleaseDomain();
+  await submitTaskStatus('TASK_COMPLETED');
+}
+
+async function submitCancel() {
+  await submitCancelDomain();
+  await submitTaskStatus('TASK_CANCELLED');
 }
 
 async function submitPark(facilityId: string) {
@@ -325,12 +365,22 @@ async function parkOrder() {
   }
 }
 
+function handleAction(actionId: string) {
+  if (actionId === 'save-and-release') return saveAndReleaseHold();
+  if (actionId === 'park') return parkOrder();
+  if (actionId === 'cancel') return cancelOrder();
+}
+
 defineExpose({
   task: props.task,
   validate,
   submitSaveAndRelease,
   submitCancel,
   submitPark,
+  submitSaveAndReleaseDomain,
+  submitCancelDomain,
+  submitParkDomain,
+  submitTaskStatus,
 });
 </script>
 

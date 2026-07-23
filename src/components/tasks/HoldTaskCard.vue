@@ -1,9 +1,9 @@
 <template>
   <TaskCardShell
     :title="taskOrderTitle(task)"
-    :subtitle="formatTaskDate(task.orderDate)"
-    :amount="money(task.grandTotal)"
-    :chip-label="task.workEffortId"
+    :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
+    :amount="formatTaskAmount(task.grandTotal)"
+    :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
     :contact-phone-href="getPhoneHref(task)"
@@ -12,7 +12,10 @@
     content-layout="grid"
     :selectable="selectable"
     :selected="selected"
+    :actions="cardActions"
+    :view-order-link="showViewOrderAction && task.orderId ? `/orders/${task.orderId}` : ''"
     @update:selected="emit('update:selected', $event)"
+    @action="handleAction"
   >
     <ion-list lines="full">
       <ion-item>
@@ -56,18 +59,13 @@
       </ion-item>
     </ion-list>
 
-    <template #actions>
-      <ion-button fill="clear" color="primary" @click="resolveTask()">{{ translate('Resolve task') }}</ion-button>
-      <ion-button v-if="showViewOrderAction && task.orderId" fill="clear" color="primary" :router-link="'/orders/' + task.orderId">{{ translate('View order') }}</ion-button>
-    </template>
   </TaskCardShell>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { DateTime } from 'luxon';
 import {
-  IonButton,
   IonItem,
   IonLabel,
   IonList,
@@ -78,7 +76,8 @@ import {
 import { commonUtil, translate } from '@common';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { formatTaskDate, taskOrderTitle } from '@/utils/taskCardDisplay';
+import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
+import type { TaskCardAction } from '@/types/taskCard';
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean; showViewOrderAction?: boolean }>(), {
   selectable: false,
@@ -92,6 +91,10 @@ const emit = defineEmits<{
 }>();
 
 const orderTaskStore = useOrderTaskStore();
+
+const cardActions = computed<TaskCardAction[]>(() => [
+  { id: 'resolve', label: translate('Resolve task'), kind: 'primary' },
+]);
 
 const resolutionComment = ref('');
 
@@ -120,6 +123,10 @@ async function resolveTask() {
 
 async function submitResolve() {
   await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED', resolutionCommunication());
+}
+
+function handleAction(actionId: string) {
+  if (actionId === 'resolve') return resolveTask();
 }
 
 function resolutionCommunication() {
@@ -170,10 +177,6 @@ function assignedPartyDate(task: any, roleTypeId: string): string {
     : (DateTime.fromISO(value).isValid ? DateTime.fromISO(value) : DateTime.fromSQL(value));
 
   return dt.isValid ? dt.toFormat('yyyy-LL-dd HH:mm') : value;
-}
-
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
 }
 
 defineExpose({

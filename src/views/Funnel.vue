@@ -111,13 +111,13 @@
         <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard v-if="!unfillableError" button :router-link="{ path: '/unfillable', query: { dateFrom: todayDateStr } }" :title="translate('Unfillable today')" :stat="unfillableLoading ? '' : totalUnfillable">
+        <StatCard v-if="!unfillableError" button router-link="/unfillable" :title="translate('Unfillable')" :stat="unfillableLoading ? '' : totalUnfillable">
           <template v-if="unfillableLoading" #stat>
             <ion-spinner name="crescent" />
           </template>
           <Sparkline v-if="!unfillableLoading" :points="unfillableTrend" color="danger" />
         </StatCard>
-        <StatCard v-else :title="translate('Unfillable today')">
+        <StatCard v-else :title="translate('Unfillable')">
           <template #stat>
             <ion-icon :icon="alertCircleOutline" color="danger" />
           </template>
@@ -130,41 +130,12 @@
           </div>
         </StatCard>
 
-        <!-- Card 3: Order Hold Tasks — drilldown follow-up -->
-        <!-- BUSINESS LOGIC COMMENT: Display list of tasks requiring resolution -->
-        <!-- stat: number of orders with hold tasks -->
+        <!-- Card 3: Order Hold Tasks -->
         <StatCard v-if="!holdTasksError" :title="translate('Order Hold Tasks')" :stat="holdTasksLoading ? '' : (holdTasks.holdTasksTotalCount || 0)">
           <template v-if="holdTasksLoading" #stat>
             <ion-spinner name="crescent" />
           </template>
-          <ion-list v-if="!holdTasksLoading" lines="none" class="hold-tasks-list">
-            <!-- Substitute workefforts -->
-            <ion-item button :detail="true" router-link="/swap">
-              <ion-label>
-                {{ translate("Substitute") }}
-                <!-- number of workefforts where purpose type is substitute -->
-              </ion-label>
-              <p slot="end">{{ holdTasks.holdSubstituteCount || 0 }} {{ translate("tasks") }}</p>
-            </ion-item>
-
-            <!-- Bad Address workefforts -->
-            <ion-item button :detail="true" router-link="/bad-address">
-              <ion-label>
-                {{ translate("Bad Address") }}
-                <!-- number of workefforts where purpose type is bad address -->
-              </ion-label>
-              <p slot="end">{{ holdTasks.holdBadAddressCount || 0 }} {{ translate("tasks") }}</p>
-            </ion-item>
-
-            <!-- Fraud Risk workefforts -->
-            <ion-item button :detail="true" router-link="/fraud">
-              <ion-label>
-                {{ translate("Fraud Risk") }}
-                <!-- number of workefforts where purpose type is fraud -->
-              </ion-label>
-              <p slot="end">{{ holdTasks.holdFraudRiskCount || 0 }} {{ translate("tasks") }}</p>
-            </ion-item>
-          </ion-list>
+          <HoldTaskCountList v-if="!holdTasksLoading" :hold-task-counts="holdTasks.holdTaskCounts" />
         </StatCard>
         <StatCard v-else :title="translate('Order Hold Tasks')">
           <template #stat>
@@ -203,8 +174,8 @@
           <ion-segment-button value="velocity">
             <ion-label>{{ translate("Fulfillment Velocity") }}</ion-label>
           </ion-segment-button>
-          <ion-segment-button value="partial">
-            <ion-label>{{ translate("Partial Fulfillments") }}</ion-label>
+          <ion-segment-button value="rejections">
+            <ion-label>{{ translate("Rejections") }}</ion-label>
           </ion-segment-button>
         </ion-segment>
       </div>
@@ -610,13 +581,15 @@ import {
 } from 'ionicons/icons';
 import { translate, StatCard, Sparkline, commonUtil } from '@common';
 import { useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
+import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
-import { getDashboardDateFilter } from '@/utils/dashboardDate';
+import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 
 const store = useCustomerServiceStore();
+const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
 const seedStore = useSeedStore();
 const userStore = useUserStore();
@@ -649,9 +622,8 @@ const holdTasks = computed(() => store.getHoldTasks);
 const facilityFulfillmentProgress = computed(() => store.getFacilityFulfillmentProgress);
 const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
 const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);
-const facilityPartialFulfillments = computed(() => store.getFacilityPartialFulfillments);
+const facilityRejections = computed(() => store.getFacilityRejections);
 const unfillableTrend = computed(() => store.unfillableTrend);
-const todayDateStr = computed(() => getDashboardDateFilter(userStore.current?.timeZone || userStore.current?.userTimeZone));
 const virtualLocationWorkRows = computed(() => store.getVirtualLocationCounts);
 
 const fulfillmentSyncData = computed(() => store.getFulfillmentSyncData);
@@ -819,14 +791,24 @@ const selectedStoreName = computed(
 // facility list shows the loading/error/empty state for the selected segment.
 const facilityMetricKey = computed<DashboardStatusKey>(() => {
   if (selectedDimension.value === 'velocity') return 'facilityFulfillmentVelocity';
-  if (selectedDimension.value === 'partial') return 'facilityPartialFulfillments';
+  if (selectedDimension.value === 'rejections') return 'facilityRejections';
   return 'facilityOrderVolume';
 });
 const facilityMetricsLoading = computed(() => store.isDashboardGroupLoading(facilityMetricKey.value));
 const facilityMetricsError = computed(() => store.isDashboardGroupError(facilityMetricKey.value));
 
 const totalUnfillable = computed(() => store.getUnfillable.totalCount || 0);
-const virtualLocationWorkTotal = computed(() => virtualLocationWorkRows.value.reduce((sum, row) => sum + row.count, 0));
+// Match the side-menu "Brokering queue" badge and the /brokering page exactly: one
+// distinct-order solr count over the awaiting-brokering facility set (orderStore
+// nav count, primed by the same fetchBrokeringCount query). Summing the per-facility
+// rows double-counts orders parked in more than one location, so it diverged from
+// the page. Falls back to the row sum until the shared count has loaded.
+const virtualLocationWorkTotal = computed(() => {
+  const brokering = orderStore.navCounts.brokering;
+  return brokering !== undefined
+    ? brokering
+    : virtualLocationWorkRows.value.reduce((sum, row) => sum + row.count, 0);
+});
 
 function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {
   if (item.id === 'unfillable') {
@@ -844,11 +826,15 @@ function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {
 function fetchStoreDashboardData(productStoreId: string) {
   store.fetchFulfillmentProgress(productStoreId);
   fetchBrokeredWorkload(productStoreId);
+  // Brokering is the only badge not derivable from a dashboard fetch below, so it
+  // gets its own distinct-order count. Unfillable + the hold-task purposes
+  // (badAddress/swap/hold/fraud) are published by fetchUnfillable / fetchHoldTasks.
+  orderStore.primeNavCounts(productStoreId);
   store.fetchUnfillable(productStoreId);
   store.fetchVirtualLocationCounts(productStoreId);
   store.fetchFacilityOrderVolume(productStoreId);
   store.fetchFacilityFulfillmentVelocity(productStoreId);
-  store.fetchFacilityPartialFulfillments(productStoreId);
+  store.fetchFacilityRejections(productStoreId);
   store.fetchHoldTasks(productStoreId);
 }
 
@@ -857,6 +843,10 @@ async function fetchBrokeredWorkload(productStoreId: string) {
   brokeredWorkloadError.value = false;
   try {
     brokeredWorkload.value = await fetchWorkflowOrderTotals(productStoreId);
+    // Share the brokered totals with the side-menu rollup badges (first-come preload).
+    orderStore.setNavCount('open', brokeredWorkload.value.open);
+    orderStore.setNavCount('inflight', brokeredWorkload.value.inflight);
+    orderStore.setNavCount('packed', brokeredWorkload.value.packed);
   } catch (error) {
     console.error('Failed to fetch brokered workload totals', error);
     brokeredWorkloadError.value = true;
@@ -992,7 +982,7 @@ function retryHoldTasks() {
 }
 function retryFacilityMetrics() {
   if (selectedDimension.value === 'velocity') store.fetchFacilityFulfillmentVelocity(selectedProductStoreId.value);
-  else if (selectedDimension.value === 'partial') store.fetchFacilityPartialFulfillments(selectedProductStoreId.value);
+  else if (selectedDimension.value === 'rejections') store.fetchFacilityRejections(selectedProductStoreId.value);
   else store.fetchFacilityOrderVolume(selectedProductStoreId.value);
 }
 function retryFacilityProgress() {
@@ -1024,15 +1014,19 @@ const filteredFacilities = computed(() => {
     list = facilityFulfillmentVelocity.value.map(item => ({
       facilityId: item.facilityId,
       name: item.facilityName || getFacilityName(item.facilityId),
-      value: item.fulfillmentVelocity || 0,
-      label: `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
+      value: item.activeFacilityFallback ? item.lastOrderCount : (item.fulfillmentVelocity || 0),
+      label: item.activeFacilityFallback
+        ? `${item.lastOrderCount || 0} ${translate("active orders")}`
+        : `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
     }));
-  } else if (selectedDimension.value === 'partial') {
-    list = facilityPartialFulfillments.value.map(item => ({
+  } else if (selectedDimension.value === 'rejections') {
+    list = facilityRejections.value.map(item => ({
       facilityId: item.facilityId,
       name: item.facilityName || getFacilityName(item.facilityId),
-      value: item.partialFulfillmentRatio || 0,
-      label: `${Math.round((item.partialFulfillmentRatio || 0) * 100)}% partial (${item.partialFulfilledOrders || 0}/${item.totalFulfilledOrders || 0} orders)`
+      value: item.lastOrderCount || 0,
+      label: item.rejectedShipGroupCount
+        ? `${item.lastOrderCount || 0} ${translate("active orders")}, ${item.rejectedShipGroupCount} ${translate("rejected orders")}`
+        : `${item.lastOrderCount || 0} ${translate("active orders")}`
     }));
   }
 
@@ -1273,7 +1267,7 @@ function handleBatchSizeChange(event: any) {
 .custom-progress-track {
   width: 100%;
   height: var(--spacer-lg);
-  background: #d4f2da; /* Light pale green for background */
+  background: var(--ion-color-light);
   border-radius: var(--spacer-xs);
   display: flex;
   overflow: hidden;
@@ -1451,8 +1445,8 @@ function handleBatchSizeChange(event: any) {
 
 .custom-progress-track {
   display: flex;
-  background-color: var(--ion-color-step-50, #ffffff);
-  border: 1px solid var(--ion-color-step-300, #b3b3b3);
+  background: var(--ion-color-light);
+  border: 1px solid var(--ion-color-medium);
   overflow: hidden;
 }
 
@@ -1469,7 +1463,7 @@ function handleBatchSizeChange(event: any) {
 }
 
 .progress-segment.allocated {
-  background-color: #d2e0fb;
+  background: var(--ion-color-primary);
 }
 
 
@@ -1503,9 +1497,9 @@ function handleBatchSizeChange(event: any) {
   height: 28px;
   border-radius: 6px;
   overflow: hidden;
-  border: 1px solid var(--ion-color-step-300, #b3b3b3);
+  border: 1px solid var(--ion-color-medium);
   margin-bottom: var(--spacer-base);
-  background-color: var(--ion-color-step-50, #ffffff);
+  background: var(--ion-color-light);
 }
 
 .queue-segment {

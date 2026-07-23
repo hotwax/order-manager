@@ -10,57 +10,35 @@
     </ion-header>
 
     <ion-content>
-      <SearchFilterCard
-        v-model="searchQuery"
-        :placeholder="translate('Search')"
-        @search="fetchFraudTasks()"
+      <OrderTaskFilterCard
+        v-model="filters"
+        :channel-options="channelOptions"
+        :order-status-options="orderStatusOptions"
+        :risk-recommendation-options="riskRecommendationOptions"
+        :risk-level-options="riskLevelOptions"
+        show-fraud-filters
+        @search="replaceFraudTasks"
         @clear="clearFilters"
-      >
-        <FilterSelect v-model="assignee" :label="translate('Assignee')">
-          <ion-select-option value="">{{ translate('All assignees') }}</ion-select-option>
-          <ion-select-option value="me">{{ translate('Me') }}</ion-select-option>
-        </FilterSelect>
-        <FilterSelect v-model="orderChannel" :label="translate('Channel')">
-          <ion-select-option value="">{{ translate('All channels') }}</ion-select-option>
-          <ion-select-option v-for="channel in salesChannels" :key="channel.enumId" :value="channel.enumId">
-            {{ channel.description || channel.enumId }}
-          </ion-select-option>
-        </FilterSelect>
-        <FilterSelect v-model="recommendation" :label="translate('Recommendation')">
-          <ion-select-option value="">{{ translate('All recommendations') }}</ion-select-option>
-          <ion-select-option v-for="rec in riskRecommendations" :key="rec.enumId" :value="rec.enumId">
-            {{ rec.description || rec.enumId }}
-          </ion-select-option>
-        </FilterSelect>
-        <FilterSelect v-model="severity" :label="translate('Severity')">
-          <ion-select-option value="">{{ translate('All severity') }}</ion-select-option>
-          <ion-select-option v-for="level in riskLevels" :key="level.enumId" :value="level.enumId">
-            {{ level.description || level.enumId }}
-          </ion-select-option>
-        </FilterSelect>
-      </SearchFilterCard>
+      />
 
       <!-- Refetch progress bar: shown while a first-page reload runs over existing cards. -->
       <ion-progress-bar v-if="isRefetching" type="indeterminate" />
 
-      <ion-list v-if="fraudTasks.length" lines="none">
-        <ion-list-header class="order-results-header">
-          <span class="order-results-header-start">
-            <ion-checkbox
-              v-if="selectMode"
-              :checked="allCurrentPageSelected"
-              :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
-              @ionChange="toggleCurrentPageSelection($event.detail.checked)"
-            />
-          </span>
-          <ion-label>
-            {{ fraudTasks.length }} {{ fraudTasks.length === 1 ? translate('fraud task') : translate('fraud tasks') }}
-          </ion-label>
-          <ion-button fill="clear" size="small" @click="toggleSelectMode">
-            {{ selectMode ? translate('Done') : translate('Select') }}
-          </ion-button>
-        </ion-list-header>
-      </ion-list>
+      <TaskQueueListHeader
+        :loaded-count="fraudTasks.length"
+        :total-count="fraudTotal"
+        singular-label="fraud task"
+        plural-label="fraud tasks"
+        :sort="filters.sort"
+        :sort-options="sortOptions"
+        trigger-id="fraud-task-sort"
+        :select-mode="selectMode"
+        :all-loaded-selected="allCurrentPageSelected"
+        :some-loaded-selected="someCurrentPageSelected"
+        @update:sort="filters.sort = $event"
+        @toggle-select-mode="toggleSelectMode"
+        @toggle-loaded-selection="toggleCurrentPageSelection"
+      />
 
       <!-- First-load spinner: only before any card exists. -->
       <div v-if="isFirstLoad" class="ion-text-center ion-padding">
@@ -80,7 +58,7 @@
         <FraudTaskCard
           v-for="task in fraudTasks"
           :key="task.workEffortId"
-          :ref="setCardRef"
+          :ref="(element) => setCardRef(task.workEffortId, element)"
           :task="task"
           :selectable="selectMode"
           :selected="!!selectedOrders[task.workEffortId]"
@@ -112,8 +90,8 @@
     <ion-footer v-if="selectMode">
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-button color="primary" :disabled="!selectedTaskCount" @click="bulkResolve">{{ translate('Resolve') }}</ion-button>
-          <ion-button color="danger" :disabled="!selectedTaskCount" @click="bulkCancel">{{ translate('Cancel orders') }}</ion-button>
+          <ion-button color="primary" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkResolve">{{ translate('Resolve') }}</ion-button>
+          <ion-button color="danger" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkCancel">{{ translate('Cancel orders') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
@@ -121,48 +99,45 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUpdate } from 'vue';
-import { IonButton, IonButtons, IonCheckbox, IonContent, IonFooter, IonHeader, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonProgressBar, IonSelectOption, IonSpinner, IonTitle, IonToolbar, IonInfiniteScroll, IonInfiniteScrollContent, alertController, onIonViewWillEnter } from '@ionic/vue';
+import { ref, computed, watch } from 'vue';
+import { IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonMenuButton, IonPage, IonProgressBar, IonSpinner, IonTitle, IonToolbar, IonInfiniteScroll, IonInfiniteScrollContent, alertController, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
-import router from '@/router';
 import { showToast } from '@/utils';
 import ErrorState from '@/components/common/ErrorState.vue';
-import FilterSelect from '@/components/common/FilterSelect.vue';
-import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import OrderTaskFilterCard from '@/components/tasks/OrderTaskFilterCard.vue';
+import TaskQueueListHeader from '@/components/tasks/TaskQueueListHeader.vue';
 import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
-import { useUserStore } from '@/store/user';
 import { useProductMaster } from '@/composables/useProductMaster';
+import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
+import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
+import { countTaskTargets, orderTaskTarget, runGroupedTaskMutation, selectedTaskCardsById } from '@/utils/orderTaskBulk';
+import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
-const userStore = useUserStore();
 
-const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
-const riskRecommendations = computed(() => seedStore.getEnumsByType('ORDER_RISK_RECOMMENDATION'));
-const riskLevels = computed(() => seedStore.getEnumsByType('ORDER_RISK_LEVEL'));
-const currentUserPartyId = computed(() => userStore.getUserProfile?.partyId || userStore.getUserProfile?.userId || '');
-
-const searchQuery = ref('');
-const assignee = ref('');
-const recommendation = ref('');
-const orderChannel = ref('');
-const severity = ref('');
+const filters = ref(defaultOrderTaskFilters());
+useOrderTaskRouteState(filters, 'fraud');
+const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
+const orderStatusOptions = computed<TaskFilterOption[]>(() => seedStore.getStatusItemsByType('ORDER_STATUS').map((status: any) => ({ id: status.statusId, label: status.description || status.statusId })));
+const riskRecommendationOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_RISK_RECOMMENDATION').map((recommendation: any) => ({ id: recommendation.enumId, label: recommendation.description || recommendation.enumId })));
+const riskLevelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_RISK_LEVEL').map((level: any) => ({ id: level.enumId, label: level.description || level.enumId })));
+const sortOptions = taskSortOptions('fraud');
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
+const bulkActionRunning = ref(false);
 
-// Card component instances, collected in render order to map back to fraudTasks.
-const cardRefs = ref<any[]>([]);
-const setCardRef = (el: any) => {
-  if (el) cardRefs.value.push(el);
-};
-onBeforeUpdate(() => {
-  cardRefs.value = [];
-});
+const cardRefs = ref<Record<string, any>>({});
+function setCardRef(workEffortId: string, element: any) {
+  if (element) cardRefs.value[workEffortId] = element;
+  else delete cardRefs.value[workEffortId];
+}
 
 const fraudTasks = computed(() => orderTaskStore.getFraudTasks);
+const fraudTotal = computed(() => orderTaskStore.getFraudTotal);
 const fraudStatus = computed(() => orderTaskStore.getFraudStatus);
 const fraudError = computed(() => orderTaskStore.getFraudError);
 const isScrollable = computed(() => orderTaskStore.isFraudTasksScrollable);
@@ -176,14 +151,25 @@ const hasError = computed(() => fraudStatus.value === 'error' && !fraudTasks.val
 // Empty copy only after a settled, successful, zero-row first-page response.
 const showEmptyState = computed(() => fraudStatus.value === 'success' && !fraudTasks.value.length);
 const selectedTaskCount = computed(() => Object.values(selectedOrders.value).filter(Boolean).length as number);
-const hasFilters = computed(() => !!(searchQuery.value || assignee.value || recommendation.value || orderChannel.value || severity.value));
+const hasFilters = computed(() => hasTaskFilters(filters.value));
 const currentPageTaskIds = computed(() => fraudTasks.value.map((task: any) => task.workEffortId));
 const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));
 const someCurrentPageSelected = computed(() => currentPageTaskIds.value.some((workEffortId: string) => selectedOrders.value[workEffortId]));
 
-watch([assignee, orderChannel, recommendation, severity], () => {
-  fetchFraudTasks();
-});
+let suppressAutomaticFetch = false;
+watch(() => [
+  filters.value.salesChannelEnumId,
+  filters.value.orderDateFrom,
+  filters.value.orderDateThru,
+  filters.value.taskCreatedFrom,
+  filters.value.taskCreatedThru,
+  filters.value.orderStatusId,
+  filters.value.riskRecommendationEnumId,
+  filters.value.riskLevelEnumId,
+  filters.value.sort,
+], () => {
+  if (!suppressAutomaticFetch) replaceFraudTasks();
+}, { flush: 'sync' });
 
 function toggleSelectMode() {
   if (selectMode.value) {
@@ -210,29 +196,23 @@ watch(fraudTasks, () => {
 });
 
 function clearFilters() {
-  searchQuery.value = '';
-  assignee.value = '';
-  recommendation.value = '';
-  orderChannel.value = '';
-  severity.value = '';
-  router.replace({ query: {} });
-  fetchFraudTasks();
+  suppressAutomaticFetch = true;
+  filters.value = defaultOrderTaskFilters();
+  suppressAutomaticFetch = false;
+  replaceFraudTasks();
 }
 
 const fetchFraudTasks = async (pageSize?: any, pageIndex?: any) => {
   // A first-page load replaces the result set, so drop any stale selection.
   if (!pageIndex) {
-    selectedOrders.value = {};
+    resetSelection();
   }
-  await orderTaskStore.fetchFraudTasks({
-    pageSize: pageSize ?? import.meta.env.VITE_VIEW_SIZE,
-    pageIndex: pageIndex ?? 0,
-    ...(searchQuery.value && { orderName: searchQuery.value, orderName_op: 'like' }),
-    ...(assignee.value === 'me' && currentUserPartyId.value && { currentUserPartyId: currentUserPartyId.value }),
-    ...(orderChannel.value && { salesChannelEnumId: orderChannel.value }),
-    ...(recommendation.value && { riskRecommendationEnumId: recommendation.value }),
-    ...(severity.value && { riskLevelEnumId: severity.value }),
-  });
+  await orderTaskStore.fetchFraudTasks(buildTaskQueueRequest(
+    'fraud',
+    filters.value,
+    pageSize ?? import.meta.env.VITE_VIEW_SIZE,
+    pageIndex ?? 0,
+  ));
 
   const productIds = fraudTasks.value
     .flatMap((task: any) => task.items ?? [])
@@ -245,6 +225,15 @@ const fetchFraudTasks = async (pageSize?: any, pageIndex?: any) => {
   }
 };
 
+function replaceFraudTasks() {
+  return fetchFraudTasks(undefined, 0);
+}
+
+function resetSelection() {
+  selectedOrders.value = {};
+  selectMode.value = false;
+}
+
 async function loadMoreFraudTasks(event: any) {
   await fetchFraudTasks(
     undefined,
@@ -253,45 +242,35 @@ async function loadMoreFraudTasks(event: any) {
   await event.target.complete();
 }
 
-// Collect the card instances for the currently-selected tasks, in fraudTasks order.
 function selectedCards(): any[] {
-  return fraudTasks.value
-    .map((task: any, index: number) => (selectedOrders.value[task.workEffortId] ? cardRefs.value[index] : null))
-    .filter(Boolean);
+  return selectedTaskCardsById(fraudTasks.value, selectedOrders.value, cardRefs.value);
 }
 
 async function bulkResolve() {
   const cards = selectedCards();
   if (!cards.length) return;
-  try {
-    await Promise.all(cards.map((card: any) => card.submitResolve()));
-    await showToast(translate('{count} tasks resolved.', { count: cards.length }));
-    selectedOrders.value = {};
-    await fetchFraudTasks();
-  } catch {
-    await showToast(translate('Failed to resolve some tasks. Please try again.'));
-  }
+  await runBulkCards(cards, (card) => card.submitResolve());
 }
 
 async function bulkCancel() {
   const cards = selectedCards();
   if (!cards.length) return;
+  const orderCount = countTaskTargets(cards, orderTaskTarget);
   const alert = await alertController.create({
     header: translate('Cancel orders'),
-    message: translate('Are you sure you want to cancel {count} orders? This action cannot be undone.', { count: cards.length }),
+    message: translate('Are you sure you want to cancel {count} orders? This action cannot be undone.', { count: orderCount }),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
         text: translate('Cancel orders'),
         role: 'confirm',
         handler: async () => {
-          try {
-            await Promise.all(cards.map((card: any) => card.submitCancel()));
-            selectedOrders.value = {};
-            await fetchFraudTasks();
-          } catch {
-            await showToast(translate('Failed to cancel some orders. Please try again.'));
-          }
+          await runBulkResults(() => runGroupedTaskMutation(
+            cards,
+            orderTaskTarget,
+            (card: any) => card.submitCancelDomain(),
+            (card: any) => card.submitTaskStatus('TASK_CANCELLED'),
+          ));
         }
       }
     ]
@@ -299,8 +278,26 @@ async function bulkCancel() {
   await alert.present();
 }
 
+async function runBulkCards(cards: any[], operation: (card: any) => Promise<unknown>) {
+  return runBulkResults(() => Promise.allSettled(cards.map(operation)));
+}
+
+async function runBulkResults(getResults: () => Promise<PromiseSettledResult<unknown>[]>) {
+  bulkActionRunning.value = true;
+  try {
+    const results = await getResults();
+    const failed = results.filter((result) => result.status === 'rejected').length;
+    const succeeded = results.length - failed;
+    if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));
+    if (failed) await showToast(translate('{count} task(s) failed.', { count: failed }));
+    await replaceFraudTasks();
+  } finally {
+    bulkActionRunning.value = false;
+  }
+}
+
 onIonViewWillEnter(() => {
-  fetchFraudTasks();
+  replaceFraudTasks();
 });
 </script>
 

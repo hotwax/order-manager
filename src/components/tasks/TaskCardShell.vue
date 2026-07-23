@@ -1,34 +1,28 @@
 <template>
-  <ion-card class="task-card-shell ship-group-card">
-    <ion-item lines="none" class="task-card-heading" :class="{ 'task-card-heading-has-chip': chipLabel }">
-      <ion-checkbox
-        v-if="selectable"
-        slot="start"
-        :checked="selected"
-        @ionChange="emit('update:selected', $event.detail.checked)"
-      />
-      <ion-label class="task-card-heading-title">
-        <slot name="title">
-          {{ title }}
-          <p v-if="subtitle">{{ subtitle }}</p>
-        </slot>
-      </ion-label>
-      <ion-chip
-        v-if="chipLabel"
-        class="task-card-heading-chip"
-        outline
-        color="medium"
-        button
-        :aria-label="translate('Copy')"
-        @click="copyChipLabel"
-      >
-        <ion-icon :icon="ticketOutline" />
-        <ion-label>{{ chipLabel }}</ion-label>
-        <ion-icon :icon="copyOutline" />
-      </ion-chip>
-      <ion-note v-if="amount" slot="end" color="dark">{{ amount }}</ion-note>
-      <slot name="heading-end" />
-    </ion-item>
+  <ion-card class="ship-group-card">
+    <ion-card-header>
+      <div class="order-task-header">
+        <ion-checkbox
+          v-if="selectable"
+          :checked="selected"
+          @ionChange="emit('update:selected', $event.detail.checked)"
+        />
+        <div>
+          <ion-card-title>{{ title }}</ion-card-title>
+          <ion-card-subtitle v-if="subtitle">{{ subtitle }}</ion-card-subtitle>
+          <ion-card-subtitle v-if="amount">{{ amount }}</ion-card-subtitle>
+        </div>
+        <ion-badge
+          v-if="taskAge"
+          class="meta"
+          color="dark"
+          :title="taskCreatedTitle"
+          :aria-label="taskCreatedTitle"
+        >
+          {{ taskAge }}
+        </ion-badge>
+      </div>
+    </ion-card-header>
 
     <ion-progress-bar
       v-if="normalizedProgressValue !== undefined"
@@ -36,7 +30,7 @@
       :color="progressColor || undefined"
     />
 
-    <div v-if="hasContactDetails" class="task-card-contact-details ship-group-timeline">
+    <div v-if="hasContactDetails" class="ship-group-timeline">
       <ion-item lines="none">
         <ion-icon slot="start" :icon="personOutline" />
         <ion-label>
@@ -66,12 +60,12 @@
       </ion-item>
     </div>
 
-    <div v-if="$slots['content-start'] || $slots.default" class="task-card-content">
+    <div v-if="$slots['content-start'] || $slots.default">
       <slot name="content-start" />
       <div
         v-if="$slots.default"
         :class="{
-          'task-card-content-grid ship-group-detail-columns': contentLayout === 'grid',
+          'ship-group-detail-columns': contentLayout === 'grid',
           'task-card-content-stack': contentLayout === 'stack',
         }"
       >
@@ -79,26 +73,37 @@
       </div>
     </div>
 
-    <ion-item class="task-actions" lines="none" v-if="$slots.actions || $slots['actions-end']">
-      <slot name="actions" />
-      <div v-if="$slots['actions-end']" class="task-card-actions-end">
-        <slot name="actions-end" />
-      </div>
+    <ion-item class="task-actions" lines="none" v-if="orderedActions.length || viewOrderLink">
+      <ion-button
+        v-for="action in orderedActions"
+        :key="action.id"
+        fill="clear"
+        :color="actionColor(action.kind)"
+        :disabled="action.disabled"
+        @click="emit('action', action.id)"
+      >
+        {{ action.label }}
+      </ion-button>
+      <ion-button v-if="viewOrderLink" slot="end" fill="clear" color="primary" :router-link="viewOrderLink">
+        {{ translate('View order') }}
+      </ion-button>
     </ion-item>
   </ion-card>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonButton, IonCard, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonNote, IonProgressBar } from '@ionic/vue';
-import { callOutline, copyOutline, mailOutline, personOutline, ticketOutline } from 'ionicons/icons';
+import { IonBadge, IonButton, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonIcon, IonItem, IonLabel, IonProgressBar } from '@ionic/vue';
+import { callOutline, mailOutline, personOutline } from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
+import type { TaskCardAction, TaskCardActionKind } from '@/types/taskCard';
+import { taskAgeLabel, taskCreatedTimestampLabel } from '@/utils/taskCardDisplay';
 
 const props = withDefaults(defineProps<{
   title: string;
   subtitle?: string;
   amount?: string;
-  chipLabel?: string;
+  taskCreatedDate?: string | number;
   contactName?: string;
   contactPhone?: string;
   contactPhoneHref?: string;
@@ -109,10 +114,12 @@ const props = withDefaults(defineProps<{
   progressColor?: string;
   selectable?: boolean;
   selected?: boolean;
+  actions?: TaskCardAction[];
+  viewOrderLink?: string;
 }>(), {
   subtitle: '',
   amount: '',
-  chipLabel: '',
+  taskCreatedDate: '',
   contactName: '',
   contactPhone: '',
   contactPhoneHref: '',
@@ -123,10 +130,13 @@ const props = withDefaults(defineProps<{
   progressColor: '',
   selectable: false,
   selected: false,
+  actions: () => [],
+  viewOrderLink: '',
 });
 
 const emit = defineEmits<{
   (event: 'update:selected', value: boolean): void;
+  (event: 'action', actionId: string): void;
 }>();
 
 const hasContactDetails = computed(() => (
@@ -134,6 +144,9 @@ const hasContactDetails = computed(() => (
   || !!props.contactPhone
   || !!props.contactEmail
 ));
+
+const taskAge = computed(() => taskAgeLabel(props.taskCreatedDate, translate('Created')));
+const taskCreatedTitle = computed(() => taskCreatedTimestampLabel(props.taskCreatedDate, translate('Task created')));
 
 const normalizedProgressValue = computed(() => {
   if (props.progressValue == null) return undefined;
@@ -145,32 +158,39 @@ const normalizedProgressValue = computed(() => {
   return Math.max(0, Math.min(1, normalizedValue));
 });
 
+const orderedActions = computed(() => {
+  const priority: Record<TaskCardActionKind, number> = {
+    primary: 0,
+    neutral: 1,
+    danger: 2,
+  };
+
+  return props.actions
+    .map((action, index) => ({ action, index }))
+    .sort((left, right) => priority[left.action.kind] - priority[right.action.kind] || left.index - right.index)
+    .map(({ action }) => action);
+});
+
+function actionColor(kind: TaskCardActionKind): string {
+  return kind === 'neutral' ? 'medium' : kind;
+}
+
 async function copyContact(value: string) {
   if (!value) return;
 
   await commonUtil.copyToClipboard(value, 'Copied');
 }
-
-async function copyChipLabel() {
-  await copyContact(props.chipLabel);
-}
 </script>
 
 <style scoped>
-.task-card-heading {
-  position: relative;
+.order-task-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacer-sm);
 }
 
-.task-card-heading-has-chip .task-card-heading-title {
-  flex: 0 1 auto;
-  max-width: min(45%, 420px);
-}
-
-.task-card-heading-chip {
-  position: absolute;
-  inset-inline-start: 50%;
-  margin: 0;
-  transform: translateX(-50%);
+.order-task-header .meta {
+  margin-inline-start: auto;
 }
 
 .task-card-content-stack {
@@ -178,32 +198,7 @@ async function copyChipLabel() {
   flex-direction: column;
 }
 
-.task-card-action-buttons {
-  flex-wrap: wrap;
-}
-
-.task-card-actions-end {
-  flex: 0 1 360px;
-  margin-inline-start: auto;
-  max-width: 360px;
-}
-
 .task-actions {
   border-block-start: var(--border-medium);
-}
-
-@media (max-width: 640px) {
-  .task-card-heading-chip {
-    position: static;
-    transform: none;
-  }
-
-  .task-card-heading-has-chip .task-card-heading-title {
-    max-width: none;
-  }
-
-  .task-card-actions-end {
-    max-width: none;
-  }
 }
 </style>

@@ -18,24 +18,26 @@
       <ion-item v-if="!filtered.length" lines="none">
         <ion-label>{{ translate('No records found.') }}</ion-label>
       </ion-item>
-      <ion-item
-        v-for="item in filtered"
-        :key="item.geoId"
-        button
-        :detail="false"
-        @click="select(item.geoId)"
-      >
-        <ion-label>{{ item.geoName }}</ion-label>
-        <ion-icon v-if="item.geoId === selectedGeoId" slot="end" color="primary" :icon="checkmarkOutline" />
-      </ion-item>
+      <ion-radio-group :value="selectedGeoId">
+        <ion-item
+          v-for="item in filtered"
+          :key="item.geoId"
+          button
+          :detail="false"
+          @click="select(item.geoId)"
+        >
+          <ion-label>{{ item.geoName }}</ion-label>
+          <ion-radio slot="end" :value="item.geoId" />
+        </ion-item>
+      </ion-radio-group>
     </ion-list>
   </ion-content>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonSearchbar, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { checkmarkOutline, closeOutline } from 'ionicons/icons';
+import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSearchbar, IonTitle, IonToolbar, modalController } from '@ionic/vue';
+import { closeOutline } from 'ionicons/icons';
 import { translate } from '@common';
 
 // Searchable single-select picker. Options live only inside this modal (mounted

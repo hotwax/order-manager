@@ -18,6 +18,12 @@
         </ion-segment-button>
       </ion-segment>
     </ion-toolbar>
+    <ion-toolbar v-if="selectedSegment === 'substitute'">
+      <ion-searchbar
+        v-model="substituteKeyword"
+        :placeholder="translate('Search substitutes')"
+      />
+    </ion-toolbar>
   </ion-header>
 
   <ion-content>
@@ -26,12 +32,22 @@
       <div class="empty-state" v-if="!substituteProducts.length">
         <p>{{ translate('No substitute products configured for this item.') }}</p>
       </div>
-      <ion-radio-group v-else v-model="selectedProductId" @ionChange="selectSubstituteProduct($event.detail.value)">
+      <div class="empty-state" v-else-if="!filteredSubstitutes.length">
+        <p>{{ translate('No substitute products match your search.') }}</p>
+      </div>
+      <ion-radio-group v-else v-model="selectedProductId">
         <ion-list-header>
           <ion-label>{{ translate('Approved Swaps') }}</ion-label>
         </ion-list-header>
-        <ion-item v-for="product in substituteProducts" :key="product.productId" :disabled="!hasSubstituteStock(product.productId)">
-          <ion-radio slot="start" :value="product.productId" />
+        <ion-item
+          v-for="product in filteredSubstitutes"
+          :key="product.productId"
+          button
+          :detail="false"
+          :disabled="!hasSubstituteStock(product.productId)"
+          @click="selectSubstituteProduct(product.productId)"
+        >
+          <ion-radio slot="start" :value="product.productId" :aria-label="getProduct(product.productId)?.productName || product.productName" />
           <ion-thumbnail slot="start">
             <DxpShopifyImg :src="getProduct(product.productId)?.mainImageUrl || product.mainImageUrl" size="small" />
           </ion-thumbnail>
@@ -66,12 +82,16 @@
         <div class="empty-state" v-else-if="!searchKeyword">
           <p>{{ translate('Search for a product by name or SKU.') }}</p>
         </div>
-        <template v-else>
-          <ion-item v-for="product in searchResults" :key="product.productId"
-            :button="hasSearchStock(product)"
+        <ion-radio-group v-else v-model="selectedProductId">
+          <ion-item
+            v-for="product in searchResults"
+            :key="product.productId"
+            button
+            :detail="false"
             :disabled="!hasSearchStock(product)"
-            @click="hasSearchStock(product) && selectProduct(toSubstituteShape(product))"
+            @click="selectSearchProduct(product)"
           >
+            <ion-radio slot="start" :value="product.productId" :aria-label="product.productName" />
             <ion-thumbnail slot="start">
               <DxpShopifyImg :src="product.mainImageUrl" size="small" />
             </ion-thumbnail>
@@ -81,9 +101,8 @@
               <p>{{ translate('SKU') }}: {{ product.internalName || product.sku }}</p>
             </ion-label>
             <ion-note class="facility-label ion-no-padding" slot="end">{{ facilityStockLabel(product.inventoryConfig?.computedLastInventoryCount) }}</ion-note>
-            <ion-icon v-if="selectedProductId === product.productId" slot="end" :icon="checkmarkCircle" color="primary" />
           </ion-item>
-        </template>
+        </ion-radio-group>
       </ion-list>
 
       <ion-infinite-scroll
@@ -106,7 +125,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonRadio, IonRadioGroup, IonSearchbar, IonSegment, IonSegmentButton, IonSpinner, IonThumbnail, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { checkmarkCircle, closeOutline, saveOutline } from 'ionicons/icons';
+import { closeOutline, saveOutline } from 'ionicons/icons';
 import { api, DxpShopifyImg, translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
@@ -127,6 +146,19 @@ const selectedProductId = ref(props.selectedProductId ?? '');
 const selectedProductData = ref<any>(
   props.substituteProducts.find((product: any) => product.productId === props.selectedProductId) ?? null
 );
+
+// Substitute list live filter
+const substituteKeyword = ref('');
+const filteredSubstitutes = computed(() => {
+  const query = substituteKeyword.value.trim().toLowerCase();
+  if (!query) return props.substituteProducts;
+  return props.substituteProducts.filter((product: any) => {
+    const cached = getProduct(product.productId);
+    const name = cached?.productName || product.productName || '';
+    const sku = cached?.internalName || product.internalName || '';
+    return `${name} ${sku} ${product.productId}`.toLowerCase().includes(query);
+  });
+});
 
 // Search state
 const searchKeyword = ref((props.defaultSearchKeyword ?? '').trim());
@@ -191,6 +223,10 @@ function selectProduct(product: any) {
 function selectSubstituteProduct(productId: string) {
   const product = props.substituteProducts.find((item: any) => item.productId === productId);
   if (product) selectProduct(product);
+}
+
+function selectSearchProduct(product: any) {
+  selectProduct(toSubstituteShape(product));
 }
 
 async function searchProducts(pageIndex = 0, append = false) {

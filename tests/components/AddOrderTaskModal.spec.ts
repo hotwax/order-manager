@@ -26,6 +26,20 @@ describe('AddOrderTaskModal canonical hold WorkEffort model (#345)', () => {
     expect(modal).not.toContain("getEnumsByParentType('WorkEffortPurposeType')");
   });
 
+  it('supports the canonical manual purpose as the selected modal default', () => {
+    expect(modal).toContain('defaultWorkEffortPurposeTypeId?: string');
+    expect(modal).toContain("workEffortPurposeTypeId: props.defaultWorkEffortPurposeTypeId || ''");
+    // #399 renders the purpose picker as an icon popover (ion-select-option can't show
+    // icons), so each option sets the canonical purpose id on click instead of via :value.
+    expect(modal).toContain('@click="form.workEffortPurposeTypeId = option.enumId"');
+  });
+
+  it('only offers operator-created purposes in the ship-group modal', () => {
+    expect(modal).toContain("new Set(['ORD_HOLD_MANUAL', 'ORD_HOLD_CUST_REQ'])");
+    expect(modal).toContain('OPERATOR_HOLD_PURPOSE_IDS.has(purpose.enumId)');
+    expect(modal).toContain('fraud is order-scoped');
+  });
+
   it('stops loading the obsolete ORDER_HOLD task seed buckets', () => {
     expect(seed).not.toContain('ORDER_HOLD_STATUS');
     expect(seed).not.toContain('ORDER_HOLD_PURPOSE');
