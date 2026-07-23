@@ -1192,10 +1192,8 @@ async function saveSchedule() {
 
 function handleBatchSizeChange(event: any) {
   const rawValue = event.detail?.value !== undefined ? event.detail.value : event.target?.value;
-  console.log('handleBatchSizeChange rawValue:', rawValue);
   const newSize = parseInt(rawValue);
   if (!isNaN(newSize) && newSize > 0) {
-    console.log('Dispatching updateBatchSize with facilityId:', selectedFacilityId.value, 'and size:', newSize);
     store.updateBatchSize(selectedFacilityId.value, newSize);
   }
 }
