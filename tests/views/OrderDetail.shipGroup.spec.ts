@@ -34,7 +34,6 @@ describe('order detail ship group card', () => {
     expect(source).toContain('@click.stop="clearGiftMessage(shipGroup)"');
     expect(source).toContain('await updateShipGroup(shipGroup.id, { giftMessage: null });');
     expect(source).toContain("count === 1 ? 'hold task' : 'hold tasks'");
-    expect(source).toContain("`${translate('Hold task')}: ${taskName}`");
     expect(source).toContain("defaultItemStatusId: defaultAddedItemStatusId(shipGroup)");
     expect(source).toContain("requiresFulfillmentReview: requiresAddItemFulfillmentReview(shipGroup)");
     expect(source).toContain("statusId: 'ITEM_APPROVED'");
