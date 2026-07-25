@@ -237,7 +237,7 @@
               <ion-item>
                 <ion-input v-model="lineItem.quantity" type="number" :label="translate('Qty')" label-placement="floating" min="0"/>
               </ion-item>
-              <ion-button color="danger" fill="clear" @click="removeLineItem(index)">
+              <ion-button color="danger" fill="clear" @click="removeLineItem(index)" :aria-label="translate('Remove item')">
                 <ion-icon slot="icon-only" :icon="trashOutline"/>
               </ion-button>
             </div>
@@ -273,7 +273,7 @@
       </div>
 
       <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-        <ion-fab-button data-testid="create-order-submit-btn" @click="submitOrder">
+        <ion-fab-button data-testid="create-order-submit-btn" @click="submitOrder" :aria-label="translate('Submit order')">
           <ion-icon :icon="checkmarkDoneOutline" />
         </ion-fab-button>
       </ion-fab>
