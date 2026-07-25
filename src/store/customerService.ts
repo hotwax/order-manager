@@ -477,7 +477,8 @@ export const useCustomerServiceStore = defineStore('customerService', {
         };
         publishHoldTaskNavCounts(this.holdTasks.holdTaskCounts);
         this.dashboardStatus.holdTasks = 'success';
-      } catch {
+      } catch (error) {
+        logger.error('Failed to fetch hold task counts', error);
         this.dashboardStatus.holdTasks = 'error';
       }
     },
