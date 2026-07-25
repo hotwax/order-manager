@@ -8,7 +8,7 @@
         </ion-buttons>
         <ion-title>Customer Detail</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="onDeleteCustomer" :disabled="deleting || customer?.statusId === 'PARTY_DISABLED'">
+          <ion-button @click="onDeleteCustomer" :disabled="deleting || customer?.statusId === 'PARTY_DISABLED'" :aria-label="translate('Delete customer')">
             <ion-icon slot="icon-only" :icon="trashOutline" />
           </ion-button>
         </ion-buttons>
@@ -117,7 +117,7 @@
                       <h3>{{ candidate.name }}</h3>
                       <p>{{ candidate.partyId }}</p>
                     </ion-label>
-                    <ion-button slot="end" fill="clear" size="small" :router-link="`/customers/${candidate.partyId}`">
+                    <ion-button slot="end" fill="clear" size="small" :router-link="`/customers/${candidate.partyId}`" :aria-label="translate('Open customer profile')">
                       <ion-icon slot="icon-only" :icon="openOutline" />
                     </ion-button>
                     <ion-button slot="end" fill="solid" size="small" color="primary" :disabled="mergingIds.includes(candidate.partyId)" @click="onMergeCandidate(candidate.partyId)">
