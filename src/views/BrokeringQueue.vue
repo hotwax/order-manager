@@ -14,6 +14,7 @@
         v-model="selectedFacilityIds"
         :label="translate('Facility')"
         label-placement="stacked"
+        fill="outline"
         interface="popover"
         :interface-options="{ showBackdrop: false }"
         multiple
