@@ -120,7 +120,7 @@
                     <ion-button slot="end" fill="clear" size="small" :router-link="`/customers/${candidate.partyId}`" :aria-label="translate('Open customer profile')">
                       <ion-icon slot="icon-only" :icon="openOutline" />
                     </ion-button>
-                    <ion-button slot="end" fill="solid" size="small" color="primary" :disabled="mergingIds.includes(candidate.partyId)" @click="onMergeCandidate(candidate.partyId)">
+                    <ion-button slot="end" fill="solid" size="small" color="primary" :disabled="mergingIds.includes(candidate.partyId)" @click="onMergeCandidate(candidate.partyId)" :aria-label="translate('Merge customer')">
                       <ion-spinner v-if="mergingIds.includes(candidate.partyId)" name="crescent" slot="icon-only" />
                       <template v-else>Merge</template>
                     </ion-button>

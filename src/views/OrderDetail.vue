@@ -690,7 +690,7 @@
                     <p slot="end" v-if="!isVirtualFacility(shipGroup) && shipGroupDistances[shipGroup.id]">
                       {{ shipGroupDistances[shipGroup.id] }} {{ translate('miles') }}
                     </p>
-                    <ion-button slot="end" fill="clear" color="medium" :id="'shipping-opt-trigger-' + shipGroup.id" :aria-label="translate('Options')">
+                    <ion-button slot="end" fill="clear" color="medium" :id="'shipping-opt-trigger-' + shipGroup.id" :aria-label="translate('Shipping options')">
                       <ion-icon slot="icon-only" :icon="ellipsisVertical" />
                     </ion-button>
                     <ion-popover :trigger="'shipping-opt-trigger-' + shipGroup.id" dismiss-on-select
