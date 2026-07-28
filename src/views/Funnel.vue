@@ -359,7 +359,7 @@
                 <ion-reorder-group :disabled="false" @ionItemReorder="handleReorder">
                   <ion-item v-for="rule in sortRules" :key="rule.id">
                     <ion-label>{{ rule.name }}</ion-label>
-                    <ion-button slot="end" fill="clear" color="danger" @click="removeSortRule(rule.id)">
+                    <ion-button slot="end" fill="clear" color="danger" @click="removeSortRule(rule.id)" :aria-label="translate('Remove sort rule')">
                       <ion-icon slot="icon-only" :icon="closeOutline" />
                     </ion-button>
                     <ion-reorder slot="end" />
