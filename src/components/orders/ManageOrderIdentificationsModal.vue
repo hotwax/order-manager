@@ -65,19 +65,20 @@
               fill="clear"
               :disabled="savingKey === rowKey(identification) || !isRowUpdatable(identification) || !editValue.trim() || editValue.trim() === identification.idValue"
               @click="saveEdit(identification)"
+              :aria-label="translate('Save edit')"
             >
               <ion-spinner v-if="savingKey === rowKey(identification)" slot="icon-only" name="crescent" />
-              <ion-icon v-else :icon="checkmarkDoneOutline" />
+              <ion-icon v-else :icon="checkmarkDoneOutline" slot="icon-only" />
             </ion-button>
-            <ion-button fill="clear" :disabled="savingKey === rowKey(identification)" @click="cancelEdit">
-              <ion-icon :icon="closeOutline" />
+            <ion-button fill="clear" :disabled="savingKey === rowKey(identification)" @click="cancelEdit" :aria-label="translate('Cancel edit')">
+              <ion-icon :icon="closeOutline" slot="icon-only" />
             </ion-button>
           </template>
           <template v-else>
             <ion-button v-if="isRowUpdatable(identification)" fill="clear" @click="startEdit(identification)" :aria-label="translate('Edit')">
               <ion-icon slot="icon-only" :icon="createOutline" />
             </ion-button>
-            <ion-button fill="clear" color="danger" :disabled="removingKey === rowKey(identification) || !isRowUpdatable(identification)" @click="removeIdentification(identification)" :aria-label="translate('Delete')">
+            <ion-button fill="clear" color="danger" :disabled="removingKey === rowKey(identification) || !isRowUpdatable(identification)" @click="removeIdentification(identification)" :aria-label="translate('Remove')">
               <ion-spinner v-if="removingKey === rowKey(identification)" slot="icon-only" name="crescent" />
               <ion-icon v-else slot="icon-only" :icon="trashOutline" />
             </ion-button>
