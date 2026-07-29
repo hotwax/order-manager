@@ -15,6 +15,10 @@ export function getHoursSinceDayStart(userTimeZone?: string, now = DateTime.now(
   return getDashboardDateTime(userTimeZone, now).hour;
 }
 
+export function getDashboardDateRefreshKey(userTimeZone?: string, now = DateTime.now()) {
+  return `${userTimeZone || 'local'}|${getDashboardDateFilter(userTimeZone, now)}`;
+}
+
 export function getMillisecondsUntilNextDashboardHour(userTimeZone?: string, now = DateTime.now()) {
   const zonedNow = getDashboardDateTime(userTimeZone, now);
   const nextHour = zonedNow.plus({ hours: 1 }).startOf('hour');
