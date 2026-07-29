@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { api } from '@common';
+import { fetchPhysicalFacilityCatalog } from '@/services/facility';
 import { fetchUnfillableHourlyCounts } from '@/services/funnelDashboard';
 import { getPickProfileGroups } from '@/services/fulfillmentSync';
 import {
@@ -37,6 +38,10 @@ vi.mock('@/services/order', () => ({
   fetchVirtualLocationOrderCounts: vi.fn(),
   getActivePhysicalFacilityOrderVolume: vi.fn(),
   searchOrders: vi.fn(),
+}));
+
+vi.mock('@/services/facility', () => ({
+  fetchPhysicalFacilityCatalog: vi.fn(),
 }));
 
 vi.mock('@/services/funnelDashboard', () => ({
@@ -257,6 +262,7 @@ describe('customer service Funnel request scope', () => {
     vi.mocked(getPickProfileGroups).mockReset();
     vi.mocked(fetchVirtualLocationOrderCounts).mockReset();
     vi.mocked(getActivePhysicalFacilityOrderVolume).mockReset();
+    vi.mocked(fetchPhysicalFacilityCatalog).mockReset();
     mockLogger.error.mockReset();
   });
 
@@ -418,6 +424,122 @@ describe('customer service Funnel request scope', () => {
       rejectedShipGroupCount: 1
     }]);
     expect(store.getDashboardStatus('facilityRejections')).toBe('success');
+  });
+
+  it('enriches a valid today-volume row with one bounded facility source while preserving its count', async () => {
+    vi.mocked(api).mockResolvedValueOnce({
+      data: {
+        facilities: [{
+          facilityId: 'M100051',
+          lastOrderCount: 151
+        }, {
+          facilityId: 'NAMED_FACILITY',
+          facilityName: 'Metric Facility Name',
+          lastOrderCount: 7
+        }]
+      }
+    });
+    vi.mocked(fetchPhysicalFacilityCatalog).mockResolvedValueOnce([{
+      facilityId: 'M100051',
+      facilityName: '2301 E. 51st St.',
+    }, {
+      facilityId: 'NAMED_FACILITY',
+      facilityName: 'Different Catalog Name',
+    }]);
+
+    const store = useCustomerServiceStore();
+    await store.fetchFacilityOrderVolume('STORE');
+
+    expect(fetchPhysicalFacilityCatalog).toHaveBeenCalledOnce();
+    expect(store.getFacilityOrderVolume).toEqual([{
+      facilityId: 'M100051',
+      facilityName: '2301 E. 51st St.',
+      lastOrderCount: 151
+    }, {
+      facilityId: 'NAMED_FACILITY',
+      facilityName: 'Metric Facility Name',
+      lastOrderCount: 7
+    }]);
+    expect(store.getDashboardStatus('facilityOrderVolume')).toBe('success');
+  });
+
+  it('keeps valid today-volume rows available with their ID fallback when name enrichment fails', async () => {
+    const enrichmentError = new Error('facility catalog unavailable');
+    vi.mocked(api).mockResolvedValueOnce({
+      data: {
+        facilities: [{
+          facilityId: 'M100051',
+          lastOrderCount: 151
+        }]
+      }
+    });
+    vi.mocked(fetchPhysicalFacilityCatalog).mockRejectedValueOnce(enrichmentError);
+
+    const store = useCustomerServiceStore();
+    await store.fetchFacilityOrderVolume('STORE');
+
+    expect(store.getFacilityOrderVolume).toEqual([{
+      facilityId: 'M100051',
+      lastOrderCount: 151
+    }]);
+    expect(store.getDashboardStatus('facilityOrderVolume')).toBe('success');
+    expect(mockLogger.error).toHaveBeenCalledWith(
+      'Failed to enrich facility order volume names from the facility catalog',
+      enrichmentError
+    );
+  });
+
+  it('does not let an older facility-name enrichment replace a newer store scope', async () => {
+    const staleNames = deferred<any[]>();
+    const currentNames = deferred<any[]>();
+    vi.mocked(api)
+      .mockResolvedValueOnce({
+        data: {
+          facilities: [{
+            facilityId: 'FACILITY_A',
+            lastOrderCount: 151
+          }]
+        }
+      })
+      .mockResolvedValueOnce({
+        data: {
+          facilities: [{
+            facilityId: 'FACILITY_B',
+            lastOrderCount: 5
+          }]
+        }
+      });
+    vi.mocked(fetchPhysicalFacilityCatalog)
+      .mockImplementationOnce(() => staleNames.promise)
+      .mockImplementationOnce(() => currentNames.promise);
+
+    const store = useCustomerServiceStore();
+    const staleRequest = store.fetchFacilityOrderVolume('STORE_A');
+    await vi.waitFor(() => {
+      expect(fetchPhysicalFacilityCatalog).toHaveBeenCalledTimes(1);
+    });
+    const currentRequest = store.fetchFacilityOrderVolume('STORE_B');
+    await vi.waitFor(() => {
+      expect(fetchPhysicalFacilityCatalog).toHaveBeenCalledTimes(2);
+    });
+
+    currentNames.resolve([{
+      facilityId: 'FACILITY_B',
+      facilityName: 'Current Facility',
+    }]);
+    await currentRequest;
+    staleNames.resolve([{
+      facilityId: 'FACILITY_A',
+      facilityName: 'Stale Facility',
+    }]);
+    await staleRequest;
+
+    expect(store.getFacilityOrderVolume).toEqual([{
+      facilityId: 'FACILITY_B',
+      facilityName: 'Current Facility',
+      lastOrderCount: 5
+    }]);
+    expect(store.getDashboardStatus('facilityOrderVolume')).toBe('success');
   });
 
   it('does not let an older active-facility fallback replace newer store rows', async () => {

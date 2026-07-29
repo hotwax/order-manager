@@ -77,6 +77,22 @@ vi.mock('@ionic/vue', () => {
     },
     template: '<div role="progressbar" v-bind="$attrs" :aria-valuenow="value"></div>',
   };
+  const searchbar = {
+    name: 'IonSearchbar',
+    props: {
+      modelValue: String,
+      placeholder: String,
+    },
+    emits: ['update:modelValue'],
+    template: `
+      <input
+        data-testid="facility-search"
+        :value="modelValue"
+        :placeholder="placeholder"
+        @input="$emit('update:modelValue', $event.target.value)"
+      />
+    `,
+  };
 
   return {
     IonButton: component,
@@ -98,7 +114,7 @@ vi.mock('@ionic/vue', () => {
     IonButtons: component,
     IonMenuButton: component,
     IonProgressBar: progressBar,
-    IonSearchbar: component,
+    IonSearchbar: searchbar,
     IonSegment: component,
     IonSegmentButton: component,
     IonRadioGroup: component,
@@ -188,6 +204,60 @@ function mountFunnel() {
 }
 
 describe('Funnel progress bar accessibility', () => {
+  it('renders and searches an enriched facility name while keeping the today count', async () => {
+    const volumeRow = mocks.customerServiceStore.getFacilityOrderVolume[0] as any;
+    const originalRow = { ...volumeRow };
+    Object.assign(volumeRow, {
+      facilityId: 'M100051',
+      facilityName: '2301 E. 51st St.',
+      lastOrderCount: 151,
+    });
+
+    try {
+      const wrapper = mountFunnel();
+      (wrapper.vm as any).selectedFacilityId = 'M100051';
+      await nextTick();
+
+      expect(wrapper.get('.facility-metric-label').text()).toContain('2301 E. 51st St.');
+      expect(wrapper.get('.facility-metric-label').text()).toContain('151 translated:orders');
+      expect(wrapper.get('.section-title').text()).toBe(
+        'translated:Fill rate at 2301 E. 51st St.'
+      );
+
+      await wrapper.get('[data-testid="facility-search"]').setValue('51st');
+
+      expect(wrapper.get('.facility-metric-label').text()).toContain('2301 E. 51st St.');
+      expect(wrapper.findAll('.facility-metric-label')).toHaveLength(1);
+    } finally {
+      Object.keys(volumeRow).forEach((key) => delete volumeRow[key]);
+      Object.assign(volumeRow, originalRow);
+    }
+  });
+
+  it('renders the facility ID when neither the metric row nor seed data has a name', async () => {
+    const volumeRow = mocks.customerServiceStore.getFacilityOrderVolume[0] as any;
+    const originalRow = { ...volumeRow };
+    Object.keys(volumeRow).forEach((key) => delete volumeRow[key]);
+    Object.assign(volumeRow, {
+      facilityId: 'M100051',
+      lastOrderCount: 151,
+    });
+
+    try {
+      const wrapper = mountFunnel();
+      (wrapper.vm as any).selectedFacilityId = 'M100051';
+      await nextTick();
+
+      expect(wrapper.get('.facility-metric-label').text()).toContain('M100051');
+      expect(wrapper.get('.section-title').text()).toBe(
+        'translated:Fill rate at M100051'
+      );
+    } finally {
+      Object.keys(volumeRow).forEach((key) => delete volumeRow[key]);
+      Object.assign(volumeRow, originalRow);
+    }
+  });
+
   it('renders distinct translated global names without replacing native progress values', () => {
     const wrapper = mountFunnel();
     const progressBars = wrapper.findAll('[role="progressbar"]');
