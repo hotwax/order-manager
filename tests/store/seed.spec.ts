@@ -72,4 +72,27 @@ describe('seed store', () => {
       toStatusColor: 'medium'
     })]);
   });
+
+  it('does not let a reset seed load mutate or launch child loads in the next session', async () => {
+    let resolveEnumTypes: (value: any) => void = () => undefined;
+    vi.mocked(api).mockImplementation((request: any) => {
+      if (request.url === 'admin/enumTypes') {
+        return new Promise((resolve) => {
+          resolveEnumTypes = resolve;
+        });
+      }
+      return Promise.resolve({ data: [] });
+    });
+
+    const seedStore = useSeedStore();
+    const loading = seedStore.loadEnumsByParentType('WorkEffortPurposeType');
+    await vi.waitFor(() => expect(api).toHaveBeenCalledOnce());
+
+    seedStore.resetSeedData();
+    resolveEnumTypes({ data: [{ enumTypeId: 'STALE_CHILD_TYPE' }] });
+    await loading;
+
+    expect(seedStore.enumChildTypesByParent).toEqual({});
+    expect(vi.mocked(api).mock.calls).toHaveLength(1);
+  });
 });

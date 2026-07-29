@@ -8,6 +8,7 @@ const { loadProductStoreSeedData } = vi.hoisted(() => ({
 }));
 const user = vi.hoisted(() => ({
   userId: 'USER',
+  oms: 'demo-oms',
 }));
 
 vi.mock('@common', () => ({
@@ -29,6 +30,9 @@ vi.mock('@common', () => ({
 
 vi.mock('@/store/user', () => ({
   useUserStore: () => ({
+    get oms() {
+      return user.oms;
+    },
     current: {
       get userId() {
         return user.userId;
@@ -46,11 +50,14 @@ vi.mock('@/store/seed', () => ({
 describe('product store selection', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    useProductStore().sessionUserId = 'USER';
+    useProductStore().sessionOms = 'demo-oms';
     vi.mocked(api).mockReset();
     vi.mocked(logger.error).mockReset();
     vi.mocked(logger.warn).mockReset();
     loadProductStoreSeedData.mockReset();
     user.userId = 'USER';
+    user.oms = 'demo-oms';
   });
 
   afterEach(() => {
@@ -266,7 +273,7 @@ describe('product store selection', () => {
     });
   });
 
-  it('does not let late initialization overwrite a selection made after the UI wait times out', async () => {
+  it('refreshes late catalog metadata without overwriting a selection made after the UI wait times out', async () => {
     vi.useFakeTimers();
     let resolveProductStores: (value: any) => void = () => undefined;
     const productStoresResponse = new Promise((resolve) => {
@@ -309,11 +316,11 @@ describe('product store selection', () => {
     });
     await initialization;
 
-    expect(store.currentProductStore).toBe(store.productStores[1]);
     expect(store.currentProductStore).toEqual({
       productStoreId: 'STORE_B',
-      storeName: 'Store B',
+      storeName: 'Updated Store B',
     });
+    expect(store.getCurrentProductStore).toEqual(store.productStores[1]);
   });
 
   it('keeps the latest result when same-user initializations resolve out of order', async () => {
@@ -381,6 +388,30 @@ describe('product store selection', () => {
     await expect(store.initializeProductStoreSelection()).resolves.toEqual(persistedStore);
     expect(store.currentProductStore).toEqual(persistedStore);
     expect(store.productStores).toEqual([persistedStore]);
+    expect(logger.error).toHaveBeenCalledWith('Failed to fetch product stores', error);
+  });
+
+  it('clears a previous user catalog before initializing a different user', async () => {
+    const error = new Error('catalog unavailable');
+    vi.mocked(api).mockImplementation((request: any) => {
+      if (request.url === '/admin/productStores') return Promise.reject(error);
+      return Promise.resolve({ data: [] });
+    });
+
+    const store = useProductStore();
+    store.sessionUserId = 'USER_A';
+    store.productStores = [{
+      productStoreId: 'STORE_A',
+      storeName: 'User A Store',
+    }];
+    store.currentProductStore = store.productStores[0];
+    user.userId = 'USER_B';
+
+    await store.initializeProductStoreSelection();
+
+    expect(store.sessionUserId).toBe('USER_B');
+    expect(store.productStores).toEqual([]);
+    expect(store.currentProductStore).toEqual({});
     expect(logger.error).toHaveBeenCalledWith('Failed to fetch product stores', error);
   });
 
@@ -453,7 +484,7 @@ describe('product store selection', () => {
     expect(loadProductStoreSeedData).toHaveBeenCalledWith('STORE_B');
   });
 
-  it('continues after a stalled write and corrects a late stale success for the captured user', async () => {
+  it('continues after a stalled write and corrects a late stale success in the same session', async () => {
     vi.useFakeTimers();
     let resolveFirstWrite: (value: any) => void = () => undefined;
     const firstWriteResponse = new Promise((resolve) => {
@@ -473,7 +504,6 @@ describe('product store selection', () => {
 
     const firstSelection = store.setProductStorePreference(store.productStores[0]);
     const latestSelection = store.setProductStorePreference(store.productStores[1]);
-    user.userId = 'NEW_USER';
 
     await Promise.resolve();
     expect(store.currentProductStore).toBe(store.productStores[1]);
@@ -501,5 +531,202 @@ describe('product store selection', () => {
     expect(logger.warn).toHaveBeenCalledWith(
       'Product store preference update timed out after 10000ms'
     );
+  });
+
+  it('drops queued and corrective writes after the product store session is reset', async () => {
+    vi.useFakeTimers();
+    let resolveFirstWrite: (value: any) => void = () => undefined;
+    const firstWriteResponse = new Promise((resolve) => {
+      resolveFirstWrite = resolve;
+    });
+    vi.mocked(api).mockImplementation(() => firstWriteResponse);
+
+    const store = useProductStore();
+    store.productStores = [
+      { productStoreId: 'STORE_A', storeName: 'Store A' },
+      { productStoreId: 'STORE_B', storeName: 'Store B' },
+    ];
+
+    const firstSelection = store.setProductStorePreference(store.productStores[0]);
+    const latestSelection = store.setProductStorePreference(store.productStores[1]);
+    await Promise.resolve();
+    expect(api).toHaveBeenCalledTimes(1);
+
+    store.resetProductStoreSession();
+    await vi.advanceTimersByTimeAsync(10_000);
+    await Promise.all([firstSelection, latestSelection]);
+
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(store.sessionUserId).toBe('');
+    expect(store.productStores).toEqual([]);
+    expect(store.currentProductStore).toEqual({});
+    expect(logger.warn).not.toHaveBeenCalled();
+
+    resolveFirstWrite({ data: {} });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(api).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not dispatch queued writes with a different authenticated user token', async () => {
+    vi.useFakeTimers();
+    let resolveFirstWrite: (value: any) => void = () => undefined;
+    const firstWriteResponse = new Promise((resolve) => {
+      resolveFirstWrite = resolve;
+    });
+    vi.mocked(api).mockImplementation(() => firstWriteResponse);
+
+    const store = useProductStore();
+    store.productStores = [
+      { productStoreId: 'STORE_A', storeName: 'Store A' },
+      { productStoreId: 'STORE_B', storeName: 'Store B' },
+    ];
+
+    const firstSelection = store.setProductStorePreference(store.productStores[0]);
+    const latestSelection = store.setProductStorePreference(store.productStores[1]);
+    await Promise.resolve();
+    expect(api).toHaveBeenCalledTimes(1);
+
+    user.userId = 'USER_B';
+    await vi.advanceTimersByTimeAsync(10_000);
+    await Promise.all([firstSelection, latestSelection]);
+
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(logger.warn).not.toHaveBeenCalled();
+
+    resolveFirstWrite({ data: {} });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(api).toHaveBeenCalledTimes(1);
+  });
+
+  it('invalidates queued writes and corrects a late success after same-user reauthentication', async () => {
+    vi.useFakeTimers();
+    let resolveFirstWrite: (value: any) => void = () => undefined;
+    const firstWriteResponse = new Promise((resolve) => {
+      resolveFirstWrite = resolve;
+    });
+    vi.mocked(api).mockImplementation(() => firstWriteResponse);
+
+    const store = useProductStore();
+    store.productStores = [
+      { productStoreId: 'STORE_A', storeName: 'Store A' },
+      { productStoreId: 'STORE_B', storeName: 'Store B' },
+    ];
+
+    const firstSelection = store.setProductStorePreference(store.productStores[0]);
+    const latestSelection = store.setProductStorePreference(store.productStores[1]);
+    await Promise.resolve();
+    expect(api).toHaveBeenCalledTimes(1);
+
+    store.startProductStoreSession('USER', 'demo-oms');
+    expect(store.productStores).toHaveLength(2);
+    expect(store.currentProductStore).toEqual({
+      productStoreId: 'STORE_B',
+      storeName: 'Store B',
+    });
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    await Promise.all([firstSelection, latestSelection]);
+    expect(api).toHaveBeenCalledTimes(1);
+
+    resolveFirstWrite({ data: {} });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(api).mock.calls[1][0].data).toMatchObject({
+      userId: 'USER',
+      preferenceValue: 'STORE_B',
+    });
+  });
+
+  it('replays correction debt when a timed-out write succeeds during the logout reset gap', async () => {
+    vi.useFakeTimers();
+    let resolveFirstWrite: (value: any) => void = () => undefined;
+    const firstWriteResponse = new Promise((resolve) => {
+      resolveFirstWrite = resolve;
+    });
+    vi.mocked(api).mockImplementation(() => (
+      vi.mocked(api).mock.calls.length === 1
+        ? firstWriteResponse
+        : Promise.resolve({ data: {} })
+    ));
+
+    const store = useProductStore();
+    store.productStores = [
+      { productStoreId: 'STORE_A', storeName: 'Store A' },
+      { productStoreId: 'STORE_B', storeName: 'Store B' },
+    ];
+
+    const firstSelection = store.setProductStorePreference(store.productStores[0]);
+    const latestSelection = store.setProductStorePreference(store.productStores[1]);
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    await Promise.all([firstSelection, latestSelection]);
+    expect(api).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(api).mock.calls[1][0].data.preferenceValue).toBe('STORE_B');
+
+    store.resetProductStoreSession();
+    resolveFirstWrite({ data: {} });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(api).toHaveBeenCalledTimes(2);
+
+    store.startProductStoreSession('USER', 'demo-oms');
+    await vi.waitFor(() => expect(api).toHaveBeenCalledTimes(3));
+
+    expect(vi.mocked(api).mock.calls[2][0].data).toMatchObject({
+      userId: 'USER',
+      preferenceValue: 'STORE_B',
+    });
+  });
+
+  it('does not dispatch a late correction after the authenticated session changes', async () => {
+    vi.useFakeTimers();
+    let resolveFirstWrite: (value: any) => void = () => undefined;
+    const firstWriteResponse = new Promise((resolve) => {
+      resolveFirstWrite = resolve;
+    });
+    vi.mocked(api).mockImplementation(() => (
+      vi.mocked(api).mock.calls.length === 1
+        ? firstWriteResponse
+        : Promise.resolve({ data: {} })
+    ));
+
+    const store = useProductStore();
+    store.productStores = [
+      { productStoreId: 'STORE_A', storeName: 'Store A' },
+      { productStoreId: 'STORE_B', storeName: 'Store B' },
+    ];
+
+    const firstSelection = store.setProductStorePreference(store.productStores[0]);
+    const latestSelection = store.setProductStorePreference(store.productStores[1]);
+    await Promise.resolve();
+
+    await vi.advanceTimersByTimeAsync(10_000);
+    await Promise.all([firstSelection, latestSelection]);
+    expect(api).toHaveBeenCalledTimes(2);
+
+    user.userId = 'USER_B';
+    store.startProductStoreSession('USER_B', 'demo-oms');
+    resolveFirstWrite({ data: {} });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(api).toHaveBeenCalledTimes(2);
+  });
+
+  it('clears persisted store state when the same user authenticates to another OMS', () => {
+    const store = useProductStore();
+    store.productStores = [{
+      productStoreId: 'STORE_A',
+      storeName: 'First OMS Store',
+    }];
+    store.currentProductStore = store.productStores[0];
+
+    store.startProductStoreSession('USER', 'other-oms');
+
+    expect(store.sessionUserId).toBe('USER');
+    expect(store.sessionOms).toBe('other-oms');
+    expect(store.productStores).toEqual([]);
+    expect(store.currentProductStore).toEqual({});
   });
 });
