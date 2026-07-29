@@ -603,6 +603,7 @@ import { useUserStore } from '@/store/user';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 import {
+  getDashboardDateRefreshKey,
   getHoursSinceDayStart,
   getMillisecondsUntilNextDashboardHour
 } from '@/utils/dashboardDate';
@@ -622,6 +623,9 @@ const router = useRouter();
 const userTimeZone = computed(() => userStore.getUserTimeZone || userStore.getUserProfile?.userTimeZone);
 const dashboardNow = shallowRef(DateTime.now());
 const hoursSinceDayStart = computed(() => getHoursSinceDayStart(userTimeZone.value, dashboardNow.value));
+const dashboardDateRefreshKey = computed(
+  () => getDashboardDateRefreshKey(userTimeZone.value, dashboardNow.value)
+);
 let dashboardClockTimer: ReturnType<typeof setTimeout> | undefined;
 
 function clearDashboardClockTimer() {
@@ -643,6 +647,7 @@ function refreshDashboardClock() {
 onMounted(refreshDashboardClock);
 onUnmounted(clearDashboardClockTimer);
 watch(userTimeZone, refreshDashboardClock);
+watch(dashboardDateRefreshKey, refreshDashboardData);
 
 // Per-section load status helpers. These drive loading affordances and error
 // states so the dashboard never renders default zeros/empty copy while a group
