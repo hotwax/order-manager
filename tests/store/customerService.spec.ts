@@ -1,9 +1,13 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { api } from '@common';
 import { getActivePhysicalFacilityOrderVolume } from '@/services/order';
 import { useCustomerServiceStore } from '@/store/customerService';
-import { DateTime } from 'luxon';
+import { Settings } from 'luxon';
+
+const mockUserStore = vi.hoisted(() => ({
+  current: { timeZone: 'UTC' }
+}));
 
 vi.mock('@common', () => ({
   api: vi.fn(),
@@ -41,20 +45,22 @@ vi.mock('@/store/orderDetail', () => ({
 }));
 
 vi.mock('@/store/user', () => ({
-  useUserStore: vi.fn(() => ({
-    current: { timeZone: 'UTC' },
-  })),
-}));
-
-vi.mock('@/utils/dashboardDate', () => ({
-  getDashboardDateFilter: vi.fn(() => '2026-07-04'),
+  useUserStore: vi.fn(() => mockUserStore),
 }));
 
 describe('customer service funnel facility metrics', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-04T12:00:00Z'));
+    mockUserStore.current.timeZone = 'UTC';
     vi.mocked(api).mockReset();
     vi.mocked(getActivePhysicalFacilityOrderVolume).mockReset();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    Settings.defaultZone = 'system';
   });
 
   it('falls back to active physical facilities when velocity rows are empty', async () => {
@@ -155,6 +161,58 @@ describe('customer service funnel facility metrics', () => {
       },
     ]);
     expect(store.getDashboardStatus('facilityRejections')).toBe('success');
+  });
+
+  it('uses the restored user timezone on the first rejection request when the browser zone differs', async () => {
+    Settings.defaultZone = 'Asia/Kolkata';
+    vi.setSystemTime(new Date('2026-07-04T02:00:00Z'));
+    mockUserStore.current.timeZone = 'America/Los_Angeles';
+    vi.mocked(getActivePhysicalFacilityOrderVolume).mockResolvedValueOnce([]);
+    vi.mocked(api).mockResolvedValueOnce({ data: { entityValueList: [] } });
+
+    const store = useCustomerServiceStore();
+    await store.fetchFacilityRejections('STORE');
+
+    expect(api).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({
+        customParametersMap: expect.objectContaining({
+          changeDatetime_from: '2026-07-03 00:00:00',
+          changeDatetime_thru: '2026-07-04 00:00:00'
+        })
+      })
+    }));
+  });
+
+  it('uses the persisted timezone range for facility progress on a DST boundary', async () => {
+    Settings.defaultZone = 'Asia/Kolkata';
+    vi.setSystemTime(new Date('2026-03-08T12:00:00Z'));
+    mockUserStore.current.timeZone = 'America/New_York';
+    vi.mocked(api)
+      .mockResolvedValueOnce({ data: {} })
+      .mockResolvedValueOnce({ data: [] })
+      .mockResolvedValueOnce({ data: { entityValueList: [] } })
+      .mockResolvedValueOnce({ data: {} });
+
+    const store = useCustomerServiceStore();
+    await store.fetchFacilityFulfillmentProgress('BROADWAY', 'STORE');
+
+    expect(api).toHaveBeenCalledWith({
+      url: 'oms/facilities/BROADWAY/facilityRejections',
+      method: 'GET',
+      params: {
+        productStoreId: 'STORE',
+        changeDatetime_from: '2026-03-08 00:00:00',
+        changeDatetime_thru: '2026-03-09 00:00:00'
+      }
+    });
+    expect(api).toHaveBeenCalledWith({
+      url: 'oms/facilities/facilityOrderCounts',
+      method: 'GET',
+      params: {
+        facilityId: 'BROADWAY',
+        entryDate: '2026-03-08'
+      }
+    });
   });
 });
 

@@ -1,7 +1,8 @@
-import { DateTime } from 'luxon';
+import { DateTime, Settings } from 'luxon';
 import { describe, expect, it } from 'vitest';
 import {
   getDashboardDateFilter,
+  getDashboardDateRange,
   getDashboardDateRefreshKey,
   getHoursSinceDayStart,
   getMillisecondsUntilNextDashboardHour
@@ -12,6 +13,41 @@ describe('getDashboardDateFilter', () => {
     const browserLocalNow = DateTime.fromISO('2026-06-27T03:57:54+05:30');
 
     expect(getDashboardDateFilter('America/New_York', browserLocalNow)).toBe('2026-06-26');
+  });
+});
+
+describe('getDashboardDateRange', () => {
+  it('uses the selected timezone when the ambient default zone is on another calendar day', () => {
+    const originalZone = Settings.defaultZone;
+    Settings.defaultZone = 'Asia/Kolkata';
+
+    try {
+      const sameInstant = DateTime.fromISO('2026-07-04T02:00:00Z');
+
+      expect(getDashboardDateRange('America/Los_Angeles', sameInstant)).toEqual({
+        dateFilter: '2026-07-03',
+        startOfDayStr: '2026-07-03 00:00:00',
+        endOfDayStr: '2026-07-04 00:00:00'
+      });
+    } finally {
+      Settings.defaultZone = originalZone;
+    }
+  });
+
+  it.each([
+    ['spring-forward', '2026-03-08T12:00:00Z', '2026-03-08', '2026-03-09', 23],
+    ['fall-back', '2026-11-01T12:00:00Z', '2026-11-01', '2026-11-02', 25]
+  ])('uses calendar-day bounds across the New York %s boundary', (_label, instant, fromDate, thruDate, durationHours) => {
+    const range = getDashboardDateRange('America/New_York', DateTime.fromISO(instant));
+    const start = DateTime.fromFormat(range.startOfDayStr, 'yyyy-MM-dd HH:mm:ss', { zone: 'America/New_York' });
+    const end = DateTime.fromFormat(range.endOfDayStr, 'yyyy-MM-dd HH:mm:ss', { zone: 'America/New_York' });
+
+    expect(range).toEqual({
+      dateFilter: fromDate,
+      startOfDayStr: `${fromDate} 00:00:00`,
+      endOfDayStr: `${thruDate} 00:00:00`
+    });
+    expect(end.diff(start, 'hours').hours).toBe(durationHours);
   });
 });
 

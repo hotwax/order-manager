@@ -82,15 +82,30 @@
             <ion-spinner name="crescent" />
           </template>
           <ion-list v-if="!brokeredWorkloadLoading" lines="none" class="hold-tasks-list">
-            <ion-item button :detail="true" router-link="/open">
+            <ion-item
+              button
+              :detail="true"
+              :href="dashboardRoute('/open').href"
+              @click="navigateToLink($event, dashboardRoute('/open'))"
+            >
               <ion-label>{{ translate("Open") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.open) }} {{ translate(brokeredWorkload.open === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" router-link="/inflight">
+            <ion-item
+              button
+              :detail="true"
+              :href="dashboardRoute('/inflight').href"
+              @click="navigateToLink($event, dashboardRoute('/inflight'))"
+            >
               <ion-label>{{ translate("Picked") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.inflight) }} {{ translate(brokeredWorkload.inflight === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" router-link="/packed">
+            <ion-item
+              button
+              :detail="true"
+              :href="dashboardRoute('/packed').href"
+              @click="navigateToLink($event, dashboardRoute('/packed'))"
+            >
               <ion-label>{{ translate("Packed and shipped") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.packed) }} {{ translate(brokeredWorkload.packed === 1 ? "order" : "orders") }}</p>
             </ion-item>
@@ -112,7 +127,14 @@
         <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard v-if="!unfillableError" button router-link="/unfillable" :title="translate('Unfillable')" :stat="unfillableLoading ? '' : totalUnfillable">
+        <StatCard
+          v-if="!unfillableError"
+          button
+          :href="dashboardRoute('/unfillable').href"
+          :title="translate('Unfillable')"
+          :stat="unfillableLoading ? '' : totalUnfillable"
+          @click="navigateToLink($event, dashboardRoute('/unfillable'))"
+        >
           <template v-if="unfillableLoading" #stat>
             <ion-spinner name="crescent" />
           </template>
@@ -613,6 +635,7 @@ import {
 } from '@/utils/dashboardDate';
 import {
   navigateNativeRouterLink,
+  resolveNativeRouterLink,
   resolveVirtualLocationRouterLink,
   resolveWorkflowRouterLink,
   type NativeRouterLink
@@ -1106,6 +1129,10 @@ watch(filteredFacilities, (newList) => {
 
 function workflowRoute(path: string) {
   return resolveWorkflowRouterLink(router, path, selectedFacilityId.value);
+}
+
+function dashboardRoute(path: string) {
+  return resolveNativeRouterLink(router, path);
 }
 
 function navigateToLink(event: MouseEvent, link: NativeRouterLink) {
