@@ -52,7 +52,7 @@
                   <p>{{ metric.percent }}%</p>
                 </div>
                 <ion-note>{{ formatCount(metric.count) }} / {{ formatCount(fulfillmentStats.totalShipGroups) }} {{ translate("ship groups") }}</ion-note>
-                <ion-progress-bar :value="metric.value"></ion-progress-bar>
+                <ion-progress-bar :value="metric.value" :aria-label="metric.label" />
               </div>
             </ion-item>
           </div>
@@ -234,7 +234,11 @@
                 <ion-label>{{ item.name }}</ion-label>
                 <ion-note>{{ item.label }}</ion-note>
               </div>
-              <ion-progress-bar :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0" color="primary" />
+              <ion-progress-bar
+                :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0"
+                color="primary"
+                :aria-label="`${item.name}: ${item.label}`"
+              />
             </div>
           </ion-item>
           <ion-item v-if="!filteredFacilities.length" lines="none">
@@ -975,6 +979,11 @@ function formatCount(value: number) {
   return countValue(value).toLocaleString();
 }
 
+function formatLocalizedCount(value: unknown, singular: string, plural: string) {
+  const count = countValue(value);
+  return `${formatCount(count)} ${translate(count === 1 ? singular : plural)}`;
+}
+
 const fulfillmentStats = computed(() => {
   const fp = fulfillmentProgress.value || {};
   const totalShipGroups = countValue(fp.totalShipGroupsCount);
@@ -1077,7 +1086,7 @@ const filteredFacilities = computed(() => {
       facilityId: item.facilityId,
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.lastOrderCount,
-      label: `${item.lastOrderCount} orders`
+      label: formatLocalizedCount(item.lastOrderCount, 'order', 'orders')
     }));
   } else if (selectedDimension.value === 'velocity') {
     list = facilityFulfillmentVelocity.value.map(item => ({
@@ -1085,8 +1094,8 @@ const filteredFacilities = computed(() => {
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.activeFacilityFallback ? item.lastOrderCount : (item.fulfillmentVelocity || 0),
       label: item.activeFacilityFallback
-        ? `${item.lastOrderCount || 0} ${translate("active orders")}`
-        : `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
+        ? formatLocalizedCount(item.lastOrderCount, 'active order', 'active orders')
+        : `${Math.round((item.fulfillmentVelocity || 0) * 100)}% ${translate("velocity")} (${formatCount(item.shipGroupCount || 0)}/${formatLocalizedCount(item.lastOrderCount, 'order', 'orders')})`
     }));
   } else if (selectedDimension.value === 'rejections') {
     list = facilityRejections.value.map(item => ({
@@ -1094,8 +1103,8 @@ const filteredFacilities = computed(() => {
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.lastOrderCount || 0,
       label: item.rejectedShipGroupCount
-        ? `${item.lastOrderCount || 0} ${translate("active orders")}, ${item.rejectedShipGroupCount} ${translate("rejected orders")}`
-        : `${item.lastOrderCount || 0} ${translate("active orders")}`
+        ? `${formatLocalizedCount(item.lastOrderCount, 'active order', 'active orders')}, ${formatLocalizedCount(item.rejectedShipGroupCount, 'rejected order', 'rejected orders')}`
+        : formatLocalizedCount(item.lastOrderCount, 'active order', 'active orders')
     }));
   }
 
