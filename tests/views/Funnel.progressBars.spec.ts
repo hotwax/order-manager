@@ -1,6 +1,7 @@
 import { mount } from '@vue/test-utils';
 import { nextTick } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
+import { createMemoryHistory, createRouter } from 'vue-router';
 import Funnel from '@/views/Funnel.vue';
 
 const mocks = vi.hoisted(() => {
@@ -162,9 +163,32 @@ vi.mock('@/services/order', () => ({
   fetchWorkflowOrderTotals: vi.fn().mockResolvedValue({ open: 0, inflight: 0, packed: 0 }),
 }));
 
+function mountFunnel() {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', component: {} },
+      { path: '/unfillable', component: {} },
+      { path: '/brokering', component: {} },
+      { path: '/open', component: {} },
+      { path: '/inflight', component: {} },
+      { path: '/swap', component: {} },
+      { path: '/bad-address', component: {} },
+      { path: '/fraud', component: {} },
+      { path: '/hold', component: {} },
+    ],
+  });
+
+  return mount(Funnel, {
+    global: {
+      plugins: [router],
+    },
+  });
+}
+
 describe('Funnel progress bar accessibility', () => {
   it('renders distinct translated global names without replacing native progress values', () => {
-    const wrapper = mount(Funnel);
+    const wrapper = mountFunnel();
     const progressBars = wrapper.findAll('[role="progressbar"]');
 
     expect(progressBars.map((bar) => bar.attributes('aria-label'))).toEqual([
@@ -182,7 +206,7 @@ describe('Funnel progress bar accessibility', () => {
   });
 
   it('names the facility bar from its facility and the metric represented by the bar', async () => {
-    const wrapper = mount(Funnel);
+    const wrapper = mountFunnel();
     const facilityProgressBar = () => wrapper.findAll('[role="progressbar"]').at(-1)!;
 
     expect(facilityProgressBar().attributes('aria-label')).toBe('Outlet One: 7 orders');
