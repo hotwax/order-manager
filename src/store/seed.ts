@@ -11,6 +11,16 @@ type SeedDatasetState<T = any> = {
   error: string;
 };
 
+const seedStoreSessionVersions = new WeakMap<object, number>();
+
+function getSeedStoreSessionVersion(store: object) {
+  return seedStoreSessionVersions.get(store) || 0;
+}
+
+function invalidateSeedStoreSession(store: object) {
+  seedStoreSessionVersions.set(store, getSeedStoreSessionVersion(store) + 1);
+}
+
 const statusTypeIds = [
   "ORDER_STATUS",
   "ORDER_ITEM_STATUS",
@@ -395,7 +405,9 @@ export const useSeedStore = defineStore("seed", {
       await this.loadEnumType("ORDER_IDENTITY");
     },
     async loadEnumsByParentType(parentTypeId: string) {
+      const sessionVersion = getSeedStoreSessionVersion(this);
       const resp = await api({ url: 'admin/enumTypes', method: 'GET', params: { parentTypeId, pageSize: 200 } });
+      if (getSeedStoreSessionVersion(this) !== sessionVersion) return;
       const childTypes: any[] = Array.isArray(resp.data) ? resp.data : (resp.data?.enumTypeList ?? resp.data?.docs ?? []);
       const childTypeIds = childTypes.map((t: any) => t.enumTypeId).filter(Boolean);
       this.enumChildTypesByParent[parentTypeId] = childTypeIds;
@@ -532,6 +544,7 @@ export const useSeedStore = defineStore("seed", {
       return collection[id];
     },
     resetSeedData() {
+      invalidateSeedStoreSession(this);
       this.$reset();
     }
   },
