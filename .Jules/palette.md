@@ -12,3 +12,6 @@
 ## 2025-07-25 - Icon-only buttons accessibility pattern
 **Learning:** Many icon-only buttons (`<ion-button>` with an inner `<ion-icon>`) across the application are missing both `aria-label`s for screen readers and `slot="icon-only"` on the inner icon for proper Ionic alignment.
 **Action:** When creating or reviewing UI components, especially modals and lists, explicitly verify that all buttons containing only icons have a localized `aria-label` (using `translate()`) and that the `<ion-icon>` has `slot="icon-only"`.
+## 2024-07-28 - Internationalization of ARIA labels
+**Learning:** Found several icon-only buttons with hardcoded English strings for accessibility (e.g. `aria-label="Close"`). This degrades the experience for screen reader users relying on localized interfaces.
+**Action:** Always wrap standard aria-label attributes with the application's `translate()` function (e.g. `:aria-label="translate('Close')"`) to ensure icon-only buttons remain accessible across all supported languages.

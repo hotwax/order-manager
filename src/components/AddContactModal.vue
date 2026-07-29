@@ -2,7 +2,7 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="dismiss()" aria-label="Close">
+        <ion-button @click="dismiss()" :aria-label="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
@@ -193,6 +193,7 @@ import {
 } from '@ionic/vue';
 import { closeOutline, saveOutline, trashOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive } from 'vue';
+import { translate } from '@common';
 import { useSeedStore } from '@/store/seed';
 import type { CustomerContactMech } from '@/types/customer';
 
