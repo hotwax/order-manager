@@ -161,8 +161,7 @@ export const useUserStore = defineStore("user", {
         await this.fetchUserProfile();
         this.oms = cookieHelper().get("oms") || "";
         await this.fetchPermissions();
-        await useProductStore().fetchProductStores();
-        await useProductStore().fetchProductStorePreference();
+        await useProductStore().initializeProductStoreSelection();
         const productStoreIds = (useProductStore().getProductStores || []).map((store: any) => store.productStoreId).filter(Boolean);
         await useSeedStore().loadInitialSeedData(productStoreIds);
       } catch (error: any) {

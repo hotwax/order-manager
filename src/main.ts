@@ -32,6 +32,8 @@ import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import localeMessages from './locales';
 import { createDxpI18n, imagePreview, initialiseConfig, logger } from '@common';
+import { useAuth } from '@common/composables/useAuth';
+import { useProductStore } from './store/productStore';
 import { useUserStore } from './store/user';
 
 const pinia = createPinia().use(piniaPluginPersistedstate);
@@ -61,6 +63,10 @@ initialiseConfig({
 app.use(router)
 
 router.isReady().then(async () => {
+  if (useAuth().isAuthenticated.value) {
+    await useProductStore().initializeProductStoreSelection();
+  }
+
   app.directive('image-preview', imagePreview)
   app.mount('#app');
 

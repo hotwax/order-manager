@@ -4,6 +4,47 @@ import { useUserStore } from '@/store/user'
 import { useSeedStore } from "@/store/seed";
 const defaultProductStoreSettings = JSON.parse(import.meta.env.VITE_DEFAULT_PRODUCT_STORE_SETTINGS as string || '{"PRDT_IDEN_PREF":{"stateKey":"productIdentifier.productIdentificationPref","value":{"primaryId":"SKU","secondaryId":"productId"}}}')
 
+function resolveCanonicalProductStore(stores: any[], preferredStoreId?: string, currentStoreId?: string) {
+  return stores.find((store: any) => store.productStoreId === preferredStoreId)
+    || stores.find((store: any) => store.productStoreId === currentStoreId)
+    || stores[0]
+}
+
+async function loadProductStores() {
+  const resp = await api({
+    url: `/admin/productStores`,
+    method: "GET",
+    params: {
+      fieldsToSelect: ["productStoreId", "storeName"],
+      pageSize: 250
+    }
+  });
+
+  if (commonUtil.hasError(resp)) {
+    throw resp.data
+  }
+
+  if (!Array.isArray(resp.data)) {
+    throw resp.data
+  }
+
+  return resp.data
+}
+
+async function loadPreferredStoreId(userId: string) {
+  const preferredStoreResp = await api({
+    url: "admin/user/preferences",
+    method: "GET",
+    params: {
+      pageSize: 1,
+      userId,
+      preferenceKey: "SELECTED_BRAND"
+    },
+  }) as any;
+
+  return preferredStoreResp.data?.[0]?.preferenceValue
+}
+
 export const useProductStore = defineStore('productStore', {
   state: () => ({
     currentProductStore: {} as any,
@@ -26,7 +67,11 @@ export const useProductStore = defineStore('productStore', {
   }),
 
   getters: {
-    getCurrentProductStore: (state) => state.currentProductStore,
+    getCurrentProductStore: (state) => {
+      const selectedStoreId = state.currentProductStore?.productStoreId
+      return state.productStores?.find((store: any) => store.productStoreId === selectedStoreId)
+        || state.currentProductStore
+    },
     getProductStores: (state) => state.productStores,
     getSettings: (state) => state.settings,
     getProductIdentificationPref: (state) => state.settings.productIdentifier.productIdentificationPref,
@@ -38,57 +83,86 @@ export const useProductStore = defineStore('productStore', {
 
   actions: {
     async setCurrentProductStore(store: any) {
-      this.currentProductStore = store
+      const canonicalStore = this.productStores?.find(
+        (productStore: any) => productStore.productStoreId === store?.productStoreId
+      )
+      this.currentProductStore = canonicalStore || store
+    },
+
+    reconcileCurrentProductStore(preferredStoreId?: string, clearWhenCatalogEmpty = false) {
+      const stores = Array.isArray(this.productStores) ? this.productStores : []
+      const currentStoreId = this.currentProductStore?.productStoreId
+      const canonicalStore = resolveCanonicalProductStore(stores, preferredStoreId, currentStoreId)
+
+      if (canonicalStore) {
+        this.currentProductStore = canonicalStore
+      } else if (clearWhenCatalogEmpty) {
+        this.currentProductStore = {}
+      }
+
+      return this.currentProductStore
     },
 
     async fetchProductStores() {
-      let stores = []
       try {
-        const payload = {
-          fieldsToSelect: ["productStoreId", "storeName"],
-          pageSize: 250
-        }
-
-        const resp = await api({
-          url: `/admin/productStores`,
-          method: "GET",
-          params: payload
-        });
-
-        if (!commonUtil.hasError(resp)) {
-          stores = resp.data
-        } else {
-          throw resp.data
-        }
+        this.productStores = await loadProductStores()
+        this.reconcileCurrentProductStore(undefined, true)
       } catch (err) {
         logger.error("Failed to fetch product stores", err)
       }
-      this.productStores = stores
     },
 
     async fetchProductStorePreference() {
       const userStore = useUserStore();
+      let preferredStoreId
       try {
-        const preferredStoreResp = await api({
-          url: "admin/user/preferences",
-          method: "GET",
-          params: {
-            pageSize: 1,
-            userId: userStore.current.userId,
-            preferenceKey: "SELECTED_BRAND"
-          },
-        }) as any;
-        const preferredStoreId = preferredStoreResp.data?.[0]?.preferenceValue
-        if (preferredStoreId) {
-          const store = this.productStores?.find((store: any) => store.productStoreId === preferredStoreId);
-          store && this.setCurrentProductStore(store)
-        }
+        preferredStoreId = await loadPreferredStoreId(userStore.current.userId)
       } catch (err) {
         logger.error('Favourite product store not found', err)
       }
+      this.reconcileCurrentProductStore(preferredStoreId)
+    },
+    async initializeProductStoreSelection() {
+      const userStore = useUserStore();
+      const [storesResult, preferenceResult] = await Promise.allSettled([
+        loadProductStores(),
+        loadPreferredStoreId(userStore.current.userId)
+      ])
+
+      if (preferenceResult.status === 'rejected') {
+        logger.error('Favourite product store not found', preferenceResult.reason)
+      }
+
+      if (storesResult.status === 'rejected') {
+        logger.error("Failed to fetch product stores", storesResult.reason)
+        return this.currentProductStore
+      }
+
+      const stores = storesResult.value
+      const preferredStoreId = preferenceResult.status === 'fulfilled'
+        ? preferenceResult.value
+        : undefined
+      const canonicalStore = resolveCanonicalProductStore(
+        stores,
+        preferredStoreId,
+        this.currentProductStore?.productStoreId
+      )
+
+      this.$patch({
+        productStores: stores,
+        currentProductStore: canonicalStore || {}
+      })
+
+      return this.currentProductStore
     },
     async setProductStorePreference(payload: any) {
       const userStore = useUserStore();
+      const selectedProductStore = this.productStores?.find(
+        (store: any) => store.productStoreId === payload?.productStoreId
+      ) || payload
+
+      if (!selectedProductStore?.productStoreId) return
+
       try {
         await api({
           url: "admin/user/preferences",
@@ -96,14 +170,14 @@ export const useProductStore = defineStore('productStore', {
           data: {
             userId: userStore.current.userId,
             preferenceKey: 'SELECTED_BRAND',
-            preferenceValue: payload.productStoreId,
+            preferenceValue: selectedProductStore.productStoreId,
           }
         });
       } catch (error) {
         console.error('error', error)
       }
-      this.currentProductStore = payload;
-      await useSeedStore().loadProductStoreSeedData(payload.productStoreId);
+      await this.setCurrentProductStore(selectedProductStore);
+      await useSeedStore().loadProductStoreSeedData(selectedProductStore.productStoreId);
     },
     async fetchProductStoreSettings(productStoreId: string) {
       const productStoreSettings = {} as any

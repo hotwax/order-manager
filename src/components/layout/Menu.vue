@@ -163,7 +163,7 @@ import router from '@/router';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
-import { computed, onMounted } from 'vue';
+import { computed } from 'vue';
 
 const { isAuthenticated } = useAuth();
 const userStore = useUserStore();
@@ -184,13 +184,6 @@ function hasPermission(permissionId: string) {
 
 const selectedPage = computed(() => {
   return router.currentRoute.value.path
-})
-
-onMounted(async () => {
-  if (isAuthenticated.value && !productStores.value.length) {
-    await productStore.fetchProductStores();
-    await productStore.fetchProductStorePreference();
-  }
 })
 
 function setCurrentProductStore(event: CustomEvent) {
