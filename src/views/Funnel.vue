@@ -68,7 +68,8 @@
               :key="item.id"
               button
               :detail="true"
-              :router-link="virtualLocationRoute(item)"
+              :href="virtualLocationRoute(item).href"
+              @click="navigateToLink($event, virtualLocationRoute(item))"
             >
               <ion-label>{{ translate(item.label) }}</ion-label>
               <p slot="end">{{ formatCount(item.count) }} {{ translate(item.count === 1 ? "order" : "orders") }}</p>
@@ -81,15 +82,30 @@
             <ion-spinner name="crescent" />
           </template>
           <ion-list v-if="!brokeredWorkloadLoading" lines="none" class="hold-tasks-list">
-            <ion-item button :detail="true" router-link="/open">
+            <ion-item
+              button
+              :detail="true"
+              :href="dashboardRoute('/open').href"
+              @click="navigateToLink($event, dashboardRoute('/open'))"
+            >
               <ion-label>{{ translate("Open") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.open) }} {{ translate(brokeredWorkload.open === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" router-link="/inflight">
+            <ion-item
+              button
+              :detail="true"
+              :href="dashboardRoute('/inflight').href"
+              @click="navigateToLink($event, dashboardRoute('/inflight'))"
+            >
               <ion-label>{{ translate("Picked") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.inflight) }} {{ translate(brokeredWorkload.inflight === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" router-link="/packed">
+            <ion-item
+              button
+              :detail="true"
+              :href="dashboardRoute('/packed').href"
+              @click="navigateToLink($event, dashboardRoute('/packed'))"
+            >
               <ion-label>{{ translate("Packed and shipped") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.packed) }} {{ translate(brokeredWorkload.packed === 1 ? "order" : "orders") }}</p>
             </ion-item>
@@ -111,7 +127,14 @@
         <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard v-if="!unfillableError" button router-link="/unfillable" :title="translate('Unfillable')" :stat="unfillableLoading ? '' : totalUnfillable">
+        <StatCard
+          v-if="!unfillableError"
+          button
+          :href="dashboardRoute('/unfillable').href"
+          :title="translate('Unfillable')"
+          :stat="unfillableLoading ? '' : totalUnfillable"
+          @click="navigateToLink($event, dashboardRoute('/unfillable'))"
+        >
           <template v-if="unfillableLoading" #stat>
             <ion-spinner name="crescent" />
           </template>
@@ -280,11 +303,23 @@
               </ion-item>
             </div>
             <ion-list class="fulfill">
-              <ion-item lines="full" :button="true" :detail="true" :router-link="workflowRoute('/open')">
+              <ion-item
+                lines="full"
+                :button="true"
+                :detail="true"
+                :href="workflowRoute('/open').href"
+                @click="navigateToLink($event, workflowRoute('/open'))"
+              >
                 <ion-icon :icon="mailUnreadOutline" slot="start" />
                 <ion-label>{{ facilityFulfillmentProgress?.openCount ?? 0 }} {{ translate("open") }}</ion-label>
               </ion-item>
-              <ion-item lines="none" :button="true" :detail="true" :router-link="workflowRoute('/inflight')">
+              <ion-item
+                lines="none"
+                :button="true"
+                :detail="true"
+                :href="workflowRoute('/inflight').href"
+                @click="navigateToLink($event, workflowRoute('/inflight'))"
+              >
                 <ion-icon :icon="mailOpenOutline" slot="start" />
                 <ion-label>{{ facilityFulfillmentProgress?.inProgressCount ?? 0 }} {{ translate("in progress") }}</ion-label>
               </ion-item>
@@ -566,6 +601,7 @@ import {
 } from '@ionic/vue';
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import { DateTime } from 'luxon';
+import { useRouter } from 'vue-router';
 import {
   globeOutline,
   businessOutline,
@@ -593,12 +629,20 @@ import {
   getHoursSinceDayStart,
   getMillisecondsUntilNextDashboardHour
 } from '@/utils/dashboardDate';
+import {
+  navigateNativeRouterLink,
+  resolveNativeRouterLink,
+  resolveVirtualLocationRouterLink,
+  resolveWorkflowRouterLink,
+  type NativeRouterLink
+} from '@/utils/funnelRoutes';
 
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
 const seedStore = useSeedStore();
 const userStore = useUserStore();
+const router = useRouter();
 const userTimeZone = computed(() => userStore.getUserTimeZone || userStore.getUserProfile?.userTimeZone);
 const dashboardNow = shallowRef(DateTime.now());
 const hoursSinceDayStart = computed(() => getHoursSinceDayStart(userTimeZone.value, dashboardNow.value));
@@ -845,16 +889,7 @@ const virtualLocationWorkTotal = computed(() => {
 });
 
 function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {
-  if (item.id === 'unfillable') {
-    return { path: '/unfillable' };
-  }
-
-  return {
-    path: '/brokering',
-    query: {
-      facilityId: item.facilityIds
-    }
-  };
+  return resolveVirtualLocationRouterLink(router, item);
 }
 
 function fetchStoreDashboardData(productStoreId: string) {
@@ -1088,15 +1123,16 @@ watch(filteredFacilities, (newList) => {
   }
 });
 
-const workflowRouteQuery = computed(() => ({
-  facilityId: selectedFacilityId.value
-}));
-
 function workflowRoute(path: string) {
-  return {
-    path,
-    query: workflowRouteQuery.value
-  };
+  return resolveWorkflowRouterLink(router, path, selectedFacilityId.value);
+}
+
+function dashboardRoute(path: string) {
+  return resolveNativeRouterLink(router, path);
+}
+
+function navigateToLink(event: MouseEvent, link: NativeRouterLink) {
+  return navigateNativeRouterLink(event, router, link);
 }
 
 

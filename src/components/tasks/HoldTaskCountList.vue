@@ -5,7 +5,8 @@
       :key="holdTask.workEffortPurposeTypeId"
       button
       :detail="true"
-      :router-link="holdTaskRoute(holdTask.workEffortPurposeTypeId)"
+      :href="holdTaskRoute(holdTask.workEffortPurposeTypeId).href"
+      @click="navigateToLink($event, holdTaskRoute(holdTask.workEffortPurposeTypeId))"
     >
       <ion-label>{{ holdTaskLabel(holdTask) }}</ion-label>
       <p slot="end">{{ holdTask.taskCount }} {{ translate("tasks") }}</p>
@@ -16,11 +17,19 @@
 <script setup lang="ts">
 import { IonItem, IonLabel, IonList } from '@ionic/vue';
 import { translate } from '@common';
+import { useRouter } from 'vue-router';
 import type { HoldTaskCount } from '@/types/customerService';
+import {
+  navigateNativeRouterLink,
+  resolveHoldTaskRouterLink,
+  type NativeRouterLink
+} from '@/utils/funnelRoutes';
 
 defineProps<{
   holdTaskCounts: HoldTaskCount[];
 }>();
+
+const router = useRouter();
 
 const knownPurposeLabels: Record<string, string> = {
   NEG_RES_REVIEW: 'Substitute',
@@ -34,13 +43,10 @@ function holdTaskLabel(holdTask: HoldTaskCount) {
 }
 
 function holdTaskRoute(workEffortPurposeTypeId: string) {
-  if (workEffortPurposeTypeId === 'NEG_RES_REVIEW') return '/swap';
-  if (workEffortPurposeTypeId === 'INVALID_ADDRESS') return '/bad-address';
-  if (workEffortPurposeTypeId === 'REVIEW_RISK_ORDER') return '/fraud';
+  return resolveHoldTaskRouterLink(router, workEffortPurposeTypeId);
+}
 
-  return {
-    path: '/hold',
-    query: { purpose: workEffortPurposeTypeId }
-  };
+function navigateToLink(event: MouseEvent, link: NativeRouterLink) {
+  return navigateNativeRouterLink(event, router, link);
 }
 </script>
