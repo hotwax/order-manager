@@ -211,6 +211,10 @@ describe('customer service Unfillable Funnel metrics', () => {
     } as any);
 
     const store = useCustomerServiceStore();
+    store.unfillable.unfillableHourlyCounts = Array.from({ length: 24 }, (_, hourOfDay) => ({
+      hourOfDay,
+      orderCount: hourOfDay === 3 ? 7 : 0
+    }));
     await store.fetchUnfillable('STORE_1');
 
     expect(store.getUnfillable.totalCount).toBe(358);

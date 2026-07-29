@@ -418,6 +418,9 @@ export const useCustomerServiceStore = defineStore('customerService', {
     },
     async fetchUnfillableTrend(productStoreId: string) {
       this.dashboardStatus.unfillableTrend = 'loading';
+      // Do not retain the prior store's hourly trend while a new selection loads
+      // or if the strict transition endpoint rejects the request.
+      this.unfillable.unfillableHourlyCounts = [];
       try {
         const userProfile = useUserStore().current;
         this.unfillable.unfillableHourlyCounts = await fetchUnfillableHourlyCounts(
