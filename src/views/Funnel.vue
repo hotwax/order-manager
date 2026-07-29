@@ -566,6 +566,7 @@ import {
 } from '@ionic/vue';
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import { DateTime } from 'luxon';
+import { useRouter } from 'vue-router';
 import {
   globeOutline,
   businessOutline,
@@ -592,12 +593,17 @@ import {
   getHoursSinceDayStart,
   getMillisecondsUntilNextDashboardHour
 } from '@/utils/dashboardDate';
+import {
+  resolveVirtualLocationRouterLink,
+  resolveWorkflowRouterLink
+} from '@/utils/funnelRoutes';
 
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
 const seedStore = useSeedStore();
 const userStore = useUserStore();
+const router = useRouter();
 const userTimeZone = computed(() => userStore.getUserTimeZone || userStore.getUserProfile?.userTimeZone);
 const dashboardNow = shallowRef(DateTime.now());
 const hoursSinceDayStart = computed(() => getHoursSinceDayStart(userTimeZone.value, dashboardNow.value));
@@ -840,16 +846,7 @@ const virtualLocationWorkTotal = computed(() => {
 });
 
 function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {
-  if (item.id === 'unfillable') {
-    return { path: '/unfillable' };
-  }
-
-  return {
-    path: '/brokering',
-    query: {
-      facilityId: item.facilityIds
-    }
-  };
+  return resolveVirtualLocationRouterLink(router, item);
 }
 
 function fetchStoreDashboardData(productStoreId: string) {
@@ -1083,15 +1080,8 @@ watch(filteredFacilities, (newList) => {
   }
 });
 
-const workflowRouteQuery = computed(() => ({
-  facilityId: selectedFacilityId.value
-}));
-
 function workflowRoute(path: string) {
-  return {
-    path,
-    query: workflowRouteQuery.value
-  };
+  return resolveWorkflowRouterLink(router, path, selectedFacilityId.value);
 }
 
 

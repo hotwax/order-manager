@@ -1,6 +1,7 @@
 import { defineComponent } from 'vue';
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
+import { createMemoryHistory, createRouter } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 
 vi.mock('@common', () => ({
@@ -14,8 +15,13 @@ const IonListStub = defineComponent({
 
 const IonItemStub = defineComponent({
   name: 'IonItem',
-  props: ['routerLink'],
-  template: '<div class="hold-task-row"><slot /></div>',
+  props: {
+    routerLink: {
+      type: String,
+      required: true,
+    },
+  },
+  template: '<a class="hold-task-row" :href="routerLink" @click.prevent="$router.push(routerLink)"><slot /></a>',
 });
 
 const IonLabelStub = defineComponent({
@@ -24,7 +30,20 @@ const IonLabelStub = defineComponent({
 });
 
 describe('Funnel hold task rows', () => {
-  it('renders every configured purpose and routes specialized and future purposes correctly', () => {
+  it('renders native hrefs for every purpose and preserves click navigation', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/funnel', component: {} },
+        { path: '/swap', component: {} },
+        { path: '/bad-address', component: {} },
+        { path: '/fraud', component: {} },
+        { path: '/hold', component: {} },
+      ],
+    });
+    await router.push('/funnel');
+    await router.isReady();
+
     const wrapper = mount(HoldTaskCountList, {
       props: {
         holdTaskCounts: [
@@ -37,6 +56,7 @@ describe('Funnel hold task rows', () => {
         ],
       },
       global: {
+        plugins: [router],
         stubs: {
           IonList: IonListStub,
           IonItem: IonItemStub,
@@ -52,15 +72,32 @@ describe('Funnel hold task rows', () => {
       '/swap',
       '/bad-address',
       '/fraud',
-      { path: '/hold', query: { purpose: 'ORD_HOLD_MANUAL' } },
-      { path: '/hold', query: { purpose: 'ORD_HOLD_CUST_REQ' } },
-      { path: '/hold', query: { purpose: 'FUTURE_HOLD' } },
+      '/hold?purpose=ORD_HOLD_MANUAL',
+      '/hold?purpose=ORD_HOLD_CUST_REQ',
+      '/hold?purpose=FUTURE_HOLD',
     ]);
+    expect(rows.map((row) => row.attributes('href'))).toEqual([
+      '/swap',
+      '/bad-address',
+      '/fraud',
+      '/hold?purpose=ORD_HOLD_MANUAL',
+      '/hold?purpose=ORD_HOLD_CUST_REQ',
+      '/hold?purpose=FUTURE_HOLD',
+    ]);
+    expect(wrapper.html()).not.toContain('[object Object]');
     expect(wrapper.text()).toContain('Substitute4 tasks');
     expect(wrapper.text()).toContain('Bad Address3 tasks');
     expect(wrapper.text()).toContain('Fraud Risk2 tasks');
     expect(wrapper.text()).toContain('Manual Hold1 tasks');
     expect(wrapper.text()).toContain('Customer Requested Hold1 tasks');
     expect(wrapper.text()).toContain('Future Hold0 tasks');
+
+    await rows[4].trigger('click');
+    await flushPromises();
+
+    expect(router.currentRoute.value.path).toBe('/hold');
+    expect(router.currentRoute.value.query).toEqual({
+      purpose: 'ORD_HOLD_CUST_REQ',
+    });
   });
 });
