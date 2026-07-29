@@ -16,7 +16,7 @@ import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { fetchVirtualLocationOrderCounts, getActivePhysicalFacilityOrderVolume, searchOrders } from '@/services/order';
-import { getDashboardDateFilter } from '@/utils/dashboardDate';
+import { getDashboardDateFilter, getDashboardDateRange } from '@/utils/dashboardDate';
 import { useUserStore } from '@/store/user';
 
 const CHANNELS = ['WEB_SALES_CHANNEL', 'POS_SALES_CHANNEL', 'MOBILE_SALES_CHANNEL', 'MARKETPLACE_CHANNEL'];
@@ -85,12 +85,8 @@ function getUserDashboardDateFilter() {
 }
 
 function getUserDashboardDateRange() {
-  const dateFilter = getUserDashboardDateFilter();
-  return {
-    dateFilter,
-    startOfDayStr: DateTime.fromISO(dateFilter).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss'),
-    endOfDayStr: DateTime.fromISO(dateFilter).plus({ days: 1 }).startOf('day').toFormat('yyyy-MM-dd HH:mm:ss')
-  };
+  const userProfile = useUserStore().current;
+  return getDashboardDateRange(userProfile?.timeZone || userProfile?.userTimeZone);
 }
 
 function facilityIdOf(facility: any) {
