@@ -14,6 +14,7 @@ import type {
   UnfillableHourlyCount
 } from '@/types/customerService';
 import { fetchUnfillableHourlyCounts } from '@/services/funnelDashboard';
+import { fetchPhysicalFacilityCatalog } from '@/services/facility';
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -248,6 +249,33 @@ function hasUsableFacilityOrderVolume(facilities: any[]) {
     facility?.facilityId
     && Number(facility.lastOrderCount || facility.orderCount || facility.shipGroupCount || 0) > 0
   );
+}
+
+function meaningfulFacilityName(facility: any) {
+  const facilityId = facilityIdOf(facility);
+  const facilityName = String(facility?.facilityName || facility?.name || '').trim();
+  return facilityName && facilityName !== facilityId ? facilityName : '';
+}
+
+function hasMissingFacilityNames(facilities: any[]) {
+  return facilities.some((facility) => facilityIdOf(facility) && !meaningfulFacilityName(facility));
+}
+
+function mergeMissingFacilityNames(facilities: any[], namedFacilities: any[]) {
+  const facilityNamesById = new Map(
+    namedFacilities
+      .map((facility) => [facilityIdOf(facility), meaningfulFacilityName(facility)] as const)
+      .filter(([facilityId, facilityName]) => facilityId && facilityName)
+  );
+
+  return facilities.map((facility) => {
+    const facilityName = meaningfulFacilityName(facility)
+      || facilityNamesById.get(facilityIdOf(facility));
+
+    return facilityName && facility.facilityName !== facilityName
+      ? { ...facility, facilityName }
+      : facility;
+  });
 }
 
 function hasUsableFacilityFulfillmentVelocity(facilities: any[]) {
@@ -640,9 +668,26 @@ export const useCustomerServiceStore = defineStore('customerService', {
 
         if (resp.data) {
           const facilities = Array.isArray(resp.data.facilities) ? resp.data.facilities : [];
-          const nextFacilityOrderVolume = hasUsableFacilityOrderVolume(facilities)
-            ? facilities
-            : await getActivePhysicalFacilityOrderVolume({ productStoreId });
+          let nextFacilityOrderVolume: any[];
+          if (!hasUsableFacilityOrderVolume(facilities)) {
+            nextFacilityOrderVolume = await getActivePhysicalFacilityOrderVolume({ productStoreId });
+          } else if (hasMissingFacilityNames(facilities)) {
+            nextFacilityOrderVolume = facilities;
+            try {
+              const namedFacilities = await fetchPhysicalFacilityCatalog();
+              if (!this.isLatestDashboardRequest('facilityOrderVolume', requestGeneration)) return;
+
+              // The dashboard endpoint remains authoritative for today's counts and
+              // ordering. The bounded facility catalog contributes only missing names.
+              nextFacilityOrderVolume = mergeMissingFacilityNames(facilities, namedFacilities);
+            } catch (error) {
+              if (!this.isLatestDashboardRequest('facilityOrderVolume', requestGeneration)) return;
+
+              logger.error('Failed to enrich facility order volume names from the facility catalog', error);
+            }
+          } else {
+            nextFacilityOrderVolume = facilities;
+          }
           if (!this.isLatestDashboardRequest('facilityOrderVolume', requestGeneration)) return;
 
           this.facilityOrderVolume = nextFacilityOrderVolume;
