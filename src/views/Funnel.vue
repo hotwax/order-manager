@@ -52,7 +52,7 @@
                   <p>{{ metric.percent }}%</p>
                 </div>
                 <ion-note>{{ formatCount(metric.count) }} / {{ formatCount(fulfillmentStats.totalShipGroups) }} {{ translate("ship groups") }}</ion-note>
-                <ion-progress-bar :value="metric.value"></ion-progress-bar>
+                <ion-progress-bar :value="metric.value" :aria-label="metric.label" />
               </div>
             </ion-item>
           </div>
@@ -211,7 +211,11 @@
                 <ion-label>{{ item.name }}</ion-label>
                 <ion-note>{{ item.label }}</ion-note>
               </div>
-              <ion-progress-bar :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0" color="primary" />
+              <ion-progress-bar
+                :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0"
+                color="primary"
+                :aria-label="`${item.name}: ${facilityDimensionLabel}`"
+              />
             </div>
           </ion-item>
           <ion-item v-if="!filteredFacilities.length" lines="none">
@@ -793,6 +797,11 @@ const facilityMetricKey = computed<DashboardStatusKey>(() => {
   if (selectedDimension.value === 'velocity') return 'facilityFulfillmentVelocity';
   if (selectedDimension.value === 'rejections') return 'facilityRejections';
   return 'facilityOrderVolume';
+});
+const facilityDimensionLabel = computed(() => {
+  if (selectedDimension.value === 'velocity') return translate('Fulfillment Velocity');
+  if (selectedDimension.value === 'rejections') return translate('Rejections');
+  return translate('Order Volume');
 });
 const facilityMetricsLoading = computed(() => store.isDashboardGroupLoading(facilityMetricKey.value));
 const facilityMetricsError = computed(() => store.isDashboardGroupError(facilityMetricKey.value));
