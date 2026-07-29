@@ -172,6 +172,7 @@ function mountFunnel() {
       { path: '/brokering', component: {} },
       { path: '/open', component: {} },
       { path: '/inflight', component: {} },
+      { path: '/packed', component: {} },
       { path: '/swap', component: {} },
       { path: '/bad-address', component: {} },
       { path: '/fraud', component: {} },

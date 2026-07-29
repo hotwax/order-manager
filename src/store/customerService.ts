@@ -10,8 +10,10 @@ import type {
   FulfillmentProgress,
   FacilityFulfillmentProgress,
   VirtualLocationWorkCount,
-  HoldTaskCounts
+  HoldTaskCounts,
+  UnfillableHourlyCount
 } from '@/types/customerService';
+import { fetchUnfillableHourlyCounts } from '@/services/funnelDashboard';
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -148,6 +150,7 @@ export type DashboardStatusKey =
   | 'fulfillmentProgress'
   | 'openOrders'
   | 'unfillable'
+  | 'unfillableTrend'
   | 'holdTasks'
   | 'facilityOrderVolume'
   | 'facilityFulfillmentVelocity'
@@ -163,6 +166,7 @@ function emptyDashboardStatus(): Record<DashboardStatusKey, LoadStatus> {
     fulfillmentProgress: 'idle',
     openOrders: 'idle',
     unfillable: 'idle',
+    unfillableTrend: 'idle',
     holdTasks: 'idle',
     facilityOrderVolume: 'idle',
     facilityFulfillmentVelocity: 'idle',
@@ -286,7 +290,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
       oldestOpenOrderDate: null as number | null
     },
     unfillable: {
-      unfillableHourlyCounts: [] as { entryDateHour: string; shipGroupCount: number }[],
+      unfillableHourlyCounts: [] as UnfillableHourlyCount[],
       totalCount: 0
     },
     holdTasks: {
@@ -317,6 +321,9 @@ export const useCustomerServiceStore = defineStore('customerService', {
     } as Record<WorkflowBucket, string[]>,
     lastAction: '' as string,
     fulfillmentSyncData: null as any,
+    // A newer store/day fetch must always win when requests resolve out of order.
+    unfillableBacklogRequestGeneration: 0,
+    unfillableTrendRequestGeneration: 0,
     // Per-group load status for the funnel dashboard metric groups.
     dashboardStatus: emptyDashboardStatus()
   }),
@@ -346,16 +353,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
       };
     },
     unfillableTrend(state): number[] {
-      const todayStr = getUserDashboardDateFilter();
-      return Array.from({ length: 24 }, (_, h) => {
-        const match = state.unfillable.unfillableHourlyCounts?.find((d) => {
-          const parsed = DateTime.fromSQL(d.entryDateHour).isValid
-            ? DateTime.fromSQL(d.entryDateHour)
-            : DateTime.fromISO(d.entryDateHour);
-          return parsed.isValid && parsed.toFormat('yyyy-MM-dd') === todayStr && parsed.hour === h;
-        });
-        return match ? match.shipGroupCount : 0;
-      });
+      const countByHour = new Map(
+        state.unfillable.unfillableHourlyCounts.map(({ hourOfDay, orderCount }) => [
+          hourOfDay,
+          Number(orderCount) || 0
+        ])
+      );
+
+      return Array.from({ length: 24 }, (_, hourOfDay) => countByHour.get(hourOfDay) ?? 0);
     },
     getFulfillmentProgress: (state) => state.fulfillmentProgress,
     getOpenOrders: (state) => state.openOrders,
@@ -410,36 +415,47 @@ export const useCustomerServiceStore = defineStore('customerService', {
         this.dashboardStatus.openOrders = 'error';
       }
     },
-    async fetchUnfillable(productStoreId?: string) {
+    async fetchUnfillableTrend(productStoreId: string) {
+      const requestGeneration = ++this.unfillableTrendRequestGeneration;
+      this.dashboardStatus.unfillableTrend = 'loading';
+      // Do not retain the prior store's hourly trend while a new selection loads
+      // or if the strict transition endpoint rejects the request.
+      this.unfillable.unfillableHourlyCounts = [];
+      try {
+        const userProfile = useUserStore().current;
+        const hourlyCounts = await fetchUnfillableHourlyCounts(
+          productStoreId,
+          userProfile?.timeZone || userProfile?.userTimeZone
+        );
+        if (requestGeneration !== this.unfillableTrendRequestGeneration) return;
+
+        this.unfillable.unfillableHourlyCounts = hourlyCounts;
+        this.dashboardStatus.unfillableTrend = 'success';
+      } catch (error) {
+        if (requestGeneration !== this.unfillableTrendRequestGeneration) return;
+
+        console.error('Failed to fetch Unfillable trend', error);
+        this.dashboardStatus.unfillableTrend = 'error';
+      }
+    },
+
+    async fetchUnfillableBacklog(productStoreId: string) {
+      const requestGeneration = ++this.unfillableBacklogRequestGeneration;
       this.dashboardStatus.unfillable = 'loading';
       try {
-        const todayStr = getUserDashboardDateFilter();
-        const params: any = { dateFilter: todayStr };
-        if (productStoreId) params.productStoreId = productStoreId;
-        const resp = await api({
-          url: 'oms/orders/funnelDashboard/unfillable',
-          method: 'GET',
-          params
-        });
-        if (resp.data) {
-          this.unfillable = {
-            ...this.unfillable,
-            ...resp.data,
-            unfillableHourlyCounts: resp.data.unfillableHourlyCounts || []
-          };
-        }
-
         // Card count is the full unfillable queue (matches the Unfillable page), not today-scoped.
         const solrParams: any = {
           facilityIds: ['UNFILLABLE_PARKING'],
           status: ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD'],
           pageSize: 0
         };
-        if (productStoreId && productStoreId !== 'All') {
+        if (productStoreId !== 'All') {
           solrParams.productStoreId = productStoreId;
         }
 
         const solrResult = await searchOrders(solrParams);
+        if (requestGeneration !== this.unfillableBacklogRequestGeneration) return;
+
         this.unfillable.totalCount = solrResult.total || 0;
         // Publish the Unfillable side-menu badge from the same full-queue count.
         // Best-effort: a badge-publish failure must not fail the dashboard fetch.
@@ -450,9 +466,18 @@ export const useCustomerServiceStore = defineStore('customerService', {
         }
         this.dashboardStatus.unfillable = 'success';
       } catch (error) {
-        console.error('Failed to fetch unfillable stats', error);
+        if (requestGeneration !== this.unfillableBacklogRequestGeneration) return;
+
+        console.error('Failed to fetch Unfillable backlog', error);
         this.dashboardStatus.unfillable = 'error';
       }
+    },
+
+    async fetchUnfillable(productStoreId: string) {
+      await Promise.all([
+        this.fetchUnfillableTrend(productStoreId),
+        this.fetchUnfillableBacklog(productStoreId)
+      ]);
     },
     async fetchHoldTasks(productStoreId?: string) {
       this.dashboardStatus.holdTasks = 'loading';

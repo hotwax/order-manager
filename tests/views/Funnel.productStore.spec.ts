@@ -24,7 +24,8 @@ describe('Funnel product store scope', () => {
   it('shows the full Unfillable queue on the dashboard card, not a today-scoped count', () => {
     // Only the top fulfillment-progress banner is day-scoped; the queue-count cards
     // (including Unfillable) show the full queue and link through unfiltered.
-    expect(funnelSource).toContain('router-link="/unfillable"');
+    expect(funnelSource).toContain(`:href="unfillableError ? undefined : dashboardRoute('/unfillable').href"`);
+    expect(funnelSource).not.toContain('router-link=');
     expect(funnelSource).not.toContain("query: { dateFrom: todayDateStr }");
     expect(funnelSource).not.toContain("import { getDashboardDateFilter } from '@/utils/dashboardDate';");
   });

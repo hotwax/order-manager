@@ -74,6 +74,11 @@ export interface HoldTaskCounts {
   holdTaskCounts: HoldTaskCount[];
 }
 
+export interface UnfillableHourlyCount {
+  hourOfDay: number;
+  orderCount: number;
+}
+
 export interface ProductStore {
   productStoreId: string;
   storeName: string;

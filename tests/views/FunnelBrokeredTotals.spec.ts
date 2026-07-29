@@ -17,7 +17,7 @@ describe('Funnel Brokered workload totals', () => {
     expect(source).toContain(`:href="dashboardRoute('/open').href"`);
     expect(source).toContain(`:href="dashboardRoute('/inflight').href"`);
     expect(source).toContain(`:href="dashboardRoute('/packed').href"`);
-    expect(source).toContain(`:href="dashboardRoute('/unfillable').href"`);
+    expect(source).toContain(`:href="unfillableError ? undefined : dashboardRoute('/unfillable').href"`);
     expect(source).not.toContain('router-link=');
     expect(source).not.toContain("{ path: '/open', query: { dateFrom: todayDateStr } }");
     expect(source).not.toContain("{ path: '/inflight', query: { dateFrom: todayDateStr } }");
