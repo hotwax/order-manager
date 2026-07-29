@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { api } from '@common';
-import { getActivePhysicalFacilityOrderVolume } from '@/services/order';
+import { fetchUnfillableHourlyCounts } from '@/services/funnelDashboard';
+import { getActivePhysicalFacilityOrderVolume, searchOrders } from '@/services/order';
 import { useCustomerServiceStore } from '@/store/customerService';
-import { DateTime } from 'luxon';
 
 vi.mock('@common', () => ({
   api: vi.fn(),
@@ -15,6 +15,11 @@ vi.mock('@common', () => ({
 vi.mock('@/services/order', () => ({
   fetchVirtualLocationOrderCounts: vi.fn(),
   getActivePhysicalFacilityOrderVolume: vi.fn(),
+  searchOrders: vi.fn(),
+}));
+
+vi.mock('@/services/funnelDashboard', () => ({
+  fetchUnfillableHourlyCounts: vi.fn(),
 }));
 
 vi.mock('@/services/fulfillmentSync', () => ({
@@ -25,6 +30,7 @@ vi.mock('@/store/order', () => ({
   useOrderStore: vi.fn(() => ({
     workflowOrders: { open: [], inflight: [], packed: [] },
     workflowOrdersTotal: { open: 0, inflight: 0, packed: 0 },
+    setNavCount: vi.fn(),
   })),
 }));
 
@@ -155,6 +161,64 @@ describe('customer service funnel facility metrics', () => {
       },
     ]);
     expect(store.getDashboardStatus('facilityRejections')).toBe('success');
+  });
+});
+
+describe('customer service Unfillable Funnel metrics', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.mocked(fetchUnfillableHourlyCounts).mockReset();
+    vi.mocked(searchOrders).mockReset();
+  });
+
+  it('keeps the current backlog total separate from the nonzero today-entry sparkline', async () => {
+    vi.mocked(fetchUnfillableHourlyCounts).mockResolvedValueOnce(
+      Array.from({ length: 24 }, (_, hourOfDay) => ({
+        hourOfDay,
+        orderCount: hourOfDay === 9 ? 4 : 0
+      }))
+    );
+    vi.mocked(searchOrders).mockResolvedValueOnce({
+      docs: [],
+      total: 358
+    } as any);
+
+    const store = useCustomerServiceStore();
+    await store.fetchUnfillable('STORE_1');
+
+    expect(fetchUnfillableHourlyCounts).toHaveBeenCalledWith('STORE_1', 'UTC');
+    expect(searchOrders).toHaveBeenCalledWith({
+      facilityIds: ['UNFILLABLE_PARKING'],
+      status: ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD'],
+      pageSize: 0,
+      productStoreId: 'STORE_1'
+    });
+    expect(store.getUnfillable.totalCount).toBe(358);
+    expect(store.unfillableTrend).toHaveLength(24);
+    expect(store.unfillableTrend[9]).toBe(4);
+    expect(store.unfillableTrend.reduce((sum, count) => sum + count, 0)).toBe(4);
+    expect(store.getDashboardStatus('unfillable')).toBe('success');
+    expect(store.getDashboardStatus('unfillableTrend')).toBe('success');
+  });
+
+  it('keeps the backlog and nav-count source available when only the trend request fails', async () => {
+    const trendError = new Error('new OMS contract unavailable');
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(fetchUnfillableHourlyCounts).mockRejectedValueOnce(trendError);
+    vi.mocked(searchOrders).mockResolvedValueOnce({
+      docs: [],
+      total: 358
+    } as any);
+
+    const store = useCustomerServiceStore();
+    await store.fetchUnfillable('STORE_1');
+
+    expect(store.getUnfillable.totalCount).toBe(358);
+    expect(store.getUnfillable.unfillableHourlyCounts).toEqual([]);
+    expect(store.getDashboardStatus('unfillable')).toBe('success');
+    expect(store.getDashboardStatus('unfillableTrend')).toBe('error');
+    expect(errorSpy).toHaveBeenCalledWith('Failed to fetch Unfillable trend', trendError);
+    errorSpy.mockRestore();
   });
 });
 
