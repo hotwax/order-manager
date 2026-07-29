@@ -109,22 +109,40 @@
           </div>
         </StatCard>
 
-        <!-- Card 2: Unfillable — trendline follow-up -->
+        <!-- Card 2: backlog total with a separate today-entry trend -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
-        <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard v-if="!unfillableError" button router-link="/unfillable" :title="translate('Unfillable')" :stat="unfillableLoading ? '' : totalUnfillable">
-          <template v-if="unfillableLoading" #stat>
-            <ion-spinner name="crescent" />
-          </template>
-          <Sparkline v-if="!unfillableLoading" :points="unfillableTrend" color="danger" />
-        </StatCard>
-        <StatCard v-else :title="translate('Unfillable')">
+        <!-- stat: current queue backlog; sparkline: first Unfillable entries by local hour today -->
+        <div v-if="!unfillableError" class="unfillable-card-shell">
+          <StatCard button router-link="/unfillable" :title="translate('Unfillable backlog')" :stat="unfillableLoading ? '' : totalUnfillable">
+            <template v-if="unfillableLoading" #stat>
+              <ion-spinner name="crescent" />
+            </template>
+            <div class="unfillable-trend">
+              <p class="unfillable-trend-label">{{ translate('Entries into Unfillable today') }}</p>
+              <Sparkline
+                v-if="unfillableTrendReady"
+                :points="unfillableTodayTrend"
+                color="danger"
+                :aria-label="translate('Entries into Unfillable today')"
+              />
+              <ion-spinner v-else-if="unfillableTrendLoading" name="crescent" />
+              <div v-else-if="unfillableTrendError" class="card-error">
+                <p>{{ translate("Couldn't load this section") }}</p>
+              </div>
+            </div>
+          </StatCard>
+          <ion-button v-if="unfillableTrendError" class="unfillable-trend-retry" fill="outline" size="small" @click="retryUnfillableTrend">
+            <ion-icon slot="start" :icon="refreshOutline" />
+            {{ translate("Retry") }}
+          </ion-button>
+        </div>
+        <StatCard v-else :title="translate('Unfillable backlog')">
           <template #stat>
             <ion-icon :icon="alertCircleOutline" color="danger" />
           </template>
           <div class="card-error">
             <p>{{ translate("Couldn't load this section") }}</p>
-            <ion-button fill="outline" size="small" @click="retryUnfillable">
+            <ion-button fill="outline" size="small" @click="retryUnfillableBacklog">
               <ion-icon slot="start" :icon="refreshOutline" />
               {{ translate("Retry") }}
             </ion-button>
@@ -663,6 +681,8 @@ const fulfillmentProgressLoading = isLoading('fulfillmentProgress');
 const fulfillmentProgressError = isError('fulfillmentProgress');
 const unfillableLoading = isLoading('unfillable');
 const unfillableError = isError('unfillable');
+const unfillableTrendLoading = isLoading('unfillableTrend');
+const unfillableTrendError = isError('unfillableTrend');
 const holdTasksLoading = isLoading('holdTasks');
 const holdTasksError = isError('holdTasks');
 const facilityProgressLoading = isLoading('facilityFulfillmentProgress');
@@ -682,7 +702,12 @@ const facilityFulfillmentProgress = computed(() => store.getFacilityFulfillmentP
 const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
 const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);
 const facilityRejections = computed(() => store.getFacilityRejections);
-const unfillableTrend = computed(() => store.unfillableTrend);
+const unfillableTodayTrend = computed(() => store.unfillableTrend);
+const unfillableTrendReady = computed(() =>
+  !unfillableTrendLoading.value
+  && !unfillableTrendError.value
+  && store.getUnfillable.unfillableHourlyCounts?.length === 24
+);
 const virtualLocationWorkRows = computed(() => store.getVirtualLocationCounts);
 
 const fulfillmentSyncData = computed(() => store.getFulfillmentSyncData);
@@ -1024,8 +1049,11 @@ function retryFulfillmentProgress() {
 function retryBrokeredWorkload() {
   fetchBrokeredWorkload(selectedProductStoreId.value);
 }
-function retryUnfillable() {
-  store.fetchUnfillable(selectedProductStoreId.value);
+function retryUnfillableBacklog() {
+  store.fetchUnfillableBacklog(selectedProductStoreId.value);
+}
+function retryUnfillableTrend() {
+  store.fetchUnfillableTrend(selectedProductStoreId.value);
 }
 function retryHoldTasks() {
   store.fetchHoldTasks(selectedProductStoreId.value);
@@ -1716,6 +1744,27 @@ function handleBatchSizeChange(event: any) {
 }
 
 .card-error p {
+  margin: 0;
+  color: var(--ion-color-step-600, #666666);
+}
+
+.unfillable-trend {
+  display: grid;
+  gap: var(--spacer-xs);
+}
+
+.unfillable-card-shell {
+  display: grid;
+  gap: var(--spacer-xs);
+  min-width: 0;
+}
+
+.unfillable-trend-retry {
+  justify-self: start;
+  margin: 0;
+}
+
+.unfillable-trend-label {
   margin: 0;
   color: var(--ion-color-step-600, #666666);
 }
