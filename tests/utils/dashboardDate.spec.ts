@@ -2,6 +2,7 @@ import { DateTime } from 'luxon';
 import { describe, expect, it } from 'vitest';
 import {
   getDashboardDateFilter,
+  getDashboardDateRefreshKey,
   getHoursSinceDayStart,
   getMillisecondsUntilNextDashboardHour
 } from '@/utils/dashboardDate';
@@ -39,5 +40,22 @@ describe('getHoursSinceDayStart', () => {
     const now = DateTime.fromISO('2026-07-29T07:59:30Z');
 
     expect(getMillisecondsUntilNextDashboardHour('America/Los_Angeles', now)).toBe(30_000);
+  });
+
+  it('changes the dashboard refresh key at selected-timezone midnight', () => {
+    const beforeMidnight = DateTime.fromISO('2026-07-29T06:59:59.999Z');
+    const midnight = beforeMidnight.plus({ milliseconds: 1 });
+
+    expect(getDashboardDateRefreshKey('America/Los_Angeles', beforeMidnight))
+      .toBe('America/Los_Angeles|2026-07-28');
+    expect(getDashboardDateRefreshKey('America/Los_Angeles', midnight))
+      .toBe('America/Los_Angeles|2026-07-29');
+  });
+
+  it('changes the dashboard refresh key when the selected timezone changes on the same date', () => {
+    const now = DateTime.fromISO('2026-07-29T18:00:00Z');
+
+    expect(getDashboardDateRefreshKey('America/Los_Angeles', now))
+      .not.toBe(getDashboardDateRefreshKey('America/New_York', now));
   });
 });
