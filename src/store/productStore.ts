@@ -3,6 +3,11 @@ import { api, commonUtil, useEmbeddedAppStore, logger, translate, useSolrSearch 
 import { useUserStore } from '@/store/user'
 import { useSeedStore } from "@/store/seed";
 const defaultProductStoreSettings = JSON.parse(import.meta.env.VITE_DEFAULT_PRODUCT_STORE_SETTINGS as string || '{"PRDT_IDEN_PREF":{"stateKey":"productIdentifier.productIdentificationPref","value":{"primaryId":"SKU","secondaryId":"productId"}}}')
+const PRODUCT_STORE_PREFERENCE_WRITE_TIMEOUT_MS = 10_000
+const productStorePreferenceWriteQueues = new WeakMap<object, Map<string, Promise<void>>>()
+const productStoreLatestPreferences = new WeakMap<object, Map<string, { productStoreId: string; version: number }>>()
+const productStoreInitializationVersions = new WeakMap<object, number>()
+const productStoreSelectionVersions = new WeakMap<object, number>()
 
 function resolveCanonicalProductStore(stores: any[], preferredStoreId?: string, currentStoreId?: string) {
   return stores.find((store: any) => store.productStoreId === preferredStoreId)
@@ -43,6 +48,77 @@ async function loadPreferredStoreId(userId: string) {
   }) as any;
 
   return preferredStoreResp.data?.[0]?.preferenceValue
+}
+
+function preferenceMapFor<T>(
+  maps: WeakMap<object, Map<string, T>>,
+  store: object
+) {
+  let map = maps.get(store)
+  if (!map) {
+    map = new Map()
+    maps.set(store, map)
+  }
+  return map
+}
+
+function queueProductStorePreferenceWrite(store: object, userId: string, write: () => Promise<void>) {
+  const queues = preferenceMapFor(productStorePreferenceWriteQueues, store)
+  const previousWrite = queues.get(userId) || Promise.resolve()
+  const queuedWrite = previousWrite.then(write, write)
+  queues.set(userId, queuedWrite)
+  return queuedWrite
+}
+
+async function persistProductStorePreference(
+  store: object,
+  userId: string,
+  productStoreId: string,
+  version: number
+) {
+  const request = api({
+    url: "admin/user/preferences",
+    method: "PUT",
+    data: {
+      userId,
+      preferenceKey: 'SELECTED_BRAND',
+      preferenceValue: productStoreId,
+    }
+  });
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+  const result = await Promise.race([
+    request.then(
+      () => ({ status: 'fulfilled' as const }),
+      (reason) => ({ status: 'rejected' as const, reason })
+    ),
+    new Promise<{ status: 'timeout' }>((resolve) => {
+      timeoutId = setTimeout(
+        () => resolve({ status: 'timeout' }),
+        PRODUCT_STORE_PREFERENCE_WRITE_TIMEOUT_MS
+      )
+    })
+  ])
+  if (timeoutId !== undefined) clearTimeout(timeoutId)
+
+  if (result.status === 'rejected') {
+    logger.error('Failed to update product store preference', result.reason)
+    return
+  }
+
+  if (result.status === 'timeout') {
+    logger.warn(`Product store preference update timed out after ${PRODUCT_STORE_PREFERENCE_WRITE_TIMEOUT_MS}ms`)
+    request.then(() => {
+      const latestPreference = productStoreLatestPreferences.get(store)?.get(userId)
+      if (latestPreference && latestPreference.version > version) {
+        void queueProductStorePreferenceWrite(store, userId, () => persistProductStorePreference(
+          store,
+          userId,
+          latestPreference.productStoreId,
+          latestPreference.version
+        ))
+      }
+    }, () => undefined)
+  }
 }
 
 export const useProductStore = defineStore('productStore', {
@@ -124,9 +200,13 @@ export const useProductStore = defineStore('productStore', {
     },
     async initializeProductStoreSelection() {
       const userStore = useUserStore();
+      const initializationUserId = userStore.current.userId
+      const initializationVersion = (productStoreInitializationVersions.get(this) || 0) + 1
+      productStoreInitializationVersions.set(this, initializationVersion)
+      const initializationSelectionVersion = productStoreSelectionVersions.get(this) || 0
       const [storesResult, preferenceResult] = await Promise.allSettled([
         loadProductStores(),
-        loadPreferredStoreId(userStore.current.userId)
+        loadPreferredStoreId(initializationUserId)
       ])
 
       if (preferenceResult.status === 'rejected') {
@@ -135,6 +215,14 @@ export const useProductStore = defineStore('productStore', {
 
       if (storesResult.status === 'rejected') {
         logger.error("Failed to fetch product stores", storesResult.reason)
+        return this.currentProductStore
+      }
+
+      if (
+        userStore.current.userId !== initializationUserId
+        || productStoreInitializationVersions.get(this) !== initializationVersion
+        || (productStoreSelectionVersions.get(this) || 0) !== initializationSelectionVersion
+      ) {
         return this.currentProductStore
       }
 
@@ -163,21 +251,33 @@ export const useProductStore = defineStore('productStore', {
 
       if (!selectedProductStore?.productStoreId) return
 
-      try {
-        await api({
-          url: "admin/user/preferences",
-          method: "PUT",
-          data: {
-            userId: userStore.current.userId,
-            preferenceKey: 'SELECTED_BRAND',
-            preferenceValue: selectedProductStore.productStoreId,
-          }
-        });
-      } catch (error) {
-        console.error('error', error)
-      }
-      await this.setCurrentProductStore(selectedProductStore);
-      await useSeedStore().loadProductStoreSeedData(selectedProductStore.productStoreId);
+      const userId = userStore.current.userId
+      const selectionVersion = (productStoreSelectionVersions.get(this) || 0) + 1
+      productStoreSelectionVersions.set(this, selectionVersion)
+      const latestPreferences = preferenceMapFor(productStoreLatestPreferences, this)
+      const preferenceVersion = (latestPreferences.get(userId)?.version || 0) + 1
+      latestPreferences.set(userId, {
+        productStoreId: selectedProductStore.productStoreId,
+        version: preferenceVersion
+      })
+      this.currentProductStore = selectedProductStore
+
+      const preferenceWrite = queueProductStorePreferenceWrite(this, userId, () => persistProductStorePreference(
+        this,
+        userId,
+        selectedProductStore.productStoreId,
+        preferenceVersion
+      ))
+      const seedDataLoading = Promise.resolve().then(() => {
+        if (
+          productStoreSelectionVersions.get(this) === selectionVersion
+          && this.currentProductStore?.productStoreId === selectedProductStore.productStoreId
+        ) {
+          return useSeedStore().loadProductStoreSeedData(selectedProductStore.productStoreId);
+        }
+      })
+
+      await Promise.all([preferenceWrite, seedDataLoading])
     },
     async fetchProductStoreSettings(productStoreId: string) {
       const productStoreSettings = {} as any
