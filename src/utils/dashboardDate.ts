@@ -11,6 +11,17 @@ export function getDashboardDateFilter(userTimeZone?: string, now = DateTime.now
   return getDashboardDateTime(userTimeZone, now).toFormat('yyyy-MM-dd');
 }
 
+export function getDashboardDateRange(userTimeZone?: string, now = DateTime.now()) {
+  const startOfDay = getDashboardDateTime(userTimeZone, now).startOf('day');
+  const endOfDay = startOfDay.plus({ days: 1 }).startOf('day');
+
+  return {
+    dateFilter: startOfDay.toFormat('yyyy-MM-dd'),
+    startOfDayStr: startOfDay.toFormat('yyyy-MM-dd HH:mm:ss'),
+    endOfDayStr: endOfDay.toFormat('yyyy-MM-dd HH:mm:ss')
+  };
+}
+
 export function getHoursSinceDayStart(userTimeZone?: string, now = DateTime.now()) {
   return getDashboardDateTime(userTimeZone, now).hour;
 }
