@@ -222,4 +222,23 @@ describe('Funnel progress bar accessibility', () => {
     );
     expect(Number(facilityProgressBar().attributes('aria-valuenow'))).toBe(1);
   });
+
+  it('announces active orders when the velocity view falls back to active work', async () => {
+    const velocityRow = mocks.customerServiceStore.getFacilityFulfillmentVelocity[0] as any;
+    velocityRow.activeFacilityFallback = true;
+
+    try {
+      const wrapper = mountFunnel();
+      (wrapper.vm as any).selectedDimension = 'velocity';
+      await nextTick();
+
+      const facilityProgressBar = wrapper.findAll('[role="progressbar"]').at(-1)!;
+      expect(facilityProgressBar.attributes('aria-label')).toBe(
+        'Outlet One: 10 translated:active orders'
+      );
+      expect(Number(facilityProgressBar.attributes('aria-valuenow'))).toBe(1);
+    } finally {
+      delete velocityRow.activeFacilityFallback;
+    }
+  });
 });
