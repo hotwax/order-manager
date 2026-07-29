@@ -2,10 +2,12 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ref } from 'vue';
 import App from '@/App.vue';
 
+const isAuthenticated = ref(true);
+
 const mocks = vi.hoisted(() => ({
-  authenticated: true,
   createLoader: vi.fn(),
   fetchPermissions: vi.fn(),
   initializeProductStoreSelection: vi.fn(),
@@ -41,11 +43,7 @@ vi.mock('@common', () => ({
 
 vi.mock('@common/composables/useAuth', () => ({
   useAuth: () => ({
-    isAuthenticated: {
-      get value() {
-        return mocks.authenticated;
-      },
-    },
+    isAuthenticated,
   }),
 }));
 
@@ -83,7 +81,7 @@ vi.mock('@/store/user', () => ({
 
 describe('authenticated app boot', () => {
   beforeEach(() => {
-    mocks.authenticated = true;
+    isAuthenticated.value = true;
     mocks.fetchPermissions.mockReset().mockResolvedValue(undefined);
     mocks.initializeProductStoreSelection.mockReset().mockResolvedValue(undefined);
     mocks.loadInitialSeedData.mockReset().mockResolvedValue(undefined);
@@ -166,6 +164,66 @@ describe('authenticated app boot', () => {
     expect(mocks.loggerWarn).toHaveBeenCalledWith(
       'Product store initialization is still pending after 10000ms'
     );
+    wrapper.unmount();
+  });
+
+  it('clears the bootstrap state when authentication is lost before mounted initialization starts', async () => {
+    let resolveLoader: (loader: any) => void = () => undefined;
+    mocks.createLoader.mockImplementation(() => new Promise((resolve) => {
+      resolveLoader = resolve;
+    }));
+
+    const wrapper = mount(App, {
+      global: {
+        stubs: {
+          Menu: true,
+        },
+      },
+    });
+
+    expect(wrapper.find('[data-testid="product-store-bootstrap"]').exists()).toBe(true);
+    isAuthenticated.value = false;
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-testid="product-store-bootstrap"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="router-outlet"]').exists()).toBe(true);
+
+    resolveLoader({
+      dismiss: mocks.loaderDismiss,
+      present: mocks.loaderPresent,
+    });
+    await flushPromises();
+
+    expect(mocks.initializeProductStoreSelection).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+
+  it('clears the bootstrap state promptly when authentication is lost during initialization', async () => {
+    let resolveInitialization: () => void = () => undefined;
+    mocks.initializeProductStoreSelection.mockImplementation(() => new Promise<void>((resolve) => {
+      resolveInitialization = resolve;
+    }));
+
+    const wrapper = mount(App, {
+      global: {
+        stubs: {
+          Menu: true,
+        },
+      },
+    });
+    await flushPromises();
+
+    expect(mocks.initializeProductStoreSelection).toHaveBeenCalledOnce();
+    expect(wrapper.find('[data-testid="product-store-bootstrap"]').exists()).toBe(true);
+
+    isAuthenticated.value = false;
+    await wrapper.vm.$nextTick();
+
+    expect(wrapper.find('[data-testid="product-store-bootstrap"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="router-outlet"]').exists()).toBe(true);
+
+    resolveInitialization();
+    await flushPromises();
     wrapper.unmount();
   });
 });
