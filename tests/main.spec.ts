@@ -8,4 +8,10 @@ describe('app theme setup', () => {
 
     expect(source).toContain("import '@ionic/vue/css/palettes/dark.system.css';");
   });
+
+  it('invalidates product-store session state before manual logout awaits the backend', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/main.ts'), 'utf8');
+
+    expect(source).toContain('preLogout: useUserStore().preLogout');
+  });
 });

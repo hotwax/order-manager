@@ -23,7 +23,7 @@
 
 <script setup lang="ts">
 import { IonApp, IonProgressBar, IonRouterOutlet, IonSplitPane, loadingController } from '@ionic/vue';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { Settings } from 'luxon';
 import { emitter, FastTravel, logger, translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
@@ -40,6 +40,10 @@ const productStore = useProductStore();
 const userProfile = computed(() => userStore.getUserProfile);
 const productStoreBootstrapPending = ref(isAuthenticated.value);
 const PRODUCT_STORE_BOOTSTRAP_TIMEOUT_MS = 10_000;
+
+watch(isAuthenticated, (authenticated) => {
+  if (!authenticated) productStoreBootstrapPending.value = false;
+});
 
 async function waitForProductStoreBootstrap(initialization: Promise<unknown>) {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
@@ -101,6 +105,8 @@ onMounted(async () => {
     } finally {
       productStoreBootstrapPending.value = false;
     }
+  } else {
+    productStoreBootstrapPending.value = false;
   }
   await permissionsRefresh;
 

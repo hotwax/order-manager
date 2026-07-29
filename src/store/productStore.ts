@@ -8,6 +8,39 @@ const productStorePreferenceWriteQueues = new WeakMap<object, Map<string, Promis
 const productStoreLatestPreferences = new WeakMap<object, Map<string, { productStoreId: string; version: number }>>()
 const productStoreInitializationVersions = new WeakMap<object, number>()
 const productStoreSelectionVersions = new WeakMap<object, number>()
+const productStoreSessionVersions = new WeakMap<object, number>()
+type PendingProductStorePreferenceCorrection = {
+  productStoreId: string;
+  sourceSessionVersion: number;
+  sourcePreferenceVersion: number;
+}
+const pendingProductStorePreferenceCorrections =
+  new WeakMap<object, Map<string, PendingProductStorePreferenceCorrection>>()
+
+function getProductStoreSessionVersion(store: object) {
+  return productStoreSessionVersions.get(store) || 0
+}
+
+function invalidateProductStoreSession(store: object) {
+  productStoreSessionVersions.set(store, getProductStoreSessionVersion(store) + 1)
+  productStorePreferenceWriteQueues.delete(store)
+  productStoreLatestPreferences.delete(store)
+  productStoreInitializationVersions.delete(store)
+  productStoreSelectionVersions.delete(store)
+}
+
+function isProductStoreSessionCurrent(
+  store: object,
+  userId: string,
+  oms: string,
+  sessionVersion: number
+) {
+  return getProductStoreSessionVersion(store) === sessionVersion
+    && (store as any).sessionUserId === userId
+    && (store as any).sessionOms === oms
+    && useUserStore().current.userId === userId
+    && useUserStore().oms === oms
+}
 
 function resolveCanonicalProductStore(stores: any[], preferredStoreId?: string, currentStoreId?: string) {
   return stores.find((store: any) => store.productStoreId === preferredStoreId)
@@ -70,12 +103,133 @@ function queueProductStorePreferenceWrite(store: object, userId: string, write: 
   return queuedWrite
 }
 
+function productStoreSessionKey(userId: string, oms: string) {
+  return `${userId}\u0000${oms}`
+}
+
+function rememberProductStorePreferenceCorrection(
+  store: object,
+  userId: string,
+  oms: string,
+  sourceSessionVersion: number,
+  writtenProductStoreId: string,
+  supersedingPreference?: { productStoreId: string; version: number }
+) {
+  if (!supersedingPreference || supersedingPreference.productStoreId === writtenProductStoreId) return
+
+  const corrections = preferenceMapFor(pendingProductStorePreferenceCorrections, store)
+  const key = productStoreSessionKey(userId, oms)
+  const pendingCorrection = {
+    productStoreId: supersedingPreference.productStoreId,
+    sourceSessionVersion,
+    sourcePreferenceVersion: supersedingPreference.version
+  }
+  const existingCorrection = corrections.get(key)
+  if (
+    !existingCorrection
+    || pendingCorrection.sourceSessionVersion > existingCorrection.sourceSessionVersion
+    || (
+      pendingCorrection.sourceSessionVersion === existingCorrection.sourceSessionVersion
+      && pendingCorrection.sourcePreferenceVersion > existingCorrection.sourcePreferenceVersion
+    )
+  ) {
+    corrections.set(key, pendingCorrection)
+  }
+}
+
+function resumeProductStorePreferenceCorrection(
+  store: object,
+  userId: string,
+  oms: string,
+  sessionVersion: number
+) {
+  const corrections = pendingProductStorePreferenceCorrections.get(store)
+  const key = productStoreSessionKey(userId, oms)
+  const pendingCorrection = corrections?.get(key)
+  if (!pendingCorrection) return
+
+  corrections!.delete(key)
+  const latestPreferences = preferenceMapFor(productStoreLatestPreferences, store)
+  const latestPreference = {
+    productStoreId: pendingCorrection.productStoreId,
+    version: 1
+  }
+  latestPreferences.set(userId, latestPreference)
+  void queueProductStorePreferenceWrite(store, userId, () => persistProductStorePreference(
+    store,
+    userId,
+    latestPreference.productStoreId,
+    latestPreference.version,
+    oms,
+    sessionVersion
+  ))
+}
+
+function reconcileSuccessfulProductStorePreferenceWrite(
+  store: object,
+  userId: string,
+  oms: string,
+  requestSessionVersion: number,
+  writtenProductStoreId: string,
+  writtenVersion: number,
+  supersedingPreference?: { productStoreId: string; version: number }
+) {
+  const currentSessionVersion = getProductStoreSessionVersion(store)
+  if (!isProductStoreSessionCurrent(store, userId, oms, currentSessionVersion)) {
+    rememberProductStorePreferenceCorrection(
+      store,
+      userId,
+      oms,
+      requestSessionVersion,
+      writtenProductStoreId,
+      supersedingPreference
+    )
+    return
+  }
+
+  const latestPreferences = productStoreLatestPreferences.get(store)
+  let latestPreference = latestPreferences?.get(userId)
+
+  if (currentSessionVersion === requestSessionVersion) {
+    if (!latestPreference || latestPreference.version <= writtenVersion) return
+  } else {
+    const currentProductStoreId = (store as any).currentProductStore?.productStoreId
+    const correctiveProductStoreId =
+      latestPreference?.productStoreId
+      || supersedingPreference?.productStoreId
+      || currentProductStoreId
+    if (!correctiveProductStoreId || correctiveProductStoreId === writtenProductStoreId) return
+
+    if (!latestPreference) {
+      latestPreference = {
+        productStoreId: correctiveProductStoreId,
+        version: 1
+      }
+      preferenceMapFor(productStoreLatestPreferences, store).set(userId, latestPreference)
+    }
+  }
+
+  void queueProductStorePreferenceWrite(store, userId, () => persistProductStorePreference(
+    store,
+    userId,
+    latestPreference!.productStoreId,
+    latestPreference!.version,
+    oms,
+    currentSessionVersion
+  ))
+}
+
 async function persistProductStorePreference(
   store: object,
   userId: string,
   productStoreId: string,
-  version: number
+  version: number,
+  oms: string,
+  sessionVersion: number
 ) {
+  if (!isProductStoreSessionCurrent(store, userId, oms, sessionVersion)) return
+
+  const requestSessionPreferences = productStoreLatestPreferences.get(store)
   const request = api({
     url: "admin/user/preferences",
     method: "PUT",
@@ -99,30 +253,62 @@ async function persistProductStorePreference(
     })
   ])
   if (timeoutId !== undefined) clearTimeout(timeoutId)
+  const requestSessionIsCurrent = isProductStoreSessionCurrent(
+    store,
+    userId,
+    oms,
+    sessionVersion
+  )
+  const latestRequestSessionPreference = requestSessionPreferences?.get(userId)
+  const supersedingPreference =
+    latestRequestSessionPreference && latestRequestSessionPreference.version > version
+      ? latestRequestSessionPreference
+      : undefined
 
   if (result.status === 'rejected') {
-    logger.error('Failed to update product store preference', result.reason)
+    if (requestSessionIsCurrent) {
+      logger.error('Failed to update product store preference', result.reason)
+    }
+    return
+  }
+
+  if (result.status === 'fulfilled') {
+    if (!requestSessionIsCurrent) {
+      reconcileSuccessfulProductStorePreferenceWrite(
+        store,
+        userId,
+        oms,
+        sessionVersion,
+        productStoreId,
+        version,
+        supersedingPreference
+      )
+    }
     return
   }
 
   if (result.status === 'timeout') {
-    logger.warn(`Product store preference update timed out after ${PRODUCT_STORE_PREFERENCE_WRITE_TIMEOUT_MS}ms`)
+    if (requestSessionIsCurrent) {
+      logger.warn(`Product store preference update timed out after ${PRODUCT_STORE_PREFERENCE_WRITE_TIMEOUT_MS}ms`)
+    }
     request.then(() => {
-      const latestPreference = productStoreLatestPreferences.get(store)?.get(userId)
-      if (latestPreference && latestPreference.version > version) {
-        void queueProductStorePreferenceWrite(store, userId, () => persistProductStorePreference(
-          store,
-          userId,
-          latestPreference.productStoreId,
-          latestPreference.version
-        ))
-      }
+      reconcileSuccessfulProductStorePreferenceWrite(
+        store,
+        userId,
+        oms,
+        sessionVersion,
+        productStoreId,
+        version,
+        supersedingPreference
+      )
     }, () => undefined)
   }
 }
 
 export const useProductStore = defineStore('productStore', {
   state: () => ({
+    sessionUserId: '',
+    sessionOms: '',
     currentProductStore: {} as any,
     settings: {
       productIdentifier: {
@@ -158,6 +344,33 @@ export const useProductStore = defineStore('productStore', {
   },
 
   actions: {
+    startProductStoreSession(userId: string, oms: string) {
+      const preserveCurrentState =
+        this.sessionUserId === userId && this.sessionOms === oms
+      invalidateProductStoreSession(this)
+      if (!preserveCurrentState) this.$reset()
+      this.sessionUserId = userId
+      this.sessionOms = oms
+      const sessionVersion = getProductStoreSessionVersion(this)
+      resumeProductStorePreferenceCorrection(this, userId, oms, sessionVersion)
+      return sessionVersion
+    },
+
+    ensureProductStoreSession(userId: string, oms: string) {
+      if (this.sessionUserId !== userId || this.sessionOms !== oms) {
+        this.startProductStoreSession(userId, oms)
+      }
+    },
+
+    isProductStoreSessionActive(userId: string, oms: string, sessionVersion: number) {
+      return isProductStoreSessionCurrent(this, userId, oms, sessionVersion)
+    },
+
+    resetProductStoreSession() {
+      invalidateProductStoreSession(this)
+      this.$reset()
+    },
+
     async setCurrentProductStore(store: any) {
       const canonicalStore = this.productStores?.find(
         (productStore: any) => productStore.productStoreId === store?.productStoreId
@@ -201,6 +414,9 @@ export const useProductStore = defineStore('productStore', {
     async initializeProductStoreSelection() {
       const userStore = useUserStore();
       const initializationUserId = userStore.current.userId
+      const initializationOms = userStore.oms
+      this.ensureProductStoreSession(initializationUserId, initializationOms)
+      const sessionVersion = getProductStoreSessionVersion(this)
       const initializationVersion = (productStoreInitializationVersions.get(this) || 0) + 1
       productStoreInitializationVersions.set(this, initializationVersion)
       const initializationSelectionVersion = productStoreSelectionVersions.get(this) || 0
@@ -219,15 +435,22 @@ export const useProductStore = defineStore('productStore', {
       }
 
       if (
-        userStore.current.userId !== initializationUserId
+        !isProductStoreSessionCurrent(
+          this,
+          initializationUserId,
+          initializationOms,
+          sessionVersion
+        )
         || productStoreInitializationVersions.get(this) !== initializationVersion
-        || (productStoreSelectionVersions.get(this) || 0) !== initializationSelectionVersion
       ) {
         return this.currentProductStore
       }
 
       const stores = storesResult.value
-      const preferredStoreId = preferenceResult.status === 'fulfilled'
+      const selectionChangedDuringInitialization =
+        (productStoreSelectionVersions.get(this) || 0) !== initializationSelectionVersion
+      const preferredStoreId = !selectionChangedDuringInitialization
+        && preferenceResult.status === 'fulfilled'
         ? preferenceResult.value
         : undefined
       const canonicalStore = resolveCanonicalProductStore(
@@ -245,13 +468,17 @@ export const useProductStore = defineStore('productStore', {
     },
     async setProductStorePreference(payload: any) {
       const userStore = useUserStore();
+      const userId = userStore.current.userId
+      const oms = userStore.oms
+      if (!userId) return
+      this.ensureProductStoreSession(userId, oms)
+      const sessionVersion = getProductStoreSessionVersion(this)
       const selectedProductStore = this.productStores?.find(
         (store: any) => store.productStoreId === payload?.productStoreId
       ) || payload
 
       if (!selectedProductStore?.productStoreId) return
 
-      const userId = userStore.current.userId
       const selectionVersion = (productStoreSelectionVersions.get(this) || 0) + 1
       productStoreSelectionVersions.set(this, selectionVersion)
       const latestPreferences = preferenceMapFor(productStoreLatestPreferences, this)
@@ -266,11 +493,14 @@ export const useProductStore = defineStore('productStore', {
         this,
         userId,
         selectedProductStore.productStoreId,
-        preferenceVersion
+        preferenceVersion,
+        oms,
+        sessionVersion
       ))
       const seedDataLoading = Promise.resolve().then(() => {
         if (
-          productStoreSelectionVersions.get(this) === selectionVersion
+          isProductStoreSessionCurrent(this, userId, oms, sessionVersion)
+          && productStoreSelectionVersions.get(this) === selectionVersion
           && this.currentProductStore?.productStoreId === selectedProductStore.productStoreId
         ) {
           return useSeedStore().loadProductStoreSeedData(selectedProductStore.productStoreId);
