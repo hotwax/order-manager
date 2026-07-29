@@ -8,7 +8,7 @@ export interface NativeRouterLink {
   to: RouteLocationRaw;
 }
 
-function resolveRouterLink(
+export function resolveNativeRouterLink(
   router: RouteResolver,
   route: RouteLocationRaw
 ): NativeRouterLink {
@@ -43,10 +43,10 @@ export function resolveVirtualLocationRouterLink(
   item: { id: string; facilityIds: string[] }
 ) {
   if (item.id === 'unfillable') {
-    return resolveRouterLink(router, { path: '/unfillable' });
+    return resolveNativeRouterLink(router, { path: '/unfillable' });
   }
 
-  return resolveRouterLink(router, {
+  return resolveNativeRouterLink(router, {
     path: '/brokering',
     query: {
       facilityId: item.facilityIds
@@ -59,7 +59,7 @@ export function resolveWorkflowRouterLink(
   path: string,
   facilityId: string
 ) {
-  return resolveRouterLink(router, {
+  return resolveNativeRouterLink(router, {
     path,
     query: { facilityId }
   });
@@ -70,16 +70,16 @@ export function resolveHoldTaskRouterLink(
   workEffortPurposeTypeId: string
 ) {
   if (workEffortPurposeTypeId === 'NEG_RES_REVIEW') {
-    return resolveRouterLink(router, '/swap');
+    return resolveNativeRouterLink(router, '/swap');
   }
   if (workEffortPurposeTypeId === 'INVALID_ADDRESS') {
-    return resolveRouterLink(router, '/bad-address');
+    return resolveNativeRouterLink(router, '/bad-address');
   }
   if (workEffortPurposeTypeId === 'REVIEW_RISK_ORDER') {
-    return resolveRouterLink(router, '/fraud');
+    return resolveNativeRouterLink(router, '/fraud');
   }
 
-  return resolveRouterLink(router, {
+  return resolveNativeRouterLink(router, {
     path: '/hold',
     query: { purpose: workEffortPurposeTypeId }
   });

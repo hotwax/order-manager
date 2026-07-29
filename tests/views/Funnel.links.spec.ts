@@ -127,7 +127,24 @@ vi.mock('@ionic/vue', () => {
 vi.mock('@common', () => ({
   translate: (value: string) => value,
   StatCard: defineComponent({
-    template: '<section><slot /><slot name="stat" /></section>',
+    inheritAttrs: false,
+    props: {
+      button: Boolean,
+      href: String,
+    },
+    emits: ['click'],
+    template: `
+      <a
+        v-if="href"
+        v-bind="$attrs"
+        class="stat-card-stub"
+        :href="href"
+        @click="$emit('click', $event)"
+      >
+        <slot /><slot name="stat" />
+      </a>
+      <section v-else v-bind="$attrs"><slot /><slot name="stat" /></section>
+    `,
   }),
   Sparkline: defineComponent({ template: '<div />' }),
   commonUtil: {
@@ -188,6 +205,7 @@ function makeRouter() {
       { path: '/brokering', component: {} },
       { path: '/open', component: {} },
       { path: '/inflight', component: {} },
+      { path: '/packed', component: {} },
       { path: '/swap', component: {} },
       { path: '/bad-address', component: {} },
       { path: '/fraud', component: {} },
@@ -215,6 +233,9 @@ describe('Funnel native drilldown links', () => {
     expect(hrefs).toEqual(expect.arrayContaining([
       '/order-manager/brokering?facilityId=_NA_&facilityId=FACILITY+%26+WEST',
       '/order-manager/unfillable',
+      '/order-manager/open',
+      '/order-manager/inflight',
+      '/order-manager/packed',
       '/order-manager/open?facilityId=FACILITY=A%26B',
       '/order-manager/inflight?facilityId=FACILITY=A%26B',
     ]));
@@ -233,5 +254,78 @@ describe('Funnel native drilldown links', () => {
       '_NA_',
       'FACILITY & WEST',
     ]);
+  });
+
+  it('routes all brokered rows and the Unfillable card only for plain primary clicks', async () => {
+    const router = makeRouter();
+    await router.push('/');
+    await router.isReady();
+    const push = vi.spyOn(router, 'push').mockResolvedValue(undefined);
+
+    const wrapper = mount(Funnel, {
+      global: {
+        plugins: [router],
+      },
+    });
+
+    const links = [
+      { href: '/order-manager/open', to: '/open' },
+      { href: '/order-manager/inflight', to: '/inflight' },
+      { href: '/order-manager/packed', to: '/packed' },
+      { href: '/order-manager/unfillable', to: '/unfillable', statCard: true },
+    ];
+
+    const findLink = (href: string, statCard = false) => {
+      const matches = wrapper.findAll('a[href]').filter((link) =>
+        link.attributes('href') === href
+        && (!statCard || link.classes().includes('stat-card-stub'))
+      );
+      expect(matches).toHaveLength(1);
+      return matches[0];
+    };
+
+    const dispatchObservedClick = (
+      link: ReturnType<typeof findLink>,
+      init: MouseEventInit
+    ) => {
+      let preventedByDashboardHandler: boolean | undefined;
+      link.element.addEventListener('click', (event) => {
+        preventedByDashboardHandler = event.defaultPrevented;
+        event.preventDefault();
+      }, { once: true });
+      link.element.dispatchEvent(new MouseEvent('click', {
+        button: 0,
+        cancelable: true,
+        ...init,
+      }));
+      return preventedByDashboardHandler;
+    };
+
+    for (const link of links) {
+      push.mockClear();
+      const prevented = dispatchObservedClick(
+        findLink(link.href, link.statCard),
+        { button: 0 }
+      );
+
+      expect(prevented).toBe(true);
+      expect(push).toHaveBeenCalledOnce();
+      expect(push).toHaveBeenCalledWith(link.to);
+    }
+
+    for (const link of links) {
+      const renderedLink = findLink(link.href, link.statCard);
+      for (const click of [
+        { metaKey: true },
+        { ctrlKey: true },
+        { button: 1 },
+      ]) {
+        push.mockClear();
+        const prevented = dispatchObservedClick(renderedLink, click);
+
+        expect(prevented).toBe(false);
+        expect(push).not.toHaveBeenCalled();
+      }
+    }
   });
 });

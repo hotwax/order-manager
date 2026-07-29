@@ -3,6 +3,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import {
   navigateNativeRouterLink,
   resolveHoldTaskRouterLink,
+  resolveNativeRouterLink,
   resolveVirtualLocationRouterLink,
   resolveWorkflowRouterLink
 } from '@/utils/funnelRoutes';
@@ -15,6 +16,7 @@ function makeRouter() {
       { path: '/brokering', component: {} },
       { path: '/open', component: {} },
       { path: '/inflight', component: {} },
+      { path: '/packed', component: {} },
       { path: '/swap', component: {} },
       { path: '/bad-address', component: {} },
       { path: '/fraud', component: {} },
@@ -55,6 +57,15 @@ describe('Funnel router links', () => {
     expect(inflight.href).toBe(
       '/order-manager/inflight?facilityId=FACILITY=A%26B'
     );
+  });
+
+  it('resolves unfiltered dashboard destinations against the router base', () => {
+    const router = makeRouter();
+
+    expect(resolveNativeRouterLink(router, '/open').href).toBe('/order-manager/open');
+    expect(resolveNativeRouterLink(router, '/inflight').href).toBe('/order-manager/inflight');
+    expect(resolveNativeRouterLink(router, '/packed').href).toBe('/order-manager/packed');
+    expect(resolveNativeRouterLink(router, '/unfillable').href).toBe('/order-manager/unfillable');
   });
 
   it('resolves known and purpose-specific hold links to native href strings', () => {
