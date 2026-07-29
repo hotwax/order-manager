@@ -1,9 +1,41 @@
 import type { RouteLocationRaw, Router } from 'vue-router';
 
 type RouteResolver = Pick<Router, 'resolve'>;
+type RouteNavigator = Pick<Router, 'push'>;
 
-function resolveRouterLink(router: RouteResolver, route: RouteLocationRaw) {
-  return router.resolve(route).href;
+export interface NativeRouterLink {
+  href: string;
+  to: RouteLocationRaw;
+}
+
+function resolveRouterLink(
+  router: RouteResolver,
+  route: RouteLocationRaw
+): NativeRouterLink {
+  return {
+    href: router.resolve(route).href,
+    to: route,
+  };
+}
+
+export function navigateNativeRouterLink(
+  event: MouseEvent,
+  router: RouteNavigator,
+  link: NativeRouterLink
+) {
+  if (
+    event.defaultPrevented
+    || event.button !== 0
+    || event.metaKey
+    || event.altKey
+    || event.ctrlKey
+    || event.shiftKey
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  return router.push(link.to);
 }
 
 export function resolveVirtualLocationRouterLink(

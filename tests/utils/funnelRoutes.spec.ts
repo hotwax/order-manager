@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createMemoryHistory, createRouter } from 'vue-router';
 import {
+  navigateNativeRouterLink,
   resolveHoldTaskRouterLink,
   resolveVirtualLocationRouterLink,
   resolveWorkflowRouterLink
@@ -35,11 +36,11 @@ describe('Funnel router links', () => {
       facilityIds: ['_NA_', 'FACILITY & WEST']
     });
 
-    expect(unfillable).toBe('/order-manager/unfillable');
-    expect(brokering).toBe(
+    expect(unfillable.href).toBe('/order-manager/unfillable');
+    expect(brokering.href).toBe(
       '/order-manager/brokering?facilityId=_NA_&facilityId=FACILITY+%26+WEST'
     );
-    expect([unfillable, brokering]).not.toContain('[object Object]');
+    expect([unfillable.href, brokering.href]).not.toContain('[object Object]');
   });
 
   it('resolves facility workflow links with an escaped facility id', () => {
@@ -48,10 +49,10 @@ describe('Funnel router links', () => {
     const open = resolveWorkflowRouterLink(router, '/open', 'FACILITY=A&B');
     const inflight = resolveWorkflowRouterLink(router, '/inflight', 'FACILITY=A&B');
 
-    expect(open).toBe(
+    expect(open.href).toBe(
       '/order-manager/open?facilityId=FACILITY=A%26B'
     );
-    expect(inflight).toBe(
+    expect(inflight.href).toBe(
       '/order-manager/inflight?facilityId=FACILITY=A%26B'
     );
   });
@@ -59,17 +60,44 @@ describe('Funnel router links', () => {
   it('resolves known and purpose-specific hold links to native href strings', () => {
     const router = makeRouter();
 
-    expect(resolveHoldTaskRouterLink(router, 'NEG_RES_REVIEW')).toBe(
+    expect(resolveHoldTaskRouterLink(router, 'NEG_RES_REVIEW').href).toBe(
       '/order-manager/swap'
     );
-    expect(resolveHoldTaskRouterLink(router, 'INVALID_ADDRESS')).toBe(
+    expect(resolveHoldTaskRouterLink(router, 'INVALID_ADDRESS').href).toBe(
       '/order-manager/bad-address'
     );
-    expect(resolveHoldTaskRouterLink(router, 'REVIEW_RISK_ORDER')).toBe(
+    expect(resolveHoldTaskRouterLink(router, 'REVIEW_RISK_ORDER').href).toBe(
       '/order-manager/fraud'
     );
-    expect(resolveHoldTaskRouterLink(router, 'ORD_HOLD=A&B')).toBe(
+    expect(resolveHoldTaskRouterLink(router, 'ORD_HOLD=A&B').href).toBe(
       '/order-manager/hold?purpose=ORD_HOLD=A%26B'
     );
+  });
+
+  it('uses Vue Router only for unmodified primary clicks', async () => {
+    const router = makeRouter();
+    const push = vi.spyOn(router, 'push');
+    const link = resolveHoldTaskRouterLink(router, 'ORD_HOLD_MANUAL');
+    const primaryClick = new MouseEvent('click', {
+      button: 0,
+      cancelable: true,
+    });
+
+    await navigateNativeRouterLink(primaryClick, router, link);
+
+    expect(primaryClick.defaultPrevented).toBe(true);
+    expect(push).toHaveBeenCalledWith(link.to);
+
+    push.mockClear();
+    const modifierClick = new MouseEvent('click', {
+      button: 0,
+      ctrlKey: true,
+      cancelable: true,
+    });
+
+    navigateNativeRouterLink(modifierClick, router, link);
+
+    expect(modifierClick.defaultPrevented).toBe(false);
+    expect(push).not.toHaveBeenCalled();
   });
 });

@@ -5,7 +5,8 @@
       :key="holdTask.workEffortPurposeTypeId"
       button
       :detail="true"
-      :router-link="holdTaskRoute(holdTask.workEffortPurposeTypeId)"
+      :href="holdTaskRoute(holdTask.workEffortPurposeTypeId).href"
+      @click="navigateToLink($event, holdTaskRoute(holdTask.workEffortPurposeTypeId))"
     >
       <ion-label>{{ holdTaskLabel(holdTask) }}</ion-label>
       <p slot="end">{{ holdTask.taskCount }} {{ translate("tasks") }}</p>
@@ -18,7 +19,11 @@ import { IonItem, IonLabel, IonList } from '@ionic/vue';
 import { translate } from '@common';
 import { useRouter } from 'vue-router';
 import type { HoldTaskCount } from '@/types/customerService';
-import { resolveHoldTaskRouterLink } from '@/utils/funnelRoutes';
+import {
+  navigateNativeRouterLink,
+  resolveHoldTaskRouterLink,
+  type NativeRouterLink
+} from '@/utils/funnelRoutes';
 
 defineProps<{
   holdTaskCounts: HoldTaskCount[];
@@ -39,5 +44,9 @@ function holdTaskLabel(holdTask: HoldTaskCount) {
 
 function holdTaskRoute(workEffortPurposeTypeId: string) {
   return resolveHoldTaskRouterLink(router, workEffortPurposeTypeId);
+}
+
+function navigateToLink(event: MouseEvent, link: NativeRouterLink) {
+  return navigateNativeRouterLink(event, router, link);
 }
 </script>
