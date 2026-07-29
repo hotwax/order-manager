@@ -8,6 +8,20 @@ import { useOrderDetailStore } from "./orderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useProductStore } from "@/store/productStore";
 
+const PRODUCT_STORE_BOOTSTRAP_TIMEOUT_MS = 10_000;
+
+async function waitForProductStoreBootstrap(initialization: Promise<unknown>) {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const result = await Promise.race([
+    initialization.then(() => 'initialized' as const),
+    new Promise<'timeout'>((resolve) => {
+      timeoutId = setTimeout(() => resolve('timeout'), PRODUCT_STORE_BOOTSTRAP_TIMEOUT_MS);
+    })
+  ]);
+  if (timeoutId !== undefined) clearTimeout(timeoutId);
+  return result;
+}
+
 export const useUserStore = defineStore("user", {
   state: () => ({
     current: {} as any,
@@ -160,16 +174,54 @@ export const useUserStore = defineStore("user", {
       try {
         await this.fetchUserProfile();
         this.oms = cookieHelper().get("oms") || "";
+        const productStore = useProductStore();
+        const loginUserId = this.current.userId;
+        const loginOms = this.oms;
+        const productStoreSessionVersion = productStore.startProductStoreSession(
+          loginUserId,
+          loginOms
+        );
+        const isLoginProductStoreSessionActive = () => (
+          this.current.userId === loginUserId
+          && this.oms === loginOms
+          && productStore.isProductStoreSessionActive(
+            loginUserId,
+            loginOms,
+            productStoreSessionVersion
+          )
+        );
         await this.fetchPermissions();
-        await useProductStore().fetchProductStores();
-        await useProductStore().fetchProductStorePreference();
-        const productStoreIds = (useProductStore().getProductStores || []).map((store: any) => store.productStoreId).filter(Boolean);
-        await useSeedStore().loadInitialSeedData(productStoreIds);
+        if (!isLoginProductStoreSessionActive()) return;
+        const productStoreInitialization = productStore.initializeProductStoreSelection();
+        const bootstrapResult = await waitForProductStoreBootstrap(productStoreInitialization);
+        const loadProductStoreSeedData = async () => {
+          if (!isLoginProductStoreSessionActive()) return;
+          const productStoreIds = (productStore.getProductStores || [])
+            .map((store: any) => store.productStoreId)
+            .filter(Boolean);
+          await useSeedStore().loadInitialSeedData(productStoreIds);
+        };
+
+        if (bootstrapResult === 'timeout') {
+          logger.warn(`Product store initialization is still pending after ${PRODUCT_STORE_BOOTSTRAP_TIMEOUT_MS}ms`);
+          void productStoreInitialization
+            .then(() => {
+              return loadProductStoreSeedData();
+            })
+            .catch((error) => logger.error("Failed to finish product store initialization after login", error));
+          return;
+        }
+
+        await loadProductStoreSeedData();
       } catch (error: any) {
         return Promise.reject(error);
       }
     },
+    async preLogout() {
+      useProductStore().resetProductStoreSession();
+    },
     async postLogout() {
+      useProductStore().resetProductStoreSession();
       useSeedStore().resetSeedData();
       useOrderDetailStore().reset();
       useProductCacheStore().reset();

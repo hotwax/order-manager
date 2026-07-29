@@ -50,6 +50,7 @@ const app = createApp(App)
 
 initialiseConfig({
   postLogin: useUserStore().postLogin,
+  preLogout: useUserStore().preLogout,
   postLogout: useUserStore().postLogout,
   get oms() { return useUserStore().oms },
   set oms(val) { useUserStore().oms = val },
@@ -60,7 +61,7 @@ initialiseConfig({
 
 app.use(router)
 
-router.isReady().then(async () => {
+router.isReady().then(() => {
   app.directive('image-preview', imagePreview)
   app.mount('#app');
 
