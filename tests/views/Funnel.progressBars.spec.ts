@@ -171,7 +171,7 @@ describe('Funnel progress bar accessibility', () => {
       'translated:Assigned to fulfillment',
       'translated:In flight',
       'translated:Packed and shipped',
-      'Outlet One: translated:Order Volume',
+      'Outlet One: 7 orders',
     ]);
     expect(progressBars.map((bar) => Number(bar.attributes('aria-valuenow')))).toEqual([
       0.8,
@@ -181,19 +181,21 @@ describe('Funnel progress bar accessibility', () => {
     ]);
   });
 
-  it('names the facility bar from its facility and translated active metric', async () => {
+  it('names the facility bar from its facility and the metric represented by the bar', async () => {
     const wrapper = mount(Funnel);
     const facilityProgressBar = () => wrapper.findAll('[role="progressbar"]').at(-1)!;
 
-    expect(facilityProgressBar().attributes('aria-label')).toBe('Outlet One: translated:Order Volume');
+    expect(facilityProgressBar().attributes('aria-label')).toBe('Outlet One: 7 orders');
 
     (wrapper.vm as any).selectedDimension = 'velocity';
     await nextTick();
-    expect(facilityProgressBar().attributes('aria-label')).toBe('Outlet One: translated:Fulfillment Velocity');
+    expect(facilityProgressBar().attributes('aria-label')).toBe('Outlet One: 50% velocity (5/10 orders)');
 
     (wrapper.vm as any).selectedDimension = 'rejections';
     await nextTick();
-    expect(facilityProgressBar().attributes('aria-label')).toBe('Outlet One: translated:Rejections');
+    expect(facilityProgressBar().attributes('aria-label')).toBe(
+      'Outlet One: 7 translated:active orders, 2 translated:rejected orders'
+    );
     expect(Number(facilityProgressBar().attributes('aria-valuenow'))).toBe(1);
   });
 });

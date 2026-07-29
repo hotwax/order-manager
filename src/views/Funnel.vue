@@ -214,7 +214,7 @@
               <ion-progress-bar
                 :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0"
                 color="primary"
-                :aria-label="`${item.name}: ${facilityDimensionLabel}`"
+                :aria-label="`${item.name}: ${item.label}`"
               />
             </div>
           </ion-item>
@@ -797,11 +797,6 @@ const facilityMetricKey = computed<DashboardStatusKey>(() => {
   if (selectedDimension.value === 'velocity') return 'facilityFulfillmentVelocity';
   if (selectedDimension.value === 'rejections') return 'facilityRejections';
   return 'facilityOrderVolume';
-});
-const facilityDimensionLabel = computed(() => {
-  if (selectedDimension.value === 'velocity') return translate('Fulfillment Velocity');
-  if (selectedDimension.value === 'rejections') return translate('Rejections');
-  return translate('Order Volume');
 });
 const facilityMetricsLoading = computed(() => store.isDashboardGroupLoading(facilityMetricKey.value));
 const facilityMetricsError = computed(() => store.isDashboardGroupError(facilityMetricKey.value));
