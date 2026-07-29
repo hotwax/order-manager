@@ -195,7 +195,7 @@ describe('Funnel progress bar accessibility', () => {
       'translated:Assigned to fulfillment',
       'translated:In flight',
       'translated:Packed and shipped',
-      'Outlet One: 7 orders',
+      'Outlet One: 7 translated:orders',
     ]);
     expect(progressBars.map((bar) => Number(bar.attributes('aria-valuenow')))).toEqual([
       0.8,
@@ -209,11 +209,13 @@ describe('Funnel progress bar accessibility', () => {
     const wrapper = mountFunnel();
     const facilityProgressBar = () => wrapper.findAll('[role="progressbar"]').at(-1)!;
 
-    expect(facilityProgressBar().attributes('aria-label')).toBe('Outlet One: 7 orders');
+    expect(facilityProgressBar().attributes('aria-label')).toBe('Outlet One: 7 translated:orders');
 
     (wrapper.vm as any).selectedDimension = 'velocity';
     await nextTick();
-    expect(facilityProgressBar().attributes('aria-label')).toBe('Outlet One: 50% velocity (5/10 orders)');
+    expect(facilityProgressBar().attributes('aria-label')).toBe(
+      'Outlet One: 50% translated:velocity (5/10 translated:orders)'
+    );
 
     (wrapper.vm as any).selectedDimension = 'rejections';
     await nextTick();
@@ -238,6 +240,60 @@ describe('Funnel progress bar accessibility', () => {
       );
       expect(Number(facilityProgressBar.attributes('aria-valuenow'))).toBe(1);
     } finally {
+      delete velocityRow.activeFacilityFallback;
+    }
+  });
+
+  it('uses localized singular facility metric names', async () => {
+    const volumeRow = mocks.customerServiceStore.getFacilityOrderVolume[0] as any;
+    const velocityRow = mocks.customerServiceStore.getFacilityFulfillmentVelocity[0] as any;
+    const rejectionRow = mocks.customerServiceStore.getFacilityRejections[0] as any;
+    const originalValues = {
+      volumeCount: volumeRow.lastOrderCount,
+      velocityCount: velocityRow.lastOrderCount,
+      shipGroupCount: velocityRow.shipGroupCount,
+      rejectionCount: rejectionRow.lastOrderCount,
+      rejectedShipGroupCount: rejectionRow.rejectedShipGroupCount,
+    };
+
+    volumeRow.lastOrderCount = 1;
+    velocityRow.lastOrderCount = 1;
+    velocityRow.shipGroupCount = 1;
+    rejectionRow.lastOrderCount = 1;
+    rejectionRow.rejectedShipGroupCount = 1;
+
+    try {
+      const wrapper = mountFunnel();
+      const facilityProgressBar = () => wrapper.findAll('[role="progressbar"]').at(-1)!;
+
+      expect(facilityProgressBar().attributes('aria-label')).toBe('Outlet One: 1 translated:order');
+
+      (wrapper.vm as any).selectedDimension = 'velocity';
+      await nextTick();
+      expect(facilityProgressBar().attributes('aria-label')).toBe(
+        'Outlet One: 50% translated:velocity (1/1 translated:order)'
+      );
+
+      velocityRow.activeFacilityFallback = true;
+      (wrapper.vm as any).selectedDimension = 'volume';
+      await nextTick();
+      (wrapper.vm as any).selectedDimension = 'velocity';
+      await nextTick();
+      expect(facilityProgressBar().attributes('aria-label')).toBe(
+        'Outlet One: 1 translated:active order'
+      );
+
+      (wrapper.vm as any).selectedDimension = 'rejections';
+      await nextTick();
+      expect(facilityProgressBar().attributes('aria-label')).toBe(
+        'Outlet One: 1 translated:active order, 1 translated:rejected order'
+      );
+    } finally {
+      volumeRow.lastOrderCount = originalValues.volumeCount;
+      velocityRow.lastOrderCount = originalValues.velocityCount;
+      velocityRow.shipGroupCount = originalValues.shipGroupCount;
+      rejectionRow.lastOrderCount = originalValues.rejectionCount;
+      rejectionRow.rejectedShipGroupCount = originalValues.rejectedShipGroupCount;
       delete velocityRow.activeFacilityFallback;
     }
   });
