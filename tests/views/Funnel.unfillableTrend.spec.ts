@@ -133,7 +133,8 @@ vi.mock('@common', () => ({
     name: 'Sparkline',
     props: {
       points: Array,
-      color: String
+      color: String,
+      ariaLabel: String
     },
     template: '<div data-testid="sparkline" />'
   },
@@ -195,6 +196,7 @@ describe('Funnel Unfillable sparkline', () => {
     expect(unfillableCard?.props('stat')).toBe(358);
     expect(unfillableCard?.text()).toContain('Entries into Unfillable today');
     expect(sparkline.props('points')).toHaveLength(24);
+    expect(sparkline.props('ariaLabel')).toBe('Entries into Unfillable today');
     expect((sparkline.props('points') as number[])[11]).toBe(5);
     expect((sparkline.props('points') as number[]).reduce((sum, count) => sum + count, 0)).toBe(5);
   });
