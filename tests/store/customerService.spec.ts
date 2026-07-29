@@ -56,6 +56,16 @@ vi.mock('@/utils/dashboardDate', () => ({
   getDashboardDateFilter: vi.fn(() => '2026-07-04'),
 }));
 
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 describe('customer service funnel facility metrics', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -222,6 +232,98 @@ describe('customer service Unfillable Funnel metrics', () => {
     expect(store.getDashboardStatus('unfillable')).toBe('success');
     expect(store.getDashboardStatus('unfillableTrend')).toBe('error');
     expect(errorSpy).toHaveBeenCalledWith('Failed to fetch Unfillable trend', trendError);
+    errorSpy.mockRestore();
+  });
+
+  it('ignores an older trend response that resolves after a newer store response', async () => {
+    const storeATrend = deferred<Awaited<ReturnType<typeof fetchUnfillableHourlyCounts>>>();
+    const storeBTrend = deferred<Awaited<ReturnType<typeof fetchUnfillableHourlyCounts>>>();
+    const storeABuckets = Array.from({ length: 24 }, (_, hourOfDay) => ({
+      hourOfDay,
+      orderCount: hourOfDay === 4 ? 9 : 0
+    }));
+    const storeBBuckets = Array.from({ length: 24 }, (_, hourOfDay) => ({
+      hourOfDay,
+      orderCount: hourOfDay === 16 ? 3 : 0
+    }));
+    vi.mocked(fetchUnfillableHourlyCounts)
+      .mockImplementationOnce(() => storeATrend.promise)
+      .mockImplementationOnce(() => storeBTrend.promise);
+
+    const store = useCustomerServiceStore();
+    const storeARequest = store.fetchUnfillableTrend('STORE_A');
+    const storeBRequest = store.fetchUnfillableTrend('STORE_B');
+
+    storeBTrend.resolve(storeBBuckets);
+    await storeBRequest;
+    storeATrend.resolve(storeABuckets);
+    await storeARequest;
+
+    expect(store.getUnfillable.unfillableHourlyCounts).toEqual(storeBBuckets);
+    expect(store.unfillableTrend[16]).toBe(3);
+    expect(store.unfillableTrend[4]).toBe(0);
+    expect(store.getDashboardStatus('unfillableTrend')).toBe('success');
+  });
+
+  it('ignores an older backlog response that resolves after a newer store response', async () => {
+    const storeABacklog = deferred<Awaited<ReturnType<typeof searchOrders>>>();
+    const storeBBacklog = deferred<Awaited<ReturnType<typeof searchOrders>>>();
+    vi.mocked(searchOrders)
+      .mockImplementationOnce(() => storeABacklog.promise)
+      .mockImplementationOnce(() => storeBBacklog.promise);
+
+    const store = useCustomerServiceStore();
+    const storeARequest = store.fetchUnfillableBacklog('STORE_A');
+    const storeBRequest = store.fetchUnfillableBacklog('STORE_B');
+
+    storeBBacklog.resolve({ docs: [], total: 22 });
+    await storeBRequest;
+    storeABacklog.resolve({ docs: [], total: 11 });
+    await storeARequest;
+
+    expect(store.getUnfillable.totalCount).toBe(22);
+    expect(store.getDashboardStatus('unfillable')).toBe('success');
+  });
+
+  it('keeps current requests loading when stale trend and backlog failures settle first', async () => {
+    const staleTrend = deferred<Awaited<ReturnType<typeof fetchUnfillableHourlyCounts>>>();
+    const currentTrend = deferred<Awaited<ReturnType<typeof fetchUnfillableHourlyCounts>>>();
+    const staleBacklog = deferred<Awaited<ReturnType<typeof searchOrders>>>();
+    const currentBacklog = deferred<Awaited<ReturnType<typeof searchOrders>>>();
+    const currentBuckets = Array.from({ length: 24 }, (_, hourOfDay) => ({
+      hourOfDay,
+      orderCount: hourOfDay === 12 ? 6 : 0
+    }));
+    vi.mocked(fetchUnfillableHourlyCounts)
+      .mockImplementationOnce(() => staleTrend.promise)
+      .mockImplementationOnce(() => currentTrend.promise);
+    vi.mocked(searchOrders)
+      .mockImplementationOnce(() => staleBacklog.promise)
+      .mockImplementationOnce(() => currentBacklog.promise);
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const store = useCustomerServiceStore();
+    const staleTrendRequest = store.fetchUnfillableTrend('STORE_A');
+    const currentTrendRequest = store.fetchUnfillableTrend('STORE_B');
+    const staleBacklogRequest = store.fetchUnfillableBacklog('STORE_A');
+    const currentBacklogRequest = store.fetchUnfillableBacklog('STORE_B');
+
+    staleTrend.reject(new Error('stale trend failure'));
+    staleBacklog.reject(new Error('stale backlog failure'));
+    await Promise.all([staleTrendRequest, staleBacklogRequest]);
+
+    expect(store.getDashboardStatus('unfillableTrend')).toBe('loading');
+    expect(store.getDashboardStatus('unfillable')).toBe('loading');
+    expect(errorSpy).not.toHaveBeenCalled();
+
+    currentTrend.resolve(currentBuckets);
+    currentBacklog.resolve({ docs: [], total: 44 });
+    await Promise.all([currentTrendRequest, currentBacklogRequest]);
+
+    expect(store.getUnfillable.unfillableHourlyCounts).toEqual(currentBuckets);
+    expect(store.getUnfillable.totalCount).toBe(44);
+    expect(store.getDashboardStatus('unfillableTrend')).toBe('success');
+    expect(store.getDashboardStatus('unfillable')).toBe('success');
     errorSpy.mockRestore();
   });
 });

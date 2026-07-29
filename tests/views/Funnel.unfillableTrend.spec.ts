@@ -208,17 +208,23 @@ describe('Funnel Unfillable sparkline', () => {
     expect(mocks.retryBacklog).not.toHaveBeenCalled();
   });
 
-  it('retries only the backlog when the current queue count fails', async () => {
+  it('keeps a successful trend visible and retries only the backlog when the queue count fails', async () => {
     mocks.state.backlogError = true;
     const wrapper = mount(Funnel);
     const cards = wrapper.findAllComponents({ name: 'StatCard' });
     const unfillableCard = cards.find((card) => card.props('title') === 'Unfillable backlog')!;
+    const sparkline = unfillableCard.getComponent({ name: 'Sparkline' });
 
     expect(unfillableCard.element.tagName).toBe('SECTION');
     expect(unfillableCard.text()).toContain("Couldn't load this section");
+    expect(unfillableCard.text()).toContain('Entries into Unfillable today');
+    expect(sparkline.props('points')).toHaveLength(24);
+    expect((sparkline.props('points') as number[])[11]).toBe(5);
     expect(unfillableCard.element.querySelector('button button')).toBeNull();
 
-    await unfillableCard.get('button').trigger('click');
+    const backlogRetry = wrapper.get('.unfillable-backlog-retry');
+    expect(unfillableCard.element.contains(backlogRetry.element)).toBe(false);
+    await backlogRetry.trigger('click');
     expect(mocks.retryBacklog).toHaveBeenCalledWith('STORE_1');
     expect(mocks.retryTrend).not.toHaveBeenCalled();
   });
