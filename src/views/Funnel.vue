@@ -41,7 +41,7 @@
             <!-- Order Count today -->
             <h1 class="big-number">{{ (fulfillmentProgress.totalOrdersCount || 0).toLocaleString() }}</h1>
             <!-- Time since day start -->
-            <p class="time-elapsed">{{ new Date().getHours() }} {{ translate("hours since day start") }}</p>
+            <p class="time-elapsed">{{ hoursSinceDayStart }} {{ translate("hours since day start") }}</p>
           </div>
 
           <div class="metrics">
@@ -564,7 +564,8 @@ import {
   IonSpinner,
   onIonViewWillEnter
 } from '@ionic/vue';
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
+import { DateTime } from 'luxon';
 import {
   globeOutline,
   businessOutline,
@@ -587,12 +588,45 @@ import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
+import {
+  getDashboardDateRefreshKey,
+  getHoursSinceDayStart,
+  getMillisecondsUntilNextDashboardHour
+} from '@/utils/dashboardDate';
 
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
 const seedStore = useSeedStore();
 const userStore = useUserStore();
+const userTimeZone = computed(() => userStore.getUserTimeZone || userStore.getUserProfile?.userTimeZone);
+const dashboardNow = shallowRef(DateTime.now());
+const hoursSinceDayStart = computed(() => getHoursSinceDayStart(userTimeZone.value, dashboardNow.value));
+const dashboardDateRefreshKey = computed(
+  () => getDashboardDateRefreshKey(userTimeZone.value, dashboardNow.value)
+);
+let dashboardClockTimer: ReturnType<typeof setTimeout> | undefined;
+
+function clearDashboardClockTimer() {
+  if (dashboardClockTimer !== undefined) {
+    clearTimeout(dashboardClockTimer);
+    dashboardClockTimer = undefined;
+  }
+}
+
+function refreshDashboardClock() {
+  clearDashboardClockTimer();
+  dashboardNow.value = DateTime.now();
+  dashboardClockTimer = setTimeout(
+    refreshDashboardClock,
+    getMillisecondsUntilNextDashboardHour(userTimeZone.value, dashboardNow.value)
+  );
+}
+
+onMounted(refreshDashboardClock);
+onUnmounted(clearDashboardClockTimer);
+watch(userTimeZone, refreshDashboardClock);
+watch(dashboardDateRefreshKey, refreshDashboardData);
 
 // Per-section load status helpers. These drive loading affordances and error
 // states so the dashboard never renders default zeros/empty copy while a group
