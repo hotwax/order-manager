@@ -15,13 +15,14 @@ const IonListStub = defineComponent({
 
 const IonItemStub = defineComponent({
   name: 'IonItem',
+  emits: ['click'],
   props: {
-    routerLink: {
+    href: {
       type: String,
       required: true,
     },
   },
-  template: '<a class="hold-task-row" :href="routerLink" @click.prevent="$router.push(routerLink)"><slot /></a>',
+  template: '<a class="hold-task-row" :href="href" @click="$emit(\'click\', $event)"><slot /></a>',
 });
 
 const IonLabelStub = defineComponent({
@@ -68,7 +69,7 @@ describe('Funnel hold task rows', () => {
     const rows = wrapper.findAllComponents(IonItemStub);
 
     expect(rows).toHaveLength(6);
-    expect(rows.map((row) => row.props('routerLink'))).toEqual([
+    expect(rows.map((row) => row.props('href'))).toEqual([
       '/swap',
       '/bad-address',
       '/fraud',
@@ -96,6 +97,17 @@ describe('Funnel hold task rows', () => {
     await flushPromises();
 
     expect(router.currentRoute.value.path).toBe('/hold');
+    expect(router.currentRoute.value.query).toEqual({
+      purpose: 'ORD_HOLD_CUST_REQ',
+    });
+
+    rows[5].vm.$emit('click', new MouseEvent('click', {
+      button: 0,
+      ctrlKey: true,
+      cancelable: true,
+    }));
+    await flushPromises();
+
     expect(router.currentRoute.value.query).toEqual({
       purpose: 'ORD_HOLD_CUST_REQ',
     });

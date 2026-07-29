@@ -68,7 +68,8 @@
               :key="item.id"
               button
               :detail="true"
-              :router-link="virtualLocationRoute(item)"
+              :href="virtualLocationRoute(item).href"
+              @click="navigateToLink($event, virtualLocationRoute(item))"
             >
               <ion-label>{{ translate(item.label) }}</ion-label>
               <p slot="end">{{ formatCount(item.count) }} {{ translate(item.count === 1 ? "order" : "orders") }}</p>
@@ -280,11 +281,23 @@
               </ion-item>
             </div>
             <ion-list class="fulfill">
-              <ion-item lines="full" :button="true" :detail="true" :router-link="workflowRoute('/open')">
+              <ion-item
+                lines="full"
+                :button="true"
+                :detail="true"
+                :href="workflowRoute('/open').href"
+                @click="navigateToLink($event, workflowRoute('/open'))"
+              >
                 <ion-icon :icon="mailUnreadOutline" slot="start" />
                 <ion-label>{{ facilityFulfillmentProgress?.openCount ?? 0 }} {{ translate("open") }}</ion-label>
               </ion-item>
-              <ion-item lines="none" :button="true" :detail="true" :router-link="workflowRoute('/inflight')">
+              <ion-item
+                lines="none"
+                :button="true"
+                :detail="true"
+                :href="workflowRoute('/inflight').href"
+                @click="navigateToLink($event, workflowRoute('/inflight'))"
+              >
                 <ion-icon :icon="mailOpenOutline" slot="start" />
                 <ion-label>{{ facilityFulfillmentProgress?.inProgressCount ?? 0 }} {{ translate("in progress") }}</ion-label>
               </ion-item>
@@ -589,8 +602,10 @@ import { useUserStore } from '@/store/user';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 import {
+  navigateNativeRouterLink,
   resolveVirtualLocationRouterLink,
-  resolveWorkflowRouterLink
+  resolveWorkflowRouterLink,
+  type NativeRouterLink
 } from '@/utils/funnelRoutes';
 
 const store = useCustomerServiceStore();
@@ -1053,6 +1068,10 @@ watch(filteredFacilities, (newList) => {
 
 function workflowRoute(path: string) {
   return resolveWorkflowRouterLink(router, path, selectedFacilityId.value);
+}
+
+function navigateToLink(event: MouseEvent, link: NativeRouterLink) {
+  return navigateNativeRouterLink(event, router, link);
 }
 
 
