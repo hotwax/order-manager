@@ -712,6 +712,7 @@ const fulfillmentProgress = computed(() => store.getFulfillmentProgress);
 const brokeredWorkload = ref<WorkflowOrderTotals>({ open: 0, inflight: 0, packed: 0 });
 const brokeredWorkloadLoading = ref(false);
 const brokeredWorkloadError = ref(false);
+let brokeredWorkloadRequestGeneration = 0;
 const brokeredWorkloadTotal = computed(() =>
   brokeredWorkload.value.open + brokeredWorkload.value.inflight + brokeredWorkload.value.packed
 );
@@ -931,20 +932,37 @@ function fetchStoreDashboardData(productStoreId: string) {
   store.fetchHoldTasks(productStoreId);
 }
 
+function clearBrokeredWorkload() {
+  brokeredWorkloadRequestGeneration += 1;
+  brokeredWorkload.value = { open: 0, inflight: 0, packed: 0 };
+  brokeredWorkloadLoading.value = false;
+  brokeredWorkloadError.value = false;
+  orderStore.clearNavCounts(['open', 'inflight', 'packed']);
+}
+
 async function fetchBrokeredWorkload(productStoreId: string) {
+  const requestGeneration = ++brokeredWorkloadRequestGeneration;
   brokeredWorkloadLoading.value = true;
   brokeredWorkloadError.value = false;
+  orderStore.clearNavCounts(['open', 'inflight', 'packed']);
   try {
-    brokeredWorkload.value = await fetchWorkflowOrderTotals(productStoreId);
+    const workload = await fetchWorkflowOrderTotals(productStoreId);
+    if (requestGeneration !== brokeredWorkloadRequestGeneration) return;
+
+    brokeredWorkload.value = workload;
     // Share the brokered totals with the side-menu rollup badges (first-come preload).
-    orderStore.setNavCount('open', brokeredWorkload.value.open);
-    orderStore.setNavCount('inflight', brokeredWorkload.value.inflight);
-    orderStore.setNavCount('packed', brokeredWorkload.value.packed);
+    orderStore.setNavCount('open', workload.open);
+    orderStore.setNavCount('inflight', workload.inflight);
+    orderStore.setNavCount('packed', workload.packed);
   } catch (error) {
+    if (requestGeneration !== brokeredWorkloadRequestGeneration) return;
+
     console.error('Failed to fetch brokered workload totals', error);
     brokeredWorkloadError.value = true;
   } finally {
-    brokeredWorkloadLoading.value = false;
+    if (requestGeneration === brokeredWorkloadRequestGeneration) {
+      brokeredWorkloadLoading.value = false;
+    }
   }
 }
 
@@ -966,6 +984,9 @@ function refreshDashboardData() {
 watch(selectedProductStoreId, (productStoreId, previousProductStoreId) => {
   if (productStoreId !== previousProductStoreId) {
     selectedFacilityId.value = '';
+    clearBrokeredWorkload();
+    store.clearStoreDashboardData();
+    orderStore.clearPrimedNavCounts();
   }
   refreshDashboardData();
 });
@@ -974,6 +995,8 @@ watch(selectedFacilityId, (newFacilityId) => {
   if (newFacilityId && selectedProductStoreId.value) {
     store.fetchFacilityFulfillmentProgress(newFacilityId, selectedProductStoreId.value);
     store.fetchFulfillmentSyncData(newFacilityId, selectedProductStoreId.value);
+  } else {
+    store.clearFacilityDashboardData();
   }
 });
 
@@ -1144,13 +1167,13 @@ const maxMetricValue = computed(() => {
   return filteredFacilities.value[0].value || 1;
 });
 
-watch(filteredFacilities, (newList) => {
+watch([filteredFacilities, facilityMetricsLoading], ([newList, isLoading]) => {
   if (newList.length > 0) {
     const exists = newList.some(item => item.facilityId === selectedFacilityId.value);
     if (!exists) {
       selectedFacilityId.value = newList[0].facilityId;
     }
-  } else {
+  } else if (!isLoading) {
     selectedFacilityId.value = '';
   }
 });

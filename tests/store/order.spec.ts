@@ -4,6 +4,11 @@ import { api } from '@common';
 import { useOrderStore } from '@/store/order';
 import { fetchOrderRowEnrichment } from '@/services/order';
 
+const mocks = vi.hoisted(() => ({
+  fetchBrokeringCount: vi.fn(),
+  loggerError: vi.fn(),
+}));
+
 vi.mock('@common', () => ({
   api: vi.fn(),
   cookieHelper: vi.fn(() => ({
@@ -11,6 +16,7 @@ vi.mock('@common', () => ({
     set: vi.fn(),
     remove: vi.fn(),
   })),
+  logger: { error: mocks.loggerError },
 }));
 
 vi.mock('@/store/seed', () => ({
@@ -20,10 +26,32 @@ vi.mock('@/store/seed', () => ({
   })),
 }));
 
+vi.mock('@/store/productStore', () => ({
+  useProductStore: vi.fn(() => ({
+    currentProductStore: {},
+  })),
+}));
+
 vi.mock('@/services/order', () => ({
   searchOrders: vi.fn(),
   fetchOrderRowEnrichment: vi.fn(),
 }));
+
+vi.mock('@/services/navCounts', () => ({
+  queueCountFetchers: {
+    brokering: mocks.fetchBrokeringCount,
+  },
+}));
+
+function deferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 describe('order workflow store', () => {
   beforeEach(() => {
@@ -32,6 +60,70 @@ describe('order workflow store', () => {
     vi.mocked(api).mockResolvedValue({ data: {} });
     vi.mocked(fetchOrderRowEnrichment).mockReset();
     vi.mocked(fetchOrderRowEnrichment).mockResolvedValue({});
+    mocks.fetchBrokeringCount.mockReset();
+    mocks.loggerError.mockReset();
+  });
+
+  it('keeps only the latest store-scoped navigation count when priming overlaps', async () => {
+    const storeA = deferred<number>();
+    const storeB = deferred<number>();
+    mocks.fetchBrokeringCount
+      .mockImplementationOnce(() => storeA.promise)
+      .mockImplementationOnce(() => storeB.promise);
+
+    const store = useOrderStore();
+    store.navCounts.brokering = 99;
+    const storeARequest = store.primeNavCounts('STORE_A');
+    expect(store.navCounts.brokering).toBeUndefined();
+    const storeBRequest = store.primeNavCounts('STORE_B');
+
+    storeB.resolve(4);
+    await storeBRequest;
+    storeA.resolve(40);
+    await storeARequest;
+
+    expect(mocks.fetchBrokeringCount.mock.calls).toEqual([['STORE_A'], ['STORE_B']]);
+    expect(store.navCounts.brokering).toBe(4);
+  });
+
+  it('invalidates an in-flight navigation count when the store scope is cleared', async () => {
+    const staleRequest = deferred<number>();
+    mocks.fetchBrokeringCount.mockImplementationOnce(() => staleRequest.promise);
+
+    const store = useOrderStore();
+    const stalePrime = store.primeNavCounts('STORE_A');
+    store.clearPrimedNavCounts();
+    staleRequest.resolve(12);
+    await stalePrime;
+
+    expect(store.navCounts.brokering).toBeUndefined();
+    expect(mocks.loggerError).not.toHaveBeenCalled();
+  });
+
+  it('ignores a stale navigation failure and still reports the latest failure', async () => {
+    const staleRequest = deferred<number>();
+    const currentRequest = deferred<number>();
+    mocks.fetchBrokeringCount
+      .mockImplementationOnce(() => staleRequest.promise)
+      .mockImplementationOnce(() => currentRequest.promise);
+
+    const store = useOrderStore();
+    const stalePrime = store.primeNavCounts('STORE_A');
+    const currentPrime = store.primeNavCounts('STORE_B');
+
+    staleRequest.reject(new Error('stale nav failure'));
+    await stalePrime;
+    expect(mocks.loggerError).not.toHaveBeenCalled();
+
+    const currentError = new Error('current nav failure');
+    currentRequest.reject(currentError);
+    await currentPrime;
+    expect(mocks.loggerError).toHaveBeenCalledOnce();
+    expect(mocks.loggerError).toHaveBeenCalledWith(
+      'Failed to prime the brokering nav count',
+      currentError
+    );
+    expect(store.navCounts.brokering).toBeUndefined();
   });
 
   it('ships selected packed workflow shipments through Poorti bulk ship', async () => {

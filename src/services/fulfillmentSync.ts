@@ -34,7 +34,12 @@ export interface FulfillmentSyncData {
   rawProfile: any;
 }
 
-export async function getPickProfileGroups(params?: any): Promise<any[]> {
+export async function getPickProfileGroups(
+  params?: any,
+  onError: (error: unknown) => void = (error) => {
+    console.error('Failed to get pick profile groups from server', error);
+  }
+): Promise<any[]> {
   try {
     const response = await api({
       url: 'poorti/pickProfile/groups',
@@ -44,7 +49,7 @@ export async function getPickProfileGroups(params?: any): Promise<any[]> {
     const list = response.data;
     return Array.isArray(list) ? list : list?.entityValueList || [];
   } catch (error) {
-    console.error('Failed to get pick profile groups from server', error);
+    onError(error);
     return [];
   }
 }
