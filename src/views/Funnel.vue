@@ -82,15 +82,30 @@
             <ion-spinner name="crescent" />
           </template>
           <ion-list v-if="!brokeredWorkloadLoading" lines="none" class="hold-tasks-list">
-            <ion-item button :detail="true" router-link="/open">
+            <ion-item
+              button
+              :detail="true"
+              :href="dashboardRoute('/open').href"
+              @click="navigateToLink($event, dashboardRoute('/open'))"
+            >
               <ion-label>{{ translate("Open") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.open) }} {{ translate(brokeredWorkload.open === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" router-link="/inflight">
+            <ion-item
+              button
+              :detail="true"
+              :href="dashboardRoute('/inflight').href"
+              @click="navigateToLink($event, dashboardRoute('/inflight'))"
+            >
               <ion-label>{{ translate("Picked") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.inflight) }} {{ translate(brokeredWorkload.inflight === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" router-link="/packed">
+            <ion-item
+              button
+              :detail="true"
+              :href="dashboardRoute('/packed').href"
+              @click="navigateToLink($event, dashboardRoute('/packed'))"
+            >
               <ion-label>{{ translate("Packed and shipped") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.packed) }} {{ translate(brokeredWorkload.packed === 1 ? "order" : "orders") }}</p>
             </ion-item>
@@ -115,9 +130,10 @@
         <div class="unfillable-card-shell">
           <StatCard
             :button="!unfillableError"
-            :router-link="unfillableError ? undefined : '/unfillable'"
+            :href="unfillableError ? undefined : dashboardRoute('/unfillable').href"
             :title="translate('Unfillable backlog')"
             :stat="unfillableLoading || unfillableError ? '' : totalUnfillable"
+            @click="unfillableError ? undefined : navigateToLink($event, dashboardRoute('/unfillable'))"
           >
             <template v-if="unfillableLoading || unfillableError" #stat>
               <ion-icon v-if="unfillableError" :icon="alertCircleOutline" color="danger" />
@@ -632,6 +648,7 @@ import {
 } from '@/utils/dashboardDate';
 import {
   navigateNativeRouterLink,
+  resolveNativeRouterLink,
   resolveVirtualLocationRouterLink,
   resolveWorkflowRouterLink,
   type NativeRouterLink
@@ -982,6 +999,11 @@ function formatCount(value: number) {
   return countValue(value).toLocaleString();
 }
 
+function formatLocalizedCount(value: unknown, singular: string, plural: string) {
+  const count = countValue(value);
+  return `${formatCount(count)} ${translate(count === 1 ? singular : plural)}`;
+}
+
 const fulfillmentStats = computed(() => {
   const fp = fulfillmentProgress.value || {};
   const totalShipGroups = countValue(fp.totalShipGroupsCount);
@@ -1087,7 +1109,7 @@ const filteredFacilities = computed(() => {
       facilityId: item.facilityId,
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.lastOrderCount,
-      label: `${item.lastOrderCount} orders`
+      label: formatLocalizedCount(item.lastOrderCount, 'order', 'orders')
     }));
   } else if (selectedDimension.value === 'velocity') {
     list = facilityFulfillmentVelocity.value.map(item => ({
@@ -1095,8 +1117,8 @@ const filteredFacilities = computed(() => {
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.activeFacilityFallback ? item.lastOrderCount : (item.fulfillmentVelocity || 0),
       label: item.activeFacilityFallback
-        ? `${item.lastOrderCount || 0} ${translate("active orders")}`
-        : `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
+        ? formatLocalizedCount(item.lastOrderCount, 'active order', 'active orders')
+        : `${Math.round((item.fulfillmentVelocity || 0) * 100)}% ${translate("velocity")} (${formatCount(item.shipGroupCount || 0)}/${formatLocalizedCount(item.lastOrderCount, 'order', 'orders')})`
     }));
   } else if (selectedDimension.value === 'rejections') {
     list = facilityRejections.value.map(item => ({
@@ -1104,8 +1126,8 @@ const filteredFacilities = computed(() => {
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.lastOrderCount || 0,
       label: item.rejectedShipGroupCount
-        ? `${item.lastOrderCount || 0} ${translate("active orders")}, ${item.rejectedShipGroupCount} ${translate("rejected orders")}`
-        : `${item.lastOrderCount || 0} ${translate("active orders")}`
+        ? `${formatLocalizedCount(item.lastOrderCount, 'active order', 'active orders')}, ${formatLocalizedCount(item.rejectedShipGroupCount, 'rejected order', 'rejected orders')}`
+        : formatLocalizedCount(item.lastOrderCount, 'active order', 'active orders')
     }));
   }
 
@@ -1135,6 +1157,10 @@ watch(filteredFacilities, (newList) => {
 
 function workflowRoute(path: string) {
   return resolveWorkflowRouterLink(router, path, selectedFacilityId.value);
+}
+
+function dashboardRoute(path: string) {
+  return resolveNativeRouterLink(router, path);
 }
 
 function navigateToLink(event: MouseEvent, link: NativeRouterLink) {

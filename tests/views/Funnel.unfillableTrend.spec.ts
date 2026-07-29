@@ -17,6 +17,12 @@ const mocks = vi.hoisted(() => {
     state,
     retryBacklog,
     retryTrend,
+    router: {
+      resolve: vi.fn((route: string | { path: string }) => ({
+        href: typeof route === 'string' ? route : route.path
+      })),
+      push: vi.fn()
+    },
     customerServiceStore: {
       isDashboardGroupLoading: () => false,
       isDashboardGroupError: (key: string) =>
@@ -63,6 +69,10 @@ const mocks = vi.hoisted(() => {
     },
   };
 });
+
+vi.mock('vue-router', () => ({
+  useRouter: () => mocks.router,
+}));
 
 vi.mock('@ionic/vue', () => {
   const component = { template: '<div><slot /></div>' };
