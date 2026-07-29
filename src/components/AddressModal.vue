@@ -3,8 +3,8 @@
     <ion-toolbar>
       <ion-title>{{ translate("Shipping address") }}</ion-title>
       <ion-buttons slot="end" @click="close()">
-        <ion-button>
-          <ion-icon :icon="closeOutline" />
+        <ion-button :aria-label="translate('Close')">
+          <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
     </ion-toolbar>
