@@ -18,6 +18,9 @@ export const useUserStore = defineStore("user", {
     },
     timeZones: [] as any[],
     oms: "",
+    // The app version this deployment is pinned to. undefined = not resolved yet, "" = no version
+    // configured, "vX.Y.Z" = pinned. Resolved from the OMS by useAuth().fetchAppVersion() on Login.
+    appVersion: undefined as string | undefined,
     fetchStatus: {
       profile: "none",
       permissions: "none"
@@ -26,6 +29,7 @@ export const useUserStore = defineStore("user", {
   getters: {
     getPermissions: (state) => state.permissions,
     getUserProfile: (state) => state.current,
+    getAppVersion: (state) => state.appVersion,
     getPwaState: (state) => state.pwaState,
     getUserTimeZone: (state) => state.current.timeZone,
     getAvailableTimeZones: (state) => state.timeZones,
