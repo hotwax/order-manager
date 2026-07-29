@@ -325,6 +325,9 @@ export const useCustomerServiceStore = defineStore('customerService', {
     } as Record<WorkflowBucket, string[]>,
     lastAction: '' as string,
     fulfillmentSyncData: null as any,
+    // A newer store/day fetch must always win when requests resolve out of order.
+    unfillableBacklogRequestGeneration: 0,
+    unfillableTrendRequestGeneration: 0,
     // Per-group load status for the funnel dashboard metric groups.
     dashboardStatus: emptyDashboardStatus()
   }),
@@ -417,24 +420,31 @@ export const useCustomerServiceStore = defineStore('customerService', {
       }
     },
     async fetchUnfillableTrend(productStoreId: string) {
+      const requestGeneration = ++this.unfillableTrendRequestGeneration;
       this.dashboardStatus.unfillableTrend = 'loading';
       // Do not retain the prior store's hourly trend while a new selection loads
       // or if the strict transition endpoint rejects the request.
       this.unfillable.unfillableHourlyCounts = [];
       try {
         const userProfile = useUserStore().current;
-        this.unfillable.unfillableHourlyCounts = await fetchUnfillableHourlyCounts(
+        const hourlyCounts = await fetchUnfillableHourlyCounts(
           productStoreId,
           userProfile?.timeZone || userProfile?.userTimeZone
         );
+        if (requestGeneration !== this.unfillableTrendRequestGeneration) return;
+
+        this.unfillable.unfillableHourlyCounts = hourlyCounts;
         this.dashboardStatus.unfillableTrend = 'success';
       } catch (error) {
+        if (requestGeneration !== this.unfillableTrendRequestGeneration) return;
+
         console.error('Failed to fetch Unfillable trend', error);
         this.dashboardStatus.unfillableTrend = 'error';
       }
     },
 
     async fetchUnfillableBacklog(productStoreId: string) {
+      const requestGeneration = ++this.unfillableBacklogRequestGeneration;
       this.dashboardStatus.unfillable = 'loading';
       try {
         // Card count is the full unfillable queue (matches the Unfillable page), not today-scoped.
@@ -448,6 +458,8 @@ export const useCustomerServiceStore = defineStore('customerService', {
         }
 
         const solrResult = await searchOrders(solrParams);
+        if (requestGeneration !== this.unfillableBacklogRequestGeneration) return;
+
         this.unfillable.totalCount = solrResult.total || 0;
         // Publish the Unfillable side-menu badge from the same full-queue count.
         // Best-effort: a badge-publish failure must not fail the dashboard fetch.
@@ -458,6 +470,8 @@ export const useCustomerServiceStore = defineStore('customerService', {
         }
         this.dashboardStatus.unfillable = 'success';
       } catch (error) {
+        if (requestGeneration !== this.unfillableBacklogRequestGeneration) return;
+
         console.error('Failed to fetch Unfillable backlog', error);
         this.dashboardStatus.unfillable = 'error';
       }

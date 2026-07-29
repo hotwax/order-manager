@@ -112,11 +112,20 @@
         <!-- Card 2: backlog total with a separate today-entry trend -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: current queue backlog; sparkline: first Unfillable entries by local hour today -->
-        <div v-if="!unfillableError" class="unfillable-card-shell">
-          <StatCard button router-link="/unfillable" :title="translate('Unfillable backlog')" :stat="unfillableLoading ? '' : totalUnfillable">
-            <template v-if="unfillableLoading" #stat>
-              <ion-spinner name="crescent" />
+        <div class="unfillable-card-shell">
+          <StatCard
+            :button="!unfillableError"
+            :router-link="unfillableError ? undefined : '/unfillable'"
+            :title="translate('Unfillable backlog')"
+            :stat="unfillableLoading || unfillableError ? '' : totalUnfillable"
+          >
+            <template v-if="unfillableLoading || unfillableError" #stat>
+              <ion-icon v-if="unfillableError" :icon="alertCircleOutline" color="danger" />
+              <ion-spinner v-else name="crescent" />
             </template>
+            <div v-if="unfillableError" class="card-error">
+              <p>{{ translate("Couldn't load this section") }}</p>
+            </div>
             <div class="unfillable-trend">
               <p class="unfillable-trend-label">{{ translate('Entries into Unfillable today') }}</p>
               <Sparkline
@@ -131,23 +140,15 @@
               </div>
             </div>
           </StatCard>
+          <ion-button v-if="unfillableError" class="unfillable-backlog-retry" fill="outline" size="small" @click="retryUnfillableBacklog">
+            <ion-icon slot="start" :icon="refreshOutline" />
+            {{ translate("Retry") }}
+          </ion-button>
           <ion-button v-if="unfillableTrendError" class="unfillable-trend-retry" fill="outline" size="small" @click="retryUnfillableTrend">
             <ion-icon slot="start" :icon="refreshOutline" />
             {{ translate("Retry") }}
           </ion-button>
         </div>
-        <StatCard v-else :title="translate('Unfillable backlog')">
-          <template #stat>
-            <ion-icon :icon="alertCircleOutline" color="danger" />
-          </template>
-          <div class="card-error">
-            <p>{{ translate("Couldn't load this section") }}</p>
-            <ion-button fill="outline" size="small" @click="retryUnfillableBacklog">
-              <ion-icon slot="start" :icon="refreshOutline" />
-              {{ translate("Retry") }}
-            </ion-button>
-          </div>
-        </StatCard>
 
         <!-- Card 3: Order Hold Tasks -->
         <StatCard v-if="!holdTasksError" :title="translate('Order Hold Tasks')" :stat="holdTasksLoading ? '' : (holdTasks.holdTasksTotalCount || 0)">
@@ -1759,6 +1760,7 @@ function handleBatchSizeChange(event: any) {
   min-width: 0;
 }
 
+.unfillable-backlog-retry,
 .unfillable-trend-retry {
   justify-self: start;
   margin: 0;
