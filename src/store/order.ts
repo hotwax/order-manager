@@ -148,7 +148,8 @@ export const useOrderStore = defineStore('orders', {
     },
     // Shared queue totals surfaced as menu rollup badges. Written as a byproduct
     // of each queue page fetching its own list; the menu reads them reactively.
-    navCounts: {} as Record<string, number | undefined>
+    navCounts: {} as Record<string, number | undefined>,
+    navCountPrimeRequestGeneration: 0
   }),
   getters: {
     filteredOrders: (state) => state.searchResults,
@@ -171,6 +172,15 @@ export const useOrderStore = defineStore('orders', {
     setNavCount(key: string, total: number) {
       this.navCounts[key] = total;
     },
+    clearNavCounts(keys: string[]) {
+      keys.forEach((key) => {
+        delete this.navCounts[key];
+      });
+    },
+    clearPrimedNavCounts() {
+      this.navCountPrimeRequestGeneration += 1;
+      this.clearNavCounts(Object.keys(queueCountFetchers));
+    },
     /**
      * Prime the nav-badge counts that no Funnel dashboard fetch already produces —
      * currently only brokering, which needs a distinct-order count over the whole
@@ -179,12 +189,20 @@ export const useOrderStore = defineStore('orders', {
      * brokered-workload fetch. Each count uses the same query its queue page uses.
      */
     async primeNavCounts(productStoreId?: string) {
+      const requestGeneration = ++this.navCountPrimeRequestGeneration;
       const storeId = productStoreId && productStoreId !== 'All' ? productStoreId : undefined;
+      const countFetchers = Object.entries(queueCountFetchers);
+      this.clearNavCounts(countFetchers.map(([key]) => key));
       await Promise.all(
-        Object.entries(queueCountFetchers).map(async ([key, fetchCount]) => {
+        countFetchers.map(async ([key, fetchCount]) => {
           try {
-            this.setNavCount(key, await fetchCount(storeId));
+            const count = await fetchCount(storeId);
+            if (requestGeneration !== this.navCountPrimeRequestGeneration) return;
+
+            this.setNavCount(key, count);
           } catch (error: any) {
+            if (requestGeneration !== this.navCountPrimeRequestGeneration) return;
+
             logger.error(`Failed to prime the ${key} nav count`, error);
           }
         })
