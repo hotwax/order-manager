@@ -565,6 +565,7 @@ import {
   onIonViewWillEnter
 } from '@ionic/vue';
 import { computed, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import {
   globeOutline,
   businessOutline,
@@ -587,12 +588,17 @@ import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
+import {
+  resolveVirtualLocationRouterLink,
+  resolveWorkflowRouterLink
+} from '@/utils/funnelRoutes';
 
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
 const seedStore = useSeedStore();
 const userStore = useUserStore();
+const router = useRouter();
 
 // Per-section load status helpers. These drive loading affordances and error
 // states so the dashboard never renders default zeros/empty copy while a group
@@ -811,16 +817,7 @@ const virtualLocationWorkTotal = computed(() => {
 });
 
 function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {
-  if (item.id === 'unfillable') {
-    return { path: '/unfillable' };
-  }
-
-  return {
-    path: '/brokering',
-    query: {
-      facilityId: item.facilityIds
-    }
-  };
+  return resolveVirtualLocationRouterLink(router, item);
 }
 
 function fetchStoreDashboardData(productStoreId: string) {
@@ -1054,15 +1051,8 @@ watch(filteredFacilities, (newList) => {
   }
 });
 
-const workflowRouteQuery = computed(() => ({
-  facilityId: selectedFacilityId.value
-}));
-
 function workflowRoute(path: string) {
-  return {
-    path,
-    query: workflowRouteQuery.value
-  };
+  return resolveWorkflowRouterLink(router, path, selectedFacilityId.value);
 }
 
 

@@ -16,11 +16,15 @@
 <script setup lang="ts">
 import { IonItem, IonLabel, IonList } from '@ionic/vue';
 import { translate } from '@common';
+import { useRouter } from 'vue-router';
 import type { HoldTaskCount } from '@/types/customerService';
+import { resolveHoldTaskRouterLink } from '@/utils/funnelRoutes';
 
 defineProps<{
   holdTaskCounts: HoldTaskCount[];
 }>();
+
+const router = useRouter();
 
 const knownPurposeLabels: Record<string, string> = {
   NEG_RES_REVIEW: 'Substitute',
@@ -34,13 +38,6 @@ function holdTaskLabel(holdTask: HoldTaskCount) {
 }
 
 function holdTaskRoute(workEffortPurposeTypeId: string) {
-  if (workEffortPurposeTypeId === 'NEG_RES_REVIEW') return '/swap';
-  if (workEffortPurposeTypeId === 'INVALID_ADDRESS') return '/bad-address';
-  if (workEffortPurposeTypeId === 'REVIEW_RISK_ORDER') return '/fraud';
-
-  return {
-    path: '/hold',
-    query: { purpose: workEffortPurposeTypeId }
-  };
+  return resolveHoldTaskRouterLink(router, workEffortPurposeTypeId);
 }
 </script>
