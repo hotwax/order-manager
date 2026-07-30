@@ -12,3 +12,7 @@
 ## 2025-07-25 - Icon-only buttons accessibility pattern
 **Learning:** Many icon-only buttons (`<ion-button>` with an inner `<ion-icon>`) across the application are missing both `aria-label`s for screen readers and `slot="icon-only"` on the inner icon for proper Ionic alignment.
 **Action:** When creating or reviewing UI components, especially modals and lists, explicitly verify that all buttons containing only icons have a localized `aria-label` (using `translate()`) and that the `<ion-icon>` has `slot="icon-only"`.
+
+## 2024-05-18 - Missing ARIA labels and Icon slots on Ionic Close Buttons
+**Learning:** Ionic `<ion-button>` elements containing only an `<ion-icon>` need `slot="icon-only"` on the icon element for proper UI spacing/layout, and they absolutely require an `aria-label` (or `:aria-label="translate('Key')"`) for screen readers, which was missing in several modal close buttons across the app.
+**Action:** When adding or auditing icon-only buttons (especially modal close buttons), ensure both `:aria-label="translate('...')"` is present on the button and `slot="icon-only"` is added to the `<ion-icon>` to guarantee both visual correctness and accessibility.
