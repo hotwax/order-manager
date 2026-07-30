@@ -1,4 +1,5 @@
 {
+  "Close": "Close",
   "{brokered}/{total} brokered": "{brokered}/{total} brokered",
   "{count} customers": "{count} customers",
   "{count} ship group(s) brokered successfully.": "{count} ship group(s) brokered successfully.",
