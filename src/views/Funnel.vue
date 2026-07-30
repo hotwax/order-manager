@@ -399,8 +399,8 @@
             <ion-header>
               <ion-toolbar>
                 <ion-buttons slot="start">
-                  <ion-button @click="closeScheduleModal">
-                    <ion-icon :icon="closeOutline" />
+                  <ion-button @click="closeScheduleModal" :aria-label="translate('Close')">
+                    <ion-icon slot="icon-only" :icon="closeOutline" />
                   </ion-button>
                 </ion-buttons>
                 <ion-title>{{ translate("Schedule") }}</ion-title>
