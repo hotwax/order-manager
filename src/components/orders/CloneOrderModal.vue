@@ -109,7 +109,7 @@
     </ion-item>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!isValid" @click="confirm()">
+      <ion-fab-button :disabled="!isValid" @click="confirm()" :aria-label="translate('Clone')">
         <ion-icon :icon="checkmarkOutline" />
       </ion-fab-button>
     </ion-fab>
