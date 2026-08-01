@@ -761,7 +761,7 @@
                         </ion-item>
                       </ion-list>
                       <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                        <ion-fab-button :disabled="savingShippingAddress" @click="saveShippingAddress(shipGroup)">
+                        <ion-fab-button :disabled="savingShippingAddress" @click="saveShippingAddress(shipGroup)" :aria-label="translate('Save')">
                           <ion-icon :icon="saveOutline" />
                         </ion-fab-button>
                       </ion-fab>
@@ -801,7 +801,7 @@
                   :placeholder="translate('Enter gift message')" v-model="giftMessageDraft" />
               </ion-item>
               <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button @click="saveGiftMessage(shipGroup)">
+                <ion-fab-button @click="saveGiftMessage(shipGroup)" :aria-label="translate('Save')">
                   <ion-icon :icon="saveOutline" />
                 </ion-fab-button>
               </ion-fab>
@@ -828,7 +828,7 @@
                   v-model="shippingDatesDraft.shipByDate" />
               </ion-item>
               <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button @click="saveShippingDates(shipGroup)">
+                <ion-fab-button @click="saveShippingDates(shipGroup)" :aria-label="translate('Save')">
                   <ion-icon :icon="saveOutline" />
                 </ion-fab-button>
               </ion-fab>
@@ -855,7 +855,7 @@
                   v-model="deliveryDatesDraft.estimatedDeliveryDate" />
               </ion-item>
               <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button @click="saveDeliveryDates(shipGroup)">
+                <ion-fab-button @click="saveDeliveryDates(shipGroup)" :aria-label="translate('Save')">
                   <ion-icon :icon="saveOutline" />
                 </ion-fab-button>
               </ion-fab>
@@ -878,7 +878,7 @@
                   :placeholder="translate('Enter shipping instructions')" v-model="instructionDraft" />
               </ion-item>
               <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button @click="saveInstruction(shipGroup)">
+                <ion-fab-button @click="saveInstruction(shipGroup)" :aria-label="translate('Save')">
                   <ion-icon :icon="saveOutline" />
                 </ion-fab-button>
               </ion-fab>
