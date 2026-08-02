@@ -10,7 +10,6 @@
     </ion-header>
 
     <ion-content>
-      <!-- Page Heading: Name of the selected product store -->
       <ion-item lines="none" class="selected-store-header">
         <ion-icon slot="start" :icon="globeOutline" />
         <ion-label>
@@ -41,7 +40,7 @@
             <!-- Order Count today -->
             <h1 class="big-number">{{ (fulfillmentProgress.totalOrdersCount || 0).toLocaleString() }}</h1>
             <!-- Time since day start -->
-            <p class="time-elapsed">{{ new Date().getHours() }} {{ translate("hours since day start") }}</p>
+            <p class="time-elapsed">{{ timeSinceDayStart() }} {{ translate("hours since day start") }}</p>
           </div>
 
           <div class="metrics">
@@ -587,6 +586,7 @@ import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
+import { DateTime } from 'luxon';
 
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
@@ -1196,6 +1196,11 @@ function handleBatchSizeChange(event: any) {
   if (!isNaN(newSize) && newSize > 0) {
     store.updateBatchSize(selectedFacilityId.value, newSize);
   }
+}
+
+function timeSinceDayStart() {
+  const now = DateTime.now();
+  return Math.floor(now.diff(now.startOf("day"), "hours").hours)
 }
 </script>
 
