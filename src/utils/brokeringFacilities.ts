@@ -54,5 +54,5 @@ export async function fetchBrokeringFacilities(): Promise<any[]> {
  * parking ids when none are configured. */
 export async function fetchBrokeringFacilityIds(): Promise<string[]> {
   const ids = buildBrokeringFacilityOptions(await fetchBrokeringFacilities()).map((option) => option.id);
-  return ids.length ? ids : [...FALLBACK_BROKERING_FACILITY_IDS];
+  return [...new Set([...ids, ...FALLBACK_BROKERING_FACILITY_IDS])];
 }

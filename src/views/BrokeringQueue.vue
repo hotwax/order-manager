@@ -56,9 +56,12 @@ const facilityIds = computed(() => {
 
   return selectedFacilityIds.value;
 });
-const virtualFacilityIds = computed(() => virtualFacilities.value
-  .map((facility) => facility.id)
-  .filter((id) => id && id !== ALL_FACILITY_OPTION_ID && !isUnfillableFacilityId(id)));
+const virtualFacilityIds = computed(() => {
+  const ids = virtualFacilities.value
+    .map((facility) => facility.id)
+    .filter((id) => id && id !== ALL_FACILITY_OPTION_ID && !isUnfillableFacilityId(id));
+  return [...new Set([...ids, ...FALLBACK_BROKERING_FACILITY_IDS])];
+});
 
 function dedupeAndSort(values: string[]) {
   return [...new Set(values.filter((value) => value && value !== ALL_FACILITY_OPTION_ID && !isUnfillableFacilityId(value)))].sort((left, right) =>
@@ -68,6 +71,7 @@ function dedupeAndSort(values: string[]) {
 
 function clearFacilityFilter() {
   selectedFacilityIds.value = [ALL_FACILITY_OPTION_ID];
+  lastSelectedFacilityIds.value = [ALL_FACILITY_OPTION_ID];
 }
 
 function routeFacilityIds(value: unknown) {
