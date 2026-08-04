@@ -622,7 +622,16 @@ const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
 const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);
 const facilityRejections = computed(() => store.getFacilityRejections);
 const unfillableTrend = computed(() => store.unfillableTrend);
-const virtualLocationWorkRows = computed(() => store.getVirtualLocationCounts);
+const virtualLocationWorkRows = computed(() => {
+  const rows = store.getVirtualLocationCounts;
+  const unfillableTotal = totalUnfillable.value;
+  return rows.map((row) => {
+    if (row.id === 'unfillable') {
+      return { ...row, count: unfillableTotal };
+    }
+    return row;
+  });
+});
 
 const fulfillmentSyncData = computed(() => store.getFulfillmentSyncData);
 
@@ -801,12 +810,9 @@ const totalUnfillable = computed(() => store.getUnfillable.totalCount || 0);
 // nav count, primed by the same fetchBrokeringCount query). Summing the per-facility
 // rows double-counts orders parked in more than one location, so it diverged from
 // the page. Falls back to the row sum until the shared count has loaded.
-const virtualLocationWorkTotal = computed(() => {
-  const brokering = orderStore.navCounts.brokering;
-  return brokering !== undefined
-    ? brokering
-    : virtualLocationWorkRows.value.reduce((sum, row) => sum + row.count, 0);
-});
+const virtualLocationWorkTotal = computed(() =>
+  virtualLocationWorkRows.value.reduce((sum, row) => sum + row.count, 0)
+);
 
 function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {
   if (item.id === 'unfillable') {
