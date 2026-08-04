@@ -76,7 +76,7 @@
       <ion-infinite-scroll
         @ionInfinite="loadMoreHoldTasks($event)"
         threshold="100px"
-        v-if="isScrollable"
+        :disabled="!isScrollable"
       >
         <ion-infinite-scroll-content
           loading-spinner="crescent"

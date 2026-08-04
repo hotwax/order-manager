@@ -166,6 +166,7 @@ export const useOrderStore = defineStore('orders', {
       state.workflowOrders[bucket].length < state.workflowOrdersTotal[bucket],
     workflowEnrichment: (state) => (bucket: 'open' | 'inflight' | 'packed', orderId: string) =>
       state.workflowOrderEnrichment[bucket][orderId],
+    getNavCount: (state) => (key: string) => state.navCounts[key] ?? 0,
   },
   actions: {
     setNavCount(key: string, total: number) {
