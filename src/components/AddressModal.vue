@@ -38,7 +38,7 @@
       </ion-item>
     </ion-list>
     <ion-fab horizontal="end" vertical="bottom">
-      <ion-fab-button @click="save()">
+      <ion-fab-button @click="save()" :aria-label="translate('Save')">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>
