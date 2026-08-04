@@ -30,7 +30,7 @@
     </ion-radio-group>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedReasonId" @click="confirm()">
+      <ion-fab-button :disabled="!selectedReasonId" @click="confirm()" :aria-label="translate('Confirm')">
         <ion-icon :icon="checkmarkOutline" />
       </ion-fab-button>
     </ion-fab>
