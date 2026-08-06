@@ -2,7 +2,7 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="dismiss()" aria-label="Close">
+        <ion-button @click="dismiss()" :aria-label="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
@@ -160,13 +160,13 @@
       </template>
     </ion-list>
     <ion-fab v-if="isEditMode" vertical="bottom" horizontal="start" slot="fixed">
-      <ion-fab-button color="danger" @click="expire()">
+      <ion-fab-button color="danger" @click="expire()" :aria-label="translate('Delete')">
         <ion-icon :icon="trashOutline" />
       </ion-fab-button>
     </ion-fab>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!isValid" @click="confirm()">
+      <ion-fab-button :disabled="!isValid" @click="confirm()" :aria-label="translate('Save')">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>
@@ -193,6 +193,7 @@ import {
 } from '@ionic/vue';
 import { closeOutline, saveOutline, trashOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive } from 'vue';
+import { translate } from '@common';
 import { useSeedStore } from '@/store/seed';
 import type { CustomerContactMech } from '@/types/customer';
 

@@ -27,12 +27,12 @@
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(`${Actions.APP_ORDER_CREATE} OR ${Actions.APP_CUSTOMER_CREATE}`)" button router-link="/create-order" router-direction="root" :class="{ selected: selectedPage === '/create-order' }">
+          <ion-item v-if="hasPermission(Actions.APP_ORDER_CREATE)" button router-link="/create-order" router-direction="root" :class="{ selected: selectedPage === '/create-order' }">
             <ion-icon slot="start" :icon="addCircleOutline" />
             <ion-label>{{ translate("Create order") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
-        <ion-item-divider color="light" v-if="hasPermission(Actions.APP_SWAP_ORDER) || hasPermission(Actions.APP_ORDER_UPDATE) || hasPermission(Actions.APP_ORDER_CANCEL)">
+        <ion-item-divider color="light" v-if="hasPermission(Actions.APP_ORDERS_VIEW) || hasPermission(Actions.APP_SWAP_ORDER) || hasPermission(Actions.APP_ORDER_UPDATE) || hasPermission(Actions.APP_ORDER_CANCEL)">
           <ion-label>{{ translate("Blocked") }}</ion-label>
         </ion-item-divider>
         <ion-menu-toggle :auto-hide="false">

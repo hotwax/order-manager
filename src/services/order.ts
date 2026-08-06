@@ -91,7 +91,7 @@ export async function fetchWorkflowOrderTotals(productStoreId?: string): Promise
       params: {
         pageSize: 1,
         pageIndex: 0,
-        ...(productStoreId && productStoreId !== 'All' ? { productStoreId } : {})
+        ...(productStoreId ? { productStoreId } : {})
       }
     });
 

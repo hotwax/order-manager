@@ -173,7 +173,7 @@
           </ion-radio-group>
 
           <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-            <ion-fab-button :disabled="!timeZoneId" @click="saveUserTimeZone">
+            <ion-fab-button :disabled="!timeZoneId" @click="saveUserTimeZone" :aria-label="translate('Save')">
               <ion-icon :icon="saveOutline" />
             </ion-fab-button>
           </ion-fab>

@@ -24,7 +24,7 @@
     </ion-list>
 
     <ion-fab horizontal="end" vertical="bottom">
-      <ion-fab-button :disabled="!isFormValid" @click="save">
+      <ion-fab-button :disabled="!isFormValid" @click="save" :aria-label="translate('Save')">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>

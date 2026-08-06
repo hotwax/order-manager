@@ -4,13 +4,21 @@ import legacy from '@vitejs/plugin-legacy'
 import vue from '@vitejs/plugin-vue'
 import path from 'path'
 import { ideTraceVue } from 'chrome-ide-trace/vite'
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv } from 'vite'
 import { versionInfoUtil } from '../../common/utils/versionInfoUtil'
 import { localApiServerDiscoveryPlugin } from '../../common/vite/localApiServerDiscoveryPlugin'
 import pkg from './package.json'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '')
+  const appBuild = JSON.parse(env.VITE_APP_VERSION_CONFIG).buildVersion
+  return {
+  // A version build (buildVersion vX.Y.Z in VITE_APP_VERSION_CONFIG) is self-contained under /vX.Y.Z/; an empty buildVersion is the root bootstrap.
+  base: appBuild ? `/${appBuild}/` : '/',
+  build: {
+    outDir: appBuild ? `dist/${appBuild}` : 'dist'
+  },
   plugins: [
     ideTraceVue(),
     vue(),
@@ -33,5 +41,6 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['tests/**/*.spec.ts', 'tests/**/*.test.ts'],
     exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', '.claude']
+  }
   }
 })

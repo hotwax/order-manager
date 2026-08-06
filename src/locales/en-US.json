@@ -1,4 +1,5 @@
 {
+  "Close": "Close",
   "{brokered}/{total} brokered": "{brokered}/{total} brokered",
   "{count} customers": "{count} customers",
   "{count} ship group(s) brokered successfully.": "{count} ship group(s) brokered successfully.",
@@ -84,6 +85,7 @@
   "attribute": "attribute",
   "Attribute": "Attribute",
   "Attribute added successfully.": "Attribute added successfully.",
+  "Delete": "Delete",
   "Attribute deleted.": "Attribute deleted.",
   "Attribute description": "Attribute description",
   "Attribute name": "Attribute name",

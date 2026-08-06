@@ -2,7 +2,7 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="dismiss()" aria-label="Close">
+        <ion-button @click="dismiss()" :aria-label="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
@@ -189,6 +189,7 @@ import {
 } from '@ionic/vue';
 import { checkmarkCircle, closeOutline } from 'ionicons/icons';
 import { computed, ref } from 'vue';
+import { translate } from '@common';
 import { useSeedStore } from '@/store/seed';
 import { findParties } from '@/services/customer';
 import type { PartySearchResult } from '@/services/customer';
