@@ -3297,8 +3297,6 @@ async function openCreateHoldTaskModal() {
     componentProps: {
       shipGroups,
       title: translate('Create hold task'),
-      autoGenerateTaskName: true,
-      defaultOrderName: currentOrder.orderName || currentOrder.id,
       defaultWorkEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
     },
   });
