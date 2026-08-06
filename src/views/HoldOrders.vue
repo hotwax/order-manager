@@ -129,7 +129,7 @@ import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
-import { ORDER_TASK_CREATE_PERMISSION } from '@/authorization/permissions';
+import Actions from "@/authorization/actions";
 
 const orderTaskStore = useOrderTaskStore();
 const userStore = useUserStore();
@@ -146,7 +146,7 @@ const purposeFilter = computed(() => {
   if (Array.isArray(purpose)) return typeof purpose[0] === 'string' ? purpose[0] : '';
   return typeof purpose === 'string' ? purpose : '';
 });
-const canCreateHoldTasks = computed(() => userStore.hasPermission(ORDER_TASK_CREATE_PERMISSION));
+const canCreateHoldTasks = computed(() => userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE));
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
 const cardRefs = ref<Record<string, any>>({});

@@ -21,7 +21,7 @@ describe('task queue empty states', () => {
   it('offers Find Order only through the task-creation permission', () => {
     const page = source('HoldOrders.vue');
     expect(page).toContain('kind="hold"');
-    expect(page).toContain('userStore.hasPermission(ORDER_TASK_CREATE_PERMISSION)');
+    expect(page).toContain('userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE)');
     expect(page).toContain("router.push('/orders')");
   });
 });

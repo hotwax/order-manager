@@ -14,7 +14,7 @@ describe('Swap proactive setup flow', () => {
   it('facets products, batches display enrichment, and gates relationship writes', () => {
     expect(source).toContain('fetchUnfillableProductCandidates(productStoreId)');
     expect(source).toContain('await productMaster.prefetch(candidates.map');
-    expect(source).toContain('userStore.hasPermission(PRODUCT_ASSOCIATION_UPDATE_PERMISSION)');
+    expect(source).toContain('userStore.hasPermission(Actions.APP_PRODUCT_ASSOCIATION_UPDATE)');
   });
 
   it('rebrokers affected product ship groups through the existing task store action', () => {
