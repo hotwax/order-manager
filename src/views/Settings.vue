@@ -40,7 +40,7 @@
           <ion-card-content>
             {{ translate("This is the name of the OMS you are connected to right now. Make sure that you are connected to the right instance before proceeding.") }}
           </ion-card-content>
-          <ion-button v-if="!commonUtil.isMoqui()" fill="clear" :disabled="!userStore.hasPermission('COMMERCEUSER_VIEW')" @click="commonUtil.goToOms()">
+          <ion-button v-if="!commonUtil.isMoqui()" fill="clear" :disabled="!userStore.hasPermission(Actions.APP_COMMERCE_VIEW)" @click="commonUtil.goToOms()">
             {{ translate("Go to OMS") }}
             <ion-icon slot="end" :icon="openOutline" />
           </ion-button>
@@ -194,6 +194,7 @@ import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore'
 import DxpProductIdentifier from "@/components/settings/DxpProductIdentifier.vue";
 import DxpAppVersionInfo from "@/components/settings/DxpAppVersionInfo.vue";
+import Actions from "@/authorization/actions";
 
 const userStore = useUserStore();
 const userProfile = computed(() => userStore.getUserProfile);

@@ -84,8 +84,8 @@ vi.mock('@/utils', () => ({
   showToast: vi.fn(),
 }));
 
-vi.mock('@/authorization/permissions', () => ({
-  ORDER_TASK_CREATE_PERMISSION: 'ORDER_TASK_CREATE',
+vi.mock('@/authorization/actions', () => ({
+  default: { APP_ORDER_TASK_CREATE: 'ORDER_TASK_CREATE' },
 }));
 
 describe('HoldOrders purpose route', () => {

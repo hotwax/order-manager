@@ -137,11 +137,11 @@ import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
-import { PRODUCT_ASSOCIATION_UPDATE_PERMISSION } from '@/authorization/permissions';
 import { fetchUnfillableProductCandidates, fetchUnfillableShipGroupsForProduct } from '@/services/order';
 import { fetchActiveSubstitutes } from '@/services/productAssociations';
 import { showToast } from '@/utils';
 import { countTaskTargets, runGroupedTaskMutation, shipGroupTaskTarget } from '@/utils/orderTaskBulk';
+import Actions from "@/authorization/actions";
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
@@ -177,7 +177,7 @@ const hasSelectedTasks = computed(() => selectedTaskIds.value.length > 0);
 const allLoadedSelected = computed(() => swapTasks.value.length > 0 && swapTasks.value.every((task: any) => selectedTasks.value[task.workEffortId]));
 const someLoadedSelected = computed(() => swapTasks.value.some((task: any) => selectedTasks.value[task.workEffortId]));
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || '');
-const canManageSubstitutes = computed(() => userStore.hasPermission(PRODUCT_ASSOCIATION_UPDATE_PERMISSION));
+const canManageSubstitutes = computed(() => userStore.hasPermission(Actions.APP_PRODUCT_ASSOCIATION_UPDATE));
 const swapStatus = computed(() => orderTaskStore.getSwapStatus);
 const errorMessage = computed(() => translate(orderTaskStore.getSwapError));
 // First open / cleared list: nothing to show while the first page loads.

@@ -217,11 +217,7 @@ import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import { toSearchOrderRowViewModel } from '@/utils/orderRows';
 import { showToast } from '@/utils';
-import {
-  ORDER_CANCEL_PERMISSION,
-  ORDER_TASK_CREATE_PERMISSION,
-  ORDER_UPDATE_PERMISSION
-} from '@/authorization/permissions';
+import Actions from "@/authorization/actions";
 
 const orderStore = useOrderStore();
 const orderDetailStore = useOrderDetailStore();
@@ -264,9 +260,9 @@ const allCurrentPageSelected = computed(() => {
 const someCurrentPageSelected = computed(() => {
   return currentPageOrderIds.value.some((orderId) => selectedOrderIds.value.includes(orderId));
 });
-const canCancelOrders = computed(() => userStore.hasPermission(ORDER_CANCEL_PERMISSION));
-const canUpdateOrders = computed(() => userStore.hasPermission(ORDER_UPDATE_PERMISSION));
-const canCreateOrderTasks = computed(() => userStore.hasPermission(ORDER_TASK_CREATE_PERMISSION));
+const canCancelOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_CANCEL));
+const canUpdateOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_UPDATE));
+const canCreateOrderTasks = computed(() => userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE));
 const canUseBulkActions = computed(() => canCancelOrders.value || canUpdateOrders.value || canCreateOrderTasks.value);
 
 onMounted(async () => {
