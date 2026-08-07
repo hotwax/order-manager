@@ -44,7 +44,7 @@
     </ion-list>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedAssigneeId" @click="saveAssignee">
+      <ion-fab-button :disabled="!selectedAssigneeId" :aria-label="translate('Save assignee')" @click="saveAssignee">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>

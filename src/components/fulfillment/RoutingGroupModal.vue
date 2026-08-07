@@ -36,7 +36,7 @@
     </ion-radio-group>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedRoutingGroupId" @click="save">
+      <ion-fab-button :disabled="!selectedRoutingGroupId" :aria-label="translate('Save')" @click="save">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>
