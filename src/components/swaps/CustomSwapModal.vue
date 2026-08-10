@@ -115,7 +115,7 @@
     </div>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedProductId" @click="save">
+      <ion-fab-button :disabled="!selectedProductId" @click="save" :aria-label="translate('Save')">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>
