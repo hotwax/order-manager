@@ -1,0 +1,25 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+import { describe, expect, it } from 'vitest';
+
+describe('add item to order modal', () => {
+  it('shows facility availability and forwards approved status for in-progress ship groups', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/components/orders/AddItemToOrderModal.vue'), 'utf8');
+
+    expect(source).toContain("url: 'oms/productFacilities'");
+    expect(source).toContain('normalizeFacilityRows({');
+    expect(source).toContain('await loadFacilityInventory(productId)');
+    expect(source).not.toContain('void loadFacilityInventory(products.value)');
+    expect(source).not.toContain('Promise.all(productList.map');
+    expect(source).toContain('if (!productId || addingProductIds.value.has(productId)) return;');
+    expect(source).toContain('setAddingProduct(productId, true);');
+    expect(source.indexOf('setAddingProduct(productId, true);')).toBeLessThan(source.indexOf('await loadFacilityInventory(productId)'));
+    expect(source).toContain('isInventoryUnavailable(product.productId)');
+    expect(source).toContain("translate('Checking')");
+    expect(source).toContain("translate('Inventory unavailable at selected facility.')");
+    expect(source).toContain('if (props.defaultItemStatusId) data.statusId = props.defaultItemStatusId;');
+    expect(source).toContain("props.defaultItemStatusId === 'ITEM_APPROVED'");
+    expect(source).toContain("translate('{quantity} available at {facility}')");
+    expect(source).toContain("translate('No inventory record at {facility}')");
+  });
+});
