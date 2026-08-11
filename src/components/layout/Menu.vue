@@ -26,12 +26,6 @@
             <ion-label>{{ translate("Find customers") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
-        <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(Actions.APP_ORDER_CREATE)" button router-link="/create-order" router-direction="root" :class="{ selected: selectedPage === '/create-order' }">
-            <ion-icon slot="start" :icon="addCircleOutline" />
-            <ion-label>{{ translate("Create order") }}</ion-label>
-          </ion-item>
-        </ion-menu-toggle>
         <ion-item-divider color="light" v-if="hasPermission(Actions.APP_ORDERS_VIEW) || hasPermission(Actions.APP_SWAP_ORDER) || hasPermission(Actions.APP_ORDER_UPDATE) || hasPermission(Actions.APP_ORDER_CANCEL)">
           <ion-label>{{ translate("Blocked") }}</ion-label>
         </ion-item-divider>
@@ -133,7 +127,6 @@
 <script setup lang="ts">
 import { IonBadge, IonContent, IonFooter, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonMenu, IonMenuToggle, IonSelect, IonSelectOption, IonTitle, IonToolbar } from '@ionic/vue';
 import {
-  addCircleOutline,
   airplaneOutline,
   alertCircleOutline,
   banOutline,

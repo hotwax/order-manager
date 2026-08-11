@@ -20,7 +20,6 @@ import BrokeringQueue from '@/views/BrokeringQueue.vue';
 import OpenOrders from '@/views/OpenOrders.vue';
 import InflightOrders from '@/views/InflightOrders.vue';
 import PackedOrders from '@/views/PackedOrders.vue';
-import CreateOrder from '@/views/CreateOrder.vue';
 import Actions from "@/authorization/actions";
 
 const authGuard = async () => {
@@ -199,15 +198,6 @@ const routes: RouteRecordRaw[] = [
     beforeEnter: authGuard,
     meta: {
       permissionId: Actions.APP_ORDERS_VIEW
-    }
-  },
-  {
-    path: '/create-order',
-    name: 'CreateOrder',
-    component: CreateOrder,
-    beforeEnter: authGuard,
-    meta: {
-      permissionId: `${Actions.APP_ORDER_CREATE} OR ${Actions.APP_CUSTOMER_CREATE}`
     }
   },
   {
