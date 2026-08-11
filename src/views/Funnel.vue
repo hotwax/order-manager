@@ -442,7 +442,7 @@
 
               <!-- Floating Save Button -->
               <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button @click="saveSchedule">
+                <ion-fab-button :aria-label="translate('Save schedule')" @click="saveSchedule">
                   <ion-icon :icon="saveOutline" />
                 </ion-fab-button>
               </ion-fab>
