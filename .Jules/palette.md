@@ -25,3 +25,7 @@
 ## 2024-08-04 - Missing ARIA Labels on ion-fab-button
 **Learning:** Found multiple instances of icon-only `<ion-fab-button>` components without an `aria-label` attribute. While these buttons function as visually distinct primary action buttons, they require an explicit `aria-label` for screen reader accessibility since the inner `<ion-icon>` does not convey meaning to assistive technologies.
 **Action:** When creating or auditing `<ion-fab-button>` elements that only contain icons, always ensure the `aria-label` attribute is set using the `translate()` function (e.g., `:aria-label="translate('Save')"`) to guarantee accessibility and localization.
+
+## 2024-08-11 - External Links Visual Indicator
+**Learning:** Users lack visual cues when clicking on buttons within empty states that lead to external sites, which may cause confusion when navigating away from the app.
+**Action:** Add an `<ion-icon slot="end" :icon="openOutline" />` element inside buttons linking to external resources to visually indicate the behavior.
