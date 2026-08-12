@@ -93,6 +93,7 @@ describe('getOrderFooterActions (unified footer)', () => {
     expect(approve.kind).toBe('status');
     expect(approve.fill).toBe('solid');
     expect(approve.toStatusId).toBe('ORDER_APPROVED');
+    expect(actions.find((a) => a.id === 'ORDER_CANCELLED')!.kind).toBe('footer');
     expect(actions.find((a) => a.id === 'CLONE')!.kind).toBe('footer');
   });
 
@@ -110,8 +111,8 @@ describe('getOrderFooterActions (unified footer)', () => {
     );
     expect(withSelection.map((a) => a.id)).toContain('CANCEL_ITEMS');
     expect(withSelection.map((a) => a.id)).not.toContain('ORDER_CANCELLED');
-    // morphing cancel stays on the start (kind 'status') so it converts in place
-    expect(withSelection.find((a) => a.id === 'CANCEL_ITEMS')!.kind).toBe('status');
+    // morphing cancel stays on the end (kind 'footer') so it converts in place
+    expect(withSelection.find((a) => a.id === 'CANCEL_ITEMS')!.kind).toBe('footer');
   });
 
   it('surfaces Return once the order has a completed item', () => {
