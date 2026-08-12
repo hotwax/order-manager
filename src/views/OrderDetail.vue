@@ -1016,8 +1016,8 @@
     <ion-footer v-if="order && selectedSegment === 'items'">
       <ion-toolbar>
         <!-- The footer is one engine-driven list (OrderActionValidator.getOrderFooterActions):
-             status transitions (Approve, Cancel order, …) on the start, lifecycle actions
-             (Cancel items, Clone, Return) on the end. Only VALID actions are present — an
+             status transitions (Approve, …) on the start, lifecycle and cancel actions
+             (Cancel items, Cancel order, Return) on the end. Only VALID actions are present — an
              action that doesn't apply to the order simply isn't rendered. -->
         <ion-buttons slot="start">
           <ion-button v-for="action in footerActions.filter(a => a.kind === 'status')" :key="action.id"
@@ -3190,7 +3190,7 @@ async function openCloneOrderModal() {
  * So a button that doesn't apply — e.g. Return on a not-yet-fulfilled order —
  * simply isn't shown.
  */
-const DISPATCHABLE_FOOTER_IDS = new Set(['CLONE', 'CANCEL_ITEMS', 'RETURN']);
+const DISPATCHABLE_FOOTER_IDS = new Set(['CANCEL_ITEMS', 'ORDER_CANCELLED', 'RETURN']);
 const footerActions = computed(() => {
   if (!order.value) return [];
   const allowedTransitions = seed.allowedTransitions(order.value.statusId);
