@@ -3093,6 +3093,7 @@ async function rejectAndReleaseItem(item: any, productId: string) {
         items: [{
           orderItemSeqId: item.orderItemSeqId,
           quantity: '1',
+          maySplit: 'Y',
           rejectionReasonId: 'NO_VARIANCE_LOG',
         }],
       },
