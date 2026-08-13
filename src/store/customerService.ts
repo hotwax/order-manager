@@ -470,6 +470,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         const resp = await api({
           url: 'oms/orders/funnelDashboard/facilityOrderVolume',
           method: 'GET',
+          params
         });
         if (resp.data) {
           const facilities = Array.isArray(resp.data.facilities) ? resp.data.facilities : [];
