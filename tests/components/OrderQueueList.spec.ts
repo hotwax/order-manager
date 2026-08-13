@@ -44,13 +44,19 @@ describe('OrderQueueList', () => {
   });
 
   it('uses sales channel, shipping method, and shared date filters for queue search', () => {
-    expect(source).toContain('label="Sales channel"');
-    expect(source).toContain('<ion-select-option value="All">All sales channels</ion-select-option>');
+    expect(source).toContain('<UniformFilterLayout @clear="clearFilters">');
+    expect(source).toContain(":label=\"translate('Sales channel')\"");
+    expect(source).toContain('fill="outline"');
+    expect(source).toContain("translate('All sales channels')");
     expect(source).toContain('v-model="searchFilters.shipmentMethodTypeId"');
-    expect(source).toContain('label="Shipping method"');
-    expect(source).toContain('<ion-select-option value="All">All methods</ion-select-option>');
-    expect(source).toContain('<DateFilterSelect v-model="searchFilters.dateFrom" :label="translate(\'Order date from\')" />');
-    expect(source).toContain('<DateFilterSelect v-model="searchFilters.dateThru" :label="translate(\'Order date thru\')" />');
+    expect(source).toContain(":label=\"translate('Shipping method')\"");
+    expect(source).toContain("translate('All methods')");
+    expect(source).toContain('<DateFilterSelect');
+    expect(source).toContain('v-model="searchFilters.dateFrom"');
+    expect(source).toContain(":label=\"translate('Order date from')\"");
+    expect(source).toContain('v-model="searchFilters.dateThru"');
+    expect(source).toContain(":label=\"translate('Order date through')\"");
+    expect(source).toContain('outlined');
     expect(source).toContain('shipmentMethodTypeId: searchFilters.value.shipmentMethodTypeId');
     expect(source).toContain('dateFrom?: string;');
     expect(source).toContain("dateFrom: props.dateFrom || ''");
