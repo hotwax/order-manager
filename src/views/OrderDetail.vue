@@ -3083,7 +3083,8 @@ async function rejectAndReleaseItem(item: any, productId: string) {
     return;
   }
 
-  // Step 2 — reject the item with default reason
+  if(!isVirtualFacilityForItem(item)) {
+  // Step 2 (optional) — reject the item with default reason
   try {
     await api({
       url: `oms/orders/${orderId}/reject`,
@@ -3102,16 +3103,18 @@ async function rejectAndReleaseItem(item: any, productId: string) {
     await showToast(translate('Failed to reject the item. Please try again.'));
     return;
   }
+  }
 
   // Step 3 — release to chosen facility
   try {
     await api({
       url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/allocation`,
       method: 'POST',
-      data: { facilityId,
-       orderFacilityChange:{
-       changeReasonEnumId:"RELEASED"
-      }
+      data: {
+        facilityId,
+        orderFacilityChange: {
+          changeReasonEnumId: "RELEASED"
+        }
       },
     });
     await showToast(translate('Item released to facility.'));
