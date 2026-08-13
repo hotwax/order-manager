@@ -154,35 +154,20 @@
       <hr class="divider" />
 
       <!-- Facility Information and Metric selection -->
-      <ion-item lines="none" class="facility-header">
-        <ion-icon slot="start" :icon="businessOutline" />
-        <ion-label>
-          <h1>{{ translate("Facilities") }}</h1>
-        </ion-label>
-      </ion-item>
-
-      <div class="dimension ion-padding-horizontal">
-        <!-- Search facilities -->
+      <div class="facility-header">
+        <ion-item lines="none">
+          <ion-icon slot="start" :icon="businessOutline" />
+          <ion-label>
+            <h1>{{ translate("Facilities") }}</h1>
+          </ion-label>
+        </ion-item>
         <ion-searchbar v-model="searchQuery" :placeholder="translate('Search facilities')"></ion-searchbar>
-        
-        <!-- Segment selection -->
-        <ion-segment v-model="selectedDimension">
-          <ion-segment-button value="volume">
-            <ion-label>{{ translate("Order Volume") }}</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="velocity">
-            <ion-label>{{ translate("Fulfillment Velocity") }}</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="rejections">
-            <ion-label>{{ translate("Rejections") }}</ion-label>
-          </ion-segment-button>
-        </ion-segment>
       </div>
 
       <!-- Facilities List -->
       <ion-list class="facilities ion-padding-top">
-        <ion-list-header>
-          <ion-label>{{ translate("Top 10 facilities by") }} {{ selectedDimension }} {{ searchQuery && translate("or") }} {{ searchQuery }}</ion-label>
+        <ion-list-header v-if="filteredFacilities.length">
+          <ion-label>{{ translate("Top 10 facilities by order volume") }} {{ searchQuery && translate("or") }} {{ searchQuery }}</ion-label>
         </ion-list-header>
 
         <!-- Error state: surface failure + retry instead of "No facilities found" -->
@@ -546,8 +531,6 @@ import {
   IonMenuButton,
   IonProgressBar,
   IonSearchbar,
-  IonSegment,
-  IonSegmentButton,
   IonRadioGroup,
   IonRadio,
   IonNote,
@@ -619,8 +602,6 @@ const brokeredWorkloadTotal = computed(() =>
 const holdTasks = computed(() => store.getHoldTasks);
 const facilityFulfillmentProgress = computed(() => store.getFacilityFulfillmentProgress);
 const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
-const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);
-const facilityRejections = computed(() => store.getFacilityRejections);
 const unfillableTrend = computed(() => store.unfillableTrend);
 const virtualLocationWorkRows = computed(() => store.getVirtualLocationCounts);
 
@@ -778,22 +759,17 @@ const queueSegments = computed(() => {
 const selectedFacilityId = ref('');
 const hoveredSegmentId = ref<string | null>(null);
 const searchQuery = ref('');
-const selectedDimension = ref('volume');
 const currentProductStore = computed(() => productStore.getCurrentProductStore || {});
 const selectedProductStoreId = computed(() => currentProductStore.value.productStoreId || '');
 const selectedStoreName = computed(
   () => currentProductStore.value.storeName || currentProductStore.value.productStoreId || ''
 );
 
-// Map the active facility-list dimension to its dashboard status group so the
-// facility list shows the loading/error/empty state for the selected segment.
-const facilityMetricKey = computed<DashboardStatusKey>(() => {
-  if (selectedDimension.value === 'velocity') return 'facilityFulfillmentVelocity';
-  if (selectedDimension.value === 'rejections') return 'facilityRejections';
-  return 'facilityOrderVolume';
-});
-const facilityMetricsLoading = computed(() => store.isDashboardGroupLoading(facilityMetricKey.value));
-const facilityMetricsError = computed(() => store.isDashboardGroupError(facilityMetricKey.value));
+// The facility list is scoped to order volume, so its loading/error state comes
+// from that dashboard status group.
+const facilityMetricKey: DashboardStatusKey = 'facilityOrderVolume';
+const facilityMetricsLoading = computed(() => store.isDashboardGroupLoading(facilityMetricKey));
+const facilityMetricsError = computed(() => store.isDashboardGroupError(facilityMetricKey));
 
 const totalUnfillable = computed(() => store.getUnfillable.totalCount || 0);
 // Match the side-menu "Brokering queue" badge and the /brokering page exactly: one
@@ -831,8 +807,6 @@ function fetchStoreDashboardData(productStoreId: string) {
   store.fetchUnfillable(productStoreId);
   store.fetchVirtualLocationCounts(productStoreId);
   store.fetchFacilityOrderVolume(productStoreId);
-  store.fetchFacilityFulfillmentVelocity(productStoreId);
-  store.fetchFacilityRejections(productStoreId);
   store.fetchHoldTasks(productStoreId);
 }
 
@@ -979,9 +953,7 @@ function retryHoldTasks() {
   store.fetchHoldTasks(selectedProductStoreId.value);
 }
 function retryFacilityMetrics() {
-  if (selectedDimension.value === 'velocity') store.fetchFacilityFulfillmentVelocity(selectedProductStoreId.value);
-  else if (selectedDimension.value === 'rejections') store.fetchFacilityRejections(selectedProductStoreId.value);
-  else store.fetchFacilityOrderVolume(selectedProductStoreId.value);
+  store.fetchFacilityOrderVolume(selectedProductStoreId.value);
 }
 function retryFacilityProgress() {
   if (selectedFacilityId.value) store.fetchFacilityFulfillmentProgress(selectedFacilityId.value, selectedProductStoreId.value);
@@ -1000,33 +972,12 @@ const selectedFacilityName = computed(() => {
 });
 
 const filteredFacilities = computed(() => {
-  let list: any[] = [];
-  if (selectedDimension.value === 'volume') {
-    list = facilityOrderVolume.value.map(item => ({
-      facilityId: item.facilityId,
-      name: item.facilityName || getFacilityName(item.facilityId),
-      value: item.lastOrderCount,
-      label: `${item.lastOrderCount} orders`
-    }));
-  } else if (selectedDimension.value === 'velocity') {
-    list = facilityFulfillmentVelocity.value.map(item => ({
-      facilityId: item.facilityId,
-      name: item.facilityName || getFacilityName(item.facilityId),
-      value: item.activeFacilityFallback ? item.lastOrderCount : (item.fulfillmentVelocity || 0),
-      label: item.activeFacilityFallback
-        ? `${item.lastOrderCount || 0} ${translate("active orders")}`
-        : `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
-    }));
-  } else if (selectedDimension.value === 'rejections') {
-    list = facilityRejections.value.map(item => ({
-      facilityId: item.facilityId,
-      name: item.facilityName || getFacilityName(item.facilityId),
-      value: item.lastOrderCount || 0,
-      label: item.rejectedShipGroupCount
-        ? `${item.lastOrderCount || 0} ${translate("active orders")}, ${item.rejectedShipGroupCount} ${translate("rejected orders")}`
-        : `${item.lastOrderCount || 0} ${translate("active orders")}`
-    }));
-  }
+  let list: any[] = facilityOrderVolume.value.map(item => ({
+    facilityId: item.facilityId,
+    name: item.facilityName || getFacilityName(item.facilityId),
+    value: item.lastOrderCount,
+    label: `${item.lastOrderCount} orders`
+  }));
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
@@ -1203,6 +1154,14 @@ function timeSinceDayStart() {
 </script>
 
 <style scoped>
+.facility-header {
+  display: flex;
+}
+
+.facility-header > *{
+  flex: 1;
+}
+
 .selected-store-header {
   margin-top: var(--spacer-xs);
   margin-bottom: var(--spacer-xs);
@@ -1323,10 +1282,6 @@ function timeSinceDayStart() {
 
   .dimension ion-searchbar {
     flex: 0 1 343px;
-  }
-
-  .dimension ion-segment {
-    flex: 1 1 auto;
   }
 }
 
