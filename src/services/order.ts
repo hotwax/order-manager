@@ -15,6 +15,7 @@ import {
   toNumberValue,
   type OrderSearchResult
 } from './OrderService';
+import { DateTime } from 'luxon';
 
 // Facility id used by OMS to hold archived order items (General Operations Parking).
 // Confirmed present in ORDER docs via the indexed `facilityId` field (see PR #309 field dump).
@@ -705,8 +706,8 @@ function buildOrderSearchQuery(searchTerm: string) {
 function buildOrderDateSolrFilter(dateFrom?: string, dateThru?: string) {
   if (!dateFrom && !dateThru) return '';
 
-  const fromDate = dateFrom ? `${dateFrom.split('T')[0]}T00:00:00Z` : '*';
-  const thruDate = dateThru ? `${dateThru.split('T')[0]}T23:59:59Z` : '*';
+  const fromDate = DateTime.fromISO(dateFrom!).startOf('day').toUTC().toISO()
+  const thruDate = DateTime.fromISO(dateThru!).endOf('day').toUTC().toISO()
 
   return `orderDate: [${fromDate} TO ${thruDate}]`;
 }
