@@ -706,8 +706,8 @@ function buildOrderSearchQuery(searchTerm: string) {
 function buildOrderDateSolrFilter(dateFrom?: string, dateThru?: string) {
   if (!dateFrom && !dateThru) return '';
 
-  const fromDate = DateTime.fromISO(dateFrom!).startOf('day').toUTC().toISO()
-  const thruDate = DateTime.fromISO(dateThru!).endOf('day').toUTC().toISO()
+  const fromDate = dateFrom ? DateTime.fromISO(dateFrom).startOf('day').toUTC().toISO() : "*"
+  const thruDate = dateThru ? DateTime.fromISO(dateThru).endOf('day').toUTC().toISO() : "*"
 
   return `orderDate: [${fromDate} TO ${thruDate}]`;
 }
