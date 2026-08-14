@@ -3090,11 +3090,7 @@ async function rejectAndReleaseItem(item: any, productId: string) {
         url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/reject`,
         method: 'POST',
         data: {
-          orderId,
-          items: [{
-            quantity: "1",
-            rejectionReasonId: 'NO_VARIANCE_LOG',
-          }],
+          rejectionReasonId: 'NO_VARIANCE_LOG',
         },
       });
     } catch {
