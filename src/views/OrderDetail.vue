@@ -156,7 +156,7 @@
                     <template v-else>{{ source.orderName }}</template>
                   </ion-label>
                 </ion-item>
-                <ion-item v-for="returnId in source.returnIds" :key="returnId" button :detail="true" :router-link="`/returns/${returnId}`">
+                <ion-item v-for="returnId in canViewReturns ? source.returnIds : []" :key="returnId" button :detail="true" :router-link="`/returns/${returnId}`">
                   <ion-label>
                     <p>{{ translate('Processed with return') }}</p>
                     {{ returnId }}
@@ -399,18 +399,20 @@
                     {{ payment.paymentMethodTypeDesc || payment.method }}
                     <p>{{ payment.statusDesc || payment.status || payment.statusId }}</p>
                     <p v-if="payment.createdDate">{{ formatDateTime(payment.createdDate) }}</p>
-                    <ion-button
-                      v-for="returnId in carriedOverReturnIds(payment)"
-                      :key="returnId"
-                      fill="clear"
-                      size="small"
-                      class="payment-return-link"
-                      :router-link="`/returns/${returnId}`"
-                      @click.stop
-                    >
-                      <ion-icon slot="start" :icon="openOutline" />
-                      {{ translate('Return') }} {{ returnId }}
-                    </ion-button>
+                    <template v-if="canViewReturns">
+                      <ion-button
+                        v-for="returnId in carriedOverReturnIds(payment)"
+                        :key="returnId"
+                        fill="clear"
+                        size="small"
+                        class="payment-return-link"
+                        :router-link="`/returns/${returnId}`"
+                        @click.stop
+                      >
+                        <ion-icon slot="start" :icon="openOutline" />
+                        {{ translate('Return') }} {{ returnId }}
+                      </ion-button>
+                    </template>
                   </ion-label>
                   <ion-label slot="end">{{ money(payment.amount, order.currency) }}</ion-label>
                 </ion-item>
@@ -1078,7 +1080,7 @@ import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
 import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
 import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
-import { getCustomerReturn } from '@/services/customer';
+import { getReturn } from '@/services/returns';
 import { showToast, isKit, riskLevelColor, sentimentCounts } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { fulfillmentLineStatus, fulfillmentLineStatusColor } from '@/utils/fulfillmentLineStatus';
@@ -1089,6 +1091,7 @@ import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
 import { useCustomerStore } from '@/store/customer';
 import type { CustomerContactMech } from '@/types/customer';
+import Actions from '@/authorization/actions';
 
 const props = defineProps<{
   orderId: string;
@@ -1098,6 +1101,8 @@ const orderDetailStore = useOrderDetailStore();
 const seed = useSeedStore();
 const productCache = useProductCacheStore();
 const customerStore = useCustomerStore();
+const userStore = useUserStore();
+const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW));
 
 const loading = computed(() => orderDetailStore.loadingById(props.orderId));
 const error = computed(() => orderDetailStore.errorById(props.orderId));
@@ -1304,15 +1309,16 @@ const billingAddress = computed(() => {
 // to the facility-less variant.
 const returnHeadersById = ref<Record<string, any | null>>({});
 
-watch(() => {
+watch([() => {
   const raw = orderDetailStore.orderById(props.orderId);
   return [...new Set((raw?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[];
-}, (returnIds) => {
+}, canViewReturns], ([returnIds, canView]) => {
+  if (!canView) return;
   returnIds.forEach(async (returnId) => {
     if (returnId in returnHeadersById.value) return;
     returnHeadersById.value = { ...returnHeadersById.value, [returnId]: null };
     try {
-      const header = await getCustomerReturn(returnId);
+      const header = await getReturn(returnId);
       if (header) returnHeadersById.value = { ...returnHeadersById.value, [returnId]: header };
     } catch (error) {
       logger.debug(`Return header ${returnId} unavailable for timeline facility context`, error);
@@ -1456,7 +1462,7 @@ const orderTimeline = computed(() => {
       metaData: facilityName
         ? `${group.count} ${itemWord} ${translate('returned at')} ${facilityName}`
         : `${group.count} ${itemWord} ${translate('returned')}`,
-      route: `/returns/${returnId}`
+      route: canViewReturns.value ? `/returns/${returnId}` : undefined
     });
   });
 
@@ -2924,7 +2930,6 @@ function shippingAdjustmentDetail(typeId: string): string {
 }
 
 const orderTaskStore = useOrderTaskStore();
-const userStore = useUserStore();
 
 async function openFacilityModal(): Promise<string | null> {
   const modal = await modalController.create({ component: FacilityModal });

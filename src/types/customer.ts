@@ -119,31 +119,6 @@ export interface CustomerTaskSummary {
   dueDate?: string;
 }
 
-export interface CustomerReturnSummary {
-  returnId: string;
-  externalId?: string;
-  statusId: string;
-  entryDate: string;
-  returnTotal: number;
-  currencyUomId: string;
-  destinationFacilityId?: string;
-  returnChannelEnumId?: string;
-  itemCount: number;
-  items: Array<{
-    returnItemSeqId: string;
-    productId?: string;
-    orderId?: string;
-    orderItemSeqId?: string;
-    statusId: string;
-    returnReasonId?: string;
-    returnTypeId?: string;
-    returnQuantity: number;
-    receivedQuantity?: number;
-    returnPrice: number;
-    description?: string;
-  }>;
-}
-
 export interface CustomerCommunicationSummary {
   communicationEventId: string;
   communicationEventTypeId: string;

@@ -125,7 +125,7 @@
                       <template v-else>Merge</template>
                     </ion-button>
                   </ion-item>
-                  <ion-item v-if="!duplicateRelationships.some((d: { active: boolean }) => d.active) && !mergableDuplicates.length" lines="none">
+                  <ion-item v-if="!hasActiveDuplicateRelationship && !mergableDuplicates.length" lines="none">
                     <ion-label color="medium"><em>No Merged Contacts</em></ion-label>
                   </ion-item>
                 </ion-list>
@@ -172,7 +172,7 @@
         <ion-segment-button value="orders">
           <ion-label>Orders</ion-label>
         </ion-segment-button>
-        <ion-segment-button value="returns">
+        <ion-segment-button v-if="canViewReturns" value="returns">
           <ion-label>Returns</ion-label>
         </ion-segment-button>
         <ion-segment-button value="comms">
@@ -398,13 +398,10 @@
             @keydown.space.prevent="openReturnRow(returnRow)"
           >
             <ion-item lines="none">
-              <ion-thumbnail v-if="returnRow.thumbnailProductId" slot="start">
-                <DxpShopifyImg :src="(productCache as any).getProduct(returnRow.thumbnailProductId)?.mainImageUrl" size="small" />
-              </ion-thumbnail>
               <ion-label class="ion-text-wrap">
                 <p class="overline">{{ returnRow.dateLabel }}</p>
                 {{ returnRow.title }}
-                <p>{{ returnRow.itemSummary }}</p>
+                <p>{{ returnRow.typeLabel }}</p>
               </ion-label>
             </ion-item>
 
@@ -415,8 +412,8 @@
             </ion-label>
 
             <ion-label class="tablet">
-              {{ returnRow.amount }}
-              <p>{{ returnRow.itemCountLabel }}</p>
+              {{ returnRow.customerLabel }}
+              <p>Customer</p>
             </ion-label>
 
             <ion-label class="ion-text-end">
@@ -614,7 +611,10 @@ import router from '@/router';
 import { deleteCustomerDetails, indexCustomer } from '@/services/customer';
 import { useProductCacheStore } from '@/store/productCache';
 import { useSeedStore } from '@/store/seed';
-import type { CustomerOrderSummary, CustomerReturnSummary, CustomerTaskSummary } from '@/types/customer';
+import { useUserStore } from '@/store/user';
+import Actions from '@/authorization/actions';
+import type { CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
+import type { ReturnSummary } from '@/types/returns';
 
 const props = defineProps<{
   customerId: string;
@@ -622,6 +622,7 @@ const props = defineProps<{
 
 const selectedSegment = ref('dashboard');
 const seed = useSeedStore();
+const userStore = useUserStore();
 const productCache = useProductCacheStore();
 const recentOrdersQuery = ref('');
 const allOrdersQuery = ref('');
@@ -665,8 +666,10 @@ const {
 
 const mergingIds = ref<string[]>([]);
 
-const customerReturns = computed(() => customerReturnsSource.value as import('@/types/customer').CustomerReturnSummary[]);
+const customerReturns = computed(() => customerReturnsSource.value as ReturnSummary[]);
 const customerCommunications = computed(() => customerCommunicationsSource.value as import('@/types/customer').CustomerCommunicationSummary[]);
+const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW));
+const hasActiveDuplicateRelationship = computed(() => duplicateRelationships.value.some((duplicate) => duplicate.active));
 
 const customerSince = computed(() => formatMonthYear(customerSinceRaw.value));
 const createdAtLabel = computed(() => (timeline.value[0]?.at ? formatTimestamp(timeline.value[0].at) : ''));
@@ -882,7 +885,7 @@ async function onExpireRelationship(relationship: { keyFields: { partyIdFrom: st
 }
 
 function loadSelectedSegment(segment = selectedSegment.value) {
-  if (segment === 'returns') return loadReturns();
+  if (segment === 'returns' && canViewReturns.value) return loadReturns();
   if (segment === 'comms') return loadCommunications();
 }
 
@@ -939,25 +942,20 @@ function formatTimestamp(value?: string | number) {
   return date?.isValid ? date.toFormat('h:mma d LLL yyyy') : '';
 }
 
-function mapReturnRow(returnRecord: CustomerReturnSummary) {
-  const primaryItem = returnRecord.items[0];
-  const orderId = returnRecord.items.find((item) => item.orderId)?.orderId || '';
-  const productLabel = primaryItem?.description || primaryItem?.productId || 'Return item';
-  const itemSummary = returnRecord.itemCount > 1
-    ? `${productLabel} + ${returnRecord.itemCount - 1} more`
-    : productLabel;
-
+function mapReturnRow(returnRecord: ReturnSummary) {
   return {
     returnId: returnRecord.returnId,
-    title: `RMA ${returnRecord.externalId || returnRecord.returnId}`,
+    title: `RMA ${returnRecord.returnId}`,
     dateLabel: formatLongDate(returnRecord.entryDate),
-    itemSummary,
-    amount: money(returnRecord.returnTotal, returnRecord.currencyUomId),
-    itemCountLabel: `${returnRecord.itemCount} ${returnRecord.itemCount === 1 ? 'item' : 'items'}`,
-    orderLabel: orderId ? `Order ${orderId}` : 'Order not linked',
+    typeLabel: returnRecord.isExchange
+      ? 'Exchange'
+      : returnRecord.returnHeaderTypeId === 'APPEASEMENT'
+        ? 'Appeasement'
+        : 'Customer return',
+    orderLabel: returnRecord.orderName || returnRecord.orderId ? `Order ${returnRecord.orderName || returnRecord.orderId}` : 'Order not linked',
+    customerLabel: returnRecord.fromPartyId || 'Not linked',
     facilityLabel: returnRecord.destinationFacilityId ? `Facility ${returnRecord.destinationFacilityId}` : '',
     channelLabel: returnRecord.returnChannelEnumId ? seed.describe(returnRecord.returnChannelEnumId) || returnRecord.returnChannelEnumId : '',
-    thumbnailProductId: primaryItem?.productId || '',
     returnRoute: `/returns/${returnRecord.returnId}`,
     statusLabel: seed.describe(returnRecord.statusId) || returnRecord.statusId
   };

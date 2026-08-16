@@ -24,6 +24,7 @@ const statusTypeIds = [
 
 const enumTypeIds = [
   "ORDER_SALES_CHANNEL",
+  "RETURN_CHANNEL",
   "ORDER_IDENTITY",
   "ORDER_RISK_LEVEL",
   "ORDER_RISK_RECOMMENDATION",

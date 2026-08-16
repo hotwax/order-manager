@@ -880,46 +880,6 @@ export async function getCustomerCommunications(partyId: string): Promise<import
   return results.sort((a, b) => (b.entryDate || '').localeCompare(a.entryDate || ''));
 }
 
-function normalizeCustomerReturn(doc: any): import('@/types/customer').CustomerReturnSummary {
-  const items: any[] = doc.items || [];
-  const returnTotal = items.reduce((sum: number, item: any) => sum + Number(item.returnPrice || 0) * Number(item.returnQuantity || 1), 0);
-  return {
-    returnId: toStringValue(doc.returnId),
-    externalId: doc.externalId ? toStringValue(doc.externalId) : undefined,
-    statusId: toStringValue(doc.statusId),
-    entryDate: toStringValue(doc.entryDate),
-    returnTotal,
-    currencyUomId: toStringValue(doc.currencyUomId) || 'USD',
-    destinationFacilityId: doc.destinationFacilityId ? toStringValue(doc.destinationFacilityId) : undefined,
-    returnChannelEnumId: doc.returnChannelEnumId ? toStringValue(doc.returnChannelEnumId) : undefined,
-    itemCount: items.length,
-    items: items.map((item: any) => ({
-      returnItemSeqId: toStringValue(item.returnItemSeqId),
-      productId: item.productId ? toStringValue(item.productId) : undefined,
-      orderId: item.orderId ? toStringValue(item.orderId) : undefined,
-      orderItemSeqId: item.orderItemSeqId ? toStringValue(item.orderItemSeqId) : undefined,
-      statusId: toStringValue(item.statusId),
-      returnReasonId: item.returnReasonId ? toStringValue(item.returnReasonId) : undefined,
-      returnTypeId: item.returnTypeId ? toStringValue(item.returnTypeId) : undefined,
-      returnQuantity: Number(item.returnQuantity || 0),
-      receivedQuantity: item.receivedQuantity != null ? Number(item.receivedQuantity) : undefined,
-      returnPrice: Number(item.returnPrice || 0),
-      description: item.description ? toStringValue(item.description) : undefined
-    }))
-  };
-}
-
-export async function getCustomerReturns(partyId: string): Promise<import('@/types/customer').CustomerReturnSummary[]> {
-  const response = await api({ url: 'oms/returns', method: 'get', params: { fromPartyId: partyId } });
-  return asList(response.data).map(normalizeCustomerReturn);
-}
-
-export async function getCustomerReturn(returnId: string): Promise<import('@/types/customer').CustomerReturnSummary | undefined> {
-  const response = await api({ url: 'oms/returns', method: 'get', params: { returnId } });
-  const returnDocs = response.data?.returnId ? [response.data] : asList(response.data);
-  return returnDocs.map(normalizeCustomerReturn).find((returnRecord) => returnRecord.returnId === returnId);
-}
-
 export async function searchShopifyCustomers(shopId: string, searchText: string): Promise<Customer[]> {
   const response = await api({
     url: 'oms/shopify/customers',
