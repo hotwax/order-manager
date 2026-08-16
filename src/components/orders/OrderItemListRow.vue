@@ -68,10 +68,13 @@
     </ion-label>
 
     <ion-label class="ion-text-end order-item-amount">
-      <ion-note v-for="adjustment in adjustments" :key="adjustment.label">
-        {{ amount }} {{ adjustment.label }}: {{ adjustment.amount }}
+      {{ amount }}
+      <ion-note class="ion-display-block" v-for="adjustment in adjustments" :key="adjustment.label">
+        {{ adjustment.label }}: {{ adjustment.amount }}
       </ion-note>
     </ion-label>
+
+    <div></div>
   </div>
 </template>
 
@@ -138,7 +141,7 @@ const emit = defineEmits<{
 
 <style scoped>
 .order-item-list-row {
-  --columns-desktop: 5;
+  --columns-desktop: 6;
   --columns-tablet: 5;
   min-height: 6rem;
   border-block-start: var(--border-medium);

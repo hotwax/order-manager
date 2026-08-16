@@ -11,13 +11,6 @@
   </ion-header>
 
   <ion-content>
-    <ion-searchbar
-      v-model="queryString"
-      :placeholder="translate('Search products')"
-      :debounce="400"
-      @ionInput="search()"
-    />
-
     <ion-list v-if="selectedProducts.length">
       <ion-list-header>
         <ion-label>{{ translate('Selected substitutes') }}</ion-label>
@@ -29,6 +22,13 @@
         </ion-chip>
       </div>
     </ion-list>
+
+    <ion-searchbar
+      v-model="queryString"
+      :placeholder="translate('Search products')"
+      :debounce="400"
+      @ionInput="search()"
+    />
 
     <div v-if="loading" class="ion-text-center ion-padding">
       <ion-spinner name="crescent" />

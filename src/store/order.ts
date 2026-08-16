@@ -8,6 +8,7 @@ import {
 import { toStringValue, toNumberValue } from '@/services/OrderService';
 import type { Customer, Order, ReturnRecord, Shipment } from '@/types/order';
 import type { WorkflowOrder, WorkflowFilters } from '@/types/customerService';
+import { DEFAULT_WORKFLOW_ORDER_SORT, WORKFLOW_ORDER_SORT_ORDER_BY } from '@/types/customerService';
 import type { OrderRowEnrichment } from '@/types/orderRow';
 import { useSeedStore } from '@/store/seed';
 import { useProductStore } from './productStore';
@@ -19,7 +20,11 @@ async function fetchWorkflowPage(
   filters: WorkflowFilters,
   pageIndex: number
 ): Promise<{ orders: WorkflowOrder[]; total: number }> {
-  const params: Record<string, any> = { pageSize: import.meta.env.VITE_VIEW_SIZE, pageIndex };
+  const params: Record<string, any> = {
+    pageSize: import.meta.env.VITE_VIEW_SIZE,
+    pageIndex,
+    orderByField: WORKFLOW_ORDER_SORT_ORDER_BY[filters.sort] ?? WORKFLOW_ORDER_SORT_ORDER_BY[DEFAULT_WORKFLOW_ORDER_SORT]
+  };
   if (filters.query) params.keyword = filters.query;
   if (filters.customerName) params.customerName = filters.customerName;
   if (filters.salesChannelEnumId && filters.salesChannelEnumId !== 'All') params.salesChannelEnumId = filters.salesChannelEnumId;
