@@ -109,6 +109,14 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
 }
 
+/* Issuance badge with its stock movement stacked underneath, in the item row's end slot. */
+.ship-group-item-issuance {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--spacer-xs);
+}
+
 .ship-group-actions {
   display: flex;
   flex-wrap: wrap;
