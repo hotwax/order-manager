@@ -328,6 +328,7 @@ export const useCustomerStore = defineStore('customerDetail', {
         this.loadCustomerProfile(partyId, force),
         this.loadCustomerOrders(partyId, force),
         this.loadCustomerTasks(partyId, force),
+        this.loadCustomerRelationships(partyId, force),
         (seed as any).loadPartyRelationshipTypes()
       ]);
       await (this as any).loadMergableDuplicates(partyId);

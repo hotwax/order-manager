@@ -37,6 +37,33 @@ export interface WorkflowOrder {
   bucket: WorkflowBucket;
 }
 
+export type WorkflowOrderSort = 'newestOrder' | 'oldestOrder' | 'highestTotal' | 'lowestTotal';
+
+export interface WorkflowOrderSortOption {
+  label: string;
+  value: WorkflowOrderSort;
+}
+
+export const WORKFLOW_ORDER_SORT_OPTIONS: WorkflowOrderSortOption[] = [
+  { label: 'Newest order first', value: 'newestOrder' },
+  { label: 'Oldest order first', value: 'oldestOrder' },
+  { label: 'Highest order total', value: 'highestTotal' },
+  { label: 'Lowest order total', value: 'lowestTotal' },
+];
+
+// Moqui `orderByField` values for get#Open/Inflight/PackedSalesOrders, which pass the
+// parameter straight through `<search-form-inputs/>`. Only fields aliased on the
+// Open/Inflight/PackedSalesOrder view entities are sortable; orderId is appended as a
+// tie-breaker so paging an infinite-scroll queue cannot repeat or skip a row.
+export const WORKFLOW_ORDER_SORT_ORDER_BY: Record<WorkflowOrderSort, string> = {
+  newestOrder: '-orderDate,-orderId',
+  oldestOrder: 'orderDate,orderId',
+  highestTotal: '-grandTotal,-orderId',
+  lowestTotal: 'grandTotal,orderId',
+};
+
+export const DEFAULT_WORKFLOW_ORDER_SORT: WorkflowOrderSort = 'newestOrder';
+
 export interface WorkflowFilters {
   query: string;
   customerName: string;
@@ -47,6 +74,7 @@ export interface WorkflowFilters {
   priority: 'HIGH' | 'NORMAL' | 'LOW' | null;
   dateFrom: string;
   dateThru: string;
+  sort: WorkflowOrderSort;
 }
 
 export interface BulkActionDefinition {

@@ -21,6 +21,7 @@ export interface CustomerSearchParams {
   loyaltyTier?: string;
   pageSize?: number;
   pageIndex?: number;
+  sort?: string;
 }
 
 export interface CustomerSearchResult {
@@ -133,7 +134,8 @@ export async function searchCustomers(params: CustomerSearchParams = {}): Promis
         rows,
         start,
         qf: 'partyId^100 fullName^50 firstName^30 lastName^30 groupName^30 emailAddress^20 phoneNumber^10',
-        defType: 'edismax'
+        defType: 'edismax',
+        ...(params.sort ? { sort: params.sort } : {})
       },
       query: '*:*',
       filter: 'docType:CUSTOMER AND -statusId:PARTY_DISABLED'

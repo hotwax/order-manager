@@ -29,6 +29,11 @@
       <ion-list v-else>
         <ion-list-header>
           <ion-label>{{ translate("{loaded} of {total} customers", { loaded: customers.length, total }) }}</ion-label>
+          <OrderSortPopover
+            v-model="searchSort"
+            :options="sortOptions"
+            trigger-id="find-customer-sort-trigger"
+          />
         </ion-list-header>
         <div
           v-for="customer in customers"
@@ -77,11 +82,23 @@ import { searchCustomers } from '@/services/customer';
 import type { Customer } from '@/types/order';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
+import OrderSortPopover, { type OrderSortOption } from '@/components/orders/OrderSortPopover.vue';
 import { translate } from '@common'
 
 const ionRouter = useIonRouter();
 
+// Solr sort clauses for the CUSTOMER doc. Only `fullName` is a sortable single-valued field
+// on that document (the indexer writes no date and no `sort_*` copy, and `sort_lastName`
+// is rejected by the collection), so name order is the only meaningful sort available.
+// The default stays empty so a keyword search keeps its edismax relevance ranking.
+const sortOptions: OrderSortOption[] = [
+  { label: 'Best match', value: '' },
+  { label: 'Name A-Z', value: 'fullName asc' },
+  { label: 'Name Z-A', value: 'fullName desc' },
+];
+
 const searchQuery = ref('');
+const searchSort = ref('');
 const customers = ref<Customer[]>([]);
 const total = ref(0);
 const pageIndex = ref(0);
@@ -94,6 +111,7 @@ const hasMore = computed(() => customers.value.length < total.value);
 onMounted(runSearch);
 
 watch(searchQuery, () => scheduleSearch());
+watch(searchSort, () => runSearch());
 
 function scheduleSearch() {
   if (debounceTimer.value) clearTimeout(debounceTimer.value);
@@ -109,7 +127,8 @@ async function runSearch() {
       queryString: searchQuery.value,
       partyTypeId: 'All',
       pageSize: 50,
-      pageIndex: 0
+      pageIndex: 0,
+      sort: searchSort.value
     });
     customers.value = result.customers;
     total.value = result.total;
@@ -129,7 +148,8 @@ async function loadMore(event: CustomEvent) {
       queryString: searchQuery.value,
       partyTypeId: 'All',
       pageSize: 50,
-      pageIndex: pageIndex.value
+      pageIndex: pageIndex.value,
+      sort: searchSort.value
     });
     customers.value = [...customers.value, ...result.customers];
     total.value = result.total;
