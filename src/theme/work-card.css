@@ -97,6 +97,20 @@
   border-radius: 8px;
 }
 
+/* Routing path and its justification share one card row, stacking only once the
+   card is too narrow to hold both. */
+.swap-routing-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacer-base);
+  width: 100%;
+}
+
+.swap-routing-row > ion-label {
+  flex: 1 1 260px;
+  min-width: 0;
+}
+
 .ship-group-options {
   display: flex;
   flex-wrap: wrap;
