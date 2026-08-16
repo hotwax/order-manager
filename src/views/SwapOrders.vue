@@ -86,10 +86,10 @@
           />
         </div>
 
-       <ion-infinite-scroll
-          @ionInfinite="loadMoreSwapTasks($event)"
+        <ion-infinite-scroll
+          :disabled="!isScrollable"
           threshold="100px"
-          v-if="isScrollable"
+          @ionInfinite="loadMoreSwapTasks($event)"
         >
           <ion-infinite-scroll-content
             loading-spinner="crescent"
@@ -388,11 +388,14 @@ async function rebrokerProductOrders(candidate: SwapSetupCandidate) {
 }
 
 async function loadMoreSwapTasks(event: any) {
-  await fetchSwapTasks(
-    undefined,
-    Math.ceil(swapTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
-  );
-  await event.target.complete();
+  try {
+    await fetchSwapTasks(
+      undefined,
+      Math.ceil(swapTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
+    );
+  } finally {
+    await event.target.complete();
+  }
 }
 
 onIonViewWillEnter(() => {

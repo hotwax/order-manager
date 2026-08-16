@@ -153,10 +153,64 @@ type TaskLoadStatus = 'idle' | 'loading' | 'success' | 'error';
 function responseTotal(response: any): number | null {
   const rawTotal = response?.headers?.get?.('x-total-count')
     ?? response?.headers?.['x-total-count']
-    ?? response?.headers?.['X-Total-Count'];
+    ?? response?.headers?.['X-Total-Count']
+    ?? response?.data?.count
+    ?? response?.data?.total
+    ?? response?.data?.totalCount
+    ?? response?.data?.tasksCount
+    ?? response?.data?.documentDataCount
+    ?? response?.data?.response?.numFound;
   if (rawTotal == null || rawTotal === '') return null;
   const total = Number(rawTotal);
   return Number.isFinite(total) && total >= 0 ? total : null;
+}
+
+function hasPayloadFilters(payload: TaskQueueRequestParams = {}): boolean {
+  const ignoredKeys = new Set([
+    'pageSize',
+    'pageIndex',
+    'orderByField',
+    'taskStatusId',
+    'taskStatusId_op',
+    'workEffortTypeId',
+    'workEffortPurposeTypeId',
+    'workEffortPurposeTypeId_op',
+    'productStoreId',
+  ]);
+  return Object.entries(payload).some(([key, val]) => !ignoredKeys.has(key) && val !== undefined && val !== '' && val !== 'All');
+}
+
+function resolveQueueCount(
+  response: any,
+  tasks: any[],
+  navKey: 'hold' | 'badAddress' | 'swap' | 'fraud',
+  payload: TaskQueueRequestParams = {}
+): { total: number; totalKnown: boolean } {
+  const explicitTotal = responseTotal(response);
+  if (explicitTotal !== null) {
+    if (!hasPayloadFilters(payload)) {
+      useOrderStore().setNavCount(navKey, explicitTotal);
+    }
+    return { total: explicitTotal, totalKnown: true };
+  }
+
+  // When no filters are active, the authoritative queue total is known from navCounts / dashboard hold breakdown
+  if (!hasPayloadFilters(payload)) {
+    const existingNavCount = useOrderStore().navCounts[navKey];
+    if (typeof existingNavCount === 'number' && Number.isFinite(existingNavCount) && existingNavCount >= tasks.length) {
+      return { total: existingNavCount, totalKnown: true };
+    }
+  }
+
+  // If a filtered query returned fewer items than the requested pageSize on page 0,
+  // we know this is the complete set of matching results.
+  const pageSize = Number(payload.pageSize || import.meta.env.VITE_VIEW_SIZE || 10);
+  const isFirstPage = !(Number(payload.pageIndex || 0) > 0);
+  if (isFirstPage && tasks.length < pageSize) {
+    return { total: tasks.length, totalKnown: true };
+  }
+
+  return { total: tasks.length, totalKnown: false };
 }
 
 function canLoadMore(tasks: any[], total: number, totalKnown: boolean): boolean {
@@ -251,10 +305,9 @@ export const useOrderTaskStore = defineStore('orderTask', {
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map(enrichHoldTask));
         this.holdTasks = isFirstPage ? detailedTasks : [...this.holdTasks, ...detailedTasks];
-        const total = responseTotal(listResponse);
-        this.holdTotalKnown = total !== null;
-        this.holdTotal = total ?? this.holdTasks.length;
-        useOrderStore().setNavCount('hold', this.holdTotal);
+        const { total, totalKnown } = resolveQueueCount(listResponse, this.holdTasks, 'hold', payload);
+        this.holdTotalKnown = totalKnown;
+        this.holdTotal = total;
         if (isFirstPage) this.holdStatus = 'success';
       } catch (err: any) {
         console.error('Failed to fetch the hold tasks', err);
@@ -282,10 +335,9 @@ export const useOrderTaskStore = defineStore('orderTask', {
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map((task: any) => enrichShipGroupTask(task)));
         this.addressValidationTasks = Number(payload.pageIndex || 0) > 0 ? [...this.addressValidationTasks, ...detailedTasks] : detailedTasks;
-        const total = responseTotal(listResponse);
-        this.addressValidationTotalKnown = total !== null;
-        this.addressValidationTotal = total ?? this.addressValidationTasks.length;
-        useOrderStore().setNavCount('badAddress', this.addressValidationTotal);
+        const { total, totalKnown } = resolveQueueCount(listResponse, this.addressValidationTasks, 'badAddress', payload);
+        this.addressValidationTotalKnown = totalKnown;
+        this.addressValidationTotal = total;
         return true;
       } catch (err) {
         console.error('Failed to fetch the address validation tasks', err);
@@ -318,10 +370,9 @@ export const useOrderTaskStore = defineStore('orderTask', {
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map(enrichShipGroupTask));
         this.swapTasks = isFirstPage ? detailedTasks : [...this.swapTasks, ...detailedTasks];
-        const total = responseTotal(listResponse);
-        this.swapTotalKnown = total !== null;
-        this.swapTotal = total ?? this.swapTasks.length;
-        useOrderStore().setNavCount('swap', this.swapTotal);
+        const { total, totalKnown } = resolveQueueCount(listResponse, this.swapTasks, 'swap', payload);
+        this.swapTotalKnown = totalKnown;
+        this.swapTotal = total;
         // Only mark success once product master + stock enrichment have settled so
         // the cards render their images/stock without flashing partial content.
         await prefetchSwapTaskAssets(detailedTasks);
@@ -359,10 +410,9 @@ export const useOrderTaskStore = defineStore('orderTask', {
         const tasks = listResponse.data ?? [];
         const detailedTasks = await Promise.all(tasks.map(enrichFraudTask));
         this.fraudTasks = isFirstPage ? detailedTasks : [...this.fraudTasks, ...detailedTasks];
-        const total = responseTotal(listResponse);
-        this.fraudTotalKnown = total !== null;
-        this.fraudTotal = total ?? this.fraudTasks.length;
-        useOrderStore().setNavCount('fraud', this.fraudTotal);
+        const { total, totalKnown } = resolveQueueCount(listResponse, this.fraudTasks, 'fraud', payload);
+        this.fraudTotalKnown = totalKnown;
+        this.fraudTotal = total;
         // Success only after both the list and the per-task enrichment have settled.
         if (isFirstPage) this.fraudStatus = 'success';
       } catch (err) {
