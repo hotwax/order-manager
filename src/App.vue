@@ -20,6 +20,7 @@ import Menu from '@/components/layout/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';
 import { useSeedStore } from '@/store/seed';
+import { useProductStore } from '@/store/productStore';
 import { orderManagerDb } from '@/cache/appCacheDb';
 import { ORDER_MANAGER_CACHE_CATALOG } from '@/config/appSyncConfig';
 
@@ -61,8 +62,9 @@ onMounted(async () => {
   const timeZone = userProfile.value?.timeZone || userProfile.value?.userTimeZone;
   if (timeZone) Settings.defaultZone = timeZone;
 
-  // Initialize in-memory seed cache from IndexedDB on startup/reload
-  useSeedStore().initSeedCache();
+  // Initialize in-memory seed cache from IndexedDB on startup/reload. Awaited so the cached
+  // datasets are in place before the API fallback below decides what still needs fetching.
+  await useSeedStore().initSeedCache();
 
   // On authenticated boot, start background Web Worker cache bootstrap to ensure sync
   if (isAuthenticated.value) {
@@ -84,11 +86,13 @@ onMounted(async () => {
     }
   }
 
-  // Ensure seed reference data is loaded on an authenticated boot.
-  const productStoreIds = (userStore.current?.stores || [])
-    .map((store: any) => store.productStoreId)
-    .filter(Boolean);
-  if (productStoreIds.length) {
+  // Ensure seed reference data is loaded on an authenticated boot. Store-scoped datasets need
+  // product store ids, but the global ones must load regardless — gating the whole call on
+  // having stores left every unfilled dataset resolving labels to raw ids.
+  if (isAuthenticated.value) {
+    const productStoreIds = (useProductStore().productStores || [])
+      .map((store: any) => store.productStoreId)
+      .filter(Boolean);
     useSeedStore().loadInitialSeedData(productStoreIds).catch(() => undefined);
   }
 });

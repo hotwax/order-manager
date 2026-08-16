@@ -187,6 +187,13 @@ export const useUserStore = defineStore("user", {
 
         // Initialize in-memory seed store from cache/API
         await useSeedStore().initSeedCache();
+
+        // On a fresh login the cache is still filling in the worker, so load whatever the seed
+        // store does not have yet directly from the API rather than waiting on the bootstrap.
+        const productStoreIds = (useProductStore().productStores || [])
+          .map((store: any) => store.productStoreId)
+          .filter(Boolean);
+        useSeedStore().loadInitialSeedData(productStoreIds).catch(() => undefined);
       } catch (error: any) {
         return Promise.reject(error);
       }
