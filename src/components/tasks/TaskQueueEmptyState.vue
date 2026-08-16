@@ -9,8 +9,9 @@
         {{ translate('Find orders') }}
       </ion-button>
 
-      <ion-button v-else-if="kind === 'badAddress' && companyCarrierUrl" fill="outline" :href="companyCarrierUrl">
+      <ion-button v-else-if="kind === 'badAddress' && companyCarrierUrl" fill="outline" :href="companyCarrierUrl" target="_blank" rel="noopener noreferrer">
         {{ translate('Configure address validation in Company') }}
+        <ion-icon slot="end" :icon="openOutline" />
       </ion-button>
 
       <template v-else-if="kind === 'fraud'">
