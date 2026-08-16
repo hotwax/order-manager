@@ -96,6 +96,24 @@ export interface CustomerOrderSummary {
   }>;
 }
 
+/** View-model a CustomerOrderSummary is mapped to before it is rendered as an order card. */
+export interface CustomerOrderCardData {
+  id: string;
+  name: string;
+  subtitle: string;
+  progressLabel: string;
+  progressValue: number;
+  progressColor: string;
+  orderDate: string;
+  isUnfillable: boolean;
+  items: Array<{
+    productId: string;
+    name: string;
+    secondary: string;
+    imageUrl: string;
+  }>;
+}
+
 export interface CustomerTaskSummary {
   workEffortId: string;
   workEffortName: string;

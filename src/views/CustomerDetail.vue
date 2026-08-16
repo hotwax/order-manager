@@ -147,7 +147,6 @@
             <ion-item v-for="event in timeline" :key="event.id" lines="full">
               <ion-icon slot="start" :icon="pricetagOutline" color="medium" />
               <ion-label>{{ event.label }}</ion-label>
-              <ion-icon slot="end" :icon="informationCircleOutline" color="medium" />
             </ion-item>
             <ion-item v-if="!timeline.length" lines="full">
               <ion-icon slot="start" :icon="pricetagOutline" color="medium" />
@@ -204,7 +203,7 @@
         <!-- Recent orders (real when present, placeholder until the Solr orders query lands) -->
         <div class="section-header">
           <h2>Recent orders</h2>
-          <ion-button fill="outline" size="small">View all</ion-button>
+          <ion-button fill="outline" size="small" @click="selectedSegment = 'orders'">View all</ion-button>
         </div>
 
         <div class="ion-padding-horizontal">
@@ -212,51 +211,7 @@
         </div>
 
         <div v-if="recentOrders.length" class="recent-orders-grid">
-          <ion-card v-for="order in recentOrders" :key="order.id">
-            <ion-item lines="full">
-              <ion-label>
-                <h2>{{ order.name }}</h2>
-                <p>{{ order.subtitle }}</p>
-              </ion-label>
-              <ion-note slot="end">{{ order.progressLabel }}</ion-note>
-              <ion-icon slot="end" :icon="chevronUp" color="medium" />
-            </ion-item>
-
-            <ion-progress-bar :value="order.progressValue" :color="order.progressColor" />
-
-            <ion-item lines="full">
-              <ion-label>
-                <p class="overline">Order date</p>
-                {{ order.orderDate }}
-              </ion-label>
-            </ion-item>
-
-            <ion-list lines="none">
-              <ion-list-header>
-                <ion-label>Items</ion-label>
-              </ion-list-header>
-              <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
-                <ion-thumbnail slot="start">
-                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
-                </ion-thumbnail>
-                <ion-label>
-                  {{ item.name }}
-                  <p>{{ item.secondary }}</p>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-
-            <div class="card-actions">
-              <ion-button
-                fill="clear"
-                size="small"
-                :router-link="order.id ? `/orders/${order.id}` : undefined"
-                :disabled="!order.id"
-              >
-                View details
-              </ion-button>
-            </div>
-          </ion-card>
+          <CustomerOrderCard v-for="order in recentOrders" :key="order.id" :order="order" />
         </div>
         <EmptyState
           v-else-if="ordersStatus === 'loaded'"
@@ -274,47 +229,7 @@
           <ion-searchbar placeholder="Search" :value="allOrdersQuery" @ion-input="allOrdersQuery = ($event.target as any).value ?? ''" />
         </div>
         <div v-if="allOrders.length" class="recent-orders-grid">
-          <ion-card v-for="order in allOrders" :key="order.id">
-            <ion-item lines="full">
-              <ion-label>
-                <h2>{{ order.name }}</h2>
-                <p>{{ order.subtitle }}</p>
-              </ion-label>
-              <ion-note slot="end">{{ order.progressLabel }}</ion-note>
-              <ion-icon slot="end" :icon="chevronUp" color="medium" />
-            </ion-item>
-            <ion-progress-bar :value="order.progressValue" :color="order.progressColor" />
-            <ion-item lines="full">
-              <ion-label>
-                <p class="overline">Order date</p>
-                {{ order.orderDate }}
-              </ion-label>
-            </ion-item>
-            <ion-list lines="none">
-              <ion-list-header>
-                <ion-label>Items</ion-label>
-              </ion-list-header>
-              <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
-                <ion-thumbnail slot="start">
-                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
-                </ion-thumbnail>
-                <ion-label>
-                  {{ item.name }}
-                  <p>{{ item.secondary }}</p>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-            <div class="card-actions">
-              <ion-button
-                fill="clear"
-                size="small"
-                :router-link="order.id ? `/orders/${order.id}` : undefined"
-                :disabled="!order.id"
-              >
-                View details
-              </ion-button>
-            </div>
-          </ion-card>
+          <CustomerOrderCard v-for="order in allOrders" :key="order.id" :order="order" />
         </div>
         <EmptyState
           v-else-if="ordersStatus === 'loaded'"
@@ -329,47 +244,7 @@
           <h2>Unfillable orders</h2>
         </div>
         <div v-if="unfillableOrders.length" class="recent-orders-grid">
-          <ion-card v-for="order in unfillableOrders" :key="order.id">
-            <ion-item lines="full">
-              <ion-label>
-                <h2>{{ order.name }}</h2>
-                <p>{{ order.subtitle }}</p>
-              </ion-label>
-              <ion-note slot="end">{{ order.progressLabel }}</ion-note>
-              <ion-icon slot="end" :icon="chevronUp" color="medium" />
-            </ion-item>
-            <ion-progress-bar :value="order.progressValue" color="warning" />
-            <ion-item lines="full">
-              <ion-label>
-                <p class="overline">Order date</p>
-                {{ order.orderDate }}
-              </ion-label>
-            </ion-item>
-            <ion-list lines="none">
-              <ion-list-header>
-                <ion-label>Items</ion-label>
-              </ion-list-header>
-              <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
-                <ion-thumbnail slot="start">
-                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
-                </ion-thumbnail>
-                <ion-label>
-                  {{ item.name }}
-                  <p>{{ item.secondary }}</p>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-            <div class="card-actions">
-              <ion-button
-                fill="clear"
-                size="small"
-                :router-link="order.id ? `/orders/${order.id}` : undefined"
-                :disabled="!order.id"
-              >
-                View details
-              </ion-button>
-            </div>
-          </ion-card>
+          <CustomerOrderCard v-for="order in unfillableOrders" :key="order.id" :order="order" />
         </div>
         <EmptyState
           v-else-if="ordersStatus === 'loaded'"
@@ -559,7 +434,7 @@
 </template>
 
 <script setup lang="ts">
-import { DxpShopifyImg, commonUtil, translate } from '@common';
+import { commonUtil, translate } from '@common';
 import {
   IonBackButton,
   IonButton,
@@ -583,7 +458,6 @@ import {
   IonSegment,
   IonSegmentButton,
   IonSpinner,
-  IonThumbnail,
   IonTitle,
   IonToolbar,
   alertController,
@@ -591,7 +465,6 @@ import {
 } from '@ionic/vue';
 import {
   addCircleOutline,
-  chevronUp,
   informationCircleOutline,
   openOutline,
   pencilOutline,
@@ -604,16 +477,16 @@ import AddContactModal from '@/components/AddContactModal.vue';
 import AddRelationshipModal from '@/components/AddRelationshipModal.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
+import CustomerOrderCard from '@/components/orders/CustomerOrderCard.vue';
 import RelationshipHistoryModal from '@/components/RelationshipHistoryModal.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useCustomerDetail } from '@/composables/useCustomerDetail';
 import router from '@/router';
 import { deleteCustomerDetails, indexCustomer } from '@/services/customer';
-import { useProductCacheStore } from '@/store/productCache';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import Actions from '@/authorization/actions';
-import type { CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
+import type { CustomerOrderCardData, CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
 import type { ReturnSummary } from '@/types/returns';
 
 const props = defineProps<{
@@ -623,7 +496,6 @@ const props = defineProps<{
 const selectedSegment = ref('dashboard');
 const seed = useSeedStore();
 const userStore = useUserStore();
-const productCache = useProductCacheStore();
 const recentOrdersQuery = ref('');
 const allOrdersQuery = ref('');
 const deleting = ref(false);
@@ -675,7 +547,7 @@ const customerSince = computed(() => formatMonthYear(customerSinceRaw.value));
 const createdAtLabel = computed(() => (timeline.value[0]?.at ? formatTimestamp(timeline.value[0].at) : ''));
 const lifetimeValue = computed(() => money(lifetimeValueRaw.value, lifetimeCurrency.value));
 
-function mapOrder(order: CustomerOrderSummary) {
+function mapOrder(order: CustomerOrderSummary): CustomerOrderCardData {
   return {
     id: order.orderId,
     name: order.orderName || order.orderId,
@@ -694,25 +566,26 @@ function mapOrder(order: CustomerOrderSummary) {
   };
 }
 
-function matchesOrderQuery(order: ReturnType<typeof mapOrder>, q: string): boolean {
+function matchesOrderQuery(order: CustomerOrderCardData, q: string): boolean {
   const lower = q.toLowerCase();
   return order.name.toLowerCase().includes(lower) || order.id.toLowerCase().includes(lower);
 }
 
-type MappedOrder = ReturnType<typeof mapOrder>;
-
 // Recent orders: live customer orders from Solr (docType:ORDER, customerPartyId).
 const recentOrders = computed(() => {
-  const mapped: MappedOrder[] = recentOrdersSource.value.slice(0, 12).map(mapOrder);
+  const mapped = recentOrdersSource.value.slice(0, 12).map(mapOrder);
   const q = recentOrdersQuery.value.trim();
   return q ? mapped.filter((o) => matchesOrderQuery(o, q)) : mapped;
 });
 const allOrders = computed(() => {
-  const mapped: MappedOrder[] = recentOrdersSource.value.map(mapOrder);
+  const mapped = recentOrdersSource.value.map(mapOrder);
   const q = allOrdersQuery.value.trim();
   return q ? mapped.filter((o) => matchesOrderQuery(o, q)) : mapped;
 });
-const unfillableOrders = computed(() => recentOrdersSource.value.filter((o: CustomerOrderSummary) => o.isUnfillable).map(mapOrder));
+// Parked at the unfillable facility: the card reads warning regardless of the order's own progress colour.
+const unfillableOrders = computed(() => recentOrdersSource.value
+  .filter((o: CustomerOrderSummary) => o.isUnfillable)
+  .map((o: CustomerOrderSummary) => ({ ...mapOrder(o), progressColor: 'warning' })));
 const customerTaskCards = computed(() => openTasks.value.map(mapCustomerTaskCard));
 const dashboardTaskCards = computed(() => customerTaskCards.value.slice(0, 1));
 const returnRows = computed(() => customerReturns.value.map(mapReturnRow));
@@ -1018,14 +891,6 @@ ion-card-header ion-card-title {
 
 .lifetime-value .overline {
   margin: 0 0 2px;
-}
-
-.overline {
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  font-size: 10px;
-  color: var(--ion-color-medium, #92949c);
-  margin: 0 0 4px;
 }
 
 .muted {
