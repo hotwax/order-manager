@@ -323,6 +323,7 @@
               <ion-accordion v-else :value="group.externalId">
                 <OrderItemListRow
                   slot="header"
+                  :select-on-row-click="false"
                   :primary="groupPrimaryIdentifier(group)"
                   :secondary="groupSecondaryIdentifier(group)"
                   :badge-label="isKit(group) ? translate('Kit') : ''"
@@ -1958,11 +1959,16 @@ function shipGroupById(shipGroupId: string) {
   return (order.value?.shipGroups || []).find((shipGroup: any) => shipGroup.id === shipGroupId) || null;
 }
 
-function selectedItemObjectsForShipGroup(shipGroup: any) {
+/**
+ * The items a ship-group action applies to. Selection NARROWS the action;
+ * with nothing checked the action covers the whole ship group, so the buttons
+ * never sit disabled just because the user has not ticked a row.
+ */
+function actionableItemObjectsForShipGroup(shipGroup: any) {
+  const items = allGroupedItems.value.filter((item: any) => item.shipGroupSeqId === shipGroup.id);
   const itemIds = new Set(selectedItemsForShipGroup(shipGroup.id));
-  return allGroupedItems.value.filter((item: any) =>
-    item.shipGroupSeqId === shipGroup.id && itemIds.has(item.orderItemSeqId)
-  );
+  if (!itemIds.size) return items;
+  return items.filter((item: any) => itemIds.has(item.orderItemSeqId));
 }
 
 function shipGroupActionContext(shipGroup: any) {
@@ -1979,7 +1985,7 @@ function shipGroupActionValidation(shipGroup: any, actionId: any) {
     order.value,
     shipGroup,
     actionId,
-    selectedItemObjectsForShipGroup(shipGroup),
+    actionableItemObjectsForShipGroup(shipGroup),
     shipGroupActionContext(shipGroup)
   );
 }
@@ -3407,7 +3413,9 @@ async function parkSelectedItems(shipGroup: any) {
     return;
   }
 
-  const itemIds = selectedItemsForShipGroup(shipGroup.id);
+  const itemIds = actionableItemObjectsForShipGroup(shipGroup)
+    .filter((item: any) => !OrderActionValidator.isItemTerminal(item))
+    .map((item: any) => item.orderItemSeqId);
   if (!itemIds.length) return;
   const facilityId = await openFacilityModal();
   if (!facilityId) return;
@@ -3423,10 +3431,10 @@ async function parkSelectedItems(shipGroup: any) {
       )
     );
     selectedShipGroupItems.value[shipGroup.id] = new Set();
-    await showToast(translate('Selected items moved to parking.'));
+    await showToast(translate('Items moved to parking.'));
     await loadOrder(orderId, true);
   } catch {
-    await showToast(translate('Failed to park selected items. Please try again.'));
+    await showToast(translate('Failed to park items. Please try again.'));
   }
 }
 
@@ -3437,7 +3445,9 @@ async function rejectSelectedItems(shipGroup: any) {
     return;
   }
 
-  const itemIds = selectedItemsForShipGroup(shipGroup.id);
+  const itemIds = actionableItemObjectsForShipGroup(shipGroup)
+    .filter((item: any) => !OrderActionValidator.isItemTerminal(item))
+    .map((item: any) => item.orderItemSeqId);
   if (!itemIds.length) return;
 
   const modal = await modalController.create({ component: RejectItemsModal });
@@ -3461,10 +3471,10 @@ async function rejectSelectedItems(shipGroup: any) {
       },
     });
     selectedShipGroupItems.value[shipGroup.id] = new Set();
-    await showToast(translate('Selected items rejected successfully.'));
+    await showToast(translate('Items rejected successfully.'));
     await loadOrder(orderId, true);
   } catch {
-    await showToast(translate('Failed to reject selected items. Please try again.'));
+    await showToast(translate('Failed to reject items. Please try again.'));
   }
 }
 
@@ -3475,7 +3485,9 @@ async function releaseSelectedItems(shipGroup: any) {
     return;
   }
 
-  const itemIds = selectedItemsForShipGroup(shipGroup.id);
+  const itemIds = actionableItemObjectsForShipGroup(shipGroup)
+    .filter((item: any) => OrderActionValidator.isItemPreFulfill(item))
+    .map((item: any) => item.orderItemSeqId);
   if (!itemIds.length) return;
   const facilityId = await openPhysicalFacilityModal();
   if (!facilityId) return;
@@ -3495,10 +3507,10 @@ async function releaseSelectedItems(shipGroup: any) {
       )
     );
     selectedShipGroupItems.value[shipGroup.id] = new Set();
-    await showToast(translate('Selected items released to facility.'));
+    await showToast(translate('Items released to facility.'));
     await loadOrder(orderId, true);
   } catch {
-    await showToast(translate('Failed to release selected items. Please try again.'));
+    await showToast(translate('Failed to release items. Please try again.'));
   }
 }
 </script>

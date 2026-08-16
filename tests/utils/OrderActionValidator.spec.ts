@@ -182,6 +182,28 @@ describe('ship-group fulfillment approval gate', () => {
     ).allowed).toBe(true);
   });
 
+  it('treats the item list as a filter, not a precondition', () => {
+    // The view passes the whole ship group when nothing is checked, so an
+    // empty list means the ship group itself has nothing to act on.
+    const empty = OrderActionValidator.validateShipGroupAction(
+      approvedOrder,
+      virtualShipGroup,
+      'PARK_ITEMS',
+      [],
+      { isVirtual: true }
+    );
+    expect(empty.allowed).toBe(false);
+    expect(empty.reason).toBe('This ship group has no items to park.');
+
+    expect(OrderActionValidator.validateShipGroupAction(
+      approvedOrder,
+      virtualShipGroup,
+      'PARK_ITEMS',
+      [{ orderItemSeqId: '01', statusId: 'ITEM_CREATED' }, { orderItemSeqId: '02', statusId: 'ITEM_CANCELLED' }],
+      { isVirtual: true }
+    ).allowed).toBe(true);
+  });
+
   it('blocks the item facility chip release path until the order is approved', () => {
     const createdValidation = OrderActionValidator.validateItemAction(
       createdOrder,
