@@ -1,6 +1,6 @@
 import { api } from "@common";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getReturn, listReturns, mapReturnDetail } from "@/services/returns";
+import { RETURN_DETAIL_UNAVAILABLE, getReturn, listReturns, mapReturnDetail } from "@/services/returns";
 
 vi.mock("@common", () => ({ api: vi.fn() }));
 
@@ -64,6 +64,14 @@ describe("returns service", () => {
 
     expect(apiMock).toHaveBeenCalledWith({ url: "oms/returns/R%2F100", method: "get" });
     expect(detail.returnId).toBe("R/100");
+  });
+
+  // oms.rest.xml mounts only POST actions under returns/{returnId}, so a deployment without the
+  // restored GET answers 405. A bare "status code 405" leaves an operator with nothing to act on.
+  it("reports an unmounted detail endpoint as a cause rather than a bare 405", async () => {
+    apiMock.mockRejectedValueOnce({ response: { status: 405 } });
+
+    await expect(getReturn("10150")).rejects.toThrow(RETURN_DETAIL_UNAVAILABLE);
   });
 
   it("prefers an authoritative header total", () => {

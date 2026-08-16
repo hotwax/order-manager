@@ -87,10 +87,17 @@ export const useReturnsStore = defineStore("returns", {
     detailLoading: false,
     error: "",
     detailError: "",
+    lastPageFull: false,
     requestSequence: 0
   }),
   getters: {
-    hasMore: (state) => state.returns.length < state.total,
+    // `total` cannot be trusted as the full match count: the OMS list service reports
+    // `returnsCount` as the size of the page it just returned (list#CustomerReturns derives it
+    // from `returns.size()`, because an entity-find with a limit never populates
+    // returnListCount). Paging past the first page works fine, so a page that came back full
+    // is also treated as "there may be more" - otherwise every return after the first page is
+    // unreachable. Remove the lastPageFull arm once the service returns a real total.
+    hasMore: (state) => state.returns.length < state.total || state.lastPageFull,
     isExactReturnSearch: (state) => state.query.searchField === "RETURN_ID" && Boolean(normalizedExactId(state.query.searchTerm))
   },
   actions: {
@@ -109,6 +116,7 @@ export const useReturnsStore = defineStore("returns", {
           if(requestId !== this.requestSequence) {return;}
           this.returns = enrichedSummaries;
           this.total = this.returns.length;
+          this.lastPageFull = false;
 
           return;
         }
@@ -118,10 +126,12 @@ export const useReturnsStore = defineStore("returns", {
         if(requestId !== this.requestSequence) {return;}
         this.returns = enrichedSummaries;
         this.total = result.total;
+        this.lastPageFull = result.items.length >= this.pageSize;
       } catch (error: any) {
         if(requestId !== this.requestSequence) {return;}
         this.returns = [];
         this.total = 0;
+        this.lastPageFull = false;
         if(error?.response?.status === 404 && this.query.searchField === "RETURN_ID") {return;}
         this.error = error?.message || "Failed to find returns";
       } finally {
@@ -152,8 +162,10 @@ export const useReturnsStore = defineStore("returns", {
         const knownIds = new Set(this.returns.map((item) => item.returnId));
         this.returns = [...this.returns, ...enrichedItems.filter((item) => !knownIds.has(item.returnId))];
         this.total = result.total;
+        this.lastPageFull = result.items.length >= this.pageSize;
         this.pageIndex = nextPage;
       } catch (error: any) {
+        this.lastPageFull = false;
         this.error = error?.message || "Failed to load more returns";
       } finally {
         this.loading = false;

@@ -150,6 +150,35 @@ describe("returns store", () => {
     expect(store.pageIndex).toBe(1);
   });
 
+  // The OMS reports `returnsCount` as the size of the page it just returned, not the number of
+  // matches, so a full first page arrives as "25 of 25". Keeping paging alive on a full page is
+  // what makes every return past the first page reachable at all.
+  it("keeps paging when a full page arrives with a total that only counts that page", async () => {
+    const page = Array.from({ length: 25 }, (_, index) => ({ returnId: `R${index}`, statusId: "A" }));
+    listReturnsMock.mockResolvedValueOnce({ items: page, total: 25 });
+    const store = useReturnsStore();
+
+    await store.search();
+
+    expect(store.returns).toHaveLength(25);
+    expect(store.total).toBe(25);
+    expect(store.hasMore).toBe(true);
+  });
+
+  it("stops paging once a short page proves the end of the result set", async () => {
+    const fullPage = Array.from({ length: 25 }, (_, index) => ({ returnId: `R${index}`, statusId: "A" }));
+    listReturnsMock
+      .mockResolvedValueOnce({ items: fullPage, total: 25 })
+      .mockResolvedValueOnce({ items: [{ returnId: "R99", statusId: "A" }], total: 1 });
+    const store = useReturnsStore();
+
+    await store.search();
+    await store.loadMore();
+
+    expect(store.returns).toHaveLength(26);
+    expect(store.hasMore).toBe(false);
+  });
+
   it("treats a 404 exact lookup as an empty result rather than a page failure", async () => {
     getReturnMock.mockRejectedValueOnce({ response: { status: 404 } });
     const store = useReturnsStore();

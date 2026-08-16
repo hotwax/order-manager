@@ -106,7 +106,7 @@
 
       <ion-list v-else-if="returns.length">
         <ion-list-header>
-          <ion-label>{{ returns.length }} {{ translate('of') }} {{ total }} {{ translate('returns') }}</ion-label>
+          <ion-label>{{ resultCountLabel }}</ion-label>
         </ion-list-header>
         <div
           v-for="returnRecord in returns"
@@ -210,6 +210,12 @@ const searchPlaceholder = computed(() => ({
   ORDER_ID: translate("Exact internal order ID"),
   CUSTOMER_ID: translate("Exact customer party ID")
 }[query.value.searchField]));
+// The OMS list service returns the page's own row count as `returnsCount`, so it only states a
+// total when that total is genuinely larger than what has been loaded; otherwise claiming
+// "25 of 25" while more pages exist would be wrong.
+const resultCountLabel = computed(() => (total.value > returns.value.length
+  ? `${returns.value.length} ${translate("of")} ${total.value} ${translate("returns")}`
+  : `${returns.value.length} ${translate("returns")}`));
 const searchContractNote = computed(() => ({
   RETURN_ID: translate("Return ID lookup opens the existing return detail contract; partial matches are not supported."),
   ORDER_ID: translate("Order lookup uses the existing exact order ID filter."),

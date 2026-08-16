@@ -165,10 +165,27 @@ export async function listReturns(query: ReturnListQuery = {}): Promise<ReturnLi
   return { items, total: Number.isFinite(total) ? total : items.length };
 }
 
+// Raised when the OMS does not serve return detail, so callers can tell "this return does not
+// exist" apart from "this deployment cannot answer the question at all".
+export const RETURN_DETAIL_UNAVAILABLE =
+  "This OMS does not serve return detail. Returns can be browsed and filtered, but an individual return cannot be opened until GET oms/returns/{returnId} is restored.";
+
 export async function getReturn(returnId: string): Promise<ReturnDetail> {
   const normalizedReturnId = returnId.trim();
   if(!normalizedReturnId) {throw new Error("Return ID is required");}
-  const response = await api({ url: `oms/returns/${encodeURIComponent(normalizedReturnId)}`, method: "get" });
+  let response;
+  try {
+    response = await api({ url: `oms/returns/${encodeURIComponent(normalizedReturnId)}`, method: "get" });
+  } catch (error: any) {
+    // oms.rest.xml mounts only POST actions (approve/reject/cancel/complete) under
+    // returns/{returnId}; the GET mount was removed 2026-08-03 together with the
+    // co.hotwax.sob.refund.ReturnReadServices it called, which exist only on
+    // hotwax-shopify-oms-bridge feat/pwa-returns. The OMS answers 405 for the bare GET, and
+    // "Request failed with status code 405" tells an operator nothing actionable.
+    if(error?.response?.status === 405) {throw new Error(RETURN_DETAIL_UNAVAILABLE, { cause: error });}
+
+    throw error;
+  }
   assertSuccessfulPayload(response.data);
   const detail = mapReturnDetail(response.data);
   if(!detail.returnId) {throw new Error(`Return ${normalizedReturnId} was not found`);}
