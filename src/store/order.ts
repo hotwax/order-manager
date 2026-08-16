@@ -14,6 +14,10 @@ import { useSeedStore } from '@/store/seed';
 import { useProductStore } from './productStore';
 import { queueCountFetchers } from '@/services/navCounts';
 
+// Oldest first by default: Find orders is worked down, so the operator should land on
+// the orders that have been waiting longest rather than on the freshest arrivals.
+export const DEFAULT_ORDER_SEARCH_SORT = 'orderDate asc';
+
 
 async function fetchWorkflowPage(
   bucket: 'open' | 'inflight' | 'packed',
@@ -115,7 +119,7 @@ export const useOrderStore = defineStore('orders', {
       hasVirtualFacilityItems: false,
       archivedOnly: false,
     } as OrderSearchFilters,
-    searchSort: 'orderDate desc',
+    searchSort: DEFAULT_ORDER_SEARCH_SORT,
     searchResults: [] as Order[],
     searchTotal: 0,
     pageIndex: 0,

@@ -169,7 +169,9 @@ import { showToast } from '@/utils';
 
 type QueueGlobalAction = 'brokerSelected';
 
-const DEFAULT_QUEUE_SORT = 'orderDate desc';
+// Oldest first by default: these queues are worked down, so the operator should land on
+// the orders that have been waiting longest rather than on the freshest arrivals.
+const DEFAULT_QUEUE_SORT = 'orderDate asc';
 
 // Every queue page renders this component, and Ionic keeps both the outgoing and incoming
 // page in the DOM during a route transition. A per-instance trigger id keeps one queue's

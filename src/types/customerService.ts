@@ -62,7 +62,9 @@ export const WORKFLOW_ORDER_SORT_ORDER_BY: Record<WorkflowOrderSort, string> = {
   lowestTotal: 'grandTotal,orderId',
 };
 
-export const DEFAULT_WORKFLOW_ORDER_SORT: WorkflowOrderSort = 'newestOrder';
+// Oldest first by default: these queues are worked down, so the operator should land on
+// the orders that have been waiting longest rather than on the freshest arrivals.
+export const DEFAULT_WORKFLOW_ORDER_SORT: WorkflowOrderSort = 'oldestOrder';
 
 export interface WorkflowFilters {
   query: string;

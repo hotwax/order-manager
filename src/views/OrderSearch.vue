@@ -200,7 +200,7 @@ import { translate } from '@common';
 import { chevronDownOutline } from 'ionicons/icons';
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useOrderStore } from '@/store/order';
+import { useOrderStore, DEFAULT_ORDER_SEARCH_SORT } from '@/store/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
@@ -354,7 +354,7 @@ async function openEditShippingMethodModal() {
 
 function clearFilters() {
   orderStore.searchQuery = '';
-  orderStore.searchSort = 'orderDate desc';
+  orderStore.searchSort = DEFAULT_ORDER_SEARCH_SORT;
   selectedOrderIds.value = [];
   orderStore.searchFilters = {
     status: [],

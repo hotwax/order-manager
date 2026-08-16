@@ -256,44 +256,53 @@
       <!-- ===== Returns segment ===== -->
       <div v-else-if="selectedSegment === 'returns'">
         <div class="section-header">
-          <h2>Returns</h2>
+          <h2>{{ translate('Returns') }}</h2>
         </div>
-        <ion-list v-if="returnRows.length">
+        <ion-list v-if="customerReturns.length">
           <ion-list-header>
-            <ion-label>{{ returnRows.length }} {{ returnRows.length === 1 ? 'RMA' : 'RMAs' }}</ion-label>
+            <ion-label>{{ customerReturns.length }} {{ customerReturns.length === 1 ? translate('RMA') : translate('RMAs') }}</ion-label>
           </ion-list-header>
           <div
-            v-for="returnRow in returnRows"
-            :key="returnRow.returnId"
-            class="list-item return-row"
+            v-for="returnRecord in customerReturns"
+            :key="returnRecord.returnId"
+            :data-testid="`return-row-${returnRecord.returnId}`"
+            class="list-item return-result-row"
             role="link"
             tabindex="0"
-            @click="openReturnRow(returnRow)"
-            @keydown.enter.prevent="openReturnRow(returnRow)"
-            @keydown.space.prevent="openReturnRow(returnRow)"
+            @click="openReturn(returnRecord.returnId)"
+            @keydown.enter.prevent="openReturn(returnRecord.returnId)"
+            @keydown.space.prevent="openReturn(returnRecord.returnId)"
           >
             <ion-item lines="none">
               <ion-label class="ion-text-wrap">
-                <p class="overline">{{ returnRow.dateLabel }}</p>
-                {{ returnRow.title }}
-                <p>{{ returnRow.typeLabel }}</p>
+                <h2>{{ returnRecord.returnId }}</h2>
+                <p>{{ formatDate(returnRecord.entryDate) }}</p>
               </ion-label>
             </ion-item>
 
             <ion-label class="tablet ion-text-start">
-              {{ returnRow.orderLabel }}
-              <p v-if="returnRow.facilityLabel">{{ returnRow.facilityLabel }}</p>
-              <p v-if="returnRow.channelLabel">{{ returnRow.channelLabel }}</p>
+              {{ returnRecord.orderName || returnRecord.orderId || translate('Not linked') }}
+              <p>{{ translate('Order') }}</p>
             </ion-label>
 
-            <ion-label class="tablet">
-              {{ returnRow.customerLabel }}
-              <p>Customer</p>
+            <ion-label class="tablet ion-text-start">
+              {{ returnTypeLabel(returnRecord.returnHeaderTypeId) }}
+              <p v-if="returnRecord.isExchange">
+                {{ translate('Exchange') }}
+              </p>
+              <p v-else-if="returnRecord.fromPartyId">
+                {{ returnRecord.customerName || `${translate('Customer')} ${returnRecord.fromPartyId}` }}
+              </p>
+            </ion-label>
+
+            <ion-label class="tablet ion-text-start">
+              {{ channelLabel(returnRecord.returnChannelEnumId) }}
+              <p>{{ facilityLabel(returnRecord.destinationFacilityId) }}</p>
             </ion-label>
 
             <ion-label class="ion-text-end">
-              {{ returnRow.statusLabel }}
-              <p>Status</p>
+              {{ returnStatusLabel(returnRecord.statusId) }}
+              <p>{{ translate('Status') }}</p>
             </ion-label>
           </div>
         </ion-list>
@@ -588,7 +597,6 @@ const unfillableOrders = computed(() => recentOrdersSource.value
   .map((o: CustomerOrderSummary) => ({ ...mapOrder(o), progressColor: 'warning' })));
 const customerTaskCards = computed(() => openTasks.value.map(mapCustomerTaskCard));
 const dashboardTaskCards = computed(() => customerTaskCards.value.slice(0, 1));
-const returnRows = computed(() => customerReturns.value.map(mapReturnRow));
 
 function mapCustomerTaskCard(task: CustomerTaskSummary) {
   const customerName = customer.value?.name || '';
@@ -815,27 +823,38 @@ function formatTimestamp(value?: string | number) {
   return date?.isValid ? date.toFormat('h:mma d LLL yyyy') : '';
 }
 
-function mapReturnRow(returnRecord: ReturnSummary) {
-  return {
-    returnId: returnRecord.returnId,
-    title: `RMA ${returnRecord.returnId}`,
-    dateLabel: formatLongDate(returnRecord.entryDate),
-    typeLabel: returnRecord.isExchange
-      ? 'Exchange'
-      : returnRecord.returnHeaderTypeId === 'APPEASEMENT'
-        ? 'Appeasement'
-        : 'Customer return',
-    orderLabel: returnRecord.orderName || returnRecord.orderId ? `Order ${returnRecord.orderName || returnRecord.orderId}` : 'Order not linked',
-    customerLabel: returnRecord.fromPartyId || 'Not linked',
-    facilityLabel: returnRecord.destinationFacilityId ? `Facility ${returnRecord.destinationFacilityId}` : '',
-    channelLabel: returnRecord.returnChannelEnumId ? seed.describe(returnRecord.returnChannelEnumId) || returnRecord.returnChannelEnumId : '',
-    returnRoute: `/returns/${returnRecord.returnId}`,
-    statusLabel: seed.describe(returnRecord.statusId) || returnRecord.statusId
-  };
+function openReturn(returnId: string) {
+  router.push(`/returns/${returnId}`);
 }
 
-function openReturnRow(returnRow: ReturnType<typeof mapReturnRow>) {
-  router.push(returnRow.returnRoute);
+function returnStatusLabel(statusId: string) {
+  return seed.statusDescription(statusId) || statusId || translate('Not specified');
+}
+
+function returnTypeLabel(returnHeaderTypeId?: string) {
+  if (returnHeaderTypeId === 'CUSTOMER_RETURN') return translate('Customer return');
+  if (returnHeaderTypeId === 'APPEASEMENT') return translate('Appeasement');
+
+  return returnHeaderTypeId ? seed.describe(returnHeaderTypeId) || returnHeaderTypeId : translate('Return');
+}
+
+function channelLabel(returnChannelEnumId?: string) {
+  return returnChannelEnumId ? seed.enumDescription(returnChannelEnumId) || returnChannelEnumId : translate('No channel');
+}
+
+function facilityLabel(destinationFacilityId?: string) {
+  return destinationFacilityId ? seed.facilityName(destinationFacilityId) || destinationFacilityId : translate('No destination facility');
+}
+
+function formatDate(value?: string | number) {
+  if (!value) return translate('Date not available');
+  const stringValue = String(value);
+  const numericValue = Number(value);
+  const date = /^\d+$/.test(stringValue)
+    ? DateTime.fromMillis(stringValue.length <= 10 ? numericValue * 1000 : numericValue)
+    : DateTime.fromISO(stringValue).isValid ? DateTime.fromISO(stringValue) : DateTime.fromSQL(stringValue);
+
+  return date.isValid ? date.toLocaleString(DateTime.DATE_MED) : stringValue;
 }
 </script>
 
@@ -951,12 +970,20 @@ ion-card-header ion-card-title {
   gap: 16px;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   padding: 8px;
+  align-items: start;
 }
 
-.return-row {
-  --columns-mobile: 2;
+.return-result-row {
+  --columns-desktop: 5;
   --columns-tablet: 4;
-  --columns-desktop: 4;
+  min-height: 4.75rem;
+  border-block-start: var(--border-medium);
+  cursor: pointer;
+  padding-inline: var(--spacer-sm);
+}
+
+.return-result-row > ion-label {
+  width: 100%;
 }
 
 .segment-placeholder {

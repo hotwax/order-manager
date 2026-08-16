@@ -155,7 +155,7 @@ describe('order workflow store', () => {
     } as any);
 
     expect(api).toHaveBeenCalledWith(expect.objectContaining({
-      params: expect.objectContaining({ orderByField: '-orderDate,-orderId' })
+      params: expect.objectContaining({ orderByField: 'orderDate,orderId' })
     }));
   });
 
