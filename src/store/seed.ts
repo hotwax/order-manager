@@ -1,5 +1,7 @@
 import { defineStore } from "pinia";
+import { liveQuery } from "dexie";
 import { api, commonUtil, logger } from "@common";
+import { orderManagerDb } from "@/cache/appCacheDb";
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error";
 
@@ -31,7 +33,14 @@ const enumTypeIds = [
   "RISK_FACT_SENTIMENT",
   "PP_SORT_PARAM_TYPE",
   "PP_FILTER_PRM_TYPE",
-  "WorkEffortType"
+  "WorkEffortType",
+  // Reasons behind the order timeline's facility-change and cancellation entries.
+  // OMS stores these as bare enum ids on OrderFacilityChange.changeReasonEnumId and
+  // OrderStatus.changeReason, so without them the timeline shows "AUTO_CANCEL".
+  "BROKERING_REASN_TYPE",
+  "INT_ORD_CANCL_REASON",
+  "ORDER_CANCEL_REASON",
+  "ODR_ITM_CH_REASON"
 ];
 
 const geoTypeEnumIds = ["GEOT_COUNTRY", "GEOT_STATE", "GEOT_PROVINCE"];
@@ -112,6 +121,7 @@ export const useSeedStore = defineStore("seed", {
 
     carriers: dataset(),
     shipmentMethodTypes: dataset(),
+    carrierShipmentMethods: dataset(),
     shopifyShops: dataset(),
     shopifyShopLocations: dataset(),
     partyRelationshipTypes: dataset(),
@@ -137,14 +147,9 @@ export const useSeedStore = defineStore("seed", {
     productStore: (state) => (productStoreId: string) => state.productStores.byId[productStoreId],
     productStoreName: (state) => (productStoreId: string) => itemDescription(state.productStores.byId[productStoreId], productStoreId, ["storeName", "companyName"]),
     status: (state) => (statusId: string) => findStatus(state, statusId),
-    // StatusItem.statusAge - a 0..~100 lifecycle position (created low, completed/cancelled ~100).
-    // Used to compute order/ship-group progress; 0 if unknown.
     statusAge: (state) => (statusId: string): number => Number(findStatus(state, statusId)?.statusAge ?? 0),
     statusDescription: (state) => (statusId: string) => itemDescription(findStatus(state, statusId), statusId),
     enumDescription: (state) => (enumId: string) => itemDescription(findEnum(state, enumId), enumId),
-    // Generic label resolver: enrich any id received from an API into its human
-    // description using whichever loaded seed dataset it belongs to. Falls back to
-    // the raw id, so it is always safe to wrap an id with this.
     describe: (state) => (id: string): string => {
       if (!id) return "";
       const status = findStatus(state, id);
@@ -167,7 +172,12 @@ export const useSeedStore = defineStore("seed", {
     facilityType: (state) => (facilityTypeId: string) => state.facilityTypes.byId[facilityTypeId],
     shipmentMethod: (state) => (shipmentMethodTypeId: string) => state.shipmentMethodTypes.byId[shipmentMethodTypeId],
     shipmentMethodDescription: (state) => (shipmentMethodTypeId: string) => itemDescription(state.shipmentMethodTypes.byId[shipmentMethodTypeId], shipmentMethodTypeId, ["description", "shipmentMethodTypeId"]),
+    carrier: (state) => (partyId: string) => state.carriers.byId[partyId],
     carrierName: (state) => (partyId: string) => state.carriers.byId[partyId] ? carrierLabel(state.carriers.byId[partyId]) : partyId,
+    shippingMethodsByCarrier: (state) => (carrierPartyId: string) => {
+      if (!carrierPartyId) return [];
+      return Object.values(state.carrierShipmentMethods.byId).filter((m: any) => m.partyId === carrierPartyId);
+    },
     paymentMethodDescription: (state) => (paymentMethodTypeId: string) => itemDescription(state.paymentMethodTypes.byId[paymentMethodTypeId], paymentMethodTypeId),
     contactPurposeDescription: (state) => (contactMechPurposeTypeId: string) => itemDescription(state.contactMechPurposeTypes.byId[contactMechPurposeTypeId], contactMechPurposeTypeId),
     communicationEventTypeDescription: (state) => (communicationEventTypeId: string) => itemDescription(state.communicationEventTypes.byId[communicationEventTypeId], communicationEventTypeId),
@@ -253,6 +263,221 @@ export const useSeedStore = defineStore("seed", {
     }
   },
   actions: {
+    async initSeedCache() {
+      await this.populateFromCache();
+      this.subscribeToCacheUpdates();
+    },
+    async populateFromCache() {
+      try {
+        const [
+          productStores,
+          statuses,
+          enums,
+          enumTypes,
+          facilities,
+          facilityTypes,
+          facilityGroups,
+          groupFacilities,
+          geos,
+          carriers,
+          shipmentMethodTypes,
+          carrierShipmentMethods,
+          paymentMethodTypes,
+          returnReasons,
+          returnTypes,
+          returnItemTypes,
+          roleTypes,
+          orderAdjustmentTypes,
+          contactMechPurposeTypes,
+          communicationEventTypes,
+          partyRelationshipTypes,
+          statusFlowTransitions,
+          shopifyShops,
+          shopifyShopLocations,
+          productStoreFacilities,
+          productStoreFacilityGroups,
+          productStoreShipmentMethods,
+          productStoreEmailSettings,
+          geoAssocs,
+        ] = await Promise.all([
+          orderManagerDb.table("productStores").toArray(),
+          orderManagerDb.table("statuses").toArray(),
+          orderManagerDb.table("enums").toArray(),
+          orderManagerDb.table("enumTypes").toArray(),
+          orderManagerDb.table("facilities").toArray(),
+          orderManagerDb.table("facilityTypes").toArray(),
+          orderManagerDb.table("facilityGroups").toArray(),
+          orderManagerDb.table("groupFacilities").toArray(),
+          orderManagerDb.table("geos").toArray(),
+          orderManagerDb.table("carriers").toArray(),
+          orderManagerDb.table("shipmentMethodTypes").toArray(),
+          orderManagerDb.table("carrierShipmentMethods").toArray(),
+          orderManagerDb.table("paymentMethodTypes").toArray(),
+          orderManagerDb.table("returnReasons").toArray(),
+          orderManagerDb.table("returnTypes").toArray(),
+          orderManagerDb.table("returnItemTypes").toArray(),
+          orderManagerDb.table("roleTypes").toArray(),
+          orderManagerDb.table("orderAdjustmentTypes").toArray(),
+          orderManagerDb.table("contactMechPurposeTypes").toArray(),
+          orderManagerDb.table("communicationEventTypes").toArray(),
+          orderManagerDb.table("partyRelationshipTypes").toArray(),
+          orderManagerDb.table("statusFlowTransitions").toArray(),
+          orderManagerDb.table("shopifyShops").toArray(),
+          orderManagerDb.table("shopifyShopLocations").toArray(),
+          orderManagerDb.table("productStoreFacilities").toArray(),
+          orderManagerDb.table("productStoreFacilityGroups").toArray(),
+          orderManagerDb.table("productStoreShipmentMethods").toArray(),
+          orderManagerDb.table("productStoreEmailSettings").toArray(),
+          orderManagerDb.table("geoAssocs").toArray(),
+        ]);
+
+        if (productStores.length) setDataset(this.productStores, productStores.map((r: any) => r.raw ?? r), (s: any) => s.productStoreId);
+        if (facilities.length) setDataset(this.facilities, facilities.map((r: any) => r.raw ?? r), (f: any) => f.facilityId);
+        if (facilityTypes.length) setDataset(this.facilityTypes, facilityTypes.map((r: any) => r.raw ?? r), (f: any) => f.facilityTypeId);
+        if (facilityGroups.length) setDataset(this.facilityGroups, facilityGroups.map((r: any) => r.raw ?? r), (f: any) => f.facilityGroupId);
+        if (groupFacilities.length) setDataset(this.facilityGroupMembers, groupFacilities.map((r: any) => r.raw ?? r), (g: any) => g.memberKey || `${g.facilityGroupId}|${g.facilityId}`);
+        if (geos.length) setDataset(this.geos, geos.map((r: any) => r.raw ?? r), (g: any) => g.geoId);
+        if (carriers.length) setDataset(this.carriers, carriers.map((r: any) => r.raw ?? r), (c: any) => c.partyId);
+        if (shipmentMethodTypes.length) setDataset(this.shipmentMethodTypes, shipmentMethodTypes.map((r: any) => r.raw ?? r), (s: any) => s.shipmentMethodTypeId);
+        if (carrierShipmentMethods.length) setDataset(this.carrierShipmentMethods, carrierShipmentMethods.map((r: any) => r.raw ?? r), (c: any) => c.carrierShipmentMethodKey || `${c.partyId}|${c.shipmentMethodTypeId}`);
+        if (paymentMethodTypes.length) setDataset(this.paymentMethodTypes, paymentMethodTypes.map((r: any) => r.raw ?? r), (p: any) => p.paymentMethodTypeId);
+        if (returnReasons.length) setDataset(this.returnReasons, returnReasons.map((r: any) => r.raw ?? r), (r: any) => r.returnReasonId);
+        if (returnTypes.length) setDataset(this.returnTypes, returnTypes.map((r: any) => r.raw ?? r), (r: any) => r.returnTypeId);
+        if (returnItemTypes.length) setDataset(this.returnItemTypes, returnItemTypes.map((r: any) => r.raw ?? r), (r: any) => r.returnItemTypeId);
+        if (roleTypes.length) setDataset(this.roleTypes, roleTypes.map((r: any) => r.raw ?? r), (r: any) => r.roleTypeId);
+        if (orderAdjustmentTypes.length) setDataset(this.orderAdjustmentTypes, orderAdjustmentTypes.map((r: any) => r.raw ?? r), (o: any) => o.orderAdjustmentTypeId);
+        if (contactMechPurposeTypes.length) setDataset(this.contactMechPurposeTypes, contactMechPurposeTypes.map((r: any) => r.raw ?? r), (c: any) => c.contactMechPurposeTypeId);
+        if (communicationEventTypes.length) setDataset(this.communicationEventTypes, communicationEventTypes.map((r: any) => r.raw ?? r), (c: any) => c.communicationEventTypeId);
+        if (partyRelationshipTypes.length) setDataset(this.partyRelationshipTypes, partyRelationshipTypes.map((r: any) => r.raw ?? r), (p: any) => p.partyRelationshipTypeId);
+        if (statusFlowTransitions.length) setDataset(this.statusFlowTransitions, statusFlowTransitions.map((r: any) => r.raw ?? r), (t: any) => t.transitionKey || `${t.statusId}|${t.toStatusId}`);
+        if (shopifyShops.length) setDataset(this.shopifyShops, shopifyShops.map((r: any) => r.raw ?? r), (s: any) => s.shopId);
+        if (shopifyShopLocations.length) setDataset(this.shopifyShopLocations, shopifyShopLocations.map((r: any) => r.raw ?? r), (s: any) => s.locationKey || `${s.shopId}|${s.shopifyLocationId}`);
+        if (productStoreEmailSettings.length) setDataset(this.productStoreEmailSettings, productStoreEmailSettings.map((r: any) => r.raw ?? r), (e: any) => e.emailSettingKey || `${e.productStoreId}|${e.emailTypeEnumId || e.emailType}`);
+
+        if (productStoreFacilities.length) {
+          const rawStoreFacilities = productStoreFacilities.map((r: any) => r.raw ?? r);
+          const grouped: Record<string, any[]> = {};
+          rawStoreFacilities.forEach((item: any) => {
+            const storeId = item.productStoreId || "UNKNOWN";
+            if (!grouped[storeId]) grouped[storeId] = [];
+            grouped[storeId].push(item);
+          });
+          Object.entries(grouped).forEach(([storeId, items]) => {
+            const target = this.scopedDataset(this.productStoreFacilitiesByStoreId, storeId);
+            setDataset(target, items, (f: any) => f.facilityId);
+          });
+        }
+
+        if (productStoreFacilityGroups.length) {
+          const rawStoreGroups = productStoreFacilityGroups.map((r: any) => r.raw ?? r);
+          const grouped: Record<string, any[]> = {};
+          rawStoreGroups.forEach((item: any) => {
+            const storeId = item.productStoreId || "UNKNOWN";
+            if (!grouped[storeId]) grouped[storeId] = [];
+            grouped[storeId].push(item);
+          });
+          Object.entries(grouped).forEach(([storeId, items]) => {
+            const target = this.scopedDataset(this.productStoreFacilityGroupsByStoreId, storeId);
+            setDataset(target, items, (g: any) => g.facilityGroupId);
+          });
+        }
+
+        if (productStoreShipmentMethods.length) {
+          const rawStoreMethods = productStoreShipmentMethods.map((r: any) => r.raw ?? r);
+          const grouped: Record<string, any[]> = {};
+          rawStoreMethods.forEach((item: any) => {
+            const storeId = item.productStoreId || "UNKNOWN";
+            if (!grouped[storeId]) grouped[storeId] = [];
+            grouped[storeId].push(item);
+          });
+          Object.entries(grouped).forEach(([storeId, items]) => {
+            const target = this.scopedDataset(this.productStoreShipmentMethodsByStoreId, storeId);
+            setDataset(target, items, (m: any) => m.storeShipmentMethodKey || `${m.productStoreId}|${m.shipmentMethodTypeId}`);
+          });
+        }
+
+        if (geoAssocs.length) {
+          const rawAssocs = geoAssocs.map((r: any) => r.raw ?? r);
+          const byCountry: Record<string, string[]> = {};
+          rawAssocs.forEach((a: any) => {
+            const countryId = a.geoId;
+            const stateId = a.toGeoId;
+            if (countryId && stateId) {
+              if (!byCountry[countryId]) byCountry[countryId] = [];
+              if (!byCountry[countryId].includes(stateId)) {
+                byCountry[countryId].push(stateId);
+              }
+            }
+          });
+          Object.entries(byCountry).forEach(([countryId, stateIds]) => {
+            this.geoAssocsByCountry[countryId] = { ids: stateIds, status: "loaded" };
+          });
+        }
+
+        if (enumTypes.length) {
+          const rawTypes = enumTypes.map((r: any) => r.raw ?? r);
+          const byParent: Record<string, string[]> = {};
+          rawTypes.forEach((t: any) => {
+            if (t.parentTypeId && t.enumTypeId) {
+              if (!byParent[t.parentTypeId]) byParent[t.parentTypeId] = [];
+              if (!byParent[t.parentTypeId].includes(t.enumTypeId)) {
+                byParent[t.parentTypeId].push(t.enumTypeId);
+              }
+            }
+          });
+          this.enumChildTypesByParent = { ...this.enumChildTypesByParent, ...byParent };
+        }
+
+        if (statuses.length) {
+          const rawStatuses = statuses.map((r: any) => r.raw ?? r);
+          const grouped: Record<string, any[]> = {};
+          rawStatuses.forEach((st: any) => {
+            const type = st.statusTypeId || "UNKNOWN";
+            if (!grouped[type]) grouped[type] = [];
+            grouped[type].push(st);
+          });
+          Object.entries(grouped).forEach(([type, items]) => {
+            const target = this.scopedDataset(this.statusesByType, type);
+            setDataset(target, items, (s: any) => s.statusId);
+          });
+        }
+
+        if (enums.length) {
+          const rawEnums = enums.map((r: any) => r.raw ?? r);
+          const grouped: Record<string, any[]> = {};
+          rawEnums.forEach((en: any) => {
+            const type = en.enumTypeId || "UNKNOWN";
+            if (!grouped[type]) grouped[type] = [];
+            grouped[type].push(en);
+          });
+          Object.entries(grouped).forEach(([type, items]) => {
+            const target = this.scopedDataset(this.enumsByType, type);
+            setDataset(target, items, (e: any) => e.enumId);
+          });
+        }
+      } catch (error) {
+        logger.warn("[seedStore] Error populating from cache:", error);
+      }
+    },
+    subscribeToCacheUpdates() {
+      if (typeof BroadcastChannel !== "undefined") {
+        try {
+          const channel = new BroadcastChannel("hotwax-cache-sync");
+          channel.onmessage = () => {
+            this.populateFromCache();
+          };
+        } catch {
+          // Ignore
+        }
+      }
+      try {
+        liveQuery(() => orderManagerDb.table("statuses").count()).subscribe({ next: () => this.populateFromCache() });
+        liveQuery(() => orderManagerDb.table("geos").count()).subscribe({ next: () => this.populateFromCache() });
+        liveQuery(() => orderManagerDb.table("facilities").count()).subscribe({ next: () => this.populateFromCache() });
+      } catch {
+        // Safe fallback in test environments without liveQuery BroadcastChannel
+      }
+    },
     setProductStores(productStores: any[]) {
       setDataset(this.productStores, productStores.filter((store) => store.productStoreId), (store) => store.productStoreId);
     },
@@ -496,7 +721,20 @@ export const useSeedStore = defineStore("seed", {
     async loadGeoAssocs(countryGeoId: string) {
       if (!countryGeoId) return;
       const existing = this.geoAssocsByCountry[countryGeoId];
-      if (existing?.status === "loaded" || existing?.status === "loading") return;
+      if (existing?.status === "loaded" && existing.ids.length > 0) return;
+
+      try {
+        const cached = await orderManagerDb.table("geoAssocs").where("geoId").equals(countryGeoId).toArray();
+        if (cached && cached.length > 0) {
+          this.geoAssocsByCountry[countryGeoId] = {
+            ids: cached.map((r: any) => r.toGeoId || r.raw?.toGeoId).filter(Boolean),
+            status: "loaded"
+          };
+          return;
+        }
+      } catch (err) {
+        console.warn("Failed to query cached geoAssocs:", err);
+      }
 
       if (!this.geoAssocsByCountry[countryGeoId]) {
         this.geoAssocsByCountry[countryGeoId] = { ids: [], status: "idle" };
@@ -535,6 +773,5 @@ export const useSeedStore = defineStore("seed", {
     resetSeedData() {
       this.$reset();
     }
-  },
-  persist: true
+  }
 });

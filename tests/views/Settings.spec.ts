@@ -11,6 +11,6 @@ describe('settings layout', () => {
     expect(source).toContain('<section>');
     expect(source).toContain('<ion-card>');
     expect(source).toContain("{{ translate('OMS') }}");
-    expect(source).toContain("{{ translate('App') }}");
+    expect(source).toContain('<DxpAppVersionInfo');
   });
 });
