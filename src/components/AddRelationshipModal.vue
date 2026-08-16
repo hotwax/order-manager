@@ -156,7 +156,7 @@
       </ion-item>
     </ion-list>
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!isValid" @click="confirm()">
+      <ion-fab-button :disabled="!isValid" :aria-label="translate('Confirm')" @click="confirm()">
         <ion-icon :icon="checkmarkCircle" />
       </ion-fab-button>
     </ion-fab>

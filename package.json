@@ -1,6 +1,6 @@
 {
   "name": "order-manager",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Order Manager App",
   "type": "module",
@@ -46,6 +46,7 @@
     "@vitejs/plugin-vue": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vite-plugin-pwa": "catalog:"
   }
 }

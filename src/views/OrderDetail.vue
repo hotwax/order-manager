@@ -283,59 +283,97 @@
             </ion-button>
           </ion-item>
           <ion-accordion-group>
-            <ion-accordion v-for="group in groupedItems" :key="group.externalId" :value="group.externalId">
+            <template v-for="{ group, soleItem } in itemGroups" :key="group.externalId">
+              <!-- Nothing to roll up when the group is a single order item, so the item row is
+                   rendered directly with the product identity the rolled up header would carry. -->
               <OrderItemListRow
-                slot="header"
+                v-if="soleItem"
                 :primary="groupPrimaryIdentifier(group)"
                 :secondary="groupSecondaryIdentifier(group)"
                 :badge-label="isKit(group) ? translate('Kit') : ''"
                 :image-url="getProduct(group.productId)?.mainImageUrl"
                 :preview-product="getProduct(group.productId)"
-                :selected="group.selected"
-                :quantity="group.totalQty"
+                :selected="soleItem.selected"
+                :quantity="soleItem.quantity"
                 :quantity-label="translate('qty')"
-                :facility-label="groupLocationLabel(group)"
-                :facility-disabled="true"
-                :status-label="group.status"
-                :status-color="group.statusColor"
-                :amount="money(group.totalPrice, order.currency)"
-                :adjustments="getGroupAdjustmentRows(group)"
-                @update:selected="group.selected = $event"
-              />
-              <div slot="content">
-                <ion-list lines="none">
-                  <OrderItemListRow
-                    v-for="item in group.items"
-                    :key="item.orderItemSeqId"
-                    class="order-item-detail-entry"
-                    :primary="`${translate('Item')} ${item.orderItemSeqId}`"
-                    :secondary="item.externalId && item.externalId !== 'null' ? `${translate('External ID')}: ${item.externalId}` : ''"
-                    :selected="item.selected"
-                    :quantity="item.quantity"
-                    :quantity-label="translate('qty')"
-                    :show-quantity="false"
-                    :facility-label="item.facilityName"
-                    :facility-disabled="isItemFacilityActionDisabled(item)"
-                    :attributes-label="attributeChipLabel(item.attributeCount)"
-                    :status-label="item.status"
-                    :status-color="item.statusColor"
-                    :status-detail="itemStatusDetail(item)"
-                    :amount="money(itemLineTotal(item), order.currency)"
-                    :adjustments="getItemAdjustmentRows(item)"
-                    @update:selected="item.selected = $event"
-                    @facility-click="rejectAndReleaseItem(item, group.productId)"
-                    @attributes-click="openItemAttributesModal(item)"
+                :facility-label="soleItem.facilityName"
+                :facility-disabled="isItemFacilityActionDisabled(soleItem)"
+                :attributes-label="attributeChipLabel(soleItem.attributeCount)"
+                :status-label="soleItem.status"
+                :status-color="soleItem.statusColor"
+                :status-detail="itemStatusDetail(soleItem)"
+                :amount="money(itemLineTotal(soleItem), order.currency)"
+                :adjustments="getItemAdjustmentRows(soleItem)"
+                @update:selected="soleItem.selected = $event"
+                @facility-click="rejectAndReleaseItem(soleItem, group.productId)"
+                @attributes-click="openItemAttributesModal(soleItem)"
+              >
+                <template #actions>
+                  <ion-button
+                    v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(soleItem.statusId)"
+                    fill="clear"
+                    size="small"
+                    color="danger"
+                    @click.stop="cancelSingleItem(soleItem)"
                   >
-                    <template #actions>
-                      <ion-button v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)" fill="clear"
-                        size="small" color="danger" @click.stop="cancelSingleItem(item)">
-                        {{ translate('Cancel') }}
-                      </ion-button>
-                    </template>
-                  </OrderItemListRow>
-                </ion-list>
-              </div>
-            </ion-accordion>
+                    {{ translate('Cancel') }}
+                  </ion-button>
+                </template>
+              </OrderItemListRow>
+              <ion-accordion v-else :value="group.externalId">
+                <OrderItemListRow
+                  slot="header"
+                  :primary="groupPrimaryIdentifier(group)"
+                  :secondary="groupSecondaryIdentifier(group)"
+                  :badge-label="isKit(group) ? translate('Kit') : ''"
+                  :image-url="getProduct(group.productId)?.mainImageUrl"
+                  :preview-product="getProduct(group.productId)"
+                  :selected="group.selected"
+                  :quantity="group.totalQty"
+                  :quantity-label="translate('qty')"
+                  :facility-label="groupLocationLabel(group)"
+                  :facility-disabled="true"
+                  :status-label="group.status"
+                  :status-color="group.statusColor"
+                  :amount="money(group.totalPrice, order.currency)"
+                  :adjustments="getGroupAdjustmentRows(group)"
+                  @update:selected="group.selected = $event"
+                />
+                <div slot="content">
+                  <ion-list lines="none">
+                    <OrderItemListRow
+                      v-for="item in group.items"
+                      :key="item.orderItemSeqId"
+                      class="order-item-detail-entry"
+                      :primary="`${translate('Item')} ${item.orderItemSeqId}`"
+                      :secondary="item.externalId && item.externalId !== 'null' ? `${translate('External ID')}: ${item.externalId}` : ''"
+                      :selected="item.selected"
+                      :quantity="item.quantity"
+                      :quantity-label="translate('qty')"
+                      :show-quantity="false"
+                      :facility-label="item.facilityName"
+                      :facility-disabled="isItemFacilityActionDisabled(item)"
+                      :attributes-label="attributeChipLabel(item.attributeCount)"
+                      :status-label="item.status"
+                      :status-color="item.statusColor"
+                      :status-detail="itemStatusDetail(item)"
+                      :amount="money(itemLineTotal(item), order.currency)"
+                      :adjustments="getItemAdjustmentRows(item)"
+                      @update:selected="item.selected = $event"
+                      @facility-click="rejectAndReleaseItem(item, group.productId)"
+                      @attributes-click="openItemAttributesModal(item)"
+                    >
+                      <template #actions>
+                        <ion-button v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)" fill="clear"
+                          size="small" color="danger" @click.stop="cancelSingleItem(item)">
+                          {{ translate('Cancel') }}
+                        </ion-button>
+                      </template>
+                    </OrderItemListRow>
+                  </ion-list>
+                </div>
+              </ion-accordion>
+            </template>
           </ion-accordion-group>
         </ion-list>
 
@@ -978,8 +1016,8 @@
     <ion-footer v-if="order && selectedSegment === 'items'">
       <ion-toolbar>
         <!-- The footer is one engine-driven list (OrderActionValidator.getOrderFooterActions):
-             status transitions (Approve, Cancel order, …) on the start, lifecycle actions
-             (Cancel items, Clone, Return) on the end. Only VALID actions are present — an
+             status transitions (Approve, …) on the start, lifecycle and cancel actions
+             (Cancel items, Cancel order, Return) on the end. Only VALID actions are present — an
              action that doesn't apply to the order simply isn't rendered. -->
         <ion-buttons slot="start">
           <ion-button v-for="action in footerActions.filter(a => a.kind === 'status')" :key="action.id"
@@ -1767,6 +1805,14 @@ const groupedItems = computed(() => {
     return group;
   });
 });
+
+// Items are rolled up by external id so a product split across ship groups reads as one row. A
+// group backed by a single order item has nothing to roll up, so it exposes that item and the
+// row is rendered without the accordion instead of hiding one row behind a disclosure.
+const itemGroups = computed(() => groupedItems.value.map((group: any) => ({
+  group,
+  soleItem: group.items.length === 1 ? group.items[0] : null
+})));
 
 const orderTotals = computed(() => orderDetailStore.orderTotalsByOrderId(props.orderId));
 
@@ -3037,23 +3083,20 @@ async function rejectAndReleaseItem(item: any, productId: string) {
     return;
   }
 
-  // Step 2 — reject the item with default reason
-  try {
-    await api({
-      url: `oms/orders/${orderId}/reject`,
-      method: 'POST',
-      data: {
-        orderId,
-        items: [{
-          orderItemSeqId: item.orderItemSeqId,
-          quantity: '1',
+  if(!isVirtualFacilityForItem(item)) {
+    // Step 2 (optional) — reject the item with default reason
+    try {
+      await api({
+        url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/reject`,
+        method: 'POST',
+        data: {
           rejectionReasonId: 'NO_VARIANCE_LOG',
-        }],
-      },
-    });
-  } catch {
-    await showToast(translate('Failed to reject the item. Please try again.'));
-    return;
+        },
+      });
+    } catch {
+      await showToast(translate('Failed to reject the item. Please try again.'));
+      return;
+    }
   }
 
   // Step 3 — release to chosen facility
@@ -3061,10 +3104,11 @@ async function rejectAndReleaseItem(item: any, productId: string) {
     await api({
       url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/allocation`,
       method: 'POST',
-      data: { facilityId,
-       orderFacilityChange:{
-       changeReasonEnumId:"RELEASED"
-      }
+      data: {
+        facilityId,
+        orderFacilityChange: {
+          changeReasonEnumId: "RELEASED"
+        }
       },
     });
     await showToast(translate('Item released to facility.'));
@@ -3143,7 +3187,7 @@ async function openCloneOrderModal() {
  * So a button that doesn't apply — e.g. Return on a not-yet-fulfilled order —
  * simply isn't shown.
  */
-const DISPATCHABLE_FOOTER_IDS = new Set(['CLONE', 'CANCEL_ITEMS', 'RETURN']);
+const DISPATCHABLE_FOOTER_IDS = new Set(['CANCEL_ITEMS', 'ORDER_CANCELLED', 'RETURN']);
 const footerActions = computed(() => {
   if (!order.value) return [];
   const allowedTransitions = seed.allowedTransitions(order.value.statusId);

@@ -228,7 +228,7 @@ async function resolveCustomer() {
   const partyId = orderDetailStore.customerPartyId;
   if (partyId) {
     try {
-      const resp = await api({ url: `oms/parties/${partyId}/identifications`, method: 'GET' });
+      const resp = await api({ url: 'oms/parties/identifications', method: 'GET', params: { partyId } });
       const rows: any[] = Array.isArray(resp.data) ? resp.data : (resp.data?.docs ?? []);
       const match = rows.find((row: any) => row.partyIdentificationTypeId === SHOPIFY_CUSTOMER_ID_TYPE && row.idValue);
       if (match) {

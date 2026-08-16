@@ -46,7 +46,7 @@
     </ion-list>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedCarrierId || !selectedMethodId" @click="confirm()">
+      <ion-fab-button :disabled="!selectedCarrierId || !selectedMethodId" :aria-label="translate('Confirm')" @click="confirm()">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>

@@ -480,18 +480,17 @@ export const OrderActionValidator = {
       });
     }
 
-    // ONE cancel button that morphs with the item selection (kept on the start
-    // so it converts in place): with cancellable items selected it is the bulk
+    // ONE cancel button that morphs with the item selection: with cancellable items selected it is the bulk
     // "Cancel N items" (the view supplies the count); otherwise, if the order
     // itself can be cancelled, it is the whole-order "Cancel order". The two
-    // never coexist.
+    // never coexist. Placed on the right (kind 'footer').
     const bulkCancelValid = footer.some((action) => action.id === 'CANCEL_ITEMS' && action.validation.allowed);
     const orderCancelValid = statusActions.some((transition) => transition.id === 'ORDER_CANCELLED');
     if (bulkCancelValid) {
-      actions.push({ id: 'CANCEL_ITEMS', kind: 'status', label: 'Cancel items', color: 'danger', fill: 'outline' });
+      actions.push({ id: 'CANCEL_ITEMS', kind: 'footer', label: 'Cancel items', color: 'danger', fill: 'outline' });
     } else if (orderCancelValid) {
       const orderCancel = statusActions.find((transition) => transition.id === 'ORDER_CANCELLED')!;
-      actions.push({ id: 'ORDER_CANCELLED', kind: 'status', toStatusId: 'ORDER_CANCELLED', label: orderCancel.label, color: 'danger', fill: 'outline' });
+      actions.push({ id: 'ORDER_CANCELLED', kind: 'footer', toStatusId: 'ORDER_CANCELLED', label: orderCancel.label, color: 'danger', fill: 'outline' });
     }
 
     // Remaining lifecycle actions on the end (cancel handled above).

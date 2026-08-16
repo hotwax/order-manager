@@ -82,12 +82,12 @@
         </div>
       </ion-segment-content>
       <!-- <ion-fab horizontal="end" vertical="bottom" v-if="selectedSection === 'create' && step === 'info'">
-        <ion-fab-button @click="step = 'shipping'">
+        <ion-fab-button :aria-label="translate('Next')" @click="step = 'shipping'">
           <ion-icon :icon="arrowForwardOutline"></ion-icon>
         </ion-fab-button>
       </ion-fab> -->
       <ion-fab horizontal="end" vertical="bottom" v-if="selectedSection === 'create'">
-        <ion-fab-button @click="handleCreateCustomer">
+        <ion-fab-button :aria-label="translate('Create')" @click="handleCreateCustomer">
           <ion-icon :icon="saveOutline"></ion-icon>
         </ion-fab-button>
       </ion-fab>
