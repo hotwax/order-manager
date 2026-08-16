@@ -153,22 +153,26 @@ export const useReturnsStore = defineStore("returns", {
     },
     async loadMore() {
       if(this.loading || !this.hasMore || this.isExactReturnSearch) {return;}
+      const requestId = this.requestSequence;
       const nextPage = this.pageIndex + 1;
       this.loading = true;
       this.error = "";
       try {
         const result = await listReturns(this.buildListQuery(nextPage));
+        if(requestId !== this.requestSequence) {return;}
         const enrichedItems = await enrichReturnSummaries(result.items);
+        if(requestId !== this.requestSequence) {return;}
         const knownIds = new Set(this.returns.map((item) => item.returnId));
         this.returns = [...this.returns, ...enrichedItems.filter((item) => !knownIds.has(item.returnId))];
         this.total = result.total;
         this.lastPageFull = result.items.length >= this.pageSize;
         this.pageIndex = nextPage;
       } catch (error: any) {
+        if(requestId !== this.requestSequence) {return;}
         this.lastPageFull = false;
         this.error = error?.message || "Failed to load more returns";
       } finally {
-        this.loading = false;
+        if(requestId === this.requestSequence) {this.loading = false;}
       }
     },
     async loadReturn(returnId: string) {
