@@ -5,6 +5,7 @@ import {
   getCustomer,
   getCustomerContactMechs,
   getCustomerOrders,
+  getCustomerTasks,
   searchCustomers
 } from '@/services/customer';
 
@@ -387,5 +388,54 @@ describe('customer service', () => {
 
     const payload = vi.mocked(api).mock.calls.at(-1)?.[0] as any;
     expect(payload.data.params).not.toHaveProperty('sort');
+  });
+
+  it('fetches customer tasks via workEffortPartyAssignments with roleTypeId CUSTOMER', async () => {
+    vi.mocked(api).mockResolvedValue({
+      data: [{
+        workEffortId: 'TASK_101',
+        workEffortName: 'Review risk',
+        workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+        workEffortPurposeTypeId: 'REVIEW_RISK_ORDER',
+        taskStatusId: 'TASK_CREATED',
+        orderId: 'ORDER_555',
+        orderName: 'PO #555',
+        orderDate: '2026-08-01',
+        grandTotal: 150.00,
+        partyId: 'CUST_111483',
+        assigneePartyId: 'USER_2',
+        assigneeFullName: 'Jane Doe',
+        assigneeSince: '2026-08-01T12:00:00Z',
+        reporterPartyId: 'USER_1',
+        reporterFullName: 'John Smith',
+        reporterSince: '2026-08-01T10:00:00Z',
+        dueDate: '2026-08-05'
+      }]
+    });
+
+    const tasks = await getCustomerTasks('CUST_111483', { taskStatusId: 'TASK_CREATED', pageSize: 10, pageIndex: 0 });
+
+    expect(api).toHaveBeenCalledWith({
+      url: 'oms/workEffortPartyAssignments',
+      method: 'get',
+      params: {
+        partyId: 'CUST_111483',
+        roleTypeId: 'CUSTOMER',
+        taskStatusId: 'TASK_CREATED',
+        pageSize: 10,
+        pageIndex: 0,
+        orderByField: undefined
+      }
+    });
+    expect(tasks).toHaveLength(1);
+    expect(tasks[0]).toMatchObject({
+      workEffortId: 'TASK_101',
+      workEffortName: 'Review risk',
+      orderId: 'ORDER_555',
+      customerPartyId: 'CUST_111483',
+      assigneeName: 'Jane Doe',
+      reporterName: 'John Smith',
+      grandTotal: 150
+    });
   });
 });

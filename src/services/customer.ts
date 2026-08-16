@@ -704,17 +704,18 @@ export async function getOrderProgressStatuses(orderId: string): Promise<string[
 }
 
 /**
- * Customer tasks via GET /oms/customers/{partyId}/tasks (get#PartyTasks). Separate,
- * paginated/filterable call - tasks are unbounded history, kept out of the profile master.
+ * Customer tasks via GET /oms/workEffortPartyAssignments (WorkEffortPartyDetail).
  */
 export async function getCustomerTasks(
   partyId: string,
   params: { taskStatusId?: string; pageSize?: number; pageIndex?: number; orderByField?: string } = {}
 ): Promise<CustomerTaskSummary[]> {
   const response = await api({
-    url: `oms/customers/${partyId}/tasks`,
+    url: 'oms/workEffortPartyAssignments',
     method: 'get',
     params: {
+      partyId,
+      roleTypeId: 'CUSTOMER',
       taskStatusId: params.taskStatusId,
       pageSize: params.pageSize ?? 20,
       pageIndex: params.pageIndex ?? 0,
@@ -736,7 +737,7 @@ export function normalizeCustomerTask(task: any): CustomerTaskSummary {
     orderName: task.orderName || undefined,
     orderDate: task.orderDate ? toStringValue(task.orderDate) : undefined,
     grandTotal: task.grandTotal != null ? Number(task.grandTotal) : undefined,
-    customerPartyId: task.customerPartyId ? toStringValue(task.customerPartyId) : undefined,
+    customerPartyId: (task.customerPartyId || task.partyId) ? toStringValue(task.customerPartyId || task.partyId) : undefined,
     assigneePartyId: task.assigneePartyId ? toStringValue(task.assigneePartyId) : undefined,
     assigneeName: task.assigneeFullName || undefined,
     assigneeSince: task.assigneeSince ? toStringValue(task.assigneeSince) : undefined,
