@@ -12,7 +12,7 @@
         <div class="search-filter-controls">
           <slot />
         </div>
-        <ion-button v-if="showClear" class="search-filter-clear" fill="clear" @click="$emit('clear')">{{ translate('Clear') }}</ion-button>
+        <ion-button v-if="showClear" class="search-filter-clear" fill="clear" @click="$emit('clear')">{{ translate('Clear filters') }}</ion-button>
       </div>
     </ion-card-content>
   </ion-card>
