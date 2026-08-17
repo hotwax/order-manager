@@ -9,7 +9,8 @@
         <ion-title>Customer Detail</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="onDeleteCustomer" :disabled="deleting || customer?.statusId === 'PARTY_DISABLED'" :aria-label="translate('Delete customer')">
-            <ion-icon slot="icon-only" :icon="trashOutline" />
+            <ion-spinner v-if="deleting" name="crescent" slot="icon-only" />
+            <ion-icon v-else slot="icon-only" :icon="trashOutline" />
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
