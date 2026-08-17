@@ -1016,8 +1016,8 @@
     <ion-footer v-if="order && selectedSegment === 'items'">
       <ion-toolbar>
         <!-- The footer is one engine-driven list (OrderActionValidator.getOrderFooterActions):
-             status transitions (Approve, Cancel order, …) on the start, lifecycle actions
-             (Cancel items, Clone, Return) on the end. Only VALID actions are present — an
+             status transitions (Approve, …) on the start, lifecycle and cancel actions
+             (Cancel items, Cancel order, Return) on the end. Only VALID actions are present — an
              action that doesn't apply to the order simply isn't rendered. -->
         <ion-buttons slot="start">
           <ion-button v-for="action in footerActions.filter(a => a.kind === 'status')" :key="action.id"
@@ -3083,24 +3083,20 @@ async function rejectAndReleaseItem(item: any, productId: string) {
     return;
   }
 
-  // Step 2 — reject the item with default reason
-  try {
-    await api({
-      url: `oms/orders/${orderId}/reject`,
-      method: 'POST',
-      data: {
-        orderId,
-        items: [{
-          orderItemSeqId: item.orderItemSeqId,
-          quantity: '1',
-          maySplit: 'Y',
+  if(!isVirtualFacilityForItem(item)) {
+    // Step 2 (optional) — reject the item with default reason
+    try {
+      await api({
+        url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/reject`,
+        method: 'POST',
+        data: {
           rejectionReasonId: 'NO_VARIANCE_LOG',
-        }],
-      },
-    });
-  } catch {
-    await showToast(translate('Failed to reject the item. Please try again.'));
-    return;
+        },
+      });
+    } catch {
+      await showToast(translate('Failed to reject the item. Please try again.'));
+      return;
+    }
   }
 
   // Step 3 — release to chosen facility
@@ -3108,10 +3104,11 @@ async function rejectAndReleaseItem(item: any, productId: string) {
     await api({
       url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/allocation`,
       method: 'POST',
-      data: { facilityId,
-       orderFacilityChange:{
-       changeReasonEnumId:"RELEASED"
-      }
+      data: {
+        facilityId,
+        orderFacilityChange: {
+          changeReasonEnumId: "RELEASED"
+        }
       },
     });
     await showToast(translate('Item released to facility.'));
@@ -3190,7 +3187,7 @@ async function openCloneOrderModal() {
  * So a button that doesn't apply — e.g. Return on a not-yet-fulfilled order —
  * simply isn't shown.
  */
-const DISPATCHABLE_FOOTER_IDS = new Set(['CLONE', 'CANCEL_ITEMS', 'RETURN']);
+const DISPATCHABLE_FOOTER_IDS = new Set(['CANCEL_ITEMS', 'ORDER_CANCELLED', 'RETURN']);
 const footerActions = computed(() => {
   if (!order.value) return [];
   const allowedTransitions = seed.allowedTransitions(order.value.statusId);
@@ -3344,8 +3341,6 @@ async function openCreateHoldTaskModal() {
     componentProps: {
       shipGroups,
       title: translate('Create hold task'),
-      autoGenerateTaskName: true,
-      defaultOrderName: currentOrder.orderName || currentOrder.id,
       defaultWorkEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
     },
   });

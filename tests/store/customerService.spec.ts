@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { api } from '@common';
+import { api, logger } from '@common';
 import { getActivePhysicalFacilityOrderVolume } from '@/services/order';
 import { useCustomerServiceStore } from '@/store/customerService';
 import { DateTime } from 'luxon';
@@ -168,7 +168,7 @@ describe('customer service hold task counts', () => {
 
   it('marks the hold task section as errored without clearing the previous counts', async () => {
     const error = new Error('network failed');
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(logger.error).mockClear();
     vi.mocked(api).mockRejectedValueOnce(error);
 
     const store = useCustomerServiceStore();
@@ -194,7 +194,6 @@ describe('customer service hold task counts', () => {
       }]
     });
     expect(store.dashboardStatus.holdTasks).toBe('error');
-    expect(errorSpy).toHaveBeenCalledWith('Failed to fetch hold task counts', error);
-    errorSpy.mockRestore();
+    expect(logger.error).toHaveBeenCalledWith('Failed to fetch hold task counts', error);
   });
 });
