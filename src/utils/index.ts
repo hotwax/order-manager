@@ -13,6 +13,18 @@ export const showToast = async (message: string) => {
   return toast.present();
 }
 
+/** A toast that also offers one follow-up, e.g. jumping to where background work can be watched. */
+export const showToastWithAction = async (message: string, actionText: string, handler: () => void) => {
+  const toast = await toastController.create({
+    message,
+    duration: 5000,
+    position: 'bottom',
+    buttons: [{ text: actionText, role: 'info', handler }],
+  })
+
+  return toast.present();
+}
+
 export const confirmParkOrder = async (): Promise<boolean> => {
   let confirmed = false;
   const alert = await alertController.create({

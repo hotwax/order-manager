@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@common';
 import {
   BULK_ACTION_CONFIGS,
+  BULK_ACTION_CONFIG_IDS,
+  cancelBulkActionRun,
+  fetchBulkActionRuns,
+  hasActiveRun,
+  toBulkActionRun,
   cancelOpenItemsRecords,
   createOrderTaskRecords,
   parkOrderRecords,
@@ -145,5 +150,89 @@ describe('bulk action permissions', () => {
     expect(permittedBulkActions(['shipMethod', 'shipDates', 'createTasks'],
       { canUpdate: true, canCancel: true, canCreateTask: true }))
       .toEqual(['shipMethod', 'shipDates', 'createTasks']);
+  });
+});
+
+describe('bulk action run mapping', () => {
+  const baseLog = {
+    logId: '5001',
+    configId: 'UPDATE_ORDER_SHIP_DATES',
+    statusId: 'DmlsFinished',
+    createdDate: '2026-08-17T09:00:00Z',
+    totalRecordCount: 20,
+    failedRecordCount: 0
+  };
+
+  it('names the run from the config rather than showing a raw config id', () => {
+    expect(toBulkActionRun(baseLog).actionName).toBe('Update ship dates');
+  });
+
+  it('treats a finished run with no failures as completed', () => {
+    const run = toBulkActionRun(baseLog);
+    expect(run.state).toBe('completed');
+    expect(run.stateLabel).toBe('Completed');
+    expect(run.successRecordCount).toBe(20);
+  });
+
+  // DmlsFinished only means the run reached the end; failed records still land in the error file.
+  it('splits a finished run with failures into completed-with-issues', () => {
+    const run = toBulkActionRun({ ...baseLog, failedRecordCount: 2 });
+    expect(run.state).toBe('completedWithIssues');
+    expect(run.stateLabel).toBe('Completed with issues');
+    expect(run.successRecordCount).toBe(18);
+  });
+
+  it('maps the queued, running, failed and cancelled statuses', () => {
+    expect(toBulkActionRun({ ...baseLog, statusId: 'DmlsPending' }).state).toBe('pending');
+    expect(toBulkActionRun({ ...baseLog, statusId: 'DmlsQueued' }).state).toBe('pending');
+    expect(toBulkActionRun({ ...baseLog, statusId: 'DmlsRunning' }).state).toBe('processing');
+    expect(toBulkActionRun({ ...baseLog, statusId: 'DmlsFailed' }).state).toBe('failed');
+    expect(toBulkActionRun({ ...baseLog, statusId: 'DmlsCrashed' }).state).toBe('failed');
+    expect(toBulkActionRun({ ...baseLog, statusId: 'DmlsCancelled' }).state).toBe('cancelled');
+  });
+
+  it('only offers cancel while the run is still pending', () => {
+    expect(toBulkActionRun({ ...baseLog, statusId: 'DmlsPending' }).canCancel).toBe(true);
+    expect(toBulkActionRun({ ...baseLog, statusId: 'DmlsRunning' }).canCancel).toBe(false);
+    expect(toBulkActionRun(baseLog).canCancel).toBe(false);
+  });
+
+  it('reports an active run only while something is queued or processing', () => {
+    expect(hasActiveRun([toBulkActionRun(baseLog)])).toBe(false);
+    expect(hasActiveRun([toBulkActionRun({ ...baseLog, statusId: 'DmlsRunning' })])).toBe(true);
+    expect(hasActiveRun([toBulkActionRun({ ...baseLog, statusId: 'DmlsPending' })])).toBe(true);
+  });
+
+  it('survives a log that has no record counts yet', () => {
+    const run = toBulkActionRun({ ...baseLog, statusId: 'DmlsPending', totalRecordCount: null, failedRecordCount: null });
+    expect(run.totalRecordCount).toBeNull();
+    expect(run.successRecordCount).toBeNull();
+    expect(run.failedRecordCount).toBe(0);
+  });
+});
+
+describe('bulk action run queries', () => {
+  beforeEach(() => {
+    apiMock.mockReset();
+    apiMock.mockResolvedValue({ data: { dataManagerLogs: [], dataManagerLogsCount: 0 } });
+  });
+
+  it('asks only for the six order bulk-action configs, newest first', async () => {
+    await fetchBulkActionRuns();
+
+    const params = apiMock.mock.calls[0][0].params;
+    expect(apiMock.mock.calls[0][0].url).toBe('admin/dataManager/details');
+    expect(params.configId.split(',').sort()).toEqual([...BULK_ACTION_CONFIG_IDS].sort());
+    expect(params.configId_op).toBe('in');
+    expect(params.orderByField).toBe('-createdDate');
+  });
+
+  it('cancels a run by moving its log to DmlsCancelled', async () => {
+    await cancelBulkActionRun('CANCEL_ORDER_ITEMS', '5001');
+
+    const request = apiMock.mock.calls[0][0];
+    expect(request.url).toBe('admin/dataManager/log/5001');
+    expect(request.method).toBe('PUT');
+    expect(request.data).toEqual({ configId: 'CANCEL_ORDER_ITEMS', logId: '5001', statusId: 'DmlsCancelled' });
   });
 });

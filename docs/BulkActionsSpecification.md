@@ -1,7 +1,22 @@
 # Bulk Actions Specification for Order Manager List & Find Pages
 
-**Status:** Proposed (MDM-Driven Architecture + Activity Monitoring)  
-**Scope:** Find Orders, Find Customers, Unfillable, In-Progress List Pages (`/open`, `/inflight`, `/packed`, `/brokering`), and Bulk Actions Activity Page (`/bulk-actions`).
+**Status:** Implemented (MDM-Driven Architecture + Activity Monitoring)  
+**Scope:** Find Orders, Unfillable, In-Progress List Pages (`/open`, `/inflight`, `/packed`, `/brokering`), and Bulk Actions Activity Page (`/bulk-actions`).  
+**Backend:** [hotwax/oms#962](https://github.com/hotwax/oms/pull/962)
+
+> **Sections 3-6 were corrected against the real backend.** The original draft named consumer
+> services, payload fields and upload parameters that do not exist in `hotwax/oms`. Three capability
+> limits are worth carrying forward:
+>
+> - **Ship-group dates.** `estimatedShipDate` belongs to `Shipment` and `estimatedDeliveryDate` to
+>   `OrderItem`; neither is an `OrderItemShipGroup` field. `shipByDate` is the only date settable at
+>   ship-group level, so that is the whole of `UPDATE_ORDER_SHIP_DATES`.
+> - **Re-routing.** `oms/orders/{orderId}/facilityChange` is a read-only history view.
+>   `process#OrderFacilityAllocation` is the real re-route path, and it only moves items currently at
+>   a *virtual* facility - an order already at a physical facility must be parked first.
+> - **Customer tasks are out of scope.** There is no `CustomerTaskServices` in `hotwax/oms`, and
+>   `create#OrderTask` is order-scoped. `/customers` carries no bulk action, and
+>   `CREATE_CUSTOMER_TASKS` was dropped.
 
 ---
 
@@ -85,102 +100,75 @@ All list and find pages follow the established AccxUI selection pattern:
 | `/inflight` | **In-Flight Orders** | 1. **Park orders**<br>2. **Re-route / Change facility**<br>3. **Update carrier & shipping method**<br>4. **Update ship group dates**<br>5. **Cancel open items**<br>6. **Add task** | Same as `/orders` |
 | `/packed` | **Packed Orders** | 1. **Update carrier & shipping method**<br>2. **Update ship group dates**<br>3. **Add task** | `UPDATE_ORDER_SHIP_METHOD`<br>`UPDATE_ORDER_SHIP_DATES`<br>`CREATE_ORDER_TASKS` |
 | `/brokering` | **Brokering Queue** | 1. **Park orders**<br>2. **Re-route / Change facility**<br>3. **Update carrier & shipping method**<br>4. **Update ship group dates**<br>5. **Cancel open items**<br>6. **Add task** | Same as `/orders` |
-| `/customers` | **Find Customers** | 1. **Add task / Create task** | `CREATE_CUSTOMER_TASKS` |
 
 ---
 
 ## 4. MDM Configuration & Payload Specifications
 
+All six configs use `executionModeId="DMC_QUEUE"` and `multiThreading="N"`. Every record is one
+selected **order**; the consumer service resolves that order's own ship groups and open items, so
+the app never fans out per ship group.
+
 ### 4.1 Update Ship Group Dates (`UPDATE_ORDER_SHIP_DATES`)
-* **Consumer Service:** `co.hotwax.order.OrderServices.update#OrderShipGroupDates`
-* **JSON Record Shape:**
+* **Consumer Service:** `co.hotwax.oms.order.OrderBulkServices.update#OrderShipDates` *(new)*
+* **Applies to:** every ship group of the order, via `update#OrderItemShipGroup`, which also
+  re-stamps the promised dates on that ship group's reservations.
 ```json
 [
-  {
-    "orderId": "10001",
-    "shipGroupSeqId": "00001",
-    "estimatedShipDate": "2026-08-25T00:00:00Z",
-    "estimatedDeliveryDate": "2026-08-28T00:00:00Z"
-  }
+  { "orderId": "10001", "shipByDate": "2026-08-25 00:00:00" }
 ]
 ```
 
 ### 4.2 Update Carrier & Shipping Method (`UPDATE_ORDER_SHIP_METHOD`)
-* **Consumer Service:** `co.hotwax.order.OrderServices.update#OrderShippingMethod`
-* **JSON Record Shape:**
+* **Consumer Service:** `co.hotwax.oms.order.OrderServices.update#ShippingMethod` *(existing)*
 ```json
 [
-  {
-    "orderId": "10001",
-    "carrierPartyId": "UPS",
-    "shipmentMethodTypeId": "NEXT_DAY"
-  }
+  { "orderId": "10001", "carrierPartyId": "UPS", "shipmentMethodTypeId": "NEXT_DAY" }
 ]
 ```
 
 ### 4.3 Park Orders (`UPDATE_ORDER_PARKING`)
-* **Consumer Service:** `co.hotwax.order.OrderServices.park#Order`
-* **JSON Record Shape:**
+* **Consumer Service:** `co.hotwax.oms.order.OrderServices.park#Order` *(existing)*
+* **Note:** `facilityId` must be a **virtual** facility; the service rejects anything else. There is
+  no `comments` parameter.
 ```json
 [
-  {
-    "orderId": "10001",
-    "facilityId": "PARKING_REJECTED",
-    "comments": "Bulk parked via Order Manager"
-  }
+  { "orderId": "10001", "facilityId": "PARKING_REJECTED" }
 ]
 ```
 
 ### 4.4 Re-route / Change Facility (`UPDATE_ORDER_FACILITY`)
-* **Consumer Service:** `co.hotwax.order.OrderServices.update#OrderShipGroupFacility`
-* **JSON Record Shape:**
+* **Consumer Service:** `co.hotwax.oms.order.OrderBulkServices.update#OrderFacility` *(new)*
+* **Applies to:** the order's `ITEM_APPROVED` items, handed to `process#OrderFacilityAllocation`.
 ```json
 [
-  {
-    "orderId": "10001",
-    "shipGroupSeqId": "00001",
-    "facilityId": "WH_STORE_01"
-  }
+  { "orderId": "10001", "facilityId": "WH_STORE_01" }
 ]
 ```
 
 ### 4.5 Cancel Open Items (`CANCEL_ORDER_ITEMS`)
-* **Consumer Service:** `co.hotwax.order.OrderServices.cancel#OrderOpenItems`
-* **JSON Record Shape:**
+* **Consumer Service:** `co.hotwax.oms.order.OrderBulkServices.cancel#OrderOpenItems` *(new)*
+* **`reason`** is an `Enumeration` id from the same reason set the single-item reject flow uses
+  (`REPORT_AN_ISSUE` / `RPRT_NO_VAR_LOG`).
 ```json
 [
-  {
-    "orderId": "10001",
-    "cancelReasonId": "BULK_OPERATOR_CANCEL"
-  }
+  { "orderId": "10001", "reason": "NO_VARIANCE_LOG", "comment": "Customer cancelled" }
 ]
 ```
 
 ### 4.6 Create Order Tasks (`CREATE_ORDER_TASKS`)
-* **Consumer Service:** `co.hotwax.order.OrderTaskServices.create#OrderTask`
-* **JSON Record Shape:**
+* **Consumer Service:** `co.hotwax.oms.order.OrderBulkServices.create#OrderTasks` *(new)*
+* **Applies to:** one task per ship group. `create#OrderTask` is ship-group scoped and has no
+  `estimatedCompletionDate`; the purpose must be a real `RESOLVE_ONHOLD_ORDER` enum
+  (`ORD_HOLD_MANUAL`, `ORD_HOLD_CUST_REQ`).
 ```json
 [
   {
     "orderId": "10001",
+    "workEffortTypeId": "RESOLVE_ONHOLD_ORDER",
+    "workEffortPurposeTypeId": "ORD_HOLD_CUST_REQ",
     "workEffortName": "Review shipping hold",
-    "workEffortPurposeTypeId": "WEPT_ORDER_HOLD",
-    "description": "Customer requested verification",
-    "estimatedCompletionDate": "2026-08-20T00:00:00Z"
-  }
-]
-```
-
-### 4.7 Create Customer Tasks (`CREATE_CUSTOMER_TASKS`)
-* **Consumer Service:** `co.hotwax.customer.CustomerTaskServices.create#CustomerTask`
-* **JSON Record Shape:**
-```json
-[
-  {
-    "partyId": "10042",
-    "workEffortName": "Customer follow-up",
-    "workEffortPurposeTypeId": "WEPT_CUST_INQUIRY",
-    "description": "Follow up on order status inquiry"
+    "description": "Customer requested verification"
   }
 ]
 ```
@@ -236,7 +224,6 @@ Technical `DataManagerConfig` IDs and status codes are translated into clear ope
 | `UPDATE_ORDER_FACILITY` | **Re-route fulfillment facility** |
 | `CANCEL_ORDER_ITEMS` | **Cancel open items** |
 | `CREATE_ORDER_TASKS` | **Create order tasks** |
-| `CREATE_CUSTOMER_TASKS` | **Create customer tasks** |
 
 | MDM Log Status (`statusId`) | Operator Status Label | Badge Color |
 |---|---|---|
@@ -256,46 +243,55 @@ Technical `DataManagerConfig` IDs and status codes are translated into clear ope
 
 ## 6. Frontend Producer Implementation
 
-The frontend uses a reusable MDM upload utility:
+`upload#DataManagerFile` declares **`configId`** and **`contentFile`** - not `dataManagerConfigId`
+and `uploadedFile` - and is mounted at `admin/uploadDataManagerFile`. Content-Type is deliberately
+left unset: axios derives the multipart boundary from the `FormData`, and naming the type without a
+boundary produces a request the backend cannot parse.
 
 ```typescript
 export async function submitBulkActionMdmFile(
   configId: string,
-  records: Record<string, any>[],
+  records: BulkActionRecord[],
   semanticName: string
 ) {
-  // 1. Serialize records to JSON Blob
+  if (!records.length) throw new Error('No records to submit');
+
   const blob = new Blob([JSON.stringify(records, null, 2)], { type: 'application/json' });
-  const filename = `${semanticName}_${configId}_${Date.now()}.json`;
+  const fileName = `${semanticName}_${configId}_${DateTime.now().toFormat('yyyyMMddHHmmss')}.json`;
 
-  // 2. Prepare FormData
   const formData = new FormData();
-  formData.append('dataManagerConfigId', configId);
-  formData.append('uploadedFile', blob, filename);
+  formData.append('configId', configId);
+  formData.append('contentFile', blob, fileName);
 
-  // 3. Upload to standard MDM endpoint
-  return api({
-    url: 'uploadDataManagerFile',
-    method: 'POST',
-    data: formData,
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
+  return api({ url: 'admin/uploadDataManagerFile', method: 'POST', data: formData });
 }
 ```
+
+Timestamps are normalised to `yyyy-MM-dd HH:mm:ss` before upload; Moqui does not reliably convert an
+ISO string carrying `T`/`Z`.
 
 ---
 
 ## 7. Implementation Plan & Deliverables
 
-1. **Moqui / Backend Work:**
-   - Define `DataManagerConfig` records in XML data for the 7 bulk action configs (`executionModeId="DMC_QUEUE"`).
-   - Author / verify consumer services following standard MDM rules (single record design, error handling via message facade).
+1. **Moqui / Backend Work** — [hotwax/oms#962](https://github.com/hotwax/oms/pull/962):
+   - Six `DataManagerConfig` rows in `upgrade/UpcomingRelease/UpgradeData.xml` (upgrades) and
+     `data/DA_ExtSeed_AA_SeedData.xml` (fresh installs).
+   - Four consumer services in `service/co/hotwax/oms/order/OrderBulkServices.xml`, each designed
+     for a single record, declaring no transaction attributes, and returning an error so a bad
+     record reaches the MDM error file.
 2. **Frontend Order Manager Work:**
-   - Implement `submitBulkActionMdmFile` upload helper.
-   - Update `OrderSearch.vue`, `OpenOrders.vue`, `InflightOrders.vue`, `PackedOrders.vue`, `OrderQueueList.vue`, and `Customers.vue` to bind selection modals to the MDM submission helper.
-   - Wire reusable `EditDeliveryDatesModal.vue`, `EditShippingMethodModal.vue`, `FacilityModal.vue`, and `TaskCreateModal.vue`.
-   - Create **`BulkActions.vue`** (`/bulk-actions`) with human-friendly log list, status filters, error file downloads, and pending-cancel actions.
-   - Add **Bulk actions** entry to `Menu.vue`.
+   - `src/services/bulkActions.ts` — upload helper, per-action record builders, permission gating,
+     and the run-history read side.
+   - `src/components/orders/BulkOrderActionFooter.vue` — one shared selection footer, replacing the
+     five near-duplicate footers and the client-side mutation loops in `orderDetail`/`customerService`.
+   - New modals `CancelOpenItemsModal.vue` and `EditShipDatesModal.vue`; `FacilityModal.vue`
+     extended with a `scope` prop so the same picker serves parking (virtual) and re-routing
+     (physical); `EditShippingMethodModal.vue` carrier picker converted to a radio group.
+   - `src/views/BulkActions.vue` (`/bulk-actions`) plus the **Bulk actions** menu entry.
 3. **Verification:**
-   - Run sample files for each `DataManagerConfigId` and verify `DataManagerLog` execution, success outcomes, and error file routing on Moqui backend.
-   - Verify that `/bulk-actions` accurately renders real-time job progress and allows error file download.
+   - Unit tests cover the upload contract, every record shape, permission gating, and run-state
+     mapping (including the `DmlsFinished` + failures → *Completed with issues* split).
+   - **Outstanding:** run one real file per `configId` against an instance carrying the new configs
+     and confirm each `DataManagerLogDetails` row reaches a terminal status with an empty
+     `errorFileContentLocation`. Not yet possible — the configs land with hotwax/oms#962.

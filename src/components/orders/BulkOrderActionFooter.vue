@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonFooter, IonTitle, IonToolbar, modalController } from '@ionic/vue';
+import { IonButton, IonButtons, IonFooter, IonTitle, IonToolbar, modalController, useIonRouter } from '@ionic/vue';
 import { computed, ref } from 'vue';
 import { logger, translate } from '@common';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
@@ -38,7 +38,7 @@ import {
   type BulkActionKey,
   type BulkActionRecord
 } from '@/services/bulkActions';
-import { showToast } from '@/utils';
+import { showToast, showToastWithAction } from '@/utils';
 
 /**
  * The bulk action bar shared by every order list and find page.
@@ -66,6 +66,7 @@ const emit = defineEmits<{
   (e: 'submitted', action: BulkActionKey): void;
 }>();
 
+const ionRouter = useIonRouter();
 const submitting = ref(false);
 
 const visibleActions = computed(() =>
@@ -83,8 +84,11 @@ async function runAction(action: BulkActionKey) {
   submitting.value = true;
   try {
     await submitBulkActionMdmFile(BULK_ACTION_CONFIGS[action], records, action);
-    await showToast(
-      translate('Bulk request submitted for {count} order(s). Processing in background.', { count: orderIds.length })
+    // The work is now MDM's; point the operator at where they can watch it finish.
+    await showToastWithAction(
+      translate('Bulk request submitted for {count} order(s). View progress in Bulk actions.', { count: orderIds.length }),
+      translate('View'),
+      () => ionRouter.push('/bulk-actions')
     );
     emit('submitted', action);
   } catch (error) {
