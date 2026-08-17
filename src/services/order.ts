@@ -587,7 +587,7 @@ function normalizeActivePhysicalFacilityOrderVolume(data: any): ActiveFacilityOr
         assignedItemQuantity: toNumberValue(bucket.itemQuantity)
       };
     })
-    .filter((row: ActiveFacilityOrderVolume) => row.facilityId && row.lastOrderCount > 0 && row.assignedItemQuantity > 0)
+    .filter((row: ActiveFacilityOrderVolume) => row.facilityId && row.lastOrderCount > 0)
     .sort((a: ActiveFacilityOrderVolume, b: ActiveFacilityOrderVolume) => b.lastOrderCount - a.lastOrderCount || a.facilityName.localeCompare(b.facilityName));
 }
 

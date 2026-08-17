@@ -203,13 +203,6 @@ function matchesFilters(order: WorkflowOrder, filters: WorkflowFilters): boolean
   return true;
 }
 
-function hasUsableFacilityOrderVolume(facilities: any[]) {
-  return facilities.some((facility) =>
-    facility?.facilityId
-    && Number(facility.lastOrderCount || facility.orderCount || facility.shipGroupCount || 0) > 0
-  );
-}
-
 function inBucket(order: WorkflowOrder, bucket: WorkflowBucket): boolean {
   return order.bucket === bucket;
 }
@@ -465,19 +458,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
     async fetchFacilityOrderVolume(productStoreId?: string) {
       this.dashboardStatus.facilityOrderVolume = 'loading';
       try {
-        const params: any = { };
-        if (productStoreId) params.productStoreId = productStoreId;
-        const resp = await api({
-          url: 'oms/orders/funnelDashboard/facilityOrderVolume',
-          method: 'GET',
-          params
-        });
-        if (resp.data) {
-          const facilities = Array.isArray(resp.data.facilities) ? resp.data.facilities : [];
-          this.facilityOrderVolume = hasUsableFacilityOrderVolume(facilities)
-            ? facilities
-            : await getActivePhysicalFacilityOrderVolume({ productStoreId });
-        }
+        this.facilityOrderVolume = await getActivePhysicalFacilityOrderVolume({ productStoreId });
         this.dashboardStatus.facilityOrderVolume = 'success';
       } catch (error) {
         logger.error('Failed to fetch facility order volume', error);
