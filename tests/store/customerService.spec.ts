@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { api, logger } from '@common';
 import { getActivePhysicalFacilityOrderVolume } from '@/services/order';
 import { useCustomerServiceStore } from '@/store/customerService';
+import { useOrderStore } from '@/store/order';
 import { DateTime } from 'luxon';
 
 vi.mock('@common', () => ({
@@ -163,6 +164,10 @@ describe('customer service hold task counts', () => {
     setActivePinia(createPinia());
     vi.mocked(api).mockReset();
     vi.mocked(api).mockResolvedValue({ headers: {}, data: [] });
+    vi.mocked(useOrderStore).mockReset().mockReturnValue({
+      workflowOrders: { open: [], inflight: [], packed: [] },
+      workflowOrdersTotal: { open: 0, inflight: 0, packed: 0 },
+    } as any);
   });
 
   it('fetches canonical open hold counts from the OMS dashboard service', async () => {
@@ -227,6 +232,34 @@ describe('customer service hold task counts', () => {
     expect(store.holdTasks.holdTaskCounts.reduce((total, count) => total + count.taskCount, 0))
       .toBe(store.holdTasks.holdTasksTotalCount);
     expect(store.dashboardStatus.holdTasks).toBe('success');
+  });
+
+  it('rolls every purpose without a dedicated queue page into the Hold badge', async () => {
+    const setNavCount = vi.fn();
+    vi.mocked(useOrderStore).mockReturnValue({ setNavCount } as any);
+    vi.mocked(api).mockResolvedValueOnce({
+      data: {
+        holdTasksTotalCount: '21',
+        holdTaskCounts: [
+          { workEffortPurposeTypeId: 'NEG_RES_REVIEW', taskCount: '12' },
+          { workEffortPurposeTypeId: 'INVALID_ADDRESS', taskCount: '4' },
+          { workEffortPurposeTypeId: 'REVIEW_RISK_ORDER', taskCount: '1' },
+          { workEffortPurposeTypeId: 'ORD_HOLD_MANUAL', taskCount: '2' },
+          // Neither of these is mapped anywhere, and both must still be counted —
+          // that is the whole point of the Hold queue being the complement.
+          { workEffortPurposeTypeId: 'SHPFY_SYNC_ERR', taskCount: '1' },
+          { workEffortPurposeTypeId: 'FUTURE_HOLD', taskCount: '1' }
+        ]
+      }
+    });
+
+    await useCustomerServiceStore().fetchHoldTasks('STORE_1');
+
+    expect(setNavCount).toHaveBeenCalledWith('swap', 12);
+    expect(setNavCount).toHaveBeenCalledWith('badAddress', 4);
+    expect(setNavCount).toHaveBeenCalledWith('fraud', 1);
+    // 2 manual + 1 Shopify sync error + 1 future hold
+    expect(setNavCount).toHaveBeenCalledWith('hold', 4);
   });
 
   it('marks the hold task section as errored without clearing the previous counts', async () => {

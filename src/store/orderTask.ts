@@ -11,10 +11,10 @@ import type { TaskQueueRequestParams } from '@/types/orderTaskFilters';
 import {
   ADDRESS_VALIDATION_PURPOSE_TYPE_ID,
   FRAUD_RISK_PURPOSE_TYPE_ID,
+  generalHoldPurposeParams,
   HOLD_TASK_TYPE_ID,
   OPEN_TASK_STATUS_IDS,
   SWAP_PURPOSE_TYPE_ID,
-  USER_HOLD_PURPOSE_TYPE_IDS,
 } from '@/utils/taskQueues';
 
 interface TaskStatusCommunicationOptions {
@@ -223,7 +223,13 @@ export const useOrderTaskStore = defineStore('orderTask', {
     getOrderFraudTasksByOrderId: (state) => (orderId: string) => state.orderFraudTasksByOrderId[orderId] || [],
   },
   actions: {
-    async fetchHoldTasks(payload: TaskQueueRequestParams = {}, workEffortPurposeTypeId = USER_HOLD_PURPOSE_TYPE_IDS) {
+    /**
+     * The general Hold queue. With no `workEffortPurposeTypeId` it lists every hold
+     * task whose purpose does *not* own a dedicated page (Bad Address / Swap / Fraud),
+     * so purposes OMS adds later surface here instead of being invisible. Passing a
+     * purpose narrows the queue to it — that is the purpose filter / deep link.
+     */
+    async fetchHoldTasks(payload: TaskQueueRequestParams = {}, workEffortPurposeTypeId?: string) {
       const isFirstPage = !(Number(payload.pageIndex || 0) > 0);
       // Loading status only gates the first-page fetch; page 2+ keeps the existing
       // list visible and relies on the infinite-scroll indicator instead.
@@ -243,8 +249,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
             taskStatusId: OPEN_TASK_STATUS_IDS,
             taskStatusId_op: 'in',
             workEffortTypeId: HOLD_TASK_TYPE_ID,
-            workEffortPurposeTypeId,
-            ...(workEffortPurposeTypeId === USER_HOLD_PURPOSE_TYPE_IDS ? { workEffortPurposeTypeId_op: 'in' } : {}),
+            ...(workEffortPurposeTypeId ? { workEffortPurposeTypeId } : generalHoldPurposeParams()),
             productStoreId,
           },
         });
@@ -393,8 +398,9 @@ export const useOrderTaskStore = defineStore('orderTask', {
               taskStatusId: OPEN_TASK_STATUS_IDS,
               taskStatusId_op: 'in',
               workEffortTypeId: HOLD_TASK_TYPE_ID,
-              workEffortPurposeTypeId: USER_HOLD_PURPOSE_TYPE_IDS,
-              workEffortPurposeTypeId_op: 'in',
+              // Same "everything without a dedicated page" definition as the Hold
+              // queue, so an order's Holds segment can't hide a task the queue lists.
+              ...generalHoldPurposeParams(),
               productStoreId,
             },
           });

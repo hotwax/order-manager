@@ -8,6 +8,21 @@
   >
     <UniformFilterLayout @clear="emit('clear')">
       <ion-select
+        v-if="showPurposeFilter"
+        :value="modelValue.workEffortPurposeTypeId"
+        :label="translate('Task purpose')"
+        label-placement="stacked"
+        fill="outline"
+        interface="popover"
+        @ionChange="updateField('workEffortPurposeTypeId', $event.detail.value)"
+      >
+        <ion-select-option value="All">{{ translate('All purposes') }}</ion-select-option>
+        <ion-select-option v-for="purpose in purposeOptions" :key="purpose.id" :value="purpose.id">
+          {{ purpose.label }}
+        </ion-select-option>
+      </ion-select>
+
+      <ion-select
         :value="modelValue.salesChannelEnumId"
         :label="translate('Sales channel')"
         label-placement="stacked"
@@ -131,19 +146,23 @@ import type { OrderTaskFilters, TaskFilterOption } from '@/types/orderTaskFilter
 const props = withDefaults(defineProps<{
   modelValue: OrderTaskFilters;
   channelOptions: TaskFilterOption[];
+  purposeOptions?: TaskFilterOption[];
   facilityOptions?: TaskFilterOption[];
   shipmentMethodOptions?: TaskFilterOption[];
   orderStatusOptions?: TaskFilterOption[];
   riskRecommendationOptions?: TaskFilterOption[];
   riskLevelOptions?: TaskFilterOption[];
+  showPurposeFilter?: boolean;
   showShipGroupFilters?: boolean;
   showFraudFilters?: boolean;
 }>(), {
+  purposeOptions: () => [],
   facilityOptions: () => [],
   shipmentMethodOptions: () => [],
   orderStatusOptions: () => [],
   riskRecommendationOptions: () => [],
   riskLevelOptions: () => [],
+  showPurposeFilter: false,
   showShipGroupFilters: false,
   showFraudFilters: false,
 });
