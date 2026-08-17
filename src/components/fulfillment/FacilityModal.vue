@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Park order') }}</ion-title>
+      <ion-title>{{ props.title || translate('Park order') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -60,7 +60,16 @@ type Facility = {
   facilityId: string;
   facilityName: string;
   description?: string;
+  parentTypeId?: string;
 };
+
+const props = withDefaults(defineProps<{
+  // Optional modal title (already localized by the caller); defaults to "Park order".
+  title?: string;
+  // Parking moves orders to a virtual facility; re-routing sends them to a physical one. The
+  // default keeps the original parking behaviour for existing callers.
+  scope?: 'virtual' | 'physical';
+}>(), { scope: 'virtual' });
 
 const facilities = ref<Facility[]>([]);
 const filteredFacilities = ref<Facility[]>([]);
@@ -99,25 +108,43 @@ function preventSpecialCharacters(event: any) {
   if (/[`!@#$%^&*()_+\-=\\|,.<>?~]/.test(event.key)) event.preventDefault();
 }
 
-async function fetchVirtualFacilities() {
+function facilityList(data: any): Facility[] {
+  return Array.isArray(data) ? data : (data?.entityValueList || data?.docs || data?.list || []);
+}
+
+async function fetchFacilities() {
   isLoading.value = true;
   try {
-    const resp = await api({
-      url: 'admin/facilities',
-      method: 'GET',
-      params: { parentTypeId: 'VIRTUAL_FACILITY' }
-    });
-    facilities.value = resp.data || [];
+    // Physical facilities are the negation of the virtual set, expressed with the same
+    // `<field>_not` convention usePhysicalFacilityOptions already relies on.
+    const resp = props.scope === 'virtual'
+      ? await api({
+        url: 'admin/facilities',
+        method: 'GET',
+        params: { parentTypeId: 'VIRTUAL_FACILITY' }
+      })
+      : await api({
+        url: 'oms/facilities',
+        method: 'GET',
+        params: {
+          pageSize: 1000,
+          facilityTypeId: 'VIRTUAL_FACILITY',
+          facilityTypeId_not: 'Y',
+          parentTypeId: 'VIRTUAL_FACILITY',
+          parentTypeId_not: 'Y'
+        }
+      });
+    facilities.value = facilityList(resp.data);
     filteredFacilities.value = facilities.value;
   } catch (error) {
-    logger.error('Failed to fetch virtual facilities', error);
+    logger.error(`Failed to fetch ${props.scope} facilities`, error);
   } finally {
     isLoading.value = false;
   }
 }
 
 onMounted(() => {
-  fetchVirtualFacilities();
+  fetchFacilities();
 });
 </script>
 

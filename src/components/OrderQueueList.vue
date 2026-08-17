@@ -105,19 +105,18 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <ion-footer v-if="selectMode">
-      <ion-toolbar>
-        <ion-title size="small">{{ selectedOrderIds.length }} {{ translate('selected') }}</ion-title>
-        <ion-buttons slot="end" class="bulk-action-buttons">
-          <ion-button v-if="hasGlobalAction('brokerSelected')" :disabled="!selectedOrderIds.length" @click="openBrokerSelectedModal">
-            {{ translate('Broker selected') }}
-          </ion-button>
-          <ion-button :disabled="!selectedOrderIds.length" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
-          <ion-button :disabled="!selectedOrderIds.length" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
-          <ion-button :disabled="!selectedOrderIds.length" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-footer>
+    <BulkOrderActionFooter
+      v-if="selectMode"
+      :order-ids="selectedOrderIds"
+      :actions="bulkActions"
+      @submitted="handleBulkSubmitted"
+    >
+      <template #actions-start>
+        <ion-button v-if="hasGlobalAction('brokerSelected')" :disabled="!selectedOrderIds.length" @click="openBrokerSelectedModal">
+          {{ translate('Broker selected') }}
+        </ion-button>
+      </template>
+    </BulkOrderActionFooter>
   </ion-page>
 </template>
 
@@ -127,7 +126,6 @@ import {
   IonButtons,
   IonCheckbox,
   IonContent,
-  IonFooter,
   IonHeader,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
@@ -141,22 +139,20 @@ import {
   IonSelectOption,
   IonTitle,
   IonToolbar,
-  alertController,
   modalController,
   useIonRouter,
 } from '@ionic/vue';
 import { api, translate } from '@common';
 import { computed, onMounted, ref, watch } from 'vue';
 import { searchOrders } from '@/services/order';
-import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderStore } from '@/store/order';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import type { Order } from '@/types/order';
-import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
-import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
 import RoutingGroupModal from '@/components/fulfillment/RoutingGroupModal.vue';
+import BulkOrderActionFooter from '@/components/orders/BulkOrderActionFooter.vue';
+import type { BulkActionKey } from '@/services/bulkActions';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
@@ -198,7 +194,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'clearFilters'): void;
 }>();
-const orderDetailStore = useOrderDetailStore();
 const orderStore = useOrderStore();
 const orderTaskStore = useOrderTaskStore();
 const productStore = useProductStore();
@@ -241,6 +236,10 @@ const someCurrentPageSelected = computed(() => {
 function hasGlobalAction(action: QueueGlobalAction): boolean {
   return props.globalActions?.includes(action) ?? false;
 }
+
+// Both queues this component backs (unfillable and brokering) hold orders that are approved but
+// not yet fulfilled, so every order-level bulk action applies.
+const bulkActions: BulkActionKey[] = ['park', 'facility', 'shipMethod', 'shipDates', 'cancelItems', 'createTasks'];
 
 onMounted(runSearch);
 
@@ -327,60 +326,10 @@ async function loadMore(event: CustomEvent) {
   (event.target as HTMLIonInfiniteScrollElement).complete();
 }
 
-async function confirmCancelOrders() {
-  const orderIds = [...selectedOrderIds.value];
-  const alert = await alertController.create({
-    header: translate('Cancel open items'),
-    message: translate('This will cancel all open items for the {count} selected order(s). This action cannot be undone.', { count: orderIds.length }),
-    buttons: [
-      { text: translate('Dismiss'), role: 'cancel' },
-      {
-        text: translate('Confirm'),
-        handler: async () => {
-          try {
-            await orderDetailStore.bulkCancelOrders(orderIds);
-            await showToast(translate('Orders cancelled successfully.'));
-            exitSelectMode();
-            await runSearch();
-          } catch {
-            await showToast(translate('Failed to cancel orders. Please try again.'));
-          }
-        },
-      },
-    ],
-  });
-  await alert.present();
-}
-
-async function openAddTaskModal() {
-  const orderIds = [...selectedOrderIds.value];
-  const modal = await modalController.create({ component: AddOrderTaskModal });
-  await modal.present();
-  const { data, role } = await modal.onWillDismiss();
-  if (role !== 'confirm' || !data) return;
-  try {
-    await orderDetailStore.bulkCreateOrderTasks(orderIds, data);
-    await showToast(translate('Tasks created successfully.'));
-    exitSelectMode();
-  } catch {
-    await showToast(translate('Failed to create tasks. Please try again.'));
-  }
-}
-
-async function openEditShippingMethodModal() {
-  const orderIds = [...selectedOrderIds.value];
-  const modal = await modalController.create({ component: EditShippingMethodModal });
-  await modal.present();
-  const { data, role } = await modal.onWillDismiss();
-  if (role !== 'confirm' || !data) return;
-  try {
-    await orderDetailStore.bulkUpdateShippingMethods(orderIds, data.carrierPartyId, data.shipmentMethodTypeId);
-    await showToast(translate('Shipping method updated successfully.'));
-    exitSelectMode();
-    await runSearch();
-  } catch {
-    await showToast(translate('Failed to update shipping method. Please try again.'));
-  }
+// MDM applies these in the background, so the list is not re-read on submit: the orders will not
+// have changed yet. Select mode is exited so the stale selection cannot be acted on twice.
+function handleBulkSubmitted() {
+  exitSelectMode();
 }
 
 async function openBrokerSelectedModal() {
@@ -546,10 +495,6 @@ function statusDescription(statusId: string) {
 .order-results-header-start {
   display: flex;
   min-width: 24px;
-}
-
-.bulk-action-buttons {
-  overflow-x: auto;
 }
 
 .queue-order-row {

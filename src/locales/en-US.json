@@ -909,5 +909,18 @@
   "{count} later date": "{count} later date",
   "{count} later dates": "{count} later dates",
   "{count} items by order date": "{count} items by order date",
-  "{count} items by order date since {date}": "{count} items by order date since {date}"
+  "{count} items by order date since {date}": "{count} items by order date since {date}",
+
+  "Park orders": "Park orders",
+  "Change facility": "Change facility",
+  "Edit ship dates": "Edit ship dates",
+  "Ship group dates": "Ship group dates",
+  "The ship-by date is applied to every ship group of the {count} selected order(s).": "The ship-by date is applied to every ship group of the {count} selected order(s).",
+  "Every open item of the {count} selected order(s) will be cancelled.": "Every open item of the {count} selected order(s) will be cancelled.",
+  "No cancellation reasons found": "No cancellation reasons found",
+  "Optional note recorded against each cancelled item": "Optional note recorded against each cancelled item",
+  "Comment": "Comment",
+  "Bulk request submitted for {count} order(s). Processing in background.": "Bulk request submitted for {count} order(s). Processing in background.",
+  "Failed to submit bulk request. Please try again.": "Failed to submit bulk request. Please try again.",
+  "No carriers found": "No carriers found"
 }
