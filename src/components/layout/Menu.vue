@@ -102,13 +102,6 @@
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
-          <ion-item v-if="hasPermission(Actions.APP_ORDERS_VIEW)" button router-link="/bulk-actions" router-direction="root" :class="{ selected: selectedPage === '/bulk-actions' }">
-            <ion-icon slot="start" :icon="layersOutline" />
-            <ion-label>{{ translate("Bulk actions") }}</ion-label>
-            <ion-badge v-if="activeBulkActionRuns" slot="end" color="primary">{{ activeBulkActionRuns }}</ion-badge>
-          </ion-item>
-        </ion-menu-toggle>
-        <ion-menu-toggle :auto-hide="false">
           <ion-item button router-link="/settings" router-direction="root" :class="{ selected: selectedPage === '/settings' }">
             <ion-icon slot="start" :icon="settingsOutline" />
             <ion-label>{{ translate("Settings") }}</ion-label>
@@ -147,7 +140,6 @@ import {
   cubeOutline,
   funnelOutline,
   gitNetworkOutline,
-  layersOutline,
   locationOutline,
   pauseCircleOutline,
   peopleOutline,
@@ -160,10 +152,9 @@ import { translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 import router from '@/router';
 import { useOrderStore } from '@/store/order';
-import { fetchActiveBulkActionRunCount } from '@/services/bulkActions';
 import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted } from 'vue';
 import Actions from "@/authorization/actions";
 
 const { isAuthenticated } = useAuth();
@@ -179,10 +170,6 @@ const productStores = computed(() => productStore.getProductStores || []);
 // badge reflects the latest count the app has loaded. A missing key = not yet loaded.
 const rollupCounts = computed(() => orderStore.navCounts);
 
-// Bulk action runs live in MDM, not in the queue rollup map, so this badge is read once on
-// mount. It is a "there is work in flight" hint, not a live counter.
-const activeBulkActionRuns = ref(0);
-
 function hasPermission(permissionId: string) {
   return userStore.hasPermission(permissionId);
 }
@@ -195,9 +182,6 @@ onMounted(async () => {
   if (isAuthenticated.value && !productStores.value.length) {
     await productStore.fetchProductStores();
     await productStore.fetchProductStorePreference();
-  }
-  if (isAuthenticated.value && hasPermission(Actions.APP_ORDERS_VIEW)) {
-    activeBulkActionRuns.value = await fetchActiveBulkActionRunCount();
   }
 })
 

@@ -11,25 +11,20 @@
   </ion-header>
 
   <ion-content>
-    <!-- Carriers are a short, stable list, so they are laid out flat instead of behind a popover:
-         picking one is a single tap and the whole set is visible at once. -->
-    <ion-radio-group v-model="selectedCarrierId">
-      <ion-list lines="none">
-        <ion-list-header>
-          <ion-label>{{ translate('Carrier') }}</ion-label>
-        </ion-list-header>
-        <ion-item v-if="!availableCarriers.length">
-          <ion-label color="medium">{{ translate('No carriers found') }}</ion-label>
-        </ion-item>
-        <ion-item v-for="carrier in availableCarriers" :key="carrier.partyId">
-          <ion-radio label-placement="end" justify="start" :value="carrier.partyId">
-            <ion-label>{{ carrierName(carrier) }}</ion-label>
-          </ion-radio>
-        </ion-item>
-      </ion-list>
-    </ion-radio-group>
-
     <ion-list>
+      <ion-item>
+        <ion-select
+          :label="translate('Carrier')"
+          interface="popover"
+          :placeholder="translate('Select Carrier')"
+          :value="selectedCarrierId"
+          @ionChange="onCarrierChange($event.detail.value)"
+        >
+          <ion-select-option v-for="carrier in availableCarriers" :key="carrier.partyId" :value="carrier.partyId">
+            {{ [carrier.firstName, carrier.lastName].filter(Boolean).join(' ') || carrier.groupName || carrier.partyId }}
+          </ion-select-option>
+        </ion-select>
+      </ion-item>
       <ion-item>
         <ion-select
           :label="translate('Shipping method')"
@@ -68,11 +63,7 @@ import {
   IonHeader,
   IonIcon,
   IonItem,
-  IonLabel,
   IonList,
-  IonListHeader,
-  IonRadio,
-  IonRadioGroup,
   IonSelect,
   IonSelectOption,
   IonTitle,
@@ -80,7 +71,7 @@ import {
   modalController,
 } from '@ionic/vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { translate } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
@@ -95,12 +86,12 @@ const availableCarriers = computed(() => {
   const list = orderDetailStore.carrierParties.length
     ? orderDetailStore.carrierParties
     : seed.carriers.ids.map((id) => seed.carriers.byId[id]);
-  return [...list].sort((a, b) => carrierName(a).localeCompare(carrierName(b)));
+  return [...list].sort((a, b) => {
+    const nameA = [a.firstName, a.lastName].filter(Boolean).join(' ') || a.groupName || a.partyId;
+    const nameB = [b.firstName, b.lastName].filter(Boolean).join(' ') || b.groupName || b.partyId;
+    return nameA.localeCompare(nameB);
+  });
 });
-
-function carrierName(carrier: any) {
-  return [carrier.firstName, carrier.lastName].filter(Boolean).join(' ') || carrier.groupName || carrier.partyId;
-}
 
 const methodsForCarrier = computed(() =>
   [...orderDetailStore.shippingMethodsByCarrier(selectedCarrierId.value)].sort(
@@ -113,10 +104,10 @@ onMounted(() => {
   orderDetailStore.fetchShippingMethods();
 });
 
-// Methods are carrier-specific, so a carrier change invalidates any method already chosen.
-watch(selectedCarrierId, () => {
+function onCarrierChange(carrierId: string) {
+  selectedCarrierId.value = carrierId;
   selectedMethodId.value = '';
-});
+}
 
 function dismiss() {
   modalController.dismiss(null, 'cancel');

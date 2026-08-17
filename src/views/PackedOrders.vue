@@ -69,25 +69,21 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <BulkOrderActionFooter
-      v-if="selectMode"
-      :order-ids="selectedOrderIds"
-      :actions="bulkActions"
-      @submitted="exitSelectMode"
-    >
-      <!-- These run against their own endpoints rather than MDM, so they stay alongside the
-           bulk actions instead of becoming DataManager configs. -->
-      <template #actions-start>
-        <ion-button
-          v-for="action in actions"
-          :key="action.id"
-          :disabled="!selectedIds.size"
-          @click="runAction(action)"
-        >
-          {{ action.label }}
-        </ion-button>
-      </template>
-    </BulkOrderActionFooter>
+    <ion-footer v-if="selectMode">
+      <ion-toolbar>
+        <ion-title size="small">{{ selectedIds.size }} {{ translate('selected') }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button
+            v-for="action in actions"
+            :key="action.id"
+            :disabled="!selectedIds.size"
+            @click="runAction(action)"
+          >
+            {{ action.label }}
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-footer>
 
     <ion-toast
       :is-open="!!toastMessage"
@@ -105,6 +101,7 @@ import {
   IonButtons,
   IonCheckbox,
   IonContent,
+  IonFooter,
   IonHeader,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
@@ -126,19 +123,15 @@ import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
-import { useUserStore } from '@/store/user';
 import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
 import { WORKFLOW_ORDER_SORT_OPTIONS } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
-import BulkOrderActionFooter from '@/components/orders/BulkOrderActionFooter.vue';
-import { permittedBulkActions } from '@/services/bulkActions';
 import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, translate } from '@common';
 import router from '@/router';
-import Actions from '@/authorization/actions';
 
 const bucket = 'packed';
 const VIRTUAL_FACILITY_TYPE_ID = 'VIRTUAL_FACILITY';
@@ -146,7 +139,6 @@ const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore();
 const seedStore = useSeedStore();
-const userStore = useUserStore();
 const ionRouter = useIonRouter();
 const toastMessage = ref('');
 
@@ -177,17 +169,6 @@ const facilityFilterOptions = computed(() => facilityOptions.value.map((facility
 
 const orders = computed(() => store.filteredOrders(bucket));
 const selectedIds = computed(() => new Set(store.selection[bucket]));
-const selectedOrderIds = computed(() => [...selectedIds.value]);
-// Packed orders are already picked and boxed: re-routing, parking and cancelling would
-// contradict a shipment that exists, so only carrier, dates and tasks remain.
-const bulkActions = computed(() => permittedBulkActions(
-  ['shipMethod', 'shipDates', 'createTasks'],
-  {
-    canUpdate: userStore.hasPermission(Actions.APP_ORDER_UPDATE),
-    canCancel: userStore.hasPermission(Actions.APP_ORDER_CANCEL),
-    canCreateTask: userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE)
-  }
-));
 const actions = computed<BulkActionDefinition[]>(() => BULK_ACTIONS[bucket]);
 const selectMode = ref(false);
 const currentPageOrderIds = computed(() => orders.value.map((order) => order.orderId));

@@ -21,7 +21,6 @@ import BrokeringQueue from '@/views/BrokeringQueue.vue';
 import OpenOrders from '@/views/OpenOrders.vue';
 import InflightOrders from '@/views/InflightOrders.vue';
 import PackedOrders from '@/views/PackedOrders.vue';
-import BulkActions from '@/views/BulkActions.vue';
 import Actions from "@/authorization/actions";
 
 const authGuard = async () => {
@@ -206,15 +205,6 @@ const routes: RouteRecordRaw[] = [
     path: '/packed',
     name: 'PackedOrders',
     component: PackedOrders,
-    beforeEnter: authGuard,
-    meta: {
-      permissionId: Actions.APP_ORDERS_VIEW
-    }
-  },
-  {
-    path: '/bulk-actions',
-    name: 'BulkActions',
-    component: BulkActions,
     beforeEnter: authGuard,
     meta: {
       permissionId: Actions.APP_ORDERS_VIEW

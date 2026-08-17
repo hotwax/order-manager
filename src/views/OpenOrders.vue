@@ -69,12 +69,21 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <BulkOrderActionFooter
-      v-if="selectMode"
-      :order-ids="selectedOrderIds"
-      :actions="bulkActions"
-      @submitted="exitSelectMode"
-    />
+    <ion-footer v-if="selectMode">
+      <ion-toolbar>
+        <ion-title size="small">{{ selectedIds.size }} {{ translate('selected') }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button
+            v-for="action in actions"
+            :key="action.id"
+            :disabled="!selectedIds.size"
+            @click="runAction(action)"
+          >
+            {{ action.label }}
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-footer>
 
     <ion-toast
       :is-open="!!toastMessage"
@@ -92,6 +101,7 @@ import {
   IonButtons,
   IonCheckbox,
   IonContent,
+  IonFooter,
   IonHeader,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
@@ -105,26 +115,23 @@ import {
   IonTitle,
   IonToast,
   IonToolbar,
+  alertController,
   useIonRouter
 } from '@ionic/vue';
 import { computed, onMounted, ref, watch } from 'vue';
-import { useCustomerServiceStore } from '@/store/customerService';
+import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
-import { useUserStore } from '@/store/user';
-import type { WorkflowOrder } from '@/types/customerService';
+import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
 import { WORKFLOW_ORDER_SORT_OPTIONS } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
-import BulkOrderActionFooter from '@/components/orders/BulkOrderActionFooter.vue';
-import { permittedBulkActions } from '@/services/bulkActions';
 import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, translate } from '@common';
 import router from '@/router';
-import Actions from '@/authorization/actions';
 
 const bucket = 'open';
 const VIRTUAL_FACILITY_TYPE_ID = 'VIRTUAL_FACILITY';
@@ -132,7 +139,6 @@ const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore();
 const seedStore = useSeedStore();
-const userStore = useUserStore();
 const ionRouter = useIonRouter();
 const toastMessage = ref('');
 
@@ -163,16 +169,7 @@ const facilityFilterOptions = computed(() => facilityOptions.value.map((facility
 
 const orders = computed(() => store.filteredOrders(bucket));
 const selectedIds = computed(() => new Set(store.selection[bucket]));
-const selectedOrderIds = computed(() => [...selectedIds.value]);
-// Open orders are approved but not yet routed or picked, so every order-level action applies.
-const bulkActions = computed(() => permittedBulkActions(
-  ['park', 'facility', 'shipMethod', 'shipDates', 'cancelItems', 'createTasks'],
-  {
-    canUpdate: userStore.hasPermission(Actions.APP_ORDER_UPDATE),
-    canCancel: userStore.hasPermission(Actions.APP_ORDER_CANCEL),
-    canCreateTask: userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE)
-  }
-));
+const actions = computed<BulkActionDefinition[]>(() => BULK_ACTIONS[bucket]);
 const selectMode = ref(false);
 const currentPageOrderIds = computed(() => orders.value.map((order) => order.orderId));
 const allCurrentPageSelected = computed(() => {
@@ -346,6 +343,32 @@ function setOrderSelection(orderId: string, checked: boolean) {
 
 function orderDetailLink(order: WorkflowOrder) {
   return `/open/${order.orderId}`;
+}
+
+async function runAction(action: BulkActionDefinition) {
+  if (!selectedIds.value.size) return;
+
+  if (action.confirmText) {
+    const alert = await alertController.create({
+      header: action.label,
+      message: action.confirmText,
+      buttons: [
+        { text: translate('Cancel'), role: 'cancel' },
+        { text: translate('Confirm'), role: 'confirm' }
+      ]
+    });
+    await alert.present();
+    const result = await alert.onDidDismiss();
+    if (result.role !== 'confirm') return;
+  }
+
+  const count = selectedIds.value.size;
+  try {
+    await store.runBulkAction(bucket, action.id);
+    toastMessage.value = `${action.label}: ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+  } catch {
+    toastMessage.value = translate('Failed to complete bulk action. Please try again.');
+  }
 }
 
 function formatChannel(channel: string) {
