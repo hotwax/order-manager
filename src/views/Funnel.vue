@@ -810,9 +810,10 @@ const totalUnfillable = computed(() => store.getUnfillable.totalCount || 0);
 // nav count, primed by the same fetchBrokeringCount query). Summing the per-facility
 // rows double-counts orders parked in more than one location, so it diverged from
 // the page. Falls back to the row sum until the shared count has loaded.
-const virtualLocationWorkTotal = computed(() =>
-  virtualLocationWorkRows.value.reduce((sum, row) => sum + row.count, 0)
-);
+const virtualLocationWorkTotal = computed(() => {
+  const brokering = orderStore.navCounts.brokering;
+  return brokering !== undefined ? brokering : virtualLocationWorkRows.value.reduce((sum, row) => sum + row.count, 0);
+});
 
 function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {
   if (item.id === 'unfillable') {
