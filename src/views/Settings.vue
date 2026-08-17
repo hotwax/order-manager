@@ -186,7 +186,6 @@
 <script setup lang="ts">
 import { IonAvatar, IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonPage, IonRadio, IonRadioGroup, IonSearchbar, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToolbar } from '@ionic/vue';
 import { closeOutline, openOutline, saveOutline } from 'ionicons/icons';
-import { DateTime } from 'luxon';
 import { computed, onBeforeMount, ref } from 'vue';
 import { api, commonUtil, cookieHelper, i18n, translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
@@ -205,12 +204,6 @@ const barcodeIdentificationOptions = computed(() => useProductStore().getBarcode
 const timeZones = computed(() => userStore.getAvailableTimeZones);
 const currentTimeZone = computed(() => userStore.getUserTimeZone || userProfile.value?.userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone);
 const omsInstance = computed(() => cookieHelper().get('oms') || userStore.oms);
-const appInfo = (import.meta.env.VITE_VERSION_INFO ? JSON.parse(import.meta.env.VITE_VERSION_INFO as string) : {}) as any;
-const appVersion = computed(() => {
-  if (appInfo.branch && appInfo.revision) return `${appInfo.branch}-${appInfo.revision}`;
-  return appInfo.tag || appInfo.version || '0.1.0';
-});
-const builtDateTime = computed(() => appInfo.builtTime ? DateTime.fromMillis(appInfo.builtTime).setZone(currentTimeZone.value).toLocaleString(DateTime.DATETIME_MED) : '');
 const userInitials = computed(() => {
   const name = userProfile.value?.userFullName || userProfile.value?.partyId || userProfile.value?.userId || '';
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]?.toUpperCase()).join('') || 'OM';
