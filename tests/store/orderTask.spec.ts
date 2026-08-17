@@ -259,8 +259,9 @@ describe('order task store', () => {
           taskStatusId: 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD',
           taskStatusId_op: 'in',
           workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-          workEffortPurposeTypeId: 'ORD_HOLD_MANUAL,ORD_HOLD_CUST_REQ',
+          workEffortPurposeTypeId: 'INVALID_ADDRESS,NEG_RES_REVIEW,REVIEW_RISK_ORDER',
           workEffortPurposeTypeId_op: 'in',
+          workEffortPurposeTypeId_not: 'Y',
           productStoreId: 'STORE',
         },
       }],
@@ -281,7 +282,7 @@ describe('order task store', () => {
     expect(vi.mocked(api).mock.calls.every(([request]) => request.url === 'oms/orders/tasks')).toBe(true);
   });
 
-  it('keeps ship-group and order-level operator holds visible through every blocking status', async () => {
+  it('lists every hold purpose without a dedicated queue page, through every blocking status', async () => {
     const store = useOrderTaskStore();
     vi.mocked(api).mockResolvedValueOnce({ data: [] });
 
@@ -296,8 +297,32 @@ describe('order task store', () => {
         taskStatusId: 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD',
         taskStatusId_op: 'in',
         workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
-        workEffortPurposeTypeId: 'ORD_HOLD_MANUAL,ORD_HOLD_CUST_REQ',
+        // NOT IN the three purposes that own their own page, so a purpose OMS adds
+        // later shows up here rather than being invisible.
+        workEffortPurposeTypeId: 'INVALID_ADDRESS,NEG_RES_REVIEW,REVIEW_RISK_ORDER',
         workEffortPurposeTypeId_op: 'in',
+        workEffortPurposeTypeId_not: 'Y',
+        productStoreId: 'STORE',
+      },
+    });
+  });
+
+  it('narrows to a single purpose without the NOT-IN complement when one is selected', async () => {
+    const store = useOrderTaskStore();
+    vi.mocked(api).mockResolvedValueOnce({ data: [] });
+
+    await store.fetchHoldTasks({ pageSize: 20, pageIndex: 0 }, 'SHPFY_SYNC_ERR');
+
+    expect(api).toHaveBeenCalledWith({
+      url: 'oms/orders/tasks',
+      method: 'GET',
+      params: {
+        pageSize: 20,
+        pageIndex: 0,
+        taskStatusId: 'TASK_CREATED,TASK_IN_PROGRESS,TASK_ON_HOLD',
+        taskStatusId_op: 'in',
+        workEffortTypeId: 'RESOLVE_ONHOLD_ORDER',
+        workEffortPurposeTypeId: 'SHPFY_SYNC_ERR',
         productStoreId: 'STORE',
       },
     });

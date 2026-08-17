@@ -57,14 +57,13 @@ const VIRTUAL_OR_PARKING_FACILITY_IDS = new Set([
   GENERAL_OPS_PARKING_FACILITY_ID
 ]);
 
-// Map each hold-task purpose the dashboard reports to its side-menu badge. The
-// two user-hold purposes roll up into the single "Hold" queue, matching the page.
-const HOLD_TASK_PURPOSE_TO_NAV_KEY: Record<string, string> = {
+// Map each hold-task purpose the dashboard reports to its side-menu badge. Only
+// the three purposes with a dedicated page get their own badge; everything else
+// rolls up into "Hold", matching that page's "no dedicated queue" population.
+const DEDICATED_PURPOSE_NAV_KEYS: Record<string, string> = {
   INVALID_ADDRESS: 'badAddress',
   NEG_RES_REVIEW: 'swap',
-  REVIEW_RISK_ORDER: 'fraud',
-  ORD_HOLD_MANUAL: 'hold',
-  ORD_HOLD_CUST_REQ: 'hold'
+  REVIEW_RISK_ORDER: 'fraud'
 };
 
 // Publish the badAddress/swap/hold/fraud badges from the hold-task breakdown the
@@ -75,8 +74,8 @@ function publishHoldTaskNavCounts(holdTaskCounts: { workEffortPurposeTypeId: str
   try {
     const totals: Record<string, number> = {};
     for (const { workEffortPurposeTypeId, taskCount } of holdTaskCounts) {
-      const navKey = HOLD_TASK_PURPOSE_TO_NAV_KEY[workEffortPurposeTypeId];
-      if (!navKey) continue;
+      if (!workEffortPurposeTypeId) continue;
+      const navKey = DEDICATED_PURPOSE_NAV_KEYS[workEffortPurposeTypeId] ?? 'hold';
       totals[navKey] = (totals[navKey] ?? 0) + (Number(taskCount) || 0);
     }
     const orderStore = useOrderStore();
