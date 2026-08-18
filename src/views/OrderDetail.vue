@@ -3059,7 +3059,7 @@ async function rejectAndReleaseItem(item: any, productId: string) {
   // Step 3 — release to chosen facility
   try {
     await api({
-      url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/allocation`,
+      url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/allocation-with-reuse`,
       method: 'POST',
       data: { facilityId,
        orderFacilityChange:{
@@ -3435,7 +3435,7 @@ async function releaseSelectedItems(shipGroup: any) {
     await Promise.all(
       itemIds.map((orderItemSeqId) =>
         api({
-        url: `oms/orders/${orderId}/items/${orderItemSeqId}/allocation`,
+        url: `oms/orders/${orderId}/items/${orderItemSeqId}/allocation-with-reuse`,
         method: 'POST',
         data: { facilityId,
          orderFacilityChange:{
