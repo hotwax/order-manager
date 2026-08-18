@@ -1,7 +1,7 @@
 <template>
   <ion-list lines="none" class="hold-tasks-list">
     <ion-item
-      v-for="holdTask in holdTaskCounts"
+      v-for="holdTask in sortedHoldTaskCounts"
       :key="holdTask.workEffortPurposeTypeId"
       button
       :detail="true"
@@ -15,10 +15,11 @@
 
 <script setup lang="ts">
 import { IonItem, IonLabel, IonList } from '@ionic/vue';
+import { computed } from 'vue';
 import { translate } from '@common';
 import type { HoldTaskCount } from '@/types/customerService';
 
-defineProps<{
+const props = defineProps<{
   holdTaskCounts: HoldTaskCount[];
 }>();
 
@@ -32,6 +33,9 @@ function holdTaskLabel(holdTask: HoldTaskCount) {
   const knownLabel = knownPurposeLabels[holdTask.workEffortPurposeTypeId];
   return knownLabel ? translate(knownLabel) : holdTask.description || holdTask.workEffortPurposeTypeId;
 }
+
+// Sorted on the resolved label, since that is the order the reader actually sees.
+const sortedHoldTaskCounts = computed(() => [...props.holdTaskCounts].sort((left, right) => holdTaskLabel(left).localeCompare(holdTaskLabel(right))));
 
 function holdTaskRoute(workEffortPurposeTypeId: string) {
   if (workEffortPurposeTypeId === 'NEG_RES_REVIEW') return '/swap';

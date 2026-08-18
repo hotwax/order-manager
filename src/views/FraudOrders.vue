@@ -91,7 +91,7 @@
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button color="primary" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkResolve">{{ translate('Resolve') }}</ion-button>
-          <ion-button color="danger" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkCancel">{{ translate('Cancel orders') }}</ion-button>
+          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" color="danger" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkCancel">{{ translate('Cancel orders') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
@@ -114,6 +114,7 @@ import { useProductMaster } from '@/composables/useProductMaster';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
 import { countTaskTargets, orderTaskTarget, runGroupedTaskMutation, selectedTaskCardsById } from '@/utils/orderTaskBulk';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();

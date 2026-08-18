@@ -132,12 +132,10 @@
           </ion-label>
 
           <ion-label class="tablet ion-text-start">
-            {{ returnTypeLabel(returnRecord.returnHeaderTypeId) }}
+            {{ returnCustomerLabel(returnRecord) }}
+            <p>{{ returnTypeLabel(returnRecord.returnHeaderTypeId) }}</p>
             <p v-if="returnRecord.isExchange">
               {{ translate('Exchange') }}
-            </p>
-            <p v-else-if="returnRecord.fromPartyId">
-              {{ returnRecord.customerName || `${translate('Customer')} ${returnRecord.fromPartyId}` }}
             </p>
           </ion-label>
 
@@ -248,6 +246,13 @@ function openReturn(returnId: string) {
 
 function statusLabel(statusId: string) {
   return seed.statusDescription(statusId) || statusId || translate("Not specified");
+}
+
+function returnCustomerLabel(returnRecord: any) {
+  if(returnRecord.customerName) {return returnRecord.customerName;}
+  if(returnRecord.fromPartyId) {return `${translate("Customer")} ${returnRecord.fromPartyId}`;}
+
+  return translate("No customer");
 }
 
 function returnTypeLabel(returnHeaderTypeId?: string) {

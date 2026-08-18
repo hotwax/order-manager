@@ -16,7 +16,24 @@ describe('add relationship modal party picker', () => {
   });
 
   it('drives the relationship config off the selected party object', () => {
-    expect(source).toContain('v-if="selectedParty"');
     expect(source).toContain('selectedParty.value = results.value.find');
+    expect(source).toContain('selectedParty?.name');
+  });
+
+  it('splits the flow into a party step and a relationship step', () => {
+    expect(source).toContain("const step = ref<'party' | 'relationship'>('party');");
+    // the relationship step is unreachable until a party is picked
+    expect(source).toContain(':disabled="!selectedParty"');
+    expect(source).toContain("@click=\"step = 'relationship'\"");
+    expect(source).toContain("@click=\"step = 'party'\"");
+  });
+
+  it('finds parties through one global search box rather than per-field inputs', () => {
+    expect(source).toContain('<ion-searchbar');
+    expect(source).toContain('searchCustomers(');
+    // the per-field entity lookup and the person/group toggle are gone
+    expect(source).not.toContain('findParties');
+    expect(source).not.toContain('ion-segment-button');
+    expect(source).not.toContain('label="First name"');
   });
 });

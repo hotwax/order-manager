@@ -33,7 +33,7 @@
             :options="sortOptions"
             trigger-id="packed-order-sort-trigger"
           />
-          <ion-button fill="clear" size="small" @click="toggleSelectMode">
+          <ion-button v-if="actions.length" fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
@@ -69,7 +69,7 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <ion-footer v-if="selectMode">
+    <ion-footer v-if="selectMode && actions.length">
       <ion-toolbar>
         <ion-title size="small">{{ selectedIds.size }} {{ translate('selected') }}</ion-title>
         <ion-buttons slot="end">

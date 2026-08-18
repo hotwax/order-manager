@@ -100,6 +100,8 @@ export type AnyActionId = OrderFooterActionId | ShipGroupActionId | OrderItemAct
 
 /* ── Result + descriptor shapes (mirror the transfers structure) ──────────── */
 
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
+
 export interface ActionValidationResult {
   allowed: boolean;
   reason?: string;
@@ -489,7 +491,10 @@ export const OrderActionValidator = {
     // "Cancel N items" (the view supplies the count); otherwise, if the order
     // itself can be cancelled, it is the whole-order "Cancel order". The two
     // never coexist. Placed on the right (kind 'footer').
-    const bulkCancelValid = footer.some((action) => action.id === 'CANCEL_ITEMS' && action.validation.allowed);
+    // Hidden while cancel does not reach Shopify; the button then falls through to
+    // the whole-order "Cancel order" below, which is unaffected.
+    const bulkCancelValid = !HIDE_SHOPIFY_UNSYNCED_ACTIONS &&
+      footer.some((action) => action.id === 'CANCEL_ITEMS' && action.validation.allowed);
     const orderCancelValid = statusActions.some((transition) => transition.id === 'ORDER_CANCELLED');
     if (bulkCancelValid) {
       actions.push({ id: 'CANCEL_ITEMS', kind: 'footer', label: 'Cancel items', color: 'danger', fill: 'outline' });
@@ -501,6 +506,7 @@ export const OrderActionValidator = {
     // Remaining lifecycle actions on the end (cancel handled above).
     for (const action of footer) {
       if (action.id === 'CANCEL_ITEMS') continue;
+      if (HIDE_SHOPIFY_UNSYNCED_ACTIONS && action.id === 'RETURN') continue;
       if (!action.validation.allowed) continue;
       actions.push({
         id: action.id,
