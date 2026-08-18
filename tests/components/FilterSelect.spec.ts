@@ -21,8 +21,10 @@ describe('filter select resting state', () => {
     const badAddressOrders = readFileSync(resolve(process.cwd(), 'src/views/BadAddressOrders.vue'), 'utf8');
     const swapOrders = readFileSync(resolve(process.cwd(), 'src/views/SwapOrders.vue'), 'utf8');
 
-    expect(taskFilters.match(/<ion-select(?:\s|>)/g)?.length).toBe(6);
-    expect(taskFilters.match(/fill="outline"/g)?.length).toBe(6);
+    // 7 = purpose, sales channel, facility, shipping method, order status, risk
+    // recommendation, risk level. The date filters are DateFilterSelect instead.
+    expect(taskFilters.match(/<ion-select(?:\s|>)/g)?.length).toBe(7);
+    expect(taskFilters.match(/fill="outline"/g)?.length).toBe(7);
     expect(taskFilters.match(/<DateFilterSelect/g)?.length).toBe(4);
     expect(taskFilters.match(/ outlined/g)?.length).toBe(4);
     expect(fraudOrders).toContain('show-fraud-filters');

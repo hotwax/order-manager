@@ -7,9 +7,11 @@ import {
   type OrderTaskFilters,
   type TaskQueueId,
 } from '@/types/orderTaskFilters';
+import { isDedicatedQueuePurpose } from '@/utils/taskQueues';
 
 const OWNED_QUERY_KEYS = [
   'q',
+  'purpose',
   'channel',
   'orderDateFrom',
   'orderDateThru',
@@ -30,9 +32,16 @@ export function useOrderTaskRouteState(filters: Ref<OrderTaskFilters>, queue: Ta
     const query = router.currentRoute.value.query;
     const defaults = defaultOrderTaskFilters();
     const routeSort = queryValue(query.sort);
+    const routePurpose = queryValue(query.purpose);
     const next: OrderTaskFilters = {
       ...defaults,
       query: queryValue(query.q),
+      // Only the Hold queue carries a purpose, and never one that belongs to another
+      // queue page — a hand-typed `?purpose=INVALID_ADDRESS` falls back to 'All' so
+      // Hold can't render Bad Address / Swap / Fraud tasks.
+      workEffortPurposeTypeId: queue === 'hold' && !isDedicatedQueuePurpose(routePurpose)
+        ? routePurpose || 'All'
+        : 'All',
       salesChannelEnumId: queryValue(query.channel) || 'All',
       orderDateFrom: queryValue(query.orderDateFrom),
       orderDateThru: queryValue(query.orderDateThru),
@@ -65,6 +74,7 @@ export function useOrderTaskRouteState(filters: Ref<OrderTaskFilters>, queue: Ta
     });
 
     if (value.query) next.q = value.query;
+    if (queue === 'hold' && value.workEffortPurposeTypeId !== 'All') next.purpose = value.workEffortPurposeTypeId;
     if (value.salesChannelEnumId !== 'All') next.channel = value.salesChannelEnumId;
     if (value.orderDateFrom) next.orderDateFrom = value.orderDateFrom;
     if (value.orderDateThru) next.orderDateThru = value.orderDateThru;

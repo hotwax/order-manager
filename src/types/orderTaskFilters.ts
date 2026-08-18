@@ -24,6 +24,8 @@ export interface TaskFilterOption {
 
 export interface OrderTaskFilters {
   query: string;
+  /** Hold queue only: 'All' means every purpose without a dedicated queue page. */
+  workEffortPurposeTypeId: string;
   salesChannelEnumId: string;
   orderDateFrom: string;
   orderDateThru: string;
@@ -90,6 +92,7 @@ export const TASK_SORT_ORDER_BY: Record<TaskSort, string> = {
 export function defaultOrderTaskFilters(): OrderTaskFilters {
   return {
     query: '',
+    workEffortPurposeTypeId: 'All',
     salesChannelEnumId: 'All',
     orderDateFrom: '',
     orderDateThru: '',
