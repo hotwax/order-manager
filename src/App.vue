@@ -13,16 +13,14 @@
 import { IonApp, IonRouterOutlet, IonSplitPane, loadingController } from '@ionic/vue';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Settings } from 'luxon';
-import { commonUtil, cookieHelper, emitter, FastTravel, translate } from '@common';
-import { startCacheBootstrap } from '@common/cache';
+import { emitter, FastTravel, translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
+import { getCacheSyncToken, startAppCacheSync } from '@/services/appCacheSync';
 import Menu from '@/components/layout/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';
 import { useSeedStore } from '@/store/seed';
 import { useProductStore } from '@/store/productStore';
-import { orderManagerDb } from '@/cache/appCacheDb';
-import { ORDER_MANAGER_CACHE_CATALOG } from '@/config/appSyncConfig';
 
 const loader = ref<HTMLIonLoadingElement | null>(null);
 const { isAuthenticated } = useAuth();
@@ -70,19 +68,12 @@ onMounted(async () => {
   if (isAuthenticated.value) {
     await userStore.fetchPermissions().catch(() => undefined);
 
-    const token = cookieHelper().get("api_key") || cookieHelper().get("token") || (useAuth() as any).token?.value || "";
+    const token = getCacheSyncToken();
     if (token) {
-      startCacheBootstrap({
-        workerFactory: () => new Worker(new URL("./workers/appSync.worker.ts", import.meta.url), { type: "module" }),
-        token,
-        maargUrl: commonUtil.getMaargURL(),
-        db: orderManagerDb,
-        domains: ORDER_MANAGER_CACHE_CATALOG.map((d) => d.name),
-      }).then(() => {
-        useSeedStore().populateFromCache();
-      }).catch((err) => {
-        console.warn("Background cache bootstrap notice:", err);
-      });
+      startAppCacheSync(token, () => useSeedStore().populateFromCache())
+        .catch((err) => {
+          console.warn("Background cache bootstrap notice:", err);
+        });
     }
   }
 

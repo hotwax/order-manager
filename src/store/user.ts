@@ -1,7 +1,7 @@
 import { DateTime, Settings } from "luxon";
 import { defineStore } from "pinia";
 import { api, commonUtil, cookieHelper, logger, translate } from "@common";
-import { startCacheBootstrap, clearAllCaches } from "@common/cache";
+import { clearAllCaches } from "@common/cache";
 import { useAuth } from "@common/composables/useAuth";
 import { showToast } from "@/utils";
 import { orderManagerDb } from "@/cache/appCacheDb";
@@ -9,7 +9,7 @@ import { useSeedStore } from "./seed";
 import { useOrderDetailStore } from "./orderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useProductStore } from "@/store/productStore";
-import { ORDER_MANAGER_CACHE_CATALOG } from "@/config/appSyncConfig";
+import { getCacheSyncToken, startAppCacheSync } from "@/services/appCacheSync";
 
 export const useUserStore = defineStore("user", {
   state: () => ({
@@ -172,18 +172,10 @@ export const useUserStore = defineStore("user", {
         await useProductStore().fetchProductStorePreference();
 
         // Start non-blocking Web Worker sync to hydrate and update IndexedDB cache
-        const token = cookieHelper().get("api_key") || cookieHelper().get("token") || (useAuth() as any).token?.value || "";
-        startCacheBootstrap({
-          workerFactory: () => new Worker(new URL("../workers/appSync.worker.ts", import.meta.url), { type: "module" }),
-          token,
-          maargUrl: commonUtil.getMaargURL(),
-          db: orderManagerDb,
-          domains: ORDER_MANAGER_CACHE_CATALOG.map((d) => d.name),
-        }).then(() => {
-          useSeedStore().populateFromCache();
-        }).catch((err) => {
-          logger.warn("Cache background sync notice:", err);
-        });
+        startAppCacheSync(getCacheSyncToken(), () => useSeedStore().populateFromCache())
+          .catch((err) => {
+            logger.warn("Cache background sync notice:", err);
+          });
 
         // Initialize in-memory seed store from cache/API
         await useSeedStore().initSeedCache();
