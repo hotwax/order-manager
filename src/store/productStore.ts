@@ -64,6 +64,9 @@ export const useProductStore = defineStore('productStore', {
         logger.error("Failed to fetch product stores", err)
       }
       this.productStores = stores
+      if (stores.length && !this.currentProductStore?.productStoreId) {
+        this.currentProductStore = stores[0]
+      }
     },
 
     async fetchProductStorePreference() {
@@ -82,9 +85,14 @@ export const useProductStore = defineStore('productStore', {
         if (preferredStoreId) {
           const store = this.productStores?.find((store: any) => store.productStoreId === preferredStoreId);
           store && this.setCurrentProductStore(store)
+        } else if (this.productStores?.length && !this.currentProductStore?.productStoreId) {
+          this.setCurrentProductStore(this.productStores[0])
         }
       } catch (err) {
         logger.error('Favourite product store not found', err)
+        if (this.productStores?.length && !this.currentProductStore?.productStoreId) {
+          this.setCurrentProductStore(this.productStores[0])
+        }
       }
     },
     async setProductStorePreference(payload: any) {

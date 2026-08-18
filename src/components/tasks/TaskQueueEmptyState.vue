@@ -16,12 +16,15 @@
       <template v-else-if="kind === 'fraud'">
         <ion-button fill="outline" :href="SHOPIFY_FRAUD_ANALYSIS_URL" target="_blank" rel="noopener noreferrer">
           {{ translate('Shopify fraud analysis') }}
+          <ion-icon slot="end" :icon="openOutline" />
         </ion-button>
         <ion-button fill="clear" :href="SHOPIFY_RISK_FLOW_URL" target="_blank" rel="noopener noreferrer">
           {{ translate('Configure high-risk workflows') }}
+          <ion-icon slot="end" :icon="openOutline" />
         </ion-button>
         <ion-button fill="clear" :href="SHOPIFY_RISK_ASSESSMENT_URL" target="_blank" rel="noopener noreferrer">
           {{ translate('Create custom risk assessments') }}
+          <ion-icon slot="end" :icon="openOutline" />
         </ion-button>
       </template>
     </template>
@@ -29,7 +32,8 @@
 </template>
 
 <script setup lang="ts">
-import { IonButton } from '@ionic/vue';
+import { IonButton, IonIcon } from '@ionic/vue';
+import { openOutline } from 'ionicons/icons';
 import { computed } from 'vue';
 import { translate } from '@common';
 import EmptyState from '@/components/common/EmptyState.vue';
@@ -70,8 +74,10 @@ const copy = {
     message: 'Shopify orders appear here when risk recommends Investigate, or when it recommends Cancel and automatic cancellation is off. Review Shopify fraud-analysis eligibility and configure how high-risk orders should be handled.',
   },
   hold: {
-    title: 'No manual holds',
-    message: 'Create a hold from an order\'s Holds tab, or select orders in Find Order and choose Add task.',
+    // This queue is every hold purpose without its own page, not just manual ones,
+    // so the copy covers system-raised holds alongside the operator-created ones.
+    title: 'No open holds',
+    message: 'Holds without a dedicated queue appear here. Create one from an order\'s Holds tab, or select orders in Find Order and choose Add task.',
   },
 } as const;
 

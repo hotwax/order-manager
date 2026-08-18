@@ -13,35 +13,48 @@
       <SearchFilterCard
         v-model="searchQuery"
         :placeholder="translate(searchPlaceholder)"
+        :show-clear="false"
         @clear="clearFilters"
       >
-        <slot name="filters" />
-        <ion-select
-          v-model="searchFilters.channel"
-          label="Sales channel"
-          label-placement="stacked"
-          interface="popover"
-          :interface-options="{ showBackdrop: false }"
-        >
-          <ion-select-option value="All">All sales channels</ion-select-option>
-          <ion-select-option v-for="option in salesChannels" :key="option.enumId" :value="option.enumId">
-            {{ option.description || option.enumName || option.enumId }}
-          </ion-select-option>
-        </ion-select>
-        <ion-select
-          v-model="searchFilters.shipmentMethodTypeId"
-          label="Shipping method"
-          label-placement="stacked"
-          interface="popover"
-          :interface-options="{ showBackdrop: false }"
-        >
-          <ion-select-option value="All">All methods</ion-select-option>
-          <ion-select-option v-for="option in shipmentMethodOptions" :key="option.id" :value="option.id">
-            {{ option.label }}
-          </ion-select-option>
-        </ion-select>
-        <DateFilterSelect v-model="searchFilters.dateFrom" :label="translate('Order date from')" />
-        <DateFilterSelect v-model="searchFilters.dateThru" :label="translate('Order date thru')" />
+        <UniformFilterLayout @clear="clearFilters">
+          <slot name="filters" />
+          <ion-select
+            v-model="searchFilters.channel"
+            :label="translate('Sales channel')"
+            label-placement="stacked"
+            fill="outline"
+            interface="popover"
+            :interface-options="{ showBackdrop: false }"
+          >
+            <ion-select-option value="All">{{ translate('All sales channels') }}</ion-select-option>
+            <ion-select-option v-for="option in salesChannels" :key="option.enumId" :value="option.enumId">
+              {{ option.description || option.enumName || option.enumId }}
+            </ion-select-option>
+          </ion-select>
+          <ion-select
+            v-model="searchFilters.shipmentMethodTypeId"
+            :label="translate('Shipping method')"
+            label-placement="stacked"
+            fill="outline"
+            interface="popover"
+            :interface-options="{ showBackdrop: false }"
+          >
+            <ion-select-option value="All">{{ translate('All methods') }}</ion-select-option>
+            <ion-select-option v-for="option in shipmentMethodOptions" :key="option.id" :value="option.id">
+              {{ option.label }}
+            </ion-select-option>
+          </ion-select>
+          <DateFilterSelect
+            v-model="searchFilters.dateFrom"
+            :label="translate('Order date from')"
+            outlined
+          />
+          <DateFilterSelect
+            v-model="searchFilters.dateThru"
+            :label="translate('Order date through')"
+            outlined
+          />
+        </UniformFilterLayout>
       </SearchFilterCard>
 
       <ion-progress-bar v-if="loading" type="indeterminate" />
@@ -63,6 +76,7 @@
             />
           </span>
           <ion-label>{{ translate("{loaded} of {total} matching orders", { loaded: searchResults.length, total: searchTotal }) }}</ion-label>
+          <OrderSortPopover v-model="searchSort" :trigger-id="sortTriggerId" />
           <ion-button fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
@@ -98,7 +112,7 @@
           <ion-button v-if="hasGlobalAction('brokerSelected')" :disabled="!selectedOrderIds.length" @click="openBrokerSelectedModal">
             {{ translate('Broker selected') }}
           </ion-button>
-          <ion-button :disabled="!selectedOrderIds.length" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
+          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" :disabled="!selectedOrderIds.length" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
           <ion-button :disabled="!selectedOrderIds.length" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
           <ion-button :disabled="!selectedOrderIds.length" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
         </ion-buttons>
@@ -147,11 +161,23 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+import UniformFilterLayout from '@/components/common/UniformFilterLayout.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
+import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { toSearchOrderRowViewModel } from '@/utils/orderRows';
 import { showToast } from '@/utils';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 
 type QueueGlobalAction = 'brokerSelected';
+
+// Oldest first by default: these queues are worked down, so the operator should land on
+// the orders that have been waiting longest rather than on the freshest arrivals.
+const DEFAULT_QUEUE_SORT = 'orderDate asc';
+
+// Every queue page renders this component, and Ionic keeps both the outgoing and incoming
+// page in the DOM during a route transition. A per-instance trigger id keeps one queue's
+// button from opening another queue's popover.
+let sortTriggerSequence = 0;
 
 const props = defineProps<{
   // Facility IDs that scope this queue. This preset is always applied and is not user-removable.
@@ -162,7 +188,10 @@ const props = defineProps<{
   emptyMessage: string;
   globalActions?: QueueGlobalAction[];
   status?: string | string[];
+  // Preset order-date bounds. They seed the same filter inputs the user can
+  // edit, so a caller can deep-link into one day of the queue.
   dateFrom?: string;
+  dateThru?: string;
   // When set, this queue's total is published to the shared nav-count map so the
   // side menu can show it as a rollup badge (updated as a byproduct of searching).
   countKey?: string;
@@ -184,8 +213,10 @@ const searchFilters = ref({
   channel: 'All',
   shipmentMethodTypeId: 'All',
   dateFrom: props.dateFrom || '',
-  dateThru: '',
+  dateThru: props.dateThru || '',
 });
+const searchSort = ref(DEFAULT_QUEUE_SORT);
+const sortTriggerId = `order-queue-sort-trigger-${++sortTriggerSequence}`;
 const searchResults = ref<Order[]>([]);
 const searchTotal = ref(0);
 const pageIndex = ref(0);
@@ -217,16 +248,29 @@ onMounted(runSearch);
 watch(searchQuery, scheduleSearch);
 watch(() => props.facilityIds, () => runSearch(), { deep: true });
 watch(searchFilters, () => runSearch(), { deep: true });
+watch(searchSort, () => runSearch());
 watch(
-  () => props.dateFrom,
-  (newDateFrom) => {
+  () => [props.dateFrom, props.dateThru],
+  ([newDateFrom, newDateThru]) => {
     searchFilters.value.dateFrom = newDateFrom ? String(newDateFrom) : '';
+    searchFilters.value.dateThru = newDateThru ? String(newDateThru) : '';
   }
 );
 watch(searchResults, () => {
   const currentOrderIds = new Set(currentPageOrderIds.value);
   selectedOrderIds.value = selectedOrderIds.value.filter((orderId) => currentOrderIds.has(orderId));
 });
+
+// The nav badge is a rollup of the whole queue, so only an unnarrowed search
+// may publish it. Deep links from the funnel land here pre-filtered, and a
+// filtered total would otherwise overwrite the badge with a smaller number.
+const isWholeQueueSearch = computed(() =>
+  !searchQuery.value.trim()
+  && searchFilters.value.channel === 'All'
+  && searchFilters.value.shipmentMethodTypeId === 'All'
+  && !searchFilters.value.dateFrom
+  && !searchFilters.value.dateThru
+);
 
 function toSearchParams(page: number) {
   return {
@@ -237,7 +281,7 @@ function toSearchParams(page: number) {
     facilityIds: props.facilityIds,
     dateFrom: searchFilters.value.dateFrom,
     dateThru: searchFilters.value.dateThru,
-    sort: 'orderDate desc',
+    sort: searchSort.value,
     pageSize: PAGE_SIZE,
     pageIndex: page,
     status: props.status,
@@ -256,7 +300,7 @@ async function runSearch() {
     pageIndex.value = 0;
     searchResults.value = result.orders;
     searchTotal.value = result.total;
-    if (props.countKey) orderStore.setNavCount(props.countKey, result.total);
+    if (props.countKey && isWholeQueueSearch.value) orderStore.setNavCount(props.countKey, result.total);
   } catch (err: any) {
     error.value = err?.message || translate('Failed to load orders');
   } finally {
@@ -432,6 +476,7 @@ function isVirtualShipGroup(shipGroup: any) {
 function clearFilters() {
   searchQuery.value = '';
   selectedOrderIds.value = [];
+  searchSort.value = DEFAULT_QUEUE_SORT;
   searchFilters.value = {
     channel: 'All',
     shipmentMethodTypeId: 'All',

@@ -1,12 +1,15 @@
 import { DateTime, Settings } from "luxon";
 import { defineStore } from "pinia";
 import { api, commonUtil, cookieHelper, logger, translate } from "@common";
+import { clearAllCaches } from "@common/cache";
 import { useAuth } from "@common/composables/useAuth";
 import { showToast } from "@/utils";
+import { orderManagerDb } from "@/cache/appCacheDb";
 import { useSeedStore } from "./seed";
 import { useOrderDetailStore } from "./orderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useProductStore } from "@/store/productStore";
+import { getCacheSyncToken, startAppCacheSync } from "@/services/appCacheSync";
 
 export const useUserStore = defineStore("user", {
   state: () => ({
@@ -76,7 +79,7 @@ export const useUserStore = defineStore("user", {
     async fetchPermissions() {
       const permissionId = import.meta.env.VITE_APP_PERMISSION_ID
       const serverPermissions = [] as string[]
-      const viewSize = 50
+      const viewSize = 200
       let viewIndex = 0
 
       this.fetchStatus.permissions = "pending"
@@ -167,13 +170,28 @@ export const useUserStore = defineStore("user", {
         await this.fetchPermissions();
         await useProductStore().fetchProductStores();
         await useProductStore().fetchProductStorePreference();
-        const productStoreIds = (useProductStore().getProductStores || []).map((store: any) => store.productStoreId).filter(Boolean);
-        await useSeedStore().loadInitialSeedData(productStoreIds);
+
+        // Start non-blocking Web Worker sync to hydrate and update IndexedDB cache
+        startAppCacheSync(getCacheSyncToken(), () => useSeedStore().populateFromCache())
+          .catch((err) => {
+            logger.warn("Cache background sync notice:", err);
+          });
+
+        // Initialize in-memory seed store from cache/API
+        await useSeedStore().initSeedCache();
+
+        // On a fresh login the cache is still filling in the worker, so load whatever the seed
+        // store does not have yet directly from the API rather than waiting on the bootstrap.
+        const productStoreIds = (useProductStore().productStores || [])
+          .map((store: any) => store.productStoreId)
+          .filter(Boolean);
+        useSeedStore().loadInitialSeedData(productStoreIds).catch(() => undefined);
       } catch (error: any) {
         return Promise.reject(error);
       }
     },
     async postLogout() {
+      await clearAllCaches(orderManagerDb);
       useSeedStore().resetSeedData();
       useOrderDetailStore().reset();
       useProductCacheStore().reset();

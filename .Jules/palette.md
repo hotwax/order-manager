@@ -22,3 +22,10 @@
 ## 2024-07-30 - Missing ARIA labels on Ionic Fab Buttons
 **Learning:** Ionic `<ion-fab-button>` elements are often missed during accessibility audits for missing ARIA labels because they function as primary action buttons and are visually distinct, but they remain completely inaccessible to screen readers without them.
 **Action:** Always verify that `<ion-fab-button>` elements that only contain an `<ion-icon>` include an explicit `aria-label` attribute.
+## 2024-08-04 - Missing ARIA Labels on ion-fab-button
+**Learning:** Found multiple instances of icon-only `<ion-fab-button>` components without an `aria-label` attribute. While these buttons function as visually distinct primary action buttons, they require an explicit `aria-label` for screen reader accessibility since the inner `<ion-icon>` does not convey meaning to assistive technologies.
+**Action:** When creating or auditing `<ion-fab-button>` elements that only contain icons, always ensure the `aria-label` attribute is set using the `translate()` function (e.g., `:aria-label="translate('Save')"`) to guarantee accessibility and localization.
+## 2024-05-24 - External Link Indicators
+**Learning:** Adding an `openOutline` icon to buttons with `target="_blank"` improves predictability by visually warning users that the action will open in a new tab.
+**Action:** Always append `<ion-icon slot="end" :icon="openOutline" />` to elements that open external resources in a new tab.
+## 2026-08-08 - Adding loading states to destructive actions\n**Learning:** Destructive actions, such as deleting a customer profile, often use an icon-only button (e.g., trash icon) without visual feedback during asynchronous processing. In Vue and Ionic applications, these async processes typically have a reactive state flag (e.g., `deleting`).\n**Action:** When inspecting destructive or asynchronous actions in icon-only buttons, replace the default icon with an `<ion-spinner>` when the async state is true. Ensure the `<ion-spinner>` has the `slot="icon-only"` attribute to maintain proper alignment during loading.

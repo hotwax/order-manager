@@ -76,9 +76,9 @@
       </div>
 
       <ion-infinite-scroll
-        @ionInfinite="loadMoreFraudTasks($event)"
+        :disabled="!isScrollable"
         threshold="100px"
-        v-if="isScrollable"
+        @ionInfinite="loadMoreFraudTasks($event)"
       >
         <ion-infinite-scroll-content
           loading-spinner="crescent"
@@ -91,7 +91,7 @@
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button color="primary" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkResolve">{{ translate('Resolve') }}</ion-button>
-          <ion-button color="danger" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkCancel">{{ translate('Cancel orders') }}</ion-button>
+          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" color="danger" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkCancel">{{ translate('Cancel orders') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
@@ -114,6 +114,7 @@ import { useProductMaster } from '@/composables/useProductMaster';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
 import { countTaskTargets, orderTaskTarget, runGroupedTaskMutation, selectedTaskCardsById } from '@/utils/orderTaskBulk';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
@@ -235,11 +236,14 @@ function resetSelection() {
 }
 
 async function loadMoreFraudTasks(event: any) {
-  await fetchFraudTasks(
-    undefined,
-    Math.ceil(fraudTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
-  );
-  await event.target.complete();
+  try {
+    await fetchFraudTasks(
+      undefined,
+      Math.ceil(fraudTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
+    );
+  } finally {
+    await event.target.complete();
+  }
 }
 
 function selectedCards(): any[] {

@@ -2,164 +2,134 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')">
+        <ion-button v-if="step === 'party'" @click="dismiss()" :aria-label="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
+        <ion-button v-else @click="step = 'party'" :aria-label="translate('Back')">
+          <ion-icon slot="icon-only" :icon="arrowBackOutline" />
+        </ion-button>
       </ion-buttons>
-      <ion-title>Add Relationship</ion-title>
+      <ion-title>{{ step === 'party' ? translate("Find party") : translate("Add Relationship") }}</ion-title>
+    </ion-toolbar>
+    <ion-toolbar v-if="step === 'party'">
+      <ion-searchbar
+        :value="queryString"
+        :placeholder="translate('Name, party ID, email, or phone')"
+        :debounce="300"
+        @ionInput="onSearchInput($event.target.value)"
+      />
     </ion-toolbar>
   </ion-header>
 
   <ion-content>
-    <ion-list>
-      <!-- Type toggle -->
-      <ion-item lines="none">
-        <ion-segment v-model="partyType" @ion-change="onTypeChange">
-          <ion-segment-button value="PERSON">
-            <ion-label>Person</ion-label>
-          </ion-segment-button>
-          <ion-segment-button value="PARTY_GROUP">
-            <ion-label>Group</ion-label>
-          </ion-segment-button>
-        </ion-segment>
-      </ion-item>
+    <!-- Step 1: find the party -->
+    <template v-if="step === 'party'">
+      <div v-if="searching" class="ion-padding ion-text-center">
+        <ion-spinner name="crescent" />
+      </div>
 
-      <!-- Search fields -->
-      <template v-if="partyType === 'PERSON'">
+      <ion-radio-group v-else-if="results.length" v-model="selectedPartyId">
+        <ion-list lines="full">
+          <ion-item v-for="party in results" :key="party.partyId">
+            <ion-radio label-placement="end" justify="start" :value="party.partyId">
+              <ion-label class="ion-text-wrap">
+                <p class="overline">{{ party.partyId }}</p>
+                {{ party.name }}
+                <p v-if="party.contact">{{ party.contact }}</p>
+              </ion-label>
+            </ion-radio>
+          </ion-item>
+        </ion-list>
+      </ion-radio-group>
+
+      <div v-else class="ion-padding ion-text-center">
+        <ion-note>{{ hasSearchTerm ? translate("No parties found") : translate("Search for a party to relate") }}</ion-note>
+      </div>
+
+      <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+        <ion-fab-button :disabled="!selectedParty" :aria-label="translate('Next')" @click="step = 'relationship'">
+          <ion-icon :icon="arrowForwardOutline" />
+        </ion-fab-button>
+      </ion-fab>
+    </template>
+
+    <!-- Step 2: describe the relationship -->
+    <template v-else>
+      <ion-list lines="full">
         <ion-item lines="none">
-          <div class="name-search-row">
-            <ion-input
-              label="First name"
-              label-placement="stacked"
-              placeholder="First name"
-              v-model="firstName"
-              @ion-input="scheduleSearch"
-              :clearInput="true"
-            />
-            <ion-input
-              label="Last name"
-              label-placement="stacked"
-              placeholder="Last name"
-              v-model="lastName"
-              @ion-input="scheduleSearch"
-              :clearInput="true"
-            />
-          </div>
+          <ion-label class="ion-text-wrap">
+            <p class="overline">{{ translate("Selected party") }}</p>
+            {{ selectedParty?.name }}
+            <p>{{ selectedParty?.partyId }}</p>
+          </ion-label>
         </ion-item>
-      </template>
-      <template v-else>
+        <ion-item>
+          <ion-select
+            :label="translate('Relationship type')"
+            label-placement="stacked"
+            interface="popover"
+            :placeholder="translate('Select relationship type')"
+            v-model="partyRelationshipTypeId"
+          >
+            <ion-select-option
+              v-for="type in relationshipTypes"
+              :key="type.partyRelationshipTypeId"
+              :value="type.partyRelationshipTypeId"
+            >
+              {{ type.partyRelationshipName || type.description || type.partyRelationshipTypeId }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+        <ion-item>
+          <ion-select
+            :label="translate('Role (current party)')"
+            label-placement="stacked"
+            interface="popover"
+            :placeholder="translate('Select role')"
+            v-model="roleTypeIdFrom"
+          >
+            <ion-select-option
+              v-for="role in availableRoleTypes"
+              :key="role.roleTypeId"
+              :value="role.roleTypeId"
+            >
+              {{ role.description || role.roleTypeId }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
+        <ion-item>
+          <ion-select
+            :label="translate('Role (selected party)')"
+            label-placement="stacked"
+            interface="popover"
+            :placeholder="translate('Select role')"
+            v-model="roleTypeIdTo"
+          >
+            <ion-select-option
+              v-for="role in availableRoleTypes"
+              :key="role.roleTypeId"
+              :value="role.roleTypeId"
+            >
+              {{ role.description || role.roleTypeId }}
+            </ion-select-option>
+          </ion-select>
+        </ion-item>
         <ion-item>
           <ion-input
-            label="Company name"
+            :label="translate('Comment')"
             label-placement="stacked"
-            placeholder="Search by company name"
-            v-model="groupName"
-            @ion-input="scheduleSearch"
-            :clearInput="true"
+            :placeholder="translate('Optional')"
+            v-model="comments"
           />
         </ion-item>
-      </template>
-    </ion-list>
-
-    <!-- Search results -->
-    <div v-if="searching" class="ion-padding ion-text-center">
-      <ion-spinner name="crescent" />
-    </div>
-
-    <ion-radio-group v-else-if="results.length" v-model="selectedPartyId">
-      <ion-list lines="full">
-        <ion-item v-for="party in results" :key="party.partyId">
-          <ion-radio label-placement="end" justify="start" :value="party.partyId">
-            <ion-label>
-              <h3>{{ party.name }}</h3>
-              <p>{{ party.partyId }}</p>
-            </ion-label>
-          </ion-radio>
-        </ion-item>
       </ion-list>
-    </ion-radio-group>
 
-    <div v-else-if="hasSearchTerm && !searching" class="ion-padding ion-text-center">
-      <p>No parties found</p>
-    </div>
-
-    <div v-else-if="!hasSearchTerm" class="ion-padding ion-text-center">
-      <p class="hint">Type a name to search</p>
-    </div>
-
-    <!-- Relationship config — shown after a party is selected -->
-    <ion-list v-if="selectedParty" lines="full">
-      <ion-item lines="none">
-        <ion-label color="medium">
-          <p class="overline">Selected party</p>
-          <h3>{{ selectedParty.name }}</h3>
-        </ion-label>
-      </ion-item>
-      <ion-item>
-        <ion-select
-          label="Relationship type"
-          label-placement="stacked"
-          interface="popover"
-          placeholder="Select relationship type"
-          v-model="partyRelationshipTypeId"
-        >
-          <ion-select-option
-            v-for="type in relationshipTypes"
-            :key="type.partyRelationshipTypeId"
-            :value="type.partyRelationshipTypeId"
-          >
-            {{ type.partyRelationshipName || type.description || type.partyRelationshipTypeId }}
-          </ion-select-option>
-        </ion-select>
-      </ion-item>
-      <ion-item>
-        <ion-select
-          label="Role (current party)"
-          label-placement="stacked"
-          interface="popover"
-          placeholder="Select role"
-          v-model="roleTypeIdFrom"
-        >
-          <ion-select-option
-            v-for="role in availableRoleTypes"
-            :key="role.roleTypeId"
-            :value="role.roleTypeId"
-          >
-            {{ role.description || role.roleTypeId }}
-          </ion-select-option>
-        </ion-select>
-      </ion-item>
-      <ion-item>
-        <ion-select
-          label="Role (selected party)"
-          label-placement="stacked"
-          interface="popover"
-          placeholder="Select role"
-          v-model="roleTypeIdTo"
-        >
-          <ion-select-option
-            v-for="role in availableRoleTypes"
-            :key="role.roleTypeId"
-            :value="role.roleTypeId"
-          >
-            {{ role.description || role.roleTypeId }}
-          </ion-select-option>
-        </ion-select>
-      </ion-item>
-      <ion-item>
-        <ion-input
-          label="Comment"
-          label-placement="stacked"
-          placeholder="Optional"
-          v-model="comments"
-        />
-      </ion-item>
-    </ion-list>
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!isValid" @click="confirm()">
-        <ion-icon :icon="checkmarkCircle" />
-      </ion-fab-button>
-    </ion-fab>
+      <ion-fab vertical="bottom" horizontal="end" slot="fixed">
+        <ion-fab-button :disabled="!isValid" :aria-label="translate('Confirm')" @click="confirm()">
+          <ion-icon :icon="checkmarkCircle" />
+        </ion-fab-button>
+      </ion-fab>
+    </template>
   </ion-content>
 </template>
 
@@ -176,10 +146,10 @@ import {
   IonItem,
   IonLabel,
   IonList,
+  IonNote,
   IonRadio,
   IonRadioGroup,
-  IonSegment,
-  IonSegmentButton,
+  IonSearchbar,
   IonSelect,
   IonSelectOption,
   IonSpinner,
@@ -187,12 +157,17 @@ import {
   IonToolbar,
   modalController
 } from '@ionic/vue';
-import { checkmarkCircle, closeOutline } from 'ionicons/icons';
+import { arrowBackOutline, arrowForwardOutline, checkmarkCircle, closeOutline } from 'ionicons/icons';
 import { computed, ref } from 'vue';
 import { translate } from '@common';
 import { useSeedStore } from '@/store/seed';
-import { findParties } from '@/services/customer';
-import type { PartySearchResult } from '@/services/customer';
+import { searchCustomers } from '@/services/customer';
+
+interface RelatableParty {
+  partyId: string;
+  name: string;
+  contact: string;
+}
 
 const props = defineProps<{
   currentPartyId: string;
@@ -200,19 +175,18 @@ const props = defineProps<{
 
 const seed = useSeedStore();
 
-const partyType = ref<'PERSON' | 'PARTY_GROUP'>('PERSON');
-const firstName = ref('');
-const lastName = ref('');
-const groupName = ref('');
-const results = ref<PartySearchResult[]>([]);
+const step = ref<'party' | 'relationship'>('party');
+const queryString = ref('');
+const results = ref<RelatableParty[]>([]);
 const searching = ref(false);
-const selectedParty = ref<PartySearchResult | null>(null);
+const selectedParty = ref<RelatableParty | null>(null);
 const partyRelationshipTypeId = ref('');
 const roleTypeIdFrom = ref('');
 const roleTypeIdTo = ref('');
 const comments = ref('');
 
-let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+// Guards against an earlier search resolving after a later one and overwriting it.
+let latestSearchId = 0;
 
 const relationshipTypes = computed(() =>
   (seed as any).partyRelationshipTypes.ids
@@ -226,11 +200,7 @@ const availableRoleTypes = computed(() =>
     .filter(Boolean)
 );
 
-const hasSearchTerm = computed(() =>
-  partyType.value === 'PERSON'
-    ? firstName.value.trim().length > 0 || lastName.value.trim().length > 0
-    : groupName.value.trim().length > 0
-);
+const hasSearchTerm = computed(() => queryString.value.trim().length > 0);
 
 const isValid = computed(() =>
   !!selectedParty.value &&
@@ -239,39 +209,40 @@ const isValid = computed(() =>
   !!roleTypeIdTo.value
 );
 
-function onTypeChange() {
-  firstName.value = '';
-  lastName.value = '';
-  groupName.value = '';
-  results.value = [];
+function onSearchInput(value: string) {
+  queryString.value = value ?? '';
   selectedParty.value = null;
-  partyRelationshipTypeId.value = '';
-}
-
-function scheduleSearch() {
-  selectedParty.value = null;
-  if (debounceTimer) clearTimeout(debounceTimer);
   if (!hasSearchTerm.value) {
     results.value = [];
     return;
   }
-  debounceTimer = setTimeout(() => runSearch(), 350);
+  runSearch();
 }
 
+// One box over the customer search index, which matches on party ID, name, email
+// and phone in a single query, so the party type never has to be chosen up front.
 async function runSearch() {
+  const searchId = ++latestSearchId;
   searching.value = true;
   try {
-    const parties = await findParties({
-      partyTypeId: partyType.value,
-      firstName: firstName.value || undefined,
-      lastName: lastName.value || undefined,
-      groupName: groupName.value || undefined
+    const { customers } = await searchCustomers({
+      queryString: queryString.value.trim(),
+      partyTypeId: 'All',
+      pageSize: 20,
+      pageIndex: 0
     });
-    results.value = parties.filter((p) => p.partyId !== props.currentPartyId);
+    if (searchId !== latestSearchId) return;
+    results.value = customers
+      .filter((doc: any) => doc.partyId && doc.partyId !== props.currentPartyId)
+      .map((doc: any) => ({
+        partyId: doc.partyId,
+        name: doc.fullName || doc.groupName || [doc.firstName, doc.lastName].filter(Boolean).join(' ').trim() || doc.partyId,
+        contact: doc.emailAddress || doc.phoneNumber || ''
+      }));
   } catch {
-    results.value = [];
+    if (searchId === latestSearchId) results.value = [];
   } finally {
-    searching.value = false;
+    if (searchId === latestSearchId) searching.value = false;
   }
 }
 
@@ -296,27 +267,3 @@ function confirm() {
   }, 'confirm');
 }
 </script>
-
-<style scoped>
-.name-search-row {
-  display: flex;
-  gap: 12px;
-  width: 100%;
-}
-
-.name-search-row ion-input {
-  flex: 1;
-}
-
-.hint {
-  color: var(--ion-color-medium, #92949c);
-}
-
-.overline {
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  font-size: 10px;
-  color: var(--ion-color-medium, #92949c);
-  margin: 0 0 4px;
-}
-</style>

@@ -1,6 +1,6 @@
 {
   "name": "order-manager",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Order Manager App",
   "type": "module",
@@ -17,15 +17,14 @@
     "@capacitor/clipboard": "catalog:",
     "@capacitor/core": "catalog:",
     "@capacitor/ios": "catalog:",
-    "@casl/ability": "^6.0.0",
     "@hotwax/app-version-info": "^1.0.0",
     "@ionic/core": "catalog:",
     "@ionic/vue": "catalog:",
     "@ionic/vue-router": "catalog:",
-    "boon-js": "^2.0.3",
+    "comlink": "catalog:",
     "cron-parser": "catalog:",
     "cronstrue": "catalog:",
-    "dexie": "^4.4.3",
+    "dexie": "catalog:",
     "file-saver": "catalog:",
     "ionicons": "catalog:",
     "luxon": "catalog:",
@@ -48,6 +47,7 @@
     "@vitejs/plugin-vue": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",
-    "vite": "catalog:"
+    "vite": "catalog:",
+    "vite-plugin-pwa": "catalog:"
   }
 }

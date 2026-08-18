@@ -1,15 +1,28 @@
 <template>
   <div class="list-item order-item-list-row">
-    <ion-item class="order-item-list-key" lines="none">
+    <ion-item
+      class="order-item-list-key"
+      lines="none"
+      :button="rowSelects"
+      :detail="false"
+      @click="rowSelects && emit('update:selected', !selected)"
+    >
       <ion-checkbox
         v-if="selectable"
         slot="start"
         :checked="selected"
+        :aria-label="translate('Select item')"
         @click.stop
         @keydown.stop
         @ionChange="emit('update:selected', $event.detail.checked)"
       />
-      <ion-thumbnail v-if="imageUrl" slot="start" v-image-preview="previewProduct" :key="imageUrl">
+      <ion-thumbnail
+        v-if="imageUrl"
+        slot="start"
+        v-image-preview="previewProduct"
+        :key="imageUrl"
+        @click.stop
+      >
         <DxpShopifyImg :src="imageUrl" :key="imageUrl" size="small" />
       </ion-thumbnail>
       <ion-label>
@@ -56,20 +69,22 @@
 
     <ion-label class="ion-text-end order-item-amount">
       {{ amount }}
-      <p v-for="adjustment in adjustments" :key="adjustment.label">
+      <ion-note class="ion-display-block" v-for="adjustment in adjustments" :key="adjustment.label">
         {{ adjustment.label }}: {{ adjustment.amount }}
-      </p>
-      <slot name="actions" />
+      </ion-note>
     </ion-label>
+
+    <div></div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue';
 import { IonBadge, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonThumbnail } from '@ionic/vue';
 import { businessOutline, listOutline } from 'ionicons/icons';
-import { DxpShopifyImg } from '@common';
+import { DxpShopifyImg, translate } from '@common';
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   primary: string;
   secondary?: string;
   badgeLabel?: string;
@@ -77,6 +92,7 @@ withDefaults(defineProps<{
   previewProduct?: any;
   selectable?: boolean;
   selected?: boolean;
+  selectOnRowClick?: boolean;
   quantity: string | number;
   quantityLabel: string;
   showQuantity?: boolean;
@@ -96,6 +112,7 @@ withDefaults(defineProps<{
   previewProduct: undefined,
   selectable: true,
   selected: false,
+  selectOnRowClick: true,
   showQuantity: true,
   facilityLabel: '',
   facilityDisabled: false,
@@ -107,6 +124,14 @@ withDefaults(defineProps<{
   adjustments: () => [],
 });
 
+/**
+ * Ionic does not forward an `ion-item` tap to a control in its `slot="start"`,
+ * so the row drives selection from its own click and the checkbox is only the
+ * indicator. Rows whose click already belongs to something else — an
+ * `ion-accordion` header toggles the group — opt out with `selectOnRowClick`.
+ */
+const rowSelects = computed(() => props.selectable && props.selectOnRowClick);
+
 const emit = defineEmits<{
   (event: 'update:selected', value: boolean): void;
   (event: 'facility-click'): void;
@@ -116,7 +141,7 @@ const emit = defineEmits<{
 
 <style scoped>
 .order-item-list-row {
-  --columns-desktop: 5;
+  --columns-desktop: 6;
   --columns-tablet: 5;
   min-height: 6rem;
   border-block-start: var(--border-medium);

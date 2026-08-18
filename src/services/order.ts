@@ -15,6 +15,7 @@ import {
   toNumberValue,
   type OrderSearchResult
 } from './OrderService';
+import { DateTime } from 'luxon';
 
 // Facility id used by OMS to hold archived order items (General Operations Parking).
 // Confirmed present in ORDER docs via the indexed `facilityId` field (see PR #309 field dump).
@@ -483,6 +484,177 @@ export async function fetchUnfillableProductCandidates(productStoreId?: string, 
     }))
 }
 
+// Order statuses that make up the live unfillable queue. Kept identical to the
+// funnel card's own count query so the trend and the big number describe the
+// same population — a trend scoped differently from its stat reads as broken.
+export const UNFILLABLE_QUEUE_ORDER_STATUSES = ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD'];
+
+// Roughly how many points the sparkline should plot. The bucket width is
+// derived from this and the queue's real age, so the line always has shape.
+export const UNFILLABLE_TREND_MAX_BUCKETS = 30;
+
+export interface UnfillableTrendPoint {
+  /** Local calendar day the bucket starts on, as yyyy-MM-dd. */
+  date: string;
+  /** Days the bucket covers — 1 for a daily point, more for an aged queue. */
+  dayspan: number;
+  /** ORDER item docs parked in UNFILLABLE_PARKING ordered within the bucket. */
+  itemCount: number;
+}
+
+export interface UnfillableOrderDay {
+  /** Local calendar day the orders were placed on, as yyyy-MM-dd. */
+  date: string;
+  /** Distinct orders placed that day with items in unfillable parking. */
+  orderCount: number;
+  /** Order items parked that day — the same unit the sparkline plots. */
+  itemCount: number;
+}
+
+export interface UnfillableTrend {
+  /** Uniform buckets for the sparkline. */
+  points: UnfillableTrendPoint[];
+  /** Days that actually have orders, oldest first — the drilldown rows. */
+  days: UnfillableOrderDay[];
+  /** Distinct orders across the whole queue. */
+  totalOrders: number;
+}
+
+function unfillableQueueFilters(productStoreId?: string) {
+  const filters = [
+    'docType:ORDER',
+    'orderTypeId:SALES_ORDER',
+    'facilityId:UNFILLABLE_PARKING',
+    `orderStatusId:(${UNFILLABLE_QUEUE_ORDER_STATUSES.join(' OR ')})`
+  ];
+  if (productStoreId && productStoreId !== 'All') filters.push(`productStoreId:${escapeSolrValue(productStoreId)}`);
+  return filters;
+}
+
+/**
+ * How far back the queue actually reaches. A fixed "last N days" window is
+ * useless here: an unfillable queue is a backlog, so on a real store every
+ * recent-day bucket comes back zero and the card draws a flat line.
+ */
+export function buildUnfillableTrendSpanPayload(productStoreId?: string) {
+  return {
+    json: {
+      params: { rows: 0, start: 0, 'q.op': 'AND' },
+      query: '*:*',
+      filter: unfillableQueueFilters(productStoreId),
+      facet: {
+        oldestOrderDate: 'min(orderDate)',
+        newestOrderDate: 'max(orderDate)'
+      }
+    }
+  };
+}
+
+/**
+ * Two views of the same queue in one request, both bucketed by the day the
+ * order was placed. Solr ORDER docs are one-per-order-item, so a range facet
+ * counts items directly and `unique(orderId)` counts orders.
+ *
+ * - `byOrderDate` uses uniform buckets, so the sparkline's x-axis stays a real
+ *   timeline even when the queue has quiet days.
+ * - `byOrderDay` is always daily and drops empty days (`mincount`), because the
+ *   drilldown rows list dates a user can act on, not gaps.
+ *
+ * Bucket boundaries are the user's local midnights, not UTC: the bounds are
+ * built in the profile timezone and then converted.
+ */
+export function buildUnfillableOrderDateTrendPayload(
+  productStoreId: string | undefined,
+  start: DateTime,
+  end: DateTime,
+  gapDays: number
+) {
+  const startIso = start.toUTC().toISO();
+  const endIso = end.toUTC().toISO();
+
+  return {
+    json: {
+      params: { rows: 0, start: 0, 'q.op': 'AND' },
+      query: '*:*',
+      filter: unfillableQueueFilters(productStoreId),
+      facet: {
+        byOrderDate: {
+          type: 'range',
+          field: 'orderDate',
+          start: startIso,
+          end: endIso,
+          gap: `+${gapDays}DAY`
+        },
+        byOrderDay: {
+          type: 'range',
+          field: 'orderDate',
+          start: startIso,
+          end: endIso,
+          gap: '+1DAY',
+          mincount: 1,
+          facet: { orderCount: 'unique(orderId)' }
+        },
+        totalOrders: 'unique(orderId)'
+      }
+    }
+  };
+}
+
+function solrFacets(data: any) {
+  return data?.facets || data?.response?.facets || {};
+}
+
+export const EMPTY_UNFILLABLE_TREND: UnfillableTrend = { points: [], days: [], totalOrders: 0 };
+
+export async function fetchUnfillableTrend(
+  productStoreId?: string,
+  timeZone?: string,
+  maxBuckets = UNFILLABLE_TREND_MAX_BUCKETS
+): Promise<UnfillableTrend> {
+  const solr = useSolrSearch();
+  const zone = timeZone || undefined;
+  const inZone = (iso: string) => (zone ? DateTime.fromISO(iso, { zone }) : DateTime.fromISO(iso));
+  const dayOf = (value: any) => {
+    const parsed = inZone(toStringValue(value));
+    return parsed.isValid ? parsed.toFormat('yyyy-MM-dd') : toStringValue(value);
+  };
+
+  const spanResponse = await solr.runSolrQuery(buildUnfillableTrendSpanPayload(productStoreId));
+  if (commonUtil.hasError(spanResponse)) return Promise.reject(spanResponse.data);
+
+  const span = solrFacets(spanResponse.data);
+  const oldest = inZone(toStringValue(span.oldestOrderDate));
+  const newest = inZone(toStringValue(span.newestOrderDate));
+  // An empty queue has no min/max at all — nothing to plot.
+  if (!oldest.isValid || !newest.isValid) return EMPTY_UNFILLABLE_TREND;
+
+  const start = oldest.startOf('day');
+  const totalDays = Math.max(1, Math.floor(newest.startOf('day').diff(start, 'days').days) + 1);
+  const gapDays = Math.max(1, Math.ceil(totalDays / maxBuckets));
+  const end = start.plus({ days: Math.ceil(totalDays / gapDays) * gapDays });
+
+  const response = await solr.runSolrQuery(
+    buildUnfillableOrderDateTrendPayload(productStoreId, start, end, gapDays)
+  );
+  if (commonUtil.hasError(response)) return Promise.reject(response.data);
+
+  const facets = solrFacets(response.data);
+
+  return {
+    points: (facets.byOrderDate?.buckets || []).map((bucket: any) => ({
+      date: dayOf(bucket.val),
+      dayspan: gapDays,
+      itemCount: toNumberValue(bucket.count)
+    })),
+    days: (facets.byOrderDay?.buckets || []).map((bucket: any) => ({
+      date: dayOf(bucket.val),
+      orderCount: toNumberValue(bucket.orderCount),
+      itemCount: toNumberValue(bucket.count)
+    })),
+    totalOrders: toNumberValue(facets.totalOrders)
+  };
+}
+
 export function buildUnfillableShipGroupsForProductPayload(productStoreId: string, productId: string) {
   return {
     json: {
@@ -705,8 +877,8 @@ function buildOrderSearchQuery(searchTerm: string) {
 function buildOrderDateSolrFilter(dateFrom?: string, dateThru?: string) {
   if (!dateFrom && !dateThru) return '';
 
-  const fromDate = dateFrom ? `${dateFrom.split('T')[0]}T00:00:00Z` : '*';
-  const thruDate = dateThru ? `${dateThru.split('T')[0]}T23:59:59Z` : '*';
+  const fromDate = dateFrom ? DateTime.fromISO(dateFrom).startOf('day').toUTC().toISO() : "*"
+  const thruDate = dateThru ? DateTime.fromISO(dateThru).endOf('day').toUTC().toISO() : "*"
 
   return `orderDate: [${fromDate} TO ${thruDate}]`;
 }

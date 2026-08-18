@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   enterCallbacks: [] as Array<() => void>,
   fetchHoldTasks: vi.fn(),
   loadPhysicalFacilities: vi.fn(),
+  loadEnumType: vi.fn(),
 }));
 
 vi.mock('@common', () => ({
@@ -66,11 +67,16 @@ vi.mock('@/store/seed', () => ({
   useSeedStore: () => ({
     getEnumsByType: () => [],
     getShipmentMethodOptions: [],
+    loadEnumType: mocks.loadEnumType,
   }),
 }));
 
+// Stands in for the real composable's route->filters direction: the purpose filter
+// is seeded from `?purpose=`, which is what this spec asserts reaches the store.
 vi.mock('@/composables/useOrderTaskRouteState', () => ({
-  useOrderTaskRouteState: vi.fn(),
+  useOrderTaskRouteState: (filters: { value: Record<string, string> }) => {
+    if (mocks.currentQuery.purpose) filters.value.workEffortPurposeTypeId = mocks.currentQuery.purpose;
+  },
 }));
 
 vi.mock('@/composables/usePhysicalFacilityOptions', () => ({
@@ -84,8 +90,8 @@ vi.mock('@/utils', () => ({
   showToast: vi.fn(),
 }));
 
-vi.mock('@/authorization/permissions', () => ({
-  ORDER_TASK_CREATE_PERMISSION: 'ORDER_TASK_CREATE',
+vi.mock('@/authorization/actions', () => ({
+  default: { APP_ORDER_TASK_CREATE: 'ORDER_TASK_CREATE' },
 }));
 
 describe('HoldOrders purpose route', () => {
@@ -94,6 +100,7 @@ describe('HoldOrders purpose route', () => {
     mocks.enterCallbacks.length = 0;
     mocks.fetchHoldTasks.mockReset().mockResolvedValue(undefined);
     mocks.loadPhysicalFacilities.mockReset();
+    mocks.loadEnumType.mockReset();
   });
 
   async function enterPage() {
@@ -114,10 +121,19 @@ describe('HoldOrders purpose route', () => {
     wrapper.unmount();
   });
 
-  it('keeps the store default when the Hold route has no purpose', async () => {
+  it('leaves the purpose unset when the Hold route has no purpose, so the store queries every non-dedicated purpose', async () => {
     const wrapper = await enterPage();
 
     expect(mocks.fetchHoldTasks).toHaveBeenCalledOnce();
+    expect(mocks.fetchHoldTasks).toHaveBeenCalledWith(expect.any(Object), undefined);
+    wrapper.unmount();
+  });
+
+  it('treats the "All" purpose selection as no purpose rather than sending it as a filter', async () => {
+    mocks.currentQuery = { purpose: 'All' };
+
+    const wrapper = await enterPage();
+
     expect(mocks.fetchHoldTasks).toHaveBeenCalledWith(expect.any(Object), undefined);
     wrapper.unmount();
   });

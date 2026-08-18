@@ -15,10 +15,12 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Settings } from 'luxon';
 import { emitter, FastTravel, translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
+import { getCacheSyncToken, startAppCacheSync } from '@/services/appCacheSync';
 import Menu from '@/components/layout/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';
 import { useSeedStore } from '@/store/seed';
+import { useProductStore } from '@/store/productStore';
 
 const loader = ref<HTMLIonLoadingElement | null>(null);
 const { isAuthenticated } = useAuth();
@@ -58,19 +60,30 @@ onMounted(async () => {
   const timeZone = userProfile.value?.timeZone || userProfile.value?.userTimeZone;
   if (timeZone) Settings.defaultZone = timeZone;
 
-  // postLogin only fires on a login transition. Refresh permissions on a restored session so
-  // changes made by an administrator are reflected without forcing the user to log out.
+  // Initialize in-memory seed cache from IndexedDB on startup/reload. Awaited so the cached
+  // datasets are in place before the API fallback below decides what still needs fetching.
+  await useSeedStore().initSeedCache();
+
+  // On authenticated boot, start background Web Worker cache bootstrap to ensure sync
   if (isAuthenticated.value) {
     await userStore.fetchPermissions().catch(() => undefined);
+
+    const token = getCacheSyncToken();
+    if (token) {
+      startAppCacheSync(token, () => useSeedStore().populateFromCache())
+        .catch((err) => {
+          console.warn("Background cache bootstrap notice:", err);
+        });
+    }
   }
 
-  // Ensure seed reference data is loaded on an authenticated boot. A page reload with a
-  // persisted session would otherwise skip it and leave label datasets unresolved.
-  // loadInitialSeedData is idempotent — already-loaded datasets are skipped.
-  const productStoreIds = (userStore.current?.stores || [])
-    .map((store: any) => store.productStoreId)
-    .filter(Boolean);
-  if (productStoreIds.length) {
+  // Ensure seed reference data is loaded on an authenticated boot. Store-scoped datasets need
+  // product store ids, but the global ones must load regardless — gating the whole call on
+  // having stores left every unfilled dataset resolving labels to raw ids.
+  if (isAuthenticated.value) {
+    const productStoreIds = (useProductStore().productStores || [])
+      .map((store: any) => store.productStoreId)
+      .filter(Boolean);
     useSeedStore().loadInitialSeedData(productStoreIds).catch(() => undefined);
   }
 });

@@ -4,17 +4,9 @@ import { Login, translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';
 import { showToast } from '@/utils';
-import {
-  CUSTOMER_CREATE_PERMISSION,
-  CUSTOMER_VIEW_PERMISSION,
-  ORDER_CANCEL_PERMISSION,
-  ORDER_CREATE_PERMISSION,
-  ORDER_UPDATE_PERMISSION,
-  ORDER_VIEW_PERMISSION,
-  SWAP_ORDER_PERMISSION
-} from '@/authorization/permissions';
 import OrderSearch from '@/views/OrderSearch.vue';
 import OrderDetail from '@/views/OrderDetail.vue';
+import Returns from '@/views/Returns.vue';
 import ReturnDetail from '@/views/ReturnDetail.vue';
 import Customers from '@/views/Customers.vue';
 import CustomerDetail from '@/views/CustomerDetail.vue';
@@ -29,7 +21,7 @@ import BrokeringQueue from '@/views/BrokeringQueue.vue';
 import OpenOrders from '@/views/OpenOrders.vue';
 import InflightOrders from '@/views/InflightOrders.vue';
 import PackedOrders from '@/views/PackedOrders.vue';
-import CreateOrder from '@/views/CreateOrder.vue';
+import Actions from "@/authorization/actions";
 
 const authGuard = async () => {
   if (!useAuth().isAuthenticated.value) {
@@ -53,7 +45,7 @@ const routes: RouteRecordRaw[] = [
     component: Funnel,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_VIEW_PERMISSION
+      permissionId: Actions.APP_ORDERS_VIEW
     }
   },
   {
@@ -62,7 +54,7 @@ const routes: RouteRecordRaw[] = [
     component: OrderSearch,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_VIEW_PERMISSION
+      permissionId: Actions.APP_ORDERS_VIEW
     }
   },
   {
@@ -72,7 +64,16 @@ const routes: RouteRecordRaw[] = [
     props: true,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_VIEW_PERMISSION
+      permissionId: Actions.APP_ORDERS_VIEW
+    }
+  },
+  {
+    path: '/returns',
+    name: 'Returns',
+    component: Returns,
+    beforeEnter: authGuard,
+    meta: {
+      permissionId: Actions.APP_ORDER_RETURN_VIEW
     }
   },
   {
@@ -82,7 +83,7 @@ const routes: RouteRecordRaw[] = [
     props: true,
     beforeEnter: authGuard,
     meta: {
-      permissionId: `${ORDER_VIEW_PERMISSION} OR ${CUSTOMER_VIEW_PERMISSION}`
+      permissionId: Actions.APP_ORDER_RETURN_VIEW
     }
   },
   {
@@ -92,7 +93,7 @@ const routes: RouteRecordRaw[] = [
     props: true,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_VIEW_PERMISSION
+      permissionId: Actions.APP_ORDERS_VIEW
     }
   },
   {
@@ -102,7 +103,7 @@ const routes: RouteRecordRaw[] = [
     props: true,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_VIEW_PERMISSION
+      permissionId: Actions.APP_ORDERS_VIEW
     }
   },
   {
@@ -112,7 +113,7 @@ const routes: RouteRecordRaw[] = [
     props: true,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_VIEW_PERMISSION
+      permissionId: Actions.APP_ORDERS_VIEW
     }
   },
   {
@@ -121,7 +122,7 @@ const routes: RouteRecordRaw[] = [
     component: Customers,
     beforeEnter: authGuard,
     meta: {
-      permissionId: CUSTOMER_VIEW_PERMISSION
+      permissionId: Actions.APP_CUSTOMERS_VIEW
     }
   },
   {
@@ -131,7 +132,7 @@ const routes: RouteRecordRaw[] = [
     props: true,
     beforeEnter: authGuard,
     meta: {
-      permissionId: CUSTOMER_VIEW_PERMISSION
+      permissionId: Actions.APP_CUSTOMERS_VIEW
     }
   },
   {
@@ -146,7 +147,7 @@ const routes: RouteRecordRaw[] = [
     component: SwapOrders,
     beforeEnter: authGuard,
     meta: {
-      permissionId: SWAP_ORDER_PERMISSION
+      permissionId: Actions.APP_SWAP_ORDER
     }
   },
   {
@@ -155,7 +156,7 @@ const routes: RouteRecordRaw[] = [
     component: BadAddressOrders,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_UPDATE_PERMISSION
+      permissionId: Actions.APP_ORDER_UPDATE
     }
   },
   {
@@ -164,7 +165,7 @@ const routes: RouteRecordRaw[] = [
     component: FraudOrders,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_CANCEL_PERMISSION
+      permissionId: Actions.APP_ORDER_CANCEL
     }
   },
   {
@@ -173,7 +174,7 @@ const routes: RouteRecordRaw[] = [
     component: HoldOrders,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_UPDATE_PERMISSION
+      permissionId: Actions.APP_ORDER_UPDATE
     }
   },
   {
@@ -188,7 +189,7 @@ const routes: RouteRecordRaw[] = [
     component: OpenOrders,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_VIEW_PERMISSION
+      permissionId: Actions.APP_ORDERS_VIEW
     }
   },
   {
@@ -197,7 +198,7 @@ const routes: RouteRecordRaw[] = [
     component: InflightOrders,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_VIEW_PERMISSION
+      permissionId: Actions.APP_ORDERS_VIEW
     }
   },
   {
@@ -206,16 +207,7 @@ const routes: RouteRecordRaw[] = [
     component: PackedOrders,
     beforeEnter: authGuard,
     meta: {
-      permissionId: ORDER_VIEW_PERMISSION
-    }
-  },
-  {
-    path: '/create-order',
-    name: 'CreateOrder',
-    component: CreateOrder,
-    beforeEnter: authGuard,
-    meta: {
-      permissionId: `${ORDER_CREATE_PERMISSION} OR ${CUSTOMER_CREATE_PERMISSION}`
+      permissionId: Actions.APP_ORDERS_VIEW
     }
   },
   {

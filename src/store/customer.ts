@@ -17,11 +17,11 @@ import {
   getCustomerOrdersFromSolr,
   getCustomerProfile,
   getCustomerRelationships,
-  getCustomerReturns,
   getCustomerTasks,
   getOrderProgressStatuses,
   getPartyNames
 } from '@/services/customer';
+import { listReturns } from '@/services/returns';
 import { useSeedStore } from '@/store/seed';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { commonUtil } from '@common';
@@ -31,12 +31,12 @@ import type {
   CustomerOrderSummary,
   CustomerProfile,
   CustomerRelationship,
-  CustomerReturnSummary,
   CustomerTaskSummary,
   CustomerTimelineEvent,
   LoadStatus,
   SourceEntry
 } from '@/types/customer';
+import type { ReturnSummary } from '@/types/returns';
 
 // Relationship taxonomy for splitting the Relationships card vs the Merged
 // contacts (duplicate) card. Personal types are the blood-relative set seeded
@@ -57,7 +57,7 @@ interface CustomerDetailState {
   recentOrdersByPartyId: Record<string, SourceEntry<CustomerOrderSummary[]>>;
   tasksByPartyId: Record<string, SourceEntry<CustomerTaskSummary[]>>;
   unfillableByPartyId: Record<string, SourceEntry<CustomerOrderSummary[]>>;
-  returnsByPartyId: Record<string, SourceEntry<CustomerReturnSummary[]>>;
+  returnsByPartyId: Record<string, SourceEntry<ReturnSummary[]>>;
   communicationsByPartyId: Record<string, SourceEntry<CustomerCommunicationSummary[]>>;
   relationshipsByPartyId: Record<string, SourceEntry<CustomerRelationship[]>>;
   mergableDuplicatesByPartyId: Record<string, Array<{ partyId: string; name: string }>>;
@@ -305,7 +305,7 @@ export const useCustomerStore = defineStore('customerDetail', {
       state.tasksByPartyId[partyId]?.hasMore ?? false,
     unfillableOrders: (state) => (partyId: string): CustomerOrderSummary[] =>
       state.unfillableByPartyId[partyId]?.payload || [],
-    returns: (state) => (partyId: string): CustomerReturnSummary[] =>
+    returns: (state) => (partyId: string): ReturnSummary[] =>
       state.returnsByPartyId[partyId]?.payload || [],
     communications: (state) => (partyId: string): CustomerCommunicationSummary[] =>
       state.communicationsByPartyId[partyId]?.payload || [],
@@ -328,6 +328,7 @@ export const useCustomerStore = defineStore('customerDetail', {
         this.loadCustomerProfile(partyId, force),
         this.loadCustomerOrders(partyId, force),
         this.loadCustomerTasks(partyId, force),
+        this.loadCustomerRelationships(partyId, force),
         (seed as any).loadPartyRelationshipTypes()
       ]);
       await (this as any).loadMergableDuplicates(partyId);
@@ -467,18 +468,17 @@ export const useCustomerStore = defineStore('customerDetail', {
       const existing = this.returnsByPartyId[partyId];
       if (existing?.status === 'loaded' && !force) return;
 
-      this.returnsByPartyId[partyId] = { ...(existing || newSource<CustomerReturnSummary[]>([])), status: 'loading', error: '' };
+      this.returnsByPartyId[partyId] = { ...(existing || newSource<ReturnSummary[]>([])), status: 'loading', error: '' };
       try {
-        const returns = await getCustomerReturns(partyId);
+        const result = await listReturns({ fromPartyId: partyId, pageIndex: 0, pageSize: 100 });
+        const returns = result.items;
         this.returnsByPartyId[partyId] = {
           payload: returns,
           status: 'loaded',
           loadedAt: new Date().toISOString(),
           error: '',
-          total: returns.length
+          total: result.total
         };
-        const returnProductIds = returns.flatMap((r) => r.items.map((item) => item.productId)).filter(Boolean) as string[];
-        if (returnProductIds.length) useProductMaster().prefetch(returnProductIds).catch(() => {});
       } catch (error: any) {
         this.returnsByPartyId[partyId] = {
           payload: [],

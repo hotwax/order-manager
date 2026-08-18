@@ -13,8 +13,10 @@
       <OrderTaskFilterCard
         v-model="filters"
         :channel-options="channelOptions"
+        :purpose-options="purposeOptions"
         :facility-options="facilityOptions"
         :shipment-method-options="shipmentMethodOptions"
+        show-purpose-filter
         show-ship-group-filters
         @search="replaceHoldTasks"
         @clear="clearFilters"
@@ -74,9 +76,9 @@
       </div>
 
       <ion-infinite-scroll
-        @ionInfinite="loadMoreHoldTasks($event)"
+        :disabled="!isScrollable"
         threshold="100px"
-        v-if="isScrollable"
+        @ionInfinite="loadMoreHoldTasks($event)"
       >
         <ion-infinite-scroll-content
           loading-spinner="crescent"
@@ -129,7 +131,8 @@ import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
-import { ORDER_TASK_CREATE_PERMISSION } from '@/authorization/permissions';
+import { HOLD_TASK_PURPOSE_ENUM_TYPE_ID, isDedicatedQueuePurpose } from '@/utils/taskQueues';
+import Actions from "@/authorization/actions";
 
 const orderTaskStore = useOrderTaskStore();
 const userStore = useUserStore();
@@ -141,12 +144,12 @@ const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions()
 const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
 const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions);
 const sortOptions = taskSortOptions('hold');
-const purposeFilter = computed(() => {
-  const purpose = router.currentRoute.value.query.purpose;
-  if (Array.isArray(purpose)) return typeof purpose[0] === 'string' ? purpose[0] : '';
-  return typeof purpose === 'string' ? purpose : '';
-});
-const canCreateHoldTasks = computed(() => userStore.hasPermission(ORDER_TASK_CREATE_PERMISSION));
+// Only purposes without a dedicated queue page are offered — picking Bad Address,
+// Swap or Fraud here would show tasks that belong on those pages.
+const purposeOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType(HOLD_TASK_PURPOSE_ENUM_TYPE_ID)
+  .filter((purpose: any) => !isDedicatedQueuePurpose(purpose.enumId))
+  .map((purpose: any) => ({ id: purpose.enumId, label: purpose.description || purpose.enumName || purpose.enumId })));
+const canCreateHoldTasks = computed(() => userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE));
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
 const cardRefs = ref<Record<string, any>>({});
@@ -194,7 +197,7 @@ watch(() => [
   filters.value.facilityId,
   filters.value.shipmentMethodTypeId,
   filters.value.sort,
-  purposeFilter.value,
+  filters.value.workEffortPurposeTypeId,
 ], () => {
   if (!suppressAutomaticFetch) replaceHoldTasks();
 }, { flush: 'sync' });
@@ -280,7 +283,7 @@ const fetchHoldTasks = async (pageSize?: any, pageIndex?: any) => {
       pageSize ?? import.meta.env.VITE_VIEW_SIZE,
       pageIndex ?? 0,
     ),
-    purposeFilter.value || undefined
+    filters.value.workEffortPurposeTypeId === 'All' ? undefined : filters.value.workEffortPurposeTypeId
   );
 };
 
@@ -294,15 +297,21 @@ function resetSelection() {
 }
 
 async function loadMoreHoldTasks(event: any) {
-  await fetchHoldTasks(
-    undefined,
-    Math.ceil(heldTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
-  );
-  await event.target.complete();
+  try {
+    await fetchHoldTasks(
+      undefined,
+      Math.ceil(heldTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
+    );
+  } finally {
+    await event.target.complete();
+  }
 }
 
 onIonViewWillEnter(() => {
   loadPhysicalFacilities();
+  // No-op once loaded; guarantees the purpose filter has options even when the
+  // page is opened directly rather than after a full seed load.
+  seedStore.loadEnumType(HOLD_TASK_PURPOSE_ENUM_TYPE_ID);
   replaceHoldTasks();
 });
 </script>

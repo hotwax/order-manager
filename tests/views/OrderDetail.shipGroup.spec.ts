@@ -39,4 +39,15 @@ describe('order detail ship group card', () => {
     expect(source).not.toContain('<ion-row');
     expect(source).not.toContain('<ion-col');
   });
+
+  it('falls back to every item in the ship group when nothing is selected', () => {
+    const source = readFileSync(resolve(process.cwd(), 'src/views/OrderDetail.vue'), 'utf8');
+
+    expect(source).toContain('function actionableItemObjectsForShipGroup(shipGroup: any)');
+    expect(source).toContain('if (!itemIds.size) return items;');
+    expect(source).not.toContain('function selectedItemObjectsForShipGroup');
+    // Park / pull back / release all act on the fallback set, not the raw selection.
+    expect(source.match(/actionableItemObjectsForShipGroup\(shipGroup\)/g)?.length).toBe(4);
+    expect(source).not.toContain('const itemIds = selectedItemsForShipGroup(shipGroup.id);');
+  });
 });

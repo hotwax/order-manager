@@ -23,18 +23,18 @@
       <ion-list lines="full" v-if="hasRoutingDetails(task)">
         <ion-item>
           <ion-icon slot="start" :icon="gitBranchOutline" />
-          <ion-label>
-            <p class="overline">{{ brokerageLabel(task) }}</p>
-            {{ routingMovementLabel(task) }}
-            <p>{{ routingPath(task) || translate('Routing details') }}</p>
-          </ion-label>
+          <div class="swap-routing-row">
+            <ion-label>
+              <p class="overline">{{ brokerageLabel(task) }}</p>
+              {{ routingMovementLabel(task) }}
+              <p>{{ routingPath(task) || translate('Routing details') }}</p>
+            </ion-label>
+            <ion-label>
+              <p class="overline">{{ translate('Routing justification') }}</p>
+              {{ routingJustification(task) || '-' }}
+            </ion-label>
+          </div>
           <ion-note slot="end" v-if="routingTimestamp(task)">{{ formatRoutingTimestamp(task) }}</ion-note>
-        </ion-item>
-        <ion-item>
-          <ion-label>
-            {{ translate('Routing justification') }}
-            <p v-if="routingJustification(task)">{{ routingJustification(task) }}</p>
-          </ion-label>
         </ion-item>
       </ion-list>
     </template>
@@ -137,7 +137,9 @@ import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { DateTime } from 'luxon';
 import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
+import ReleaseSwapOrderModal from '@/components/swaps/ReleaseSwapOrderModal.vue';
 import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductActionPopover.vue';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
@@ -159,11 +161,11 @@ const emit = defineEmits<{ (e: 'update:selected', value: boolean): void; (e: 'co
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
 
-const cardActions = computed<TaskCardAction[]>(() => [
+const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'release', label: translate('Release updated order'), kind: 'primary' },
   { id: 'park', label: translate('Park'), kind: 'neutral' },
   { id: 'cancel', label: translate('Cancel order'), kind: 'danger' },
-]);
+] as TaskCardAction[]).filter((action) => !(HIDE_SHOPIFY_UNSYNCED_ACTIONS && action.id === 'cancel')));
 
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 
@@ -398,32 +400,45 @@ function revertCancel(task: any, suggested: any) {
 }
 
 async function releaseUpdatedOrder(task: any) {
-  const { list, suggestedRefund } = getSuggestedItems(task);
+  const { list, newTotal, suggestedRefund } = getSuggestedItems(task);
+
+  const cancelledItems = list.filter((suggested: any) => suggested._cancel || suggested._noReplacement);
+  const substitutedItems = list.filter((suggested: any) => suggested._isSubstitute);
 
   // Items with an approved substitute — send to swap API
-  const itemSwapList = list
-    .filter((suggested: any) => suggested._isSubstitute)
-    .map((suggested: any) => ({
-      orderItemSeqId: suggested._sourceOrderItemSeqId,
-      newProductId: suggested.productId,
-    }));
+  const itemSwapList = substitutedItems.map((suggested: any) => ({
+    orderItemSeqId: suggested._sourceOrderItemSeqId,
+    newProductId: suggested.productId,
+  }));
 
   // Items marked cancelled by user OR with no replacement — send to cancel API
-  const itemCancelList = list
-    .filter((suggested: any) => suggested._cancel || suggested._noReplacement)
-    .map((suggested: any) => ({
-      orderItemSeqId: suggested._sourceOrderItemSeqId,
-      shipGroupSeqId: task.shipGroupSeqId,
-    }));
+  const itemCancelList = cancelledItems.map((suggested: any) => ({
+    orderItemSeqId: suggested._sourceOrderItemSeqId,
+    shipGroupSeqId: task.shipGroupSeqId,
+  }));
 
   if (!itemSwapList.length && !itemCancelList.length) {
     await showToast(translate('No changes to apply.'));
     return;
   }
 
-  try {
-    const refundAmount = task._refundAmount ?? suggestedRefund;
+  const refundAmount = task._refundAmount ?? suggestedRefund;
 
+  const modal = await modalController.create({
+    component: ReleaseSwapOrderModal,
+    componentProps: {
+      grandTotal: task.grandTotal,
+      newTotal,
+      refundAmount,
+      cancelledItems,
+      substitutedItems,
+    },
+  });
+  await modal.present();
+  const { data } = await modal.onWillDismiss();
+  if (!data?.confirmed) return;
+
+  try {
     if (itemSwapList.length) {
       await orderTaskStore.swapOrder(task.orderId, task.shipGroupSeqId, itemSwapList, refundAmount > 0 ? refundAmount : undefined);
     }

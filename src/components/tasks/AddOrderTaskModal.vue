@@ -44,7 +44,6 @@
            icons, so use an anchored popover list (icons centralized in taskPurposeIcons).
            #391 fixes the work-effort type to a constant, so no type selector is shown. -->
       <ion-item button detail="false" id="task-purpose-trigger">
-        <ion-icon v-if="selectedPurposeIcon" slot="start" :icon="selectedPurposeIcon" />
         <ion-label>
           <p>{{ requiredLabel('Task Purpose') }}</p>
           <span :class="{ 'task-purpose-placeholder': !form.workEffortPurposeTypeId }">{{ selectedPurposeLabel }}</span>
@@ -79,7 +78,7 @@
     </ion-list>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!isValid" @click="confirm()">
+      <ion-fab-button :disabled="!isValid" :aria-label="translate('Confirm')" @click="confirm()">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>

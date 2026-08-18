@@ -16,10 +16,12 @@ describe('nav-count priming', () => {
     // the Funnel already runs on landing.
     expect(customerService).toContain("useOrderStore().setNavCount('unfillable'");
     expect(customerService).toContain('publishHoldTaskNavCounts');
-    // badAddress/swap/hold/fraud map off the hold-task breakdown; hold rolls up both user-hold purposes.
-    for (const purpose of ['INVALID_ADDRESS', 'NEG_RES_REVIEW', 'REVIEW_RISK_ORDER', 'ORD_HOLD_MANUAL', 'ORD_HOLD_CUST_REQ']) {
+    // badAddress/swap/fraud map off the hold-task breakdown; every other purpose
+    // rolls up into hold, matching the Hold page's "no dedicated queue" population.
+    for (const purpose of ['INVALID_ADDRESS', 'NEG_RES_REVIEW', 'REVIEW_RISK_ORDER']) {
       expect(customerService).toContain(purpose);
     }
+    expect(customerService).toContain("DEDICATED_PURPOSE_NAV_KEYS[workEffortPurposeTypeId] ?? 'hold'");
   });
 
   it('keeps only brokering as a dedicated count (page uses distinct-order grouping)', () => {

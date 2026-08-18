@@ -8,6 +8,8 @@ import {
   buildUnfillableShipGroupsForProductPayload,
   getActivePhysicalFacilityOrderVolume,
   buildVirtualLocationCountsPayload,
+  buildUnfillableTrendSpanPayload,
+  fetchUnfillableTrend,
   fetchUnfillableProductCandidates,
   fetchUnfillableShipGroupsForProduct,
   fetchVirtualLocationOrderCounts,
@@ -441,6 +443,104 @@ describe('proactive swap setup queries', () => {
       { orderId: 'ORDER_1', shipGroupSeqId: '00001' },
       { orderId: 'ORDER_2', shipGroupSeqId: '00002' },
     ]);
+  });
+});
+
+describe('unfillable order-date trend', () => {
+  function mockSolrSequence(responses: any[]) {
+    (commonUtil.hasError as any).mockReturnValue(false);
+    const runSolrQuery = vi.fn();
+    responses.forEach((data) => runSolrQuery.mockResolvedValueOnce({ data }));
+    (useSolrSearch as any).mockReturnValue({ runSolrQuery });
+    return runSolrQuery;
+  }
+
+  it('scopes the span query to the same queue the funnel card counts', () => {
+    const payload = buildUnfillableTrendSpanPayload('STORE_1');
+    expect(payload.json.filter).toEqual([
+      'docType:ORDER',
+      'orderTypeId:SALES_ORDER',
+      'facilityId:UNFILLABLE_PARKING',
+      'orderStatusId:(ORDER_CREATED OR ORDER_APPROVED OR ORDER_HOLD)',
+      'productStoreId:STORE_1'
+    ]);
+    expect(payload.json.facet).toEqual({
+      oldestOrderDate: 'min(orderDate)',
+      newestOrderDate: 'max(orderDate)'
+    });
+  });
+
+  it('drops the store filter when every store is selected', () => {
+    expect(buildUnfillableTrendSpanPayload('All').json.filter).not.toContain('productStoreId:All');
+  });
+
+  it('buckets daily across the queue\'s real age rather than a fixed recent window', async () => {
+    const runSolrQuery = mockSolrSequence([
+      { facets: { oldestOrderDate: '2026-07-24T07:00:00Z', newestOrderDate: '2026-07-26T07:00:00Z' } },
+      { facets: { byOrderDate: { buckets: [
+        { val: '2026-07-24T07:00:00Z', count: 255 },
+        { val: '2026-07-25T07:00:00Z', count: 328 },
+        { val: '2026-07-26T07:00:00Z', count: 577 }
+      ] } } }
+    ]);
+
+    const trend = await fetchUnfillableTrend('STORE_1', 'UTC');
+    expect(trend.points).toEqual([
+      { date: '2026-07-24', dayspan: 1, itemCount: 255 },
+      { date: '2026-07-25', dayspan: 1, itemCount: 328 },
+      { date: '2026-07-26', dayspan: 1, itemCount: 577 }
+    ]);
+
+    const facet = runSolrQuery.mock.calls[1][0].json.facet.byOrderDate;
+    expect(facet).toMatchObject({ type: 'range', field: 'orderDate', gap: '+1DAY' });
+    expect(facet.start).toBe('2026-07-24T00:00:00.000Z');
+    expect(facet.end).toBe('2026-07-27T00:00:00.000Z');
+  });
+
+  it('widens the bucket width so an aged queue stays within the plottable point budget', async () => {
+    const runSolrQuery = mockSolrSequence([
+      { facets: { oldestOrderDate: '2026-01-01T00:00:00Z', newestOrderDate: '2026-07-30T00:00:00Z' } },
+      { facets: { byOrderDate: { buckets: [{ val: '2026-01-01T00:00:00Z', count: 3 }] } } }
+    ]);
+
+    const trend = await fetchUnfillableTrend(undefined, 'UTC', 30);
+
+    // 211 days over at most 30 points -> 8-day buckets.
+    expect(runSolrQuery.mock.calls[1][0].json.facet.byOrderDate.gap).toBe('+8DAY');
+    expect(trend.points[0].dayspan).toBe(8);
+  });
+
+  it('counts orders per day and skips days with nothing parked, for the drilldown rows', async () => {
+    const runSolrQuery = mockSolrSequence([
+      { facets: { oldestOrderDate: '2026-07-24T00:00:00Z', newestOrderDate: '2026-07-27T00:00:00Z' } },
+      { facets: {
+        totalOrders: 190,
+        byOrderDate: { buckets: [] },
+        byOrderDay: { buckets: [
+          { val: '2026-07-24T00:00:00Z', count: 255, orderCount: 120 },
+          // 25 Jul has nothing parked; Solr's mincount drops it entirely.
+          { val: '2026-07-26T00:00:00Z', count: 90, orderCount: 70 }
+        ] }
+      } }
+    ]);
+
+    const trend = await fetchUnfillableTrend('STORE_1', 'UTC');
+
+    expect(trend.days).toEqual([
+      { date: '2026-07-24', orderCount: 120, itemCount: 255 },
+      { date: '2026-07-26', orderCount: 70, itemCount: 90 }
+    ]);
+    expect(trend.totalOrders).toBe(190);
+
+    const dayFacet = runSolrQuery.mock.calls[1][0].json.facet.byOrderDay;
+    expect(dayFacet).toMatchObject({ gap: '+1DAY', mincount: 1 });
+    expect(dayFacet.facet).toEqual({ orderCount: 'unique(orderId)' });
+  });
+
+  it('plots nothing when the queue is empty', async () => {
+    mockSolrSequence([{ facets: { count: 0 } }]);
+    await expect(fetchUnfillableTrend('STORE_1', 'UTC'))
+      .resolves.toEqual({ points: [], days: [], totalOrders: 0 });
   });
 });
 

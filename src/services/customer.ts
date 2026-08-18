@@ -21,6 +21,7 @@ export interface CustomerSearchParams {
   loyaltyTier?: string;
   pageSize?: number;
   pageIndex?: number;
+  sort?: string;
 }
 
 export interface CustomerSearchResult {
@@ -133,7 +134,8 @@ export async function searchCustomers(params: CustomerSearchParams = {}): Promis
         rows,
         start,
         qf: 'partyId^100 fullName^50 firstName^30 lastName^30 groupName^30 emailAddress^20 phoneNumber^10',
-        defType: 'edismax'
+        defType: 'edismax',
+        ...(params.sort ? { sort: params.sort } : {})
       },
       query: '*:*',
       filter: 'docType:CUSTOMER AND -statusId:PARTY_DISABLED'
@@ -702,17 +704,18 @@ export async function getOrderProgressStatuses(orderId: string): Promise<string[
 }
 
 /**
- * Customer tasks via GET /oms/customers/{partyId}/tasks (get#PartyTasks). Separate,
- * paginated/filterable call - tasks are unbounded history, kept out of the profile master.
+ * Customer tasks via GET /oms/workEffortPartyAssignments (WorkEffortPartyDetail).
  */
 export async function getCustomerTasks(
   partyId: string,
   params: { taskStatusId?: string; pageSize?: number; pageIndex?: number; orderByField?: string } = {}
 ): Promise<CustomerTaskSummary[]> {
   const response = await api({
-    url: `oms/customers/${partyId}/tasks`,
+    url: 'oms/workEffortPartyAssignments',
     method: 'get',
     params: {
+      partyId,
+      roleTypeId: 'CUSTOMER',
       taskStatusId: params.taskStatusId,
       pageSize: params.pageSize ?? 20,
       pageIndex: params.pageIndex ?? 0,
@@ -734,7 +737,7 @@ export function normalizeCustomerTask(task: any): CustomerTaskSummary {
     orderName: task.orderName || undefined,
     orderDate: task.orderDate ? toStringValue(task.orderDate) : undefined,
     grandTotal: task.grandTotal != null ? Number(task.grandTotal) : undefined,
-    customerPartyId: task.customerPartyId ? toStringValue(task.customerPartyId) : undefined,
+    customerPartyId: (task.customerPartyId || task.partyId) ? toStringValue(task.customerPartyId || task.partyId) : undefined,
     assigneePartyId: task.assigneePartyId ? toStringValue(task.assigneePartyId) : undefined,
     assigneeName: task.assigneeFullName || undefined,
     assigneeSince: task.assigneeSince ? toStringValue(task.assigneeSince) : undefined,
@@ -878,46 +881,6 @@ export async function getCustomerCommunications(partyId: string): Promise<import
     }
   }
   return results.sort((a, b) => (b.entryDate || '').localeCompare(a.entryDate || ''));
-}
-
-function normalizeCustomerReturn(doc: any): import('@/types/customer').CustomerReturnSummary {
-  const items: any[] = doc.items || [];
-  const returnTotal = items.reduce((sum: number, item: any) => sum + Number(item.returnPrice || 0) * Number(item.returnQuantity || 1), 0);
-  return {
-    returnId: toStringValue(doc.returnId),
-    externalId: doc.externalId ? toStringValue(doc.externalId) : undefined,
-    statusId: toStringValue(doc.statusId),
-    entryDate: toStringValue(doc.entryDate),
-    returnTotal,
-    currencyUomId: toStringValue(doc.currencyUomId) || 'USD',
-    destinationFacilityId: doc.destinationFacilityId ? toStringValue(doc.destinationFacilityId) : undefined,
-    returnChannelEnumId: doc.returnChannelEnumId ? toStringValue(doc.returnChannelEnumId) : undefined,
-    itemCount: items.length,
-    items: items.map((item: any) => ({
-      returnItemSeqId: toStringValue(item.returnItemSeqId),
-      productId: item.productId ? toStringValue(item.productId) : undefined,
-      orderId: item.orderId ? toStringValue(item.orderId) : undefined,
-      orderItemSeqId: item.orderItemSeqId ? toStringValue(item.orderItemSeqId) : undefined,
-      statusId: toStringValue(item.statusId),
-      returnReasonId: item.returnReasonId ? toStringValue(item.returnReasonId) : undefined,
-      returnTypeId: item.returnTypeId ? toStringValue(item.returnTypeId) : undefined,
-      returnQuantity: Number(item.returnQuantity || 0),
-      receivedQuantity: item.receivedQuantity != null ? Number(item.receivedQuantity) : undefined,
-      returnPrice: Number(item.returnPrice || 0),
-      description: item.description ? toStringValue(item.description) : undefined
-    }))
-  };
-}
-
-export async function getCustomerReturns(partyId: string): Promise<import('@/types/customer').CustomerReturnSummary[]> {
-  const response = await api({ url: 'oms/returns', method: 'get', params: { fromPartyId: partyId } });
-  return asList(response.data).map(normalizeCustomerReturn);
-}
-
-export async function getCustomerReturn(returnId: string): Promise<import('@/types/customer').CustomerReturnSummary | undefined> {
-  const response = await api({ url: 'oms/returns', method: 'get', params: { returnId } });
-  const returnDocs = response.data?.returnId ? [response.data] : asList(response.data);
-  return returnDocs.map(normalizeCustomerReturn).find((returnRecord) => returnRecord.returnId === returnId);
 }
 
 export async function searchShopifyCustomers(shopId: string, searchText: string): Promise<Customer[]> {

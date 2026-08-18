@@ -114,11 +114,11 @@ import { DateTime } from 'luxon';
 import { api, commonUtil, translate } from '@common';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
-import { ORDER_IDENTIFICATION_UPDATE_PERMISSION } from '@/authorization/permissions';
 import { showToast } from '@/utils';
 import EmptyState from '@/components/common/EmptyState.vue';
 import IdentificationListItem from '@/components/orders/IdentificationListItem.vue';
 import CreateIdentificationTypeModal from '@/components/orders/CreateIdentificationTypeModal.vue';
+import Actions from "@/authorization/actions";
 
 type Identification = {
   orderIdentificationTypeId: string;
@@ -146,10 +146,10 @@ function isSystemSourced(identification: Identification) {
 
 const seed = useSeedStore();
 const userStore = useUserStore();
-// A user with ORDER_IDENTIFICATION_UPDATE_PERMISSION (ORDERMGR_ADMIN) can edit/remove any
+// A user with Actions.APP_ORDER_IDENTIFICATION_UPDATE (ORDERMGR_ADMIN) can edit/remove any
 // identification, including system/imported ones; everyone else can only edit/remove the
 // identifications that aren't system-sourced.
-const canUpdate = computed(() => userStore.hasPermission(ORDER_IDENTIFICATION_UPDATE_PERMISSION));
+const canUpdate = computed(() => userStore.hasPermission(Actions.APP_ORDER_IDENTIFICATION_UPDATE));
 
 function isRowUpdatable(identification: Identification) {
   return canUpdate.value || !isSystemSourced(identification);
