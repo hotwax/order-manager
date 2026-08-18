@@ -3059,12 +3059,14 @@ async function rejectAndReleaseItem(item: any, productId: string) {
   // Step 3 — release to chosen facility
   try {
     await api({
-      url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/allocation-with-reuse`,
+      url: `oms/orders/${orderId}/allocation-with-reuse`,
       method: 'POST',
-      data: { facilityId,
-       orderFacilityChange:{
-       changeReasonEnumId:"RELEASED"
-      }
+      data: {
+        facilityId,
+        orderItemSeqId: item.orderItemSeqId,
+        orderFacilityChange: {
+          changeReasonEnumId: "RELEASED"
+        }
       },
     });
     await showToast(translate('Item released to facility.'));
@@ -3432,19 +3434,17 @@ async function releaseSelectedItems(shipGroup: any) {
   if (!facilityId) return;
   const orderId = order.value!.id;
   try {
-    await Promise.all(
-      itemIds.map((orderItemSeqId) =>
-        api({
-        url: `oms/orders/${orderId}/items/${orderItemSeqId}/allocation-with-reuse`,
-        method: 'POST',
-        data: { facilityId,
-         orderFacilityChange:{
-         changeReasonEnumId: "RELEASED"
-         }
-         },
-        })
-      )
-    );
+    await api({
+      url: `oms/orders/${orderId}/allocation-with-reuse`,
+      method: 'POST',
+      data: {
+        facilityId,
+        orderItemSeqIds: itemIds,
+        orderFacilityChange: {
+          changeReasonEnumId: "RELEASED"
+        }
+      },
+    });
     selectedShipGroupItems.value[shipGroup.id] = new Set();
     await showToast(translate('Selected items released to facility.'));
     await loadOrder(orderId, true);
