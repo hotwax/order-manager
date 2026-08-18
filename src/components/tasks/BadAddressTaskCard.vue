@@ -125,6 +125,7 @@ import {
 } from '@ionic/vue';
 import { chevronDownOutline } from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
@@ -156,11 +157,11 @@ const emit = defineEmits<{
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
 
-const cardActions = computed<TaskCardAction[]>(() => [
+const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'save-and-release', label: translate('Save and release hold'), kind: 'primary' },
   { id: 'park', label: translate('Park'), kind: 'neutral' },
   { id: 'cancel', label: translate('Cancel order'), kind: 'danger' },
-]);
+] as TaskCardAction[]).filter((action) => !(HIDE_SHOPIFY_UNSYNCED_ACTIONS && action.id === 'cancel')));
 
 // Editable per-card address form. Built lazily (see onMounted) from the task so
 // the shell + skeleton paint first; stays null until then, which drives the

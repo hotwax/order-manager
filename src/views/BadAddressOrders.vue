@@ -87,7 +87,7 @@
       <ion-toolbar>
         <ion-buttons slot="start">
           <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkSaveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
-          <ion-button fill="outline" color="danger" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkCancelOrder()">{{ translate('Cancel orders') }}</ion-button>
+          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" fill="outline" color="danger" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkCancelOrder()">{{ translate('Cancel orders') }}</ion-button>
           <ion-button fill="outline" color="medium" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkParkOrder()">{{ translate('Park') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -112,6 +112,7 @@ import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
 import { countTaskTargets, groupTaskCardsByTarget, runGroupedTaskMutation, shipGroupTaskTarget } from '@/utils/orderTaskBulk';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();

@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { api, logger } from '@common';
 import {
   fetchUnfillableTrend,
+  fetchVirtualLocationOrderCounts,
   getActivePhysicalFacilityOrderVolume,
   searchOrders
 } from '@/services/order';
@@ -361,5 +362,41 @@ describe('unfillable queue trend', () => {
     expect(store.unfillableTrend).toEqual([]);
     expect(store.getUnfillableOrderDays).toEqual([]);
     errorSpy.mockRestore();
+  });
+  it('lists every virtual queue holding orders, unmerged and under its backend name', async () => {
+    vi.mocked(api).mockResolvedValueOnce({
+      data: [
+        { facilityId: '_NA_', facilityName: 'Brokering Queue' },
+        { facilityId: 'REJECTED_ITM_PARKING', facilityName: 'Rejected Item Parking' },
+        { facilityId: 'UNFILLABLE_PARKING', facilityName: 'Unfillable Parking' },
+        { facilityId: 'BACKORDER_PARKING', facilityName: 'Backorder Parking' },
+        // no orders parked here, so it should not be listed at all
+        { facilityId: 'CONFIGURATION', facilityName: 'Configuration Facility' },
+        // an archive of completed/cancelled orders, never a work queue
+        { facilityId: 'GENERAL_OPS_PARKING', facilityName: 'General Ops Parking' },
+      ],
+    });
+    vi.mocked(fetchVirtualLocationOrderCounts)
+      .mockResolvedValueOnce([
+        { facilityId: '_NA_', count: 30 },
+        { facilityId: 'REJECTED_ITM_PARKING', count: 2 },
+        { facilityId: 'BACKORDER_PARKING', count: 5 },
+        { facilityId: 'CONFIGURATION', count: 0 },
+      ] as any)
+      .mockResolvedValueOnce([{ facilityId: 'UNFILLABLE_PARKING', count: 7 }] as any);
+
+    const store = useCustomerServiceStore();
+    await store.fetchVirtualLocationCounts('STORE');
+
+    // alphabetical by backend name, one row per facility, zero-count queues omitted
+    expect(store.getVirtualLocationCounts).toEqual([
+      { id: 'BACKORDER_PARKING', label: 'Backorder Parking', facilityIds: ['BACKORDER_PARKING'], count: 5 },
+      { id: '_NA_', label: 'Brokering Queue', facilityIds: ['_NA_'], count: 30 },
+      { id: 'REJECTED_ITM_PARKING', label: 'Rejected Item Parking', facilityIds: ['REJECTED_ITM_PARKING'], count: 2 },
+      { id: 'UNFILLABLE_PARKING', label: 'Unfillable Parking', facilityIds: ['UNFILLABLE_PARKING'], count: 7 },
+    ]);
+    // the archive facility is never even queried
+    const queriedIds = vi.mocked(fetchVirtualLocationOrderCounts).mock.calls.flatMap(([params]: any[]) => params.facilityIds);
+    expect(queriedIds).not.toContain('GENERAL_OPS_PARKING');
   });
 });

@@ -139,6 +139,7 @@ import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import ReleaseSwapOrderModal from '@/components/swaps/ReleaseSwapOrderModal.vue';
 import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductActionPopover.vue';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
@@ -160,11 +161,11 @@ const emit = defineEmits<{ (e: 'update:selected', value: boolean): void; (e: 'co
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
 
-const cardActions = computed<TaskCardAction[]>(() => [
+const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'release', label: translate('Release updated order'), kind: 'primary' },
   { id: 'park', label: translate('Park'), kind: 'neutral' },
   { id: 'cancel', label: translate('Cancel order'), kind: 'danger' },
-]);
+] as TaskCardAction[]).filter((action) => !(HIDE_SHOPIFY_UNSYNCED_ACTIONS && action.id === 'cancel')));
 
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 

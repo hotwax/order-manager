@@ -69,7 +69,7 @@
               :detail="true"
               :router-link="virtualLocationRoute(item)"
             >
-              <ion-label>{{ translate(item.label) }}</ion-label>
+              <ion-label>{{ item.label }}</ion-label>
               <p slot="end">{{ formatCount(item.count) }} {{ translate(item.count === 1 ? "order" : "orders") }}</p>
             </ion-item>
           </ion-list>
@@ -614,7 +614,7 @@ import {
   alertCircleOutline
 } from 'ionicons/icons';
 import { translate, StatCard, Sparkline, commonUtil } from '@common';
-import { useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
+import { UNFILLABLE_FACILITY_ID, useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
@@ -884,15 +884,15 @@ const totalUnfillable = computed(() => store.getUnfillable.totalCount || 0);
 // nav count, primed by the same fetchBrokeringCount query). Summing the per-facility
 // rows double-counts orders parked in more than one location, so it diverged from
 // the page. Falls back to the row sum until the shared count has loaded.
-const virtualLocationWorkTotal = computed(() => {
-  const brokering = orderStore.navCounts.brokering;
-  return brokering !== undefined
-    ? brokering
-    : virtualLocationWorkRows.value.reduce((sum, row) => sum + row.count, 0);
-});
+// The headline is the sum of the rows below it. The side-menu "Brokering queue" badge
+// counts a different population (it folds in rejected items), so using it here made the
+// card disagree with its own drilldown list.
+const virtualLocationWorkTotal = computed(() =>
+  virtualLocationWorkRows.value.reduce((sum, row) => sum + row.count, 0)
+);
 
 function virtualLocationRoute(item: { id: string; facilityIds: string[] }) {
-  if (item.id === 'unfillable') {
+  if (item.id === UNFILLABLE_FACILITY_ID) {
     return { path: '/unfillable' };
   }
 
