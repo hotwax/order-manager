@@ -67,4 +67,34 @@ describe('OrderQueueList', () => {
     expect(source).not.toContain('<h3>');
     expect(source).not.toContain("import router from '@/router';");
   });
+
+  it('only publishes the nav badge from an unnarrowed search', () => {
+    // Funnel deep links land here pre-filtered by order date; a filtered total
+    // must not overwrite the side-menu rollup for the whole queue.
+    expect(source).toContain('if (props.countKey && isWholeQueueSearch.value) orderStore.setNavCount(props.countKey, result.total);');
+    expect(source).toContain('const isWholeQueueSearch = computed(() =>');
+    expect(source).toContain('&& !searchFilters.value.dateFrom');
+    expect(source).toContain('&& !searchFilters.value.dateThru');
+    expect(source).not.toContain('if (props.countKey) orderStore.setNavCount(props.countKey, result.total);');
+  });
+
+  it('seeds both order-date bounds from its props so a caller can preselect one day', () => {
+    expect(source).toContain('dateThru?: string;');
+    expect(source).toContain('dateThru: props.dateThru || \'\',');
+    expect(source).toContain('() => [props.dateFrom, props.dateThru],');
+  });
+
+  it('lets the queue be re-sorted and sends the choice to Solr instead of a fixed order', () => {
+    expect(source).toContain('<OrderSortPopover v-model="searchSort" :trigger-id="sortTriggerId" />');
+    expect(source).toContain('sort: searchSort.value,');
+    expect(source).toContain('watch(searchSort, () => runSearch());');
+    expect(source).not.toContain("sort: 'orderDate desc',");
+  });
+
+  it('gives each queue instance its own sort popover trigger id', () => {
+    // Two queue pages share the DOM during an Ionic route transition, so a constant id
+    // would let one queue's button open the other queue's popover.
+    expect(source).toContain('let sortTriggerSequence = 0;');
+    expect(source).toContain('const sortTriggerId = `order-queue-sort-trigger-${++sortTriggerSequence}`;');
+  });
 });

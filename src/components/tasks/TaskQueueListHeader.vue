@@ -49,8 +49,9 @@ const emit = defineEmits<{
 }>();
 
 const resultsSummary = computed(() => {
-  const label = props.totalCount === 1 ? props.singularLabel : props.pluralLabel;
-  return `${props.loadedCount} ${translate('of')} ${props.totalCount} ${translate(label)}`;
+  const effectiveTotal = Math.max(props.totalCount, props.loadedCount);
+  const label = effectiveTotal === 1 ? props.singularLabel : props.pluralLabel;
+  return `${props.loadedCount} ${translate('of')} ${effectiveTotal} ${translate(label)}`;
 });
 
 function updateSort(value: string) {

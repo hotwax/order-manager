@@ -76,9 +76,9 @@
       </div>
 
       <ion-infinite-scroll
-        @ionInfinite="loadMoreHoldTasks($event)"
+        :disabled="!isScrollable"
         threshold="100px"
-        v-if="isScrollable"
+        @ionInfinite="loadMoreHoldTasks($event)"
       >
         <ion-infinite-scroll-content
           loading-spinner="crescent"
@@ -297,11 +297,14 @@ function resetSelection() {
 }
 
 async function loadMoreHoldTasks(event: any) {
-  await fetchHoldTasks(
-    undefined,
-    Math.ceil(heldTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
-  );
-  await event.target.complete();
+  try {
+    await fetchHoldTasks(
+      undefined,
+      Math.ceil(heldTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
+    );
+  } finally {
+    await event.target.complete();
+  }
 }
 
 onIonViewWillEnter(() => {

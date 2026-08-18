@@ -12,10 +12,19 @@ import type {
   VirtualLocationWorkCount,
   HoldTaskCounts
 } from '@/types/customerService';
+import { DEFAULT_WORKFLOW_ORDER_SORT } from '@/types/customerService';
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { fetchVirtualLocationOrderCounts, getActivePhysicalFacilityOrderVolume, searchOrders } from '@/services/order';
+import {
+  EMPTY_UNFILLABLE_TREND,
+  fetchUnfillableTrend,
+  fetchVirtualLocationOrderCounts,
+  getActivePhysicalFacilityOrderVolume,
+  searchOrders,
+  UNFILLABLE_QUEUE_ORDER_STATUSES,
+  type UnfillableTrend
+} from '@/services/order';
 import { getDashboardDateFilter } from '@/utils/dashboardDate';
 import { useUserStore } from '@/store/user';
 
@@ -78,9 +87,13 @@ function publishHoldTaskNavCounts(holdTaskCounts: { workEffortPurposeTypeId: str
   }
 }
 
-function getUserDashboardDateFilter() {
+function getUserTimeZone(): string | undefined {
   const userProfile = useUserStore().current;
-  return getDashboardDateFilter(userProfile?.timeZone || userProfile?.userTimeZone);
+  return userProfile?.timeZone || userProfile?.userTimeZone || undefined;
+}
+
+function getUserDashboardDateFilter() {
+  return getDashboardDateFilter(getUserTimeZone());
 }
 
 function getUserDashboardDateRange() {
@@ -186,7 +199,8 @@ function emptyFilters(): WorkflowFilters {
     shipmentMethodTypeId: 'All',
     priority: null,
     dateFrom: '',
-    dateThru: ''
+    dateThru: '',
+    sort: DEFAULT_WORKFLOW_ORDER_SORT
   };
 }
 
@@ -289,7 +303,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
       oldestOpenOrderDate: null as number | null
     },
     unfillable: {
-      unfillableHourlyCounts: [] as { entryDateHour: string; shipGroupCount: number }[],
+      trend: { ...EMPTY_UNFILLABLE_TREND } as UnfillableTrend,
       totalCount: 0
     },
     holdTasks: {
@@ -348,18 +362,13 @@ export const useCustomerServiceStore = defineStore('customerService', {
         packed: workflowOrders.packed.length
       };
     },
+    // Item counts only, oldest order date first — the shape <Sparkline> plots.
     unfillableTrend(state): number[] {
-      const todayStr = getUserDashboardDateFilter();
-      return Array.from({ length: 24 }, (_, h) => {
-        const match = state.unfillable.unfillableHourlyCounts?.find((d) => {
-          const parsed = DateTime.fromSQL(d.entryDateHour).isValid
-            ? DateTime.fromSQL(d.entryDateHour)
-            : DateTime.fromISO(d.entryDateHour);
-          return parsed.isValid && parsed.toFormat('yyyy-MM-dd') === todayStr && parsed.hour === h;
-        });
-        return match ? match.shipGroupCount : 0;
-      });
+      return (state.unfillable.trend.points || []).map((point) => point.itemCount);
     },
+    getUnfillableTrendPoints: (state) => state.unfillable.trend.points || [],
+    getUnfillableOrderDays: (state) => state.unfillable.trend.days || [],
+    getUnfillableTrendOrderTotal: (state) => state.unfillable.trend.totalOrders || 0,
     getFulfillmentProgress: (state) => state.fulfillmentProgress,
     getOpenOrders: (state) => state.openOrders,
     getUnfillable: (state) => state.unfillable,
@@ -416,33 +425,27 @@ export const useCustomerServiceStore = defineStore('customerService', {
     async fetchUnfillable(productStoreId?: string) {
       this.dashboardStatus.unfillable = 'loading';
       try {
-        const todayStr = getUserDashboardDateFilter();
-        const params: any = { dateFilter: todayStr };
-        if (productStoreId) params.productStoreId = productStoreId;
-        const resp = await api({
-          url: 'oms/orders/funnelDashboard/unfillable',
-          method: 'GET',
-          params
-        });
-        if (resp.data) {
-          this.unfillable = {
-            ...this.unfillable,
-            ...resp.data,
-            unfillableHourlyCounts: resp.data.unfillableHourlyCounts || []
-          };
-        }
-
         // Card count is the full unfillable queue (matches the Unfillable page), not today-scoped.
         const solrParams: any = {
-          facilityIds: ['UNFILLABLE_PARKING'],
-          status: ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD'],
+          facilityIds: [UNFILLABLE_FACILITY_ID],
+          status: UNFILLABLE_QUEUE_ORDER_STATUSES,
           pageSize: 0
         };
         if (productStoreId && productStoreId !== 'All') {
           solrParams.productStoreId = productStoreId;
         }
 
-        const solrResult = await searchOrders(solrParams);
+        // The trend reads the same queue as the count, bucketed by order date,
+        // so the line explains the number above it. The funnelDashboard/
+        // unfillable endpoint is deliberately not used: it only returns
+        // today's hourly ship-group counts, which are empty for a backlog
+        // queue and rendered the card's sparkline as a flat zero line.
+        const [solrResult, trend] = await Promise.all([
+          searchOrders(solrParams),
+          fetchUnfillableTrend(productStoreId, getUserTimeZone())
+        ]);
+
+        this.unfillable.trend = trend;
         this.unfillable.totalCount = solrResult.total || 0;
         // Publish the Unfillable side-menu badge from the same full-queue count.
         // Best-effort: a badge-publish failure must not fail the dashboard fetch.

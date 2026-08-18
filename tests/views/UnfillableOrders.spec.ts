@@ -10,8 +10,13 @@ describe('UnfillableOrders', () => {
     expect(source).toContain(':global-actions="[\'brokerSelected\']"');
   });
 
-  it('passes the route date filter into the queue list', () => {
+  it('passes both route date bounds into the queue list', () => {
+    // The funnel's Unfillable card deep-links into a single order date, so the
+    // page has to seed the through bound as well as the from bound.
     expect(source).toContain(':date-from="dateFrom"');
-    expect(source).toContain('router.currentRoute.value.query.dateFrom');
+    expect(source).toContain(':date-thru="dateThru"');
+    expect(source).toContain('router.currentRoute.value.query[name]');
+    expect(source).toContain("const dateFrom = queryDate('dateFrom');");
+    expect(source).toContain("const dateThru = queryDate('dateThru');");
   });
 });

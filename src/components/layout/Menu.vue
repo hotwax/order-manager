@@ -21,6 +21,12 @@
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
+          <ion-item v-if="hasPermission(Actions.APP_ORDER_RETURN_VIEW)" button router-link="/returns" router-direction="root" :class="{ selected: selectedPage.startsWith('/returns') }">
+            <ion-icon slot="start" :icon="arrowUndoOutline" />
+            <ion-label>{{ translate("Find returns") }}</ion-label>
+          </ion-item>
+        </ion-menu-toggle>
+        <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(Actions.APP_CUSTOMERS_VIEW)" button router-link="/customers" router-direction="root" :class="{ selected: selectedPage === '/customers' }">
             <ion-icon slot="start" :icon="peopleOutline" />
             <ion-label>{{ translate("Find customers") }}</ion-label>
@@ -129,6 +135,7 @@ import { IonBadge, IonContent, IonFooter, IonHeader, IonIcon, IonItem, IonItemDi
 import {
   airplaneOutline,
   alertCircleOutline,
+  arrowUndoOutline,
   banOutline,
   cubeOutline,
   funnelOutline,

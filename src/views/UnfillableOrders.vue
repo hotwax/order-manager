@@ -8,6 +8,7 @@
     :global-actions="['brokerSelected']"
     :status="['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD']"
     :date-from="dateFrom"
+    :date-thru="dateThru"
     count-key="unfillable"
   />
 </template>
@@ -17,10 +18,16 @@ import { computed } from 'vue';
 import router from '@/router';
 import OrderQueueList from '@/components/OrderQueueList.vue';
 
-const dateFrom = computed(() => {
-  const routeDateFrom = router.currentRoute.value.query.dateFrom;
-  if (Array.isArray(routeDateFrom)) return routeDateFrom[0] || '';
+// The funnel's Unfillable card deep-links into a single order date, so both
+// bounds come from the route and seed the queue's own date filters.
+function queryDate(name: string) {
+  return computed(() => {
+    const value = router.currentRoute.value.query[name];
+    if (Array.isArray(value)) return value[0] || '';
+    return value ? String(value) : '';
+  });
+}
 
-  return routeDateFrom ? String(routeDateFrom) : '';
-});
+const dateFrom = queryDate('dateFrom');
+const dateThru = queryDate('dateThru');
 </script>

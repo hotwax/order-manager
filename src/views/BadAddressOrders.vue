@@ -71,9 +71,9 @@
         </div>
 
         <ion-infinite-scroll
-          @ionInfinite="loadMoreAddressValidationTasks($event)"
+          :disabled="!isScrollable"
           threshold="100px"
-          v-if="isScrollable"
+          @ionInfinite="loadMoreAddressValidationTasks($event)"
         >
           <ion-infinite-scroll-content
             loading-spinner="crescent"
@@ -323,11 +323,14 @@ async function runGroupedBulkCards(
 }
 
 async function loadMoreAddressValidationTasks(event: any) {
-  await fetchAddressValidationTasks(
-    undefined,
-    Math.ceil(addressValidationTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
-  );
-  await event.target.complete();
+  try {
+    await fetchAddressValidationTasks(
+      undefined,
+      Math.ceil(addressValidationTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
+    );
+  } finally {
+    await event.target.complete();
+  }
 }
 
 onIonViewWillEnter(() => {

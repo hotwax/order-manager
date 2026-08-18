@@ -7,12 +7,12 @@ describe('order detail ship-group lifecycle step deltas (#350)', () => {
 
   it('renders every lifecycle step through the shared delta helper, not per-step relative ages', () => {
     for (const step of ['brokered', 'pick', 'pack', 'ship']) {
-      expect(source).toContain(`lifecycleStepLabel(timelineByShipGroup[shipGroup.id], '${step}')`);
+      expect(source).toContain(`lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], '${step}')`);
     }
     // The old behaviour computed each step's own "months ago" independently.
-    expect(source).not.toContain('commonUtil.getRelativeTime(timelineByShipGroup[shipGroup.id]?.picklistDate)');
-    expect(source).not.toContain('commonUtil.getRelativeTime(timelineByShipGroup[shipGroup.id]?.packedDate)');
-    expect(source).not.toContain('commonUtil.getRelativeTime(timelineByShipGroup[shipGroup.id]?.shippedDate)');
+    expect(source).not.toContain('commonUtil.getRelativeTime(lifecycleByShipGroup[shipGroup.id]?.picklistDate)');
+    expect(source).not.toContain('commonUtil.getRelativeTime(lifecycleByShipGroup[shipGroup.id]?.packedDate)');
+    expect(source).not.toContain('commonUtil.getRelativeTime(lifecycleByShipGroup[shipGroup.id]?.shippedDate)');
   });
 
   it('shows the first completed step as age-from-now and later steps as a delta from the previous completed step', () => {
@@ -28,7 +28,7 @@ describe('order detail ship-group lifecycle step deltas (#350)', () => {
   });
 
   it('keeps the absolute clock time in the end note and Pending for incomplete steps', () => {
-    expect(source).toContain("formatTime(timelineByShipGroup[shipGroup.id]?.shippedDate)");
+    expect(source).toContain("formatTime(lifecycleByShipGroup[shipGroup.id]?.shippedDate)");
     expect(source).toContain("translate('Pending')");
   });
 });

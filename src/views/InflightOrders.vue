@@ -28,6 +28,11 @@
             @ion-change="toggleCurrentPageSelection($event.detail.checked)"
           />
           <ion-label>{{ resultsSummary }}</ion-label>
+          <OrderSortPopover
+            v-model="filters.sort"
+            :options="sortOptions"
+            trigger-id="inflight-order-sort-trigger"
+          />
           <ion-button fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
@@ -118,9 +123,11 @@ import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useSeedStore } from '@/store/seed';
 import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
+import { WORKFLOW_ORDER_SORT_OPTIONS } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
+import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, translate } from '@common';
 import router from '@/router';
@@ -173,6 +180,7 @@ const hasMore = computed(() => orderStore.workflowOrders[bucket].length < orderS
 const resultsSummary = computed(() =>
   `${orders.value.length} of ${orderTotal.value} ${orderTotal.value === 1 ? translate('order') : translate('orders')}`
 );
+const sortOptions = WORKFLOW_ORDER_SORT_OPTIONS;
 
 function orderRow(order: WorkflowOrder) {
   return toWorkflowOrderRowViewModel(order, orderStore.workflowEnrichment(bucket, order.orderId));
@@ -260,7 +268,8 @@ watch(
     filters.value.facilityId,
     filters.value.shipmentMethodTypeId,
     filters.value.dateFrom,
-    filters.value.dateThru
+    filters.value.dateThru,
+    filters.value.sort
   ],
   loadWorkflowOrders
 );

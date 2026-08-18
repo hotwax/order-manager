@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { api, logger } from '@common';
-import { getActivePhysicalFacilityOrderVolume } from '@/services/order';
+import {
+  fetchUnfillableTrend,
+  getActivePhysicalFacilityOrderVolume,
+  searchOrders
+} from '@/services/order';
 import { useCustomerServiceStore } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { DateTime } from 'luxon';
@@ -14,8 +18,12 @@ vi.mock('@common', () => ({
 }));
 
 vi.mock('@/services/order', () => ({
+  EMPTY_UNFILLABLE_TREND: { points: [], days: [], totalOrders: 0 },
+  fetchUnfillableTrend: vi.fn(),
   fetchVirtualLocationOrderCounts: vi.fn(),
   getActivePhysicalFacilityOrderVolume: vi.fn(),
+  searchOrders: vi.fn(),
+  UNFILLABLE_QUEUE_ORDER_STATUSES: ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD'],
 }));
 
 vi.mock('@/services/fulfillmentSync', () => ({
@@ -291,5 +299,67 @@ describe('customer service hold task counts', () => {
     });
     expect(store.dashboardStatus.holdTasks).toBe('error');
     expect(logger.error).toHaveBeenCalledWith('Failed to fetch hold task counts', error);
+  });
+});
+
+describe('unfillable queue trend', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.mocked(searchOrders).mockReset();
+    vi.mocked(fetchUnfillableTrend).mockReset();
+  });
+
+  it('stores the order-date trend beside the queue total and exposes item counts to the sparkline', async () => {
+    vi.mocked(searchOrders).mockResolvedValueOnce({ orders: [], total: 1204 } as any);
+    vi.mocked(fetchUnfillableTrend).mockResolvedValueOnce({
+      points: [
+        { date: '2026-07-24', dayspan: 1, itemCount: 255 },
+        { date: '2026-07-25', dayspan: 1, itemCount: 328 },
+      ],
+      days: [
+        { date: '2026-07-24', orderCount: 120, itemCount: 255 },
+        { date: '2026-07-25', orderCount: 140, itemCount: 328 },
+      ],
+      totalOrders: 260,
+    });
+
+    const store = useCustomerServiceStore();
+    await store.fetchUnfillable('STORE_1');
+
+    expect(store.unfillable.totalCount).toBe(1204);
+    // The sparkline plots bare item counts, oldest order date first.
+    expect(store.unfillableTrend).toEqual([255, 328]);
+    expect(store.getUnfillableTrendPoints[0].date).toBe('2026-07-24');
+    // The drilldown rows count orders, not items.
+    expect(store.getUnfillableOrderDays).toEqual([
+      { date: '2026-07-24', orderCount: 120, itemCount: 255 },
+      { date: '2026-07-25', orderCount: 140, itemCount: 328 },
+    ]);
+    expect(store.getUnfillableTrendOrderTotal).toBe(260);
+    expect(store.dashboardStatus.unfillable).toBe('success');
+  });
+
+  it('does not call the today-scoped funnelDashboard endpoint, which is empty for a backlog queue', async () => {
+    vi.mocked(searchOrders).mockResolvedValueOnce({ orders: [], total: 3 } as any);
+    vi.mocked(fetchUnfillableTrend).mockResolvedValueOnce({ points: [], days: [], totalOrders: 0 });
+
+    await useCustomerServiceStore().fetchUnfillable('STORE_1');
+
+    const calledUrls = vi.mocked(api).mock.calls.map(([config]: any[]) => config?.url);
+    expect(calledUrls).not.toContain('oms/orders/funnelDashboard/unfillable');
+  });
+
+  it('marks the group as errored when the trend query fails', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.mocked(searchOrders).mockResolvedValueOnce({ orders: [], total: 3 } as any);
+    vi.mocked(fetchUnfillableTrend).mockRejectedValueOnce(new Error('solr down'));
+
+    const store = useCustomerServiceStore();
+    await store.fetchUnfillable('STORE_1');
+
+    expect(store.dashboardStatus.unfillable).toBe('error');
+    expect(store.unfillableTrend).toEqual([]);
+    expect(store.getUnfillableOrderDays).toEqual([]);
+    errorSpy.mockRestore();
   });
 });

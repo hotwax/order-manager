@@ -8,10 +8,15 @@ import {
 import { toStringValue, toNumberValue } from '@/services/OrderService';
 import type { Customer, Order, ReturnRecord, Shipment } from '@/types/order';
 import type { WorkflowOrder, WorkflowFilters } from '@/types/customerService';
+import { DEFAULT_WORKFLOW_ORDER_SORT, WORKFLOW_ORDER_SORT_ORDER_BY } from '@/types/customerService';
 import type { OrderRowEnrichment } from '@/types/orderRow';
 import { useSeedStore } from '@/store/seed';
 import { useProductStore } from './productStore';
 import { queueCountFetchers } from '@/services/navCounts';
+
+// Oldest first by default: Find orders is worked down, so the operator should land on
+// the orders that have been waiting longest rather than on the freshest arrivals.
+export const DEFAULT_ORDER_SEARCH_SORT = 'orderDate asc';
 
 
 async function fetchWorkflowPage(
@@ -19,7 +24,11 @@ async function fetchWorkflowPage(
   filters: WorkflowFilters,
   pageIndex: number
 ): Promise<{ orders: WorkflowOrder[]; total: number }> {
-  const params: Record<string, any> = { pageSize: import.meta.env.VITE_VIEW_SIZE, pageIndex };
+  const params: Record<string, any> = {
+    pageSize: import.meta.env.VITE_VIEW_SIZE,
+    pageIndex,
+    orderByField: WORKFLOW_ORDER_SORT_ORDER_BY[filters.sort] ?? WORKFLOW_ORDER_SORT_ORDER_BY[DEFAULT_WORKFLOW_ORDER_SORT]
+  };
   if (filters.query) params.keyword = filters.query;
   if (filters.customerName) params.customerName = filters.customerName;
   if (filters.salesChannelEnumId && filters.salesChannelEnumId !== 'All') params.salesChannelEnumId = filters.salesChannelEnumId;
@@ -110,7 +119,7 @@ export const useOrderStore = defineStore('orders', {
       hasVirtualFacilityItems: false,
       archivedOnly: false,
     } as OrderSearchFilters,
-    searchSort: 'orderDate desc',
+    searchSort: DEFAULT_ORDER_SEARCH_SORT,
     searchResults: [] as Order[],
     searchTotal: 0,
     pageIndex: 0,

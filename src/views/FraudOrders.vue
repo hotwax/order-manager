@@ -76,9 +76,9 @@
       </div>
 
       <ion-infinite-scroll
-        @ionInfinite="loadMoreFraudTasks($event)"
+        :disabled="!isScrollable"
         threshold="100px"
-        v-if="isScrollable"
+        @ionInfinite="loadMoreFraudTasks($event)"
       >
         <ion-infinite-scroll-content
           loading-spinner="crescent"
@@ -235,11 +235,14 @@ function resetSelection() {
 }
 
 async function loadMoreFraudTasks(event: any) {
-  await fetchFraudTasks(
-    undefined,
-    Math.ceil(fraudTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
-  );
-  await event.target.complete();
+  try {
+    await fetchFraudTasks(
+      undefined,
+      Math.ceil(fraudTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
+    );
+  } finally {
+    await event.target.complete();
+  }
 }
 
 function selectedCards(): any[] {

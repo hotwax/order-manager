@@ -156,7 +156,7 @@
                     <template v-else>{{ source.orderName }}</template>
                   </ion-label>
                 </ion-item>
-                <ion-item v-for="returnId in source.returnIds" :key="returnId" button :detail="true" :router-link="`/returns/${returnId}`">
+                <ion-item v-for="returnId in canViewReturns ? source.returnIds : []" :key="returnId" button :detail="true" :router-link="`/returns/${returnId}`">
                   <ion-label>
                     <p>{{ translate('Processed with return') }}</p>
                     {{ returnId }}
@@ -305,7 +305,7 @@
                 :amount="money(itemLineTotal(soleItem), order.currency)"
                 :adjustments="getItemAdjustmentRows(soleItem)"
                 @update:selected="soleItem.selected = $event"
-                @facility-click="rejectAndReleaseItem(soleItem, group.productId)"
+                @facility-click="rejectAndReleaseItem(soleItem)"
                 @attributes-click="openItemAttributesModal(soleItem)"
               >
                 <template #actions>
@@ -323,6 +323,7 @@
               <ion-accordion v-else :value="group.externalId">
                 <OrderItemListRow
                   slot="header"
+                  :select-on-row-click="false"
                   :primary="groupPrimaryIdentifier(group)"
                   :secondary="groupSecondaryIdentifier(group)"
                   :badge-label="isKit(group) ? translate('Kit') : ''"
@@ -360,7 +361,7 @@
                       :amount="money(itemLineTotal(item), order.currency)"
                       :adjustments="getItemAdjustmentRows(item)"
                       @update:selected="item.selected = $event"
-                      @facility-click="rejectAndReleaseItem(item, group.productId)"
+                      @facility-click="rejectAndReleaseItem(item)"
                       @attributes-click="openItemAttributesModal(item)"
                     >
                       <template #actions>
@@ -399,18 +400,20 @@
                     {{ payment.paymentMethodTypeDesc || payment.method }}
                     <p>{{ payment.statusDesc || payment.status || payment.statusId }}</p>
                     <p v-if="payment.createdDate">{{ formatDateTime(payment.createdDate) }}</p>
-                    <ion-button
-                      v-for="returnId in carriedOverReturnIds(payment)"
-                      :key="returnId"
-                      fill="clear"
-                      size="small"
-                      class="payment-return-link"
-                      :router-link="`/returns/${returnId}`"
-                      @click.stop
-                    >
-                      <ion-icon slot="start" :icon="openOutline" />
-                      {{ translate('Return') }} {{ returnId }}
-                    </ion-button>
+                    <template v-if="canViewReturns">
+                      <ion-button
+                        v-for="returnId in carriedOverReturnIds(payment)"
+                        :key="returnId"
+                        fill="clear"
+                        size="small"
+                        class="payment-return-link"
+                        :router-link="`/returns/${returnId}`"
+                        @click.stop
+                      >
+                        <ion-icon slot="start" :icon="openOutline" />
+                        {{ translate('Return') }} {{ returnId }}
+                      </ion-button>
+                    </template>
                   </ion-label>
                   <ion-label slot="end">{{ money(payment.amount, order.currency) }}</ion-label>
                 </ion-item>
@@ -465,7 +468,8 @@
 
               <div class="ship-group-status-toggle">
                 <p>{{ shipGroupStatusLabel(shipGroup) }}</p>
-                <ion-button fill="clear" color="medium" @click="toggleShipGroup(shipGroup.id)" :aria-label="translate('Toggle ship group')">
+                <!-- A counter sale has one state, so there is nothing to expand into. -->
+                <ion-button v-if="!isPosCompleted(shipGroup)" fill="clear" color="medium" @click="toggleShipGroup(shipGroup.id)" :aria-label="translate('Toggle ship group')">
                   <ion-icon slot="icon-only" :icon="isShipGroupExpanded(shipGroup.id) ? chevronUp : chevronDown" />
                 </ion-button>
               </div>
@@ -482,7 +486,9 @@
               </ion-button>
             </ion-item>
 
-            <div class="ship-group-options-wrapper">
+            <!-- Gift, shipping date, delivery date and instruction options all describe a
+                 shipment that will happen; a counter sale has already happened. -->
+            <div v-if="!isPosCompleted(shipGroup)" class="ship-group-options-wrapper">
               <!-- shows when expanded -->
               <div v-collapsible class="ship-group-expanded-options"
                 :class="{ 'ship-group-expanded-options-open': hasSelectableShipGroupOptions(shipGroup) && isShipGroupExpanded(shipGroup.id) }"
@@ -560,56 +566,55 @@
               </div>
             </div>
 
-            <!-- shows all the time -->
-            <div class="ship-group-timeline">
+            <!-- shows all the time, except on a counter sale that never brokers, picks,
+                 packs or ships — every step there would read "Pending" forever -->
+            <div v-if="!isPosCompleted(shipGroup)" class="ship-group-timeline">
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="compassOutline" />
                 <ion-label>
-                  <p class="overline" v-if="timelineByShipGroup[shipGroup.id]?.firstBrokeredDate || timelineByShipGroup[shipGroup.id]?.firstReleasedDate">{{
-                    lifecycleStepLabel(timelineByShipGroup[shipGroup.id], 'brokered') }}</p>
+                  <p class="overline" v-if="lifecycleByShipGroup[shipGroup.id]?.firstBrokeredDate">{{
+                    lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], 'brokered') }}</p>
                   {{ translate('Brokered') }}
                 </ion-label>
-                <ion-note slot="end">{{ formatTime(timelineByShipGroup[shipGroup.id]?.firstBrokeredDate) || formatTime(timelineByShipGroup[shipGroup.id]?.firstReleasedDate) ||
-                  translate('Pending')
-                  }}</ion-note>
+                <ion-note slot="end">{{ brokeredStepNote(shipGroup) }}</ion-note>
               </ion-item>
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="mailOutline" />
                 <ion-label>
-                  <p class="overline" v-if="timelineByShipGroup[shipGroup.id]?.picklistDate">{{
-                    lifecycleStepLabel(timelineByShipGroup[shipGroup.id], 'pick') }}</p>
+                  <p class="overline" v-if="lifecycleByShipGroup[shipGroup.id]?.picklistDate">{{
+                    lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], 'pick') }}</p>
                   {{ translate('Pick') }}
                 </ion-label>
-                <ion-note slot="end">{{ formatTime(timelineByShipGroup[shipGroup.id]?.picklistDate) ||
+                <ion-note slot="end">{{ formatTime(lifecycleByShipGroup[shipGroup.id]?.picklistDate) ||
                   translate('Pending')
                   }}</ion-note>
               </ion-item>
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="cubeOutline" />
                 <ion-label>
-                  <p class="overline" v-if="timelineByShipGroup[shipGroup.id]?.packedDate">{{
-                    lifecycleStepLabel(timelineByShipGroup[shipGroup.id], 'pack') }}</p>
+                  <p class="overline" v-if="lifecycleByShipGroup[shipGroup.id]?.packedDate">{{
+                    lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], 'pack') }}</p>
                   {{ translate('Pack') }}
                 </ion-label>
-                <ion-note slot="end">{{ formatTime(timelineByShipGroup[shipGroup.id]?.packedDate) ||
+                <ion-note slot="end">{{ formatTime(lifecycleByShipGroup[shipGroup.id]?.packedDate) ||
                   translate('Pending')
                   }}</ion-note>
               </ion-item>
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="sendOutline" />
                 <ion-label>
-                  <p class="overline" v-if="timelineByShipGroup[shipGroup.id]?.shippedDate">{{
-                    lifecycleStepLabel(timelineByShipGroup[shipGroup.id], 'ship') }}</p>
+                  <p class="overline" v-if="lifecycleByShipGroup[shipGroup.id]?.shippedDate">{{
+                    lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], 'ship') }}</p>
                   {{ translate('Ship') }}
                 </ion-label>
-                <ion-note slot="end">{{ formatTime(timelineByShipGroup[shipGroup.id]?.shippedDate) ||
+                <ion-note slot="end">{{ formatTime(lifecycleByShipGroup[shipGroup.id]?.shippedDate) ||
                   translate('Pending')
                   }}</ion-note>
               </ion-item>
             </div>
 
-            <!-- shows when collapsed -->
-            <div v-collapsible class="ship-group-summary-container"
+            <!-- shows when collapsed; a counter sale has no collapsed state -->
+            <div v-if="!isPosCompleted(shipGroup)" v-collapsible class="ship-group-summary-container"
               :class="{ 'ship-group-summary-collapsed': isShipGroupExpanded(shipGroup.id) }"
               :aria-hidden="isShipGroupExpanded(shipGroup.id)"
               :inert="isShipGroupExpanded(shipGroup.id) ? '' : undefined">
@@ -652,11 +657,11 @@
               </div>
             </div>
 
-            <!-- shows when expanded -->
+            <!-- shows when expanded; a counter sale has no other state, so it stays open -->
             <div v-collapsible class="ship-group-card-details"
-              :class="{ 'ship-group-card-details-expanded': isShipGroupExpanded(shipGroup.id) }"
-              :aria-hidden="!isShipGroupExpanded(shipGroup.id)"
-              :inert="isShipGroupExpanded(shipGroup.id) ? undefined : ''">
+              :class="{ 'ship-group-card-details-expanded': isShipGroupDetailsOpen(shipGroup) }"
+              :aria-hidden="!isShipGroupDetailsOpen(shipGroup)"
+              :inert="isShipGroupDetailsOpen(shipGroup) ? undefined : ''">
               <div class="ship-group-card-details-inner">
                 <div class="ship-group-detail-columns">
                   <ion-list class="ship-group-items" lines="none">
@@ -664,7 +669,9 @@
                     <ion-label>{{ translate('Items') }}</ion-label>
                   </ion-list-header>
                   <ion-item v-for="item in shipGroup.items" :key="item.id">
-                    <ion-checkbox slot="start" :checked="isItemSelected(shipGroup.id, item.id)"
+                    <!-- Selection only feeds the pull back / release actions, which a counter
+                         sale does not have. -->
+                    <ion-checkbox v-if="!isPosCompleted(shipGroup)" slot="start" :checked="isItemSelected(shipGroup.id, item.id)"
                       @ionChange="toggleItemSelection(shipGroup.id, item.id, $event.detail.checked)" />
                     <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)"
                       :key="getProduct(item.productId)?.mainImageUrl">
@@ -680,13 +687,29 @@
                       <p>{{ shipGroupProductIdentification(productIdentificationPref.secondaryId, item) }}</p>
                     </ion-label>
 
-                    <ion-button slot="end" fill="clear" color="medium" @click.stop="viewInventory(item.productId)" :aria-label="translate('View inventory')">
+                    <!-- Inventory lookup answers "can we still fulfil this?"; the goods have
+                         already left the store. What matters instead is whether the stock
+                         they left with came off the books. -->
+                    <ion-button v-if="!isPosCompleted(shipGroup)" slot="end" fill="clear" color="medium" @click.stop="viewInventory(item.productId)" :aria-label="translate('View inventory')">
                       <ion-icon slot="icon-only" :icon="cubeOutline" />
                     </ion-button>
+                    <div v-else-if="itemIssuanceBadges[item.id]" slot="end" class="ship-group-item-issuance">
+                      <ion-badge :color="itemIssuanceBadges[item.id].tone">
+                        {{ translate(itemIssuanceBadges[item.id].label) }}
+                      </ion-badge>
+                      <!-- Stock at the store as the sale was recorded, not stock now: later
+                           movements against the same inventory item are not reflected here. -->
+                      <ion-note v-if="itemIssuanceBadges[item.id].label === 'Inventory issued'">
+                        {{ translate('On hand at sale') }} {{ itemIssuanceBadges[item.id].qohBefore }} → {{ itemIssuanceBadges[item.id].qohAfter }}
+                      </ion-note>
+                    </div>
                   </ion-item>
                   </ion-list>
 
-                  <ion-list class="ship-group-fulfillment" lines="none">
+                  <!-- Nothing here applies to a counter sale: the carrier is _NA_, the method
+                       cannot be changed once the goods have left with the customer, and there
+                       is no ship-to address to show or edit. -->
+                  <ion-list v-if="!isPosCompleted(shipGroup)" class="ship-group-fulfillment" lines="none">
                   <ion-list-header>
                     <ion-label>{{ translate('Fulfillment') }}</ion-label>
                   </ion-list-header>
@@ -811,14 +834,16 @@
             </div>
 
             <div class="ship-group-actions">
-              <ion-button v-if="isVirtualFacility(shipGroup)" fill="clear"
+              <!-- Broker, park, pull back and release all move a group through fulfillment.
+                   A counter sale has none left, so only the order-level actions remain. -->
+              <ion-button v-if="isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)" fill="clear"
                 :disabled="isShipGroupActionDisabled(shipGroup, 'BROKER')" @click="brokerShipGroup(shipGroup.id)">{{
                 translate('Broker ship group') }}</ion-button>
-              <ion-button fill="clear"
+              <ion-button v-if="!isPosCompleted(shipGroup)" fill="clear"
                 :disabled="isShipGroupActionDisabled(shipGroup, isVirtualFacility(shipGroup) ? 'PARK_ITEMS' : 'PULL_BACK')"
                 @click="isVirtualFacility(shipGroup) ? parkSelectedItems(shipGroup) : rejectSelectedItems(shipGroup)">{{
                   isVirtualFacility(shipGroup) ? translate('Park Items') : translate('Pull back') }}</ion-button>
-              <ion-button v-if="isVirtualFacility(shipGroup)" fill="clear"
+              <ion-button v-if="isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)" fill="clear"
                 :disabled="isShipGroupActionDisabled(shipGroup, 'RELEASE')" @click="releaseSelectedItems(shipGroup)">{{
                   translate('Release') }}</ion-button>
               <ion-button fill="clear" @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
@@ -1049,7 +1074,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
-import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
+import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, chevronDown, chevronUp, closeCircleOutline, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pauseCircleOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, storefrontOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
@@ -1063,13 +1088,12 @@ import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
 import RejectItemsModal from '@/components/orders/RejectItemsModal.vue';
 import ProductInventoryModal from '@/components/inventory/ProductInventoryModal.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
-import PhysicalFacilityModal from '@/components/fulfillment/PhysicalFacilityModal.vue';
 import RoutingGroupModal from '@/components/fulfillment/RoutingGroupModal.vue';
 import OrderItemAttributesModal from '@/components/orders/OrderItemAttributesModal.vue';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import ManageOrderIdentificationsModal from '@/components/orders/ManageOrderIdentificationsModal.vue';
 import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
-import ItemFacilityInventoryModal from '@/components/fulfillment/ItemFacilityInventoryModal.vue';
+import FacilityInventoryModal from '@/components/fulfillment/FacilityInventoryModal.vue';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
@@ -1078,7 +1102,7 @@ import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
 import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
 import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
-import { getCustomerReturn } from '@/services/customer';
+import { getReturn } from '@/services/returns';
 import { showToast, isKit, riskLevelColor, sentimentCounts } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { fulfillmentLineStatus, fulfillmentLineStatusColor } from '@/utils/fulfillmentLineStatus';
@@ -1089,6 +1113,7 @@ import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
 import { useCustomerStore } from '@/store/customer';
 import type { CustomerContactMech } from '@/types/customer';
+import Actions from '@/authorization/actions';
 
 const props = defineProps<{
   orderId: string;
@@ -1098,6 +1123,8 @@ const orderDetailStore = useOrderDetailStore();
 const seed = useSeedStore();
 const productCache = useProductCacheStore();
 const customerStore = useCustomerStore();
+const userStore = useUserStore();
+const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW));
 
 const loading = computed(() => orderDetailStore.loadingById(props.orderId));
 const error = computed(() => orderDetailStore.errorById(props.orderId));
@@ -1304,15 +1331,16 @@ const billingAddress = computed(() => {
 // to the facility-less variant.
 const returnHeadersById = ref<Record<string, any | null>>({});
 
-watch(() => {
+watch([() => {
   const raw = orderDetailStore.orderById(props.orderId);
   return [...new Set((raw?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[];
-}, (returnIds) => {
+}, canViewReturns], ([returnIds, canView]) => {
+  if (!canView) return;
   returnIds.forEach(async (returnId) => {
     if (returnId in returnHeadersById.value) return;
     returnHeadersById.value = { ...returnHeadersById.value, [returnId]: null };
     try {
-      const header = await getCustomerReturn(returnId);
+      const header = await getReturn(returnId);
       if (header) returnHeadersById.value = { ...returnHeadersById.value, [returnId]: header };
     } catch (error) {
       logger.debug(`Return header ${returnId} unavailable for timeline facility context`, error);
@@ -1376,6 +1404,23 @@ async function discoverExchangeChildren(orderId: string) {
     logger.error('Failed to discover exchange orders for timeline', error);
   }
 }
+
+// OrderFacilityChange reasons that describe where items went. Every other reason —
+// the REPORT_VAR/REPORT_NO_VAR rejection reasons, damaged, inventory-not-found — is a
+// rejection, and reads by where the items came from instead.
+const FACILITY_CHANGE_LABELS: Record<string, string> = {
+  BROKERED: 'Brokered',
+  ALLOCATED: 'Allocated',
+  RELEASED: 'Released',
+  PARKED: 'Parked'
+};
+
+const FACILITY_CHANGE_ICONS: Record<string, string> = {
+  BROKERED: compassOutline,
+  ALLOCATED: compassOutline,
+  RELEASED: storefrontOutline,
+  PARKED: pauseCircleOutline
+};
 
 const orderTimeline = computed(() => {
   const raw = orderDetailStore.orderById(props.orderId);
@@ -1456,7 +1501,7 @@ const orderTimeline = computed(() => {
       metaData: facilityName
         ? `${group.count} ${itemWord} ${translate('returned at')} ${facilityName}`
         : `${group.count} ${itemWord} ${translate('returned')}`,
-      route: `/returns/${returnId}`
+      route: canViewReturns.value ? `/returns/${returnId}` : undefined
     });
   });
 
@@ -1525,7 +1570,71 @@ const orderTimeline = computed(() => {
     usedStatusIds.add('ORDER_COMPLETED');
   }
 
-  orderDetailStore.headerStatuses
+  // Item cancellations and rejections, one entry per action rather than per item.
+  orderDetailStore.itemStatusEventsByOrderId(props.orderId).forEach((event) => {
+    const itemWord = event.itemCount === 1 ? translate('item') : translate('items');
+    timeline.push({
+      label: seed.statusDescription(event.statusId),
+      id: `item-status-${event.id}`,
+      value: event.value,
+      icon: closeCircleOutline,
+      valueType: 'date-time-millis',
+      timeDiff: findTimeDiff(orderDate, event.value),
+      metaData: [
+        `${event.itemCount} ${itemWord}`,
+        event.changeReason ? seed.describe(event.changeReason) : '',
+        event.statusUserLogin
+      ].filter(Boolean).join(' - ')
+    });
+  });
+
+  // Brokering, release, park and reject moves. UNFILLABLE is deliberately absent —
+  // it is summarised below instead, since a single order can carry thousands.
+  orderDetailStore.facilityChangeEventsByOrderId(props.orderId).forEach((event) => {
+    const itemWord = event.itemCount === 1 ? translate('item') : translate('items');
+    // A rejection reads by where the items came from; every other move reads by where
+    // they went. Reasons outside FACILITY_CHANGE_LABELS are rejection reasons
+    // (REPORT_VAR/REPORT_NO_VAR children, damaged, inventory not found); a row with no
+    // reason at all is just a move and says so.
+    const knownMove = FACILITY_CHANGE_LABELS[event.changeReasonEnumId];
+    const isRejection = !knownMove && !!event.changeReasonEnumId;
+    const facilityId = isRejection ? event.fromFacilityId : event.facilityId;
+    const facilityName = facilityId ? seed.facilityName(facilityId) : '';
+    const direction = isRejection ? translate('from') : translate('to');
+
+    timeline.push({
+      label: knownMove || (isRejection ? 'Rejected' : 'Facility changed'),
+      id: `facility-change-${event.id}`,
+      value: event.value,
+      icon: FACILITY_CHANGE_ICONS[event.changeReasonEnumId] || (isRejection ? closeCircleOutline : compassOutline),
+      valueType: 'date-time-millis',
+      timeDiff: findTimeDiff(orderDate, event.value),
+      metaData: [
+        `${event.itemCount} ${itemWord}`,
+        facilityName ? `${direction} ${facilityName}` : '',
+        isRejection ? seed.enumDescription(event.changeReasonEnumId) : '',
+        event.changeUserLogin
+      ].filter(Boolean).join(' - ')
+    });
+  });
+
+  // Every failed brokering attempt writes an UNFILLABLE row — 11.5k on the worst
+  // order observed — so the timeline shows the count and the last attempt, not the rows.
+  const unfillable = orderDetailStore.unfillableAttemptsByOrderId(props.orderId);
+  const lastUnfillableDate = timelineMillis(unfillable?.lastAttemptDate);
+  if (unfillable && lastUnfillableDate) {
+    timeline.push({
+      label: 'Brokering could not fill',
+      id: 'unfillable-attempts',
+      value: lastUnfillableDate,
+      icon: warningOutline,
+      valueType: 'date-time-millis',
+      timeDiff: findTimeDiff(orderDate, lastUnfillableDate),
+      metaData: `${unfillable.count}${unfillable.atLeast ? '+' : ''} ${unfillable.count === 1 ? translate('attempt') : translate('attempts')}`
+    });
+  }
+
+  orderDetailStore.headerStatusesByOrderId(props.orderId)
     .filter((status: any) => status.statusId && !usedStatusIds.has(status.statusId))
     .forEach((status: any) => {
       const value = timelineMillis(status.statusDatetime);
@@ -1538,7 +1647,7 @@ const orderTimeline = computed(() => {
         icon: pulseOutline,
         valueType: 'date-time-millis',
         timeDiff: findTimeDiff(orderDate, value),
-        metaData: [status.statusUserLogin, status.changeReason].filter(Boolean).join(' - ')
+        metaData: [status.statusUserLogin, status.changeReason ? seed.describe(status.changeReason) : ''].filter(Boolean).join(' - ')
       });
     });
 
@@ -1551,6 +1660,41 @@ const orderTimeline = computed(() => {
 });
 
 const timelineByShipGroup = computed(() => orderDetailStore.timelineByShipGroupByOrderId(props.orderId));
+
+/**
+ * Earliest OrderFacilityChange per ship group, from the rows the events feed already
+ * loads. `get#OrderFulfillmentTimeline` dates brokering off rows carrying a BROKERED
+ * or RELEASED changeReasonEnumId, and only the routing engine writes those — the row
+ * OMS writes when an order is first allocated carries no reason at all, so a group that
+ * was never re-brokered has no date in the timeline endpoint. That row is the date.
+ */
+const facilityChangeDateByShipGroup = computed<Record<string, number>>(() => {
+  const earliest: Record<string, number> = {};
+  (orderDetailStore.facilityChangesByOrderId[props.orderId] || []).forEach((change: any) => {
+    const millis = timelineMillis(change?.changeDatetime);
+    if (!change?.shipGroupSeqId || millis == undefined) return;
+    const current = earliest[change.shipGroupSeqId];
+    if (current == undefined || millis < current) earliest[change.shipGroupSeqId] = millis;
+  });
+  return earliest;
+});
+
+/**
+ * What the lifecycle strip and the progress bar read: the timeline endpoint's dates with
+ * the brokered date resolved as above. Kept separate from `timelineByShipGroup` so the
+ * action engine and the item status chips keep reading the endpoint's contract verbatim.
+ */
+const lifecycleByShipGroup = computed<Record<string, any>>(() => {
+  const index: Record<string, any> = {};
+  (order.value?.shipGroups || []).forEach((shipGroup: any) => {
+    index[shipGroup.id] = {
+      ...(timelineByShipGroup.value[shipGroup.id] || {}),
+      firstBrokeredDate: shipGroupBrokeredDate(shipGroup)
+    };
+  });
+  return index;
+});
+
 const expandedShipGroupIds = ref<Set<string>>(new Set());
 const collapsibleObservers = new WeakMap<HTMLElement, ResizeObserver>();
 
@@ -1597,20 +1741,97 @@ function isVirtualFacility(shipGroup: any): boolean {
   );
 }
 
-function shipGroupProgress(shipGroup: any): number {
+/**
+ * A ship group sold over the counter. OMS treats POS_COMPLETED as needing no
+ * fulfillment at all (`requiresFulfillment` in OrderServices get#SalesOrder), so the
+ * group has no carrier, no ship-to address, and no brokering/pick/pack/ship dates —
+ * the goods left with the customer.
+ */
+function isPosCompleted(shipGroup: any): boolean {
+  return shipGroup?.shipmentMethodTypeId === 'POS_COMPLETED';
+}
+
+/** When the ship group reached its facility, or undefined if nothing recorded it. */
+function shipGroupBrokeredDate(shipGroup: any): string | number | undefined {
   const tl = timelineByShipGroup.value[shipGroup.id];
-  if (!tl) return 0;
+  const brokered = tl?.firstBrokeredDate || tl?.firstReleasedDate;
+  if (brokered) return brokered;
+  // The fallback row only dates brokering for a group that reached a physical facility.
+  // On a virtual one the same rows record parking, rejections and cancellations, none of
+  // which are a brokering — so a parked group must not inherit a date from them.
+  return isVirtualFacility(shipGroup) ? undefined : facilityChangeDateByShipGroup.value[shipGroup.id];
+}
+
+/**
+ * Brokered == the items sit at a physical facility. This is the rule the action engine
+ * already applies (`OrderActionValidator.isShipGroupBrokered`); the lifecycle display
+ * has to apply it too, because a group can be brokered with no date to show.
+ */
+function isShipGroupBrokered(shipGroup: any): boolean {
+  return !isVirtualFacility(shipGroup) || !!shipGroupBrokeredDate(shipGroup);
+}
+
+function shipGroupProgress(shipGroup: any): number {
+  // A counter sale is finished the moment it is recorded; there is no lifecycle to
+  // measure and no timeline row to measure it from.
+  if (isPosCompleted(shipGroup)) return 1;
+  const tl = timelineByShipGroup.value[shipGroup.id];
   let progress = 0;
-  if (tl.firstBrokeredDate || tl.firstReleasedDate) progress += 0.25;
-  if (tl.picklistDate) progress += 0.25;
-  if (tl.packedDate) progress += 0.25;
-  if (tl.shippedDate) progress += 0.25;
+  if (isShipGroupBrokered(shipGroup)) progress += 0.25;
+  if (tl?.picklistDate) progress += 0.25;
+  if (tl?.packedDate) progress += 0.25;
+  if (tl?.shippedDate) progress += 0.25;
   return progress;
+}
+
+/** The brokered step's time, or why there is none: not brokered yet vs. brokered untimed. */
+function brokeredStepNote(shipGroup: any): string {
+  return formatTime(shipGroupBrokeredDate(shipGroup))
+    || (isShipGroupBrokered(shipGroup) ? translate('No date') : translate('Pending'));
 }
 
 function isShipGroupExpanded(shipGroupId: string): boolean {
   return expandedShipGroupIds.value.has(shipGroupId);
 }
+
+/** Whether the item detail block is showing — always, for a counter sale with no toggle. */
+function isShipGroupDetailsOpen(shipGroup: any): boolean {
+  return isPosCompleted(shipGroup) || isShipGroupExpanded(shipGroup.id);
+}
+
+/** `tone` is the Ionic semantic colour name handed to the badge, not a CSS colour. */
+interface IssuanceBadge { label: string; tone: string; qohBefore: number; qohAfter: number }
+
+/**
+ * Whether inventory was issued for a counter-sale line, and how completely.
+ *
+ * Completion and issuance are separate steps — issue#PosOrderInventory skips an order
+ * whose facility is not a physical store — so an item can be ITEM_COMPLETED with no
+ * inventory ever issued. That gap is the reason to show this at all, and it is why the
+ * badge reads the issuance rows rather than the item status. Returns null while the
+ * rows are still loading or if they failed, so an unknown never reads as "not issued".
+ */
+const itemIssuanceBadges = computed<Record<string, IssuanceBadge>>(() => {
+  const issuanceByItem = orderDetailStore.issuanceByItemSeqIdByOrderId(props.orderId);
+  if (!issuanceByItem) return {};
+
+  const badges: Record<string, IssuanceBadge> = {};
+  (order.value?.shipGroups || [])
+    .filter(isPosCompleted)
+    .forEach((shipGroup: any) => {
+      (shipGroup.items || []).forEach((item: any) => {
+        const ordered = Number(item.quantity) || 0;
+        const summary = issuanceByItem[item.id];
+        const issued = summary?.issued || 0;
+        const stock = { qohBefore: summary?.qohBefore ?? 0, qohAfter: summary?.qohAfter ?? 0 };
+
+        if (issued <= 0) badges[item.id] = { label: 'Inventory not issued', tone: 'warning', ...stock };
+        else if (ordered && issued < ordered) badges[item.id] = { label: 'Inventory partly issued', tone: 'warning', ...stock };
+        else badges[item.id] = { label: 'Inventory issued', tone: 'success', ...stock };
+      });
+    });
+  return badges;
+});
 
 function toggleShipGroup(shipGroupId: string) {
   const next = new Set(expandedShipGroupIds.value);
@@ -1627,9 +1848,11 @@ function shipGroupHeaderTitle(shipGroup: any): string {
 }
 
 function shipGroupStatusLabel(shipGroup: any): string {
+  if (isPosCompleted(shipGroup)) return translate('Sold in store');
   if (isVirtualFacility(shipGroup)) return translate('Not Brokered');
-  const progress = Math.round(shipGroupProgress(shipGroup) * 100);
-  return progress > 0 ? `${progress}% ${translate('Complete')}` : translate('Brokered');
+  // A physical facility is always at least brokered, so there is no 0% case left to
+  // label — the old fallback here read "Brokered", which collided with the step name.
+  return `${Math.round(shipGroupProgress(shipGroup) * 100)}% ${translate('Complete')}`;
 }
 
 function hasSelectableShipGroupOptions(shipGroup: any): boolean {
@@ -1952,11 +2175,16 @@ function shipGroupById(shipGroupId: string) {
   return (order.value?.shipGroups || []).find((shipGroup: any) => shipGroup.id === shipGroupId) || null;
 }
 
-function selectedItemObjectsForShipGroup(shipGroup: any) {
+/**
+ * The items a ship-group action applies to. Selection NARROWS the action;
+ * with nothing checked the action covers the whole ship group, so the buttons
+ * never sit disabled just because the user has not ticked a row.
+ */
+function actionableItemObjectsForShipGroup(shipGroup: any) {
+  const items = allGroupedItems.value.filter((item: any) => item.shipGroupSeqId === shipGroup.id);
   const itemIds = new Set(selectedItemsForShipGroup(shipGroup.id));
-  return allGroupedItems.value.filter((item: any) =>
-    item.shipGroupSeqId === shipGroup.id && itemIds.has(item.orderItemSeqId)
-  );
+  if (!itemIds.size) return items;
+  return items.filter((item: any) => itemIds.has(item.orderItemSeqId));
 }
 
 function shipGroupActionContext(shipGroup: any) {
@@ -1973,7 +2201,7 @@ function shipGroupActionValidation(shipGroup: any, actionId: any) {
     order.value,
     shipGroup,
     actionId,
-    selectedItemObjectsForShipGroup(shipGroup),
+    actionableItemObjectsForShipGroup(shipGroup),
     shipGroupActionContext(shipGroup)
   );
 }
@@ -2098,11 +2326,36 @@ function carriedOverReturnIds(payment: any): string[] {
   return [...new Set(sources.flatMap((source) => source.returnIds))];
 }
 
+// Rejection reasons live under these two enum parent types and are otherwise only
+// loaded when the Reject items modal opens — without them a timeline rejection reads
+// as its raw id ("REJ_RSN_DAMAGED"). Loading is idempotent per enum type, so the guard
+// just avoids re-listing the child types on every order.
+const REJECTION_REASON_PARENT_TYPES = ['REPORT_AN_ISSUE', 'RPRT_NO_VAR_LOG'];
+
+function loadRejectionReasonEnums() {
+  REJECTION_REASON_PARENT_TYPES
+    .filter((parentTypeId) => !seed.getEnumsByParentType(parentTypeId).length)
+    .forEach((parentTypeId) => {
+      seed.loadEnumsByParentType(parentTypeId).catch((error: any) =>
+        logger.debug(`Rejection reason enums for ${parentTypeId} unavailable`, error)
+      );
+    });
+}
+
 async function loadOrder(orderId: string, force = false) {
   if (force) {
     await orderDetailStore.fetchOrder(orderId, true);
   } else {
     await orderDetailStore.setCurrentOrder(orderId);
+  }
+  // Timeline event sources (OrderStatus, OrderFacilityChange). Fire-and-forget: the
+  // header timeline fills in as they land, and the rest of the page never waits.
+  orderDetailStore.fetchOrderEvents(orderId, force);
+  loadRejectionReasonEnums();
+  // A counter sale's only remaining question is whether inventory actually left the
+  // books, so load the issuance rows for those orders and no others.
+  if ((orderDetailStore.orderById(orderId)?.shipGroups || []).some(isPosCompleted)) {
+    orderDetailStore.fetchInventoryIssuance(orderId, force);
   }
   // Fire-and-forget: the Shopify Admin link hydrates when it resolves; the page
   // never waits on it.
@@ -2725,7 +2978,7 @@ function timelineMillis(value: string | number | undefined | null) {
 }
 
 function statusTimelineDate(statusIds: string[]) {
-  const dates = orderDetailStore.headerStatuses
+  const dates = orderDetailStore.headerStatusesByOrderId(props.orderId)
     .filter((status: any) => statusIds.includes(status.statusId))
     .map((status: any) => timelineMillis(status.statusDatetime))
     .filter((value): value is number => value != undefined);
@@ -2924,10 +3177,46 @@ function shippingAdjustmentDetail(typeId: string): string {
 }
 
 const orderTaskStore = useOrderTaskStore();
-const userStore = useUserStore();
 
 async function openFacilityModal(): Promise<string | null> {
   const modal = await modalController.create({ component: FacilityModal });
+  await modal.present();
+  const { data: facilityId } = await modal.onWillDismiss();
+  return facilityId ?? null;
+}
+
+/**
+ * Order items carry no product identity of their own — the rolled up group holds it — so the
+ * facility picker gets its product, name and image resolved from the owning group.
+ */
+function facilityInventoryItems(items: any[]) {
+  return items.map((item: any) => {
+    const group = groupedItems.value.find((candidate: any) =>
+      candidate.items.some((groupItem: any) => groupItem.orderItemSeqId === item.orderItemSeqId));
+
+    return {
+      orderItemSeqId: item.orderItemSeqId,
+      productId: group?.productId || '',
+      name: group ? groupPrimaryIdentifier(group) : `${translate('Item')} ${item.orderItemSeqId}`,
+      imageUrl: getProduct(group?.productId)?.mainImageUrl,
+      quantity: Number(item.quantity || 1)
+    };
+  });
+}
+
+/**
+ * One picker for both entry points. Releasing a single item from the items tab and releasing a
+ * ship group's selection differ only in how many items are handed over.
+ */
+async function openFacilityInventoryModal(items: any[]): Promise<string | null> {
+  const modal = await modalController.create({
+    component: FacilityInventoryModal,
+    componentProps: {
+      items: facilityInventoryItems(items),
+      productStoreId: orderDetailStore.orderById(props.orderId)?.productStoreId
+    },
+    cssClass: 'facility-inventory-modal'
+  });
   await modal.present();
   const { data: facilityId } = await modal.onWillDismiss();
   return facilityId ?? null;
@@ -3062,7 +3351,7 @@ async function cancelOrderItems() {
   await alert.present();
 }
 
-async function rejectAndReleaseItem(item: any, productId: string) {
+async function rejectAndReleaseItem(item: any) {
   const validation = itemFacilityActionValidation(item);
   if (!validation.allowed) {
     await showUnavailableAction(validation);
@@ -3072,13 +3361,7 @@ async function rejectAndReleaseItem(item: any, productId: string) {
   const orderId = order.value!.id;
 
   // Step 1 — pick a facility with inventory to release to
-  const facilityModal = await modalController.create({
-    component: ItemFacilityInventoryModal,
-    componentProps: { productId, productStoreId: orderDetailStore.orderById(props.orderId)?.productStoreId },
-    cssClass: 'item-facility-inventory-modal'
-  });
-  await facilityModal.present();
-  const { data: facilityId } = await facilityModal.onWillDismiss();
+  const facilityId = await openFacilityInventoryModal([item]);
   if (!facilityId) {
     return;
   }
@@ -3386,13 +3669,6 @@ async function openAddItemModal(shipGroup: any) {
   }
 }
 
-async function openPhysicalFacilityModal(): Promise<string | null> {
-  const modal = await modalController.create({ component: PhysicalFacilityModal });
-  await modal.present();
-  const { data: facilityId } = await modal.onWillDismiss();
-  return facilityId ?? null;
-}
-
 async function parkSelectedItems(shipGroup: any) {
   const validation = shipGroupActionValidation(shipGroup, 'PARK_ITEMS');
   if (!validation.allowed) {
@@ -3400,7 +3676,9 @@ async function parkSelectedItems(shipGroup: any) {
     return;
   }
 
-  const itemIds = selectedItemsForShipGroup(shipGroup.id);
+  const itemIds = actionableItemObjectsForShipGroup(shipGroup)
+    .filter((item: any) => !OrderActionValidator.isItemTerminal(item))
+    .map((item: any) => item.orderItemSeqId);
   if (!itemIds.length) return;
   const facilityId = await openFacilityModal();
   if (!facilityId) return;
@@ -3416,10 +3694,10 @@ async function parkSelectedItems(shipGroup: any) {
       )
     );
     selectedShipGroupItems.value[shipGroup.id] = new Set();
-    await showToast(translate('Selected items moved to parking.'));
+    await showToast(translate('Items moved to parking.'));
     await loadOrder(orderId, true);
   } catch {
-    await showToast(translate('Failed to park selected items. Please try again.'));
+    await showToast(translate('Failed to park items. Please try again.'));
   }
 }
 
@@ -3430,7 +3708,9 @@ async function rejectSelectedItems(shipGroup: any) {
     return;
   }
 
-  const itemIds = selectedItemsForShipGroup(shipGroup.id);
+  const itemIds = actionableItemObjectsForShipGroup(shipGroup)
+    .filter((item: any) => !OrderActionValidator.isItemTerminal(item))
+    .map((item: any) => item.orderItemSeqId);
   if (!itemIds.length) return;
 
   const modal = await modalController.create({ component: RejectItemsModal });
@@ -3454,10 +3734,10 @@ async function rejectSelectedItems(shipGroup: any) {
       },
     });
     selectedShipGroupItems.value[shipGroup.id] = new Set();
-    await showToast(translate('Selected items rejected successfully.'));
+    await showToast(translate('Items rejected successfully.'));
     await loadOrder(orderId, true);
   } catch {
-    await showToast(translate('Failed to reject selected items. Please try again.'));
+    await showToast(translate('Failed to reject items. Please try again.'));
   }
 }
 
@@ -3468,9 +3748,11 @@ async function releaseSelectedItems(shipGroup: any) {
     return;
   }
 
-  const itemIds = selectedItemsForShipGroup(shipGroup.id);
+  const releasableItems = actionableItemObjectsForShipGroup(shipGroup)
+    .filter((item: any) => OrderActionValidator.isItemPreFulfill(item));
+  const itemIds = releasableItems.map((item: any) => item.orderItemSeqId);
   if (!itemIds.length) return;
-  const facilityId = await openPhysicalFacilityModal();
+  const facilityId = await openFacilityInventoryModal(releasableItems);
   if (!facilityId) return;
   const orderId = order.value!.id;
   try {
@@ -3488,10 +3770,10 @@ async function releaseSelectedItems(shipGroup: any) {
       )
     );
     selectedShipGroupItems.value[shipGroup.id] = new Set();
-    await showToast(translate('Selected items released to facility.'));
+    await showToast(translate('Items released to facility.'));
     await loadOrder(orderId, true);
   } catch {
-    await showToast(translate('Failed to release selected items. Please try again.'));
+    await showToast(translate('Failed to release items. Please try again.'));
   }
 }
 </script>

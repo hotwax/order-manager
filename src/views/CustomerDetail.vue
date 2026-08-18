@@ -126,7 +126,7 @@
                       <template v-else>Merge</template>
                     </ion-button>
                   </ion-item>
-                  <ion-item v-if="!duplicateRelationships.some((d: { active: boolean }) => d.active) && !mergableDuplicates.length" lines="none">
+                  <ion-item v-if="!hasActiveDuplicateRelationship && !mergableDuplicates.length" lines="none">
                     <ion-label color="medium"><em>No Merged Contacts</em></ion-label>
                   </ion-item>
                 </ion-list>
@@ -148,7 +148,6 @@
             <ion-item v-for="event in timeline" :key="event.id" lines="full">
               <ion-icon slot="start" :icon="pricetagOutline" color="medium" />
               <ion-label>{{ event.label }}</ion-label>
-              <ion-icon slot="end" :icon="informationCircleOutline" color="medium" />
             </ion-item>
             <ion-item v-if="!timeline.length" lines="full">
               <ion-icon slot="start" :icon="pricetagOutline" color="medium" />
@@ -173,7 +172,7 @@
         <ion-segment-button value="orders">
           <ion-label>Orders</ion-label>
         </ion-segment-button>
-        <ion-segment-button value="returns">
+        <ion-segment-button v-if="canViewReturns" value="returns">
           <ion-label>Returns</ion-label>
         </ion-segment-button>
         <ion-segment-button value="comms">
@@ -205,7 +204,7 @@
         <!-- Recent orders (real when present, placeholder until the Solr orders query lands) -->
         <div class="section-header">
           <h2>Recent orders</h2>
-          <ion-button fill="outline" size="small">View all</ion-button>
+          <ion-button fill="outline" size="small" @click="selectedSegment = 'orders'">View all</ion-button>
         </div>
 
         <div class="ion-padding-horizontal">
@@ -213,51 +212,7 @@
         </div>
 
         <div v-if="recentOrders.length" class="recent-orders-grid">
-          <ion-card v-for="order in recentOrders" :key="order.id">
-            <ion-item lines="full">
-              <ion-label>
-                <h2>{{ order.name }}</h2>
-                <p>{{ order.subtitle }}</p>
-              </ion-label>
-              <ion-note slot="end">{{ order.progressLabel }}</ion-note>
-              <ion-icon slot="end" :icon="chevronUp" color="medium" />
-            </ion-item>
-
-            <ion-progress-bar :value="order.progressValue" :color="order.progressColor" />
-
-            <ion-item lines="full">
-              <ion-label>
-                <p class="overline">Order date</p>
-                {{ order.orderDate }}
-              </ion-label>
-            </ion-item>
-
-            <ion-list lines="none">
-              <ion-list-header>
-                <ion-label>Items</ion-label>
-              </ion-list-header>
-              <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
-                <ion-thumbnail slot="start">
-                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
-                </ion-thumbnail>
-                <ion-label>
-                  {{ item.name }}
-                  <p>{{ item.secondary }}</p>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-
-            <div class="card-actions">
-              <ion-button
-                fill="clear"
-                size="small"
-                :router-link="order.id ? `/orders/${order.id}` : undefined"
-                :disabled="!order.id"
-              >
-                View details
-              </ion-button>
-            </div>
-          </ion-card>
+          <CustomerOrderCard v-for="order in recentOrders" :key="order.id" :order="order" />
         </div>
         <EmptyState
           v-else-if="ordersStatus === 'loaded'"
@@ -275,47 +230,7 @@
           <ion-searchbar placeholder="Search" :value="allOrdersQuery" @ion-input="allOrdersQuery = ($event.target as any).value ?? ''" />
         </div>
         <div v-if="allOrders.length" class="recent-orders-grid">
-          <ion-card v-for="order in allOrders" :key="order.id">
-            <ion-item lines="full">
-              <ion-label>
-                <h2>{{ order.name }}</h2>
-                <p>{{ order.subtitle }}</p>
-              </ion-label>
-              <ion-note slot="end">{{ order.progressLabel }}</ion-note>
-              <ion-icon slot="end" :icon="chevronUp" color="medium" />
-            </ion-item>
-            <ion-progress-bar :value="order.progressValue" :color="order.progressColor" />
-            <ion-item lines="full">
-              <ion-label>
-                <p class="overline">Order date</p>
-                {{ order.orderDate }}
-              </ion-label>
-            </ion-item>
-            <ion-list lines="none">
-              <ion-list-header>
-                <ion-label>Items</ion-label>
-              </ion-list-header>
-              <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
-                <ion-thumbnail slot="start">
-                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
-                </ion-thumbnail>
-                <ion-label>
-                  {{ item.name }}
-                  <p>{{ item.secondary }}</p>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-            <div class="card-actions">
-              <ion-button
-                fill="clear"
-                size="small"
-                :router-link="order.id ? `/orders/${order.id}` : undefined"
-                :disabled="!order.id"
-              >
-                View details
-              </ion-button>
-            </div>
-          </ion-card>
+          <CustomerOrderCard v-for="order in allOrders" :key="order.id" :order="order" />
         </div>
         <EmptyState
           v-else-if="ordersStatus === 'loaded'"
@@ -330,47 +245,7 @@
           <h2>Unfillable orders</h2>
         </div>
         <div v-if="unfillableOrders.length" class="recent-orders-grid">
-          <ion-card v-for="order in unfillableOrders" :key="order.id">
-            <ion-item lines="full">
-              <ion-label>
-                <h2>{{ order.name }}</h2>
-                <p>{{ order.subtitle }}</p>
-              </ion-label>
-              <ion-note slot="end">{{ order.progressLabel }}</ion-note>
-              <ion-icon slot="end" :icon="chevronUp" color="medium" />
-            </ion-item>
-            <ion-progress-bar :value="order.progressValue" color="warning" />
-            <ion-item lines="full">
-              <ion-label>
-                <p class="overline">Order date</p>
-                {{ order.orderDate }}
-              </ion-label>
-            </ion-item>
-            <ion-list lines="none">
-              <ion-list-header>
-                <ion-label>Items</ion-label>
-              </ion-list-header>
-              <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
-                <ion-thumbnail slot="start">
-                  <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
-                </ion-thumbnail>
-                <ion-label>
-                  {{ item.name }}
-                  <p>{{ item.secondary }}</p>
-                </ion-label>
-              </ion-item>
-            </ion-list>
-            <div class="card-actions">
-              <ion-button
-                fill="clear"
-                size="small"
-                :router-link="order.id ? `/orders/${order.id}` : undefined"
-                :disabled="!order.id"
-              >
-                View details
-              </ion-button>
-            </div>
-          </ion-card>
+          <CustomerOrderCard v-for="order in unfillableOrders" :key="order.id" :order="order" />
         </div>
         <EmptyState
           v-else-if="ordersStatus === 'loaded'"
@@ -382,47 +257,53 @@
       <!-- ===== Returns segment ===== -->
       <div v-else-if="selectedSegment === 'returns'">
         <div class="section-header">
-          <h2>Returns</h2>
+          <h2>{{ translate('Returns') }}</h2>
         </div>
-        <ion-list v-if="returnRows.length">
+        <ion-list v-if="customerReturns.length">
           <ion-list-header>
-            <ion-label>{{ returnRows.length }} {{ returnRows.length === 1 ? 'RMA' : 'RMAs' }}</ion-label>
+            <ion-label>{{ customerReturns.length }} {{ customerReturns.length === 1 ? translate('RMA') : translate('RMAs') }}</ion-label>
           </ion-list-header>
           <div
-            v-for="returnRow in returnRows"
-            :key="returnRow.returnId"
-            class="list-item return-row"
+            v-for="returnRecord in customerReturns"
+            :key="returnRecord.returnId"
+            :data-testid="`return-row-${returnRecord.returnId}`"
+            class="list-item return-result-row"
             role="link"
             tabindex="0"
-            @click="openReturnRow(returnRow)"
-            @keydown.enter.prevent="openReturnRow(returnRow)"
-            @keydown.space.prevent="openReturnRow(returnRow)"
+            @click="openReturn(returnRecord.returnId)"
+            @keydown.enter.prevent="openReturn(returnRecord.returnId)"
+            @keydown.space.prevent="openReturn(returnRecord.returnId)"
           >
             <ion-item lines="none">
-              <ion-thumbnail v-if="returnRow.thumbnailProductId" slot="start">
-                <DxpShopifyImg :src="(productCache as any).getProduct(returnRow.thumbnailProductId)?.mainImageUrl" size="small" />
-              </ion-thumbnail>
               <ion-label class="ion-text-wrap">
-                <p class="overline">{{ returnRow.dateLabel }}</p>
-                {{ returnRow.title }}
-                <p>{{ returnRow.itemSummary }}</p>
+                <h2>{{ returnRecord.returnId }}</h2>
+                <p>{{ formatDate(returnRecord.entryDate) }}</p>
               </ion-label>
             </ion-item>
 
             <ion-label class="tablet ion-text-start">
-              {{ returnRow.orderLabel }}
-              <p v-if="returnRow.facilityLabel">{{ returnRow.facilityLabel }}</p>
-              <p v-if="returnRow.channelLabel">{{ returnRow.channelLabel }}</p>
+              {{ returnRecord.orderName || returnRecord.orderId || translate('Not linked') }}
+              <p>{{ translate('Order') }}</p>
             </ion-label>
 
-            <ion-label class="tablet">
-              {{ returnRow.amount }}
-              <p>{{ returnRow.itemCountLabel }}</p>
+            <ion-label class="tablet ion-text-start">
+              {{ returnTypeLabel(returnRecord.returnHeaderTypeId) }}
+              <p v-if="returnRecord.isExchange">
+                {{ translate('Exchange') }}
+              </p>
+              <p v-else-if="returnRecord.fromPartyId">
+                {{ returnRecord.customerName || `${translate('Customer')} ${returnRecord.fromPartyId}` }}
+              </p>
+            </ion-label>
+
+            <ion-label class="tablet ion-text-start">
+              {{ channelLabel(returnRecord.returnChannelEnumId) }}
+              <p>{{ facilityLabel(returnRecord.destinationFacilityId) }}</p>
             </ion-label>
 
             <ion-label class="ion-text-end">
-              {{ returnRow.statusLabel }}
-              <p>Status</p>
+              {{ returnStatusLabel(returnRecord.statusId) }}
+              <p>{{ translate('Status') }}</p>
             </ion-label>
           </div>
         </ion-list>
@@ -563,7 +444,7 @@
 </template>
 
 <script setup lang="ts">
-import { DxpShopifyImg, commonUtil, translate } from '@common';
+import { commonUtil, translate } from '@common';
 import {
   IonBackButton,
   IonButton,
@@ -587,7 +468,6 @@ import {
   IonSegment,
   IonSegmentButton,
   IonSpinner,
-  IonThumbnail,
   IonTitle,
   IonToolbar,
   alertController,
@@ -595,7 +475,6 @@ import {
 } from '@ionic/vue';
 import {
   addCircleOutline,
-  chevronUp,
   informationCircleOutline,
   openOutline,
   pencilOutline,
@@ -608,14 +487,17 @@ import AddContactModal from '@/components/AddContactModal.vue';
 import AddRelationshipModal from '@/components/AddRelationshipModal.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
+import CustomerOrderCard from '@/components/orders/CustomerOrderCard.vue';
 import RelationshipHistoryModal from '@/components/RelationshipHistoryModal.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useCustomerDetail } from '@/composables/useCustomerDetail';
 import router from '@/router';
 import { deleteCustomerDetails, indexCustomer } from '@/services/customer';
-import { useProductCacheStore } from '@/store/productCache';
 import { useSeedStore } from '@/store/seed';
-import type { CustomerOrderSummary, CustomerReturnSummary, CustomerTaskSummary } from '@/types/customer';
+import { useUserStore } from '@/store/user';
+import Actions from '@/authorization/actions';
+import type { CustomerOrderCardData, CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
+import type { ReturnSummary } from '@/types/returns';
 
 const props = defineProps<{
   customerId: string;
@@ -623,7 +505,7 @@ const props = defineProps<{
 
 const selectedSegment = ref('dashboard');
 const seed = useSeedStore();
-const productCache = useProductCacheStore();
+const userStore = useUserStore();
 const recentOrdersQuery = ref('');
 const allOrdersQuery = ref('');
 const deleting = ref(false);
@@ -666,14 +548,16 @@ const {
 
 const mergingIds = ref<string[]>([]);
 
-const customerReturns = computed(() => customerReturnsSource.value as import('@/types/customer').CustomerReturnSummary[]);
+const customerReturns = computed(() => customerReturnsSource.value as ReturnSummary[]);
 const customerCommunications = computed(() => customerCommunicationsSource.value as import('@/types/customer').CustomerCommunicationSummary[]);
+const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW));
+const hasActiveDuplicateRelationship = computed(() => duplicateRelationships.value.some((duplicate) => duplicate.active));
 
 const customerSince = computed(() => formatMonthYear(customerSinceRaw.value));
 const createdAtLabel = computed(() => (timeline.value[0]?.at ? formatTimestamp(timeline.value[0].at) : ''));
 const lifetimeValue = computed(() => money(lifetimeValueRaw.value, lifetimeCurrency.value));
 
-function mapOrder(order: CustomerOrderSummary) {
+function mapOrder(order: CustomerOrderSummary): CustomerOrderCardData {
   return {
     id: order.orderId,
     name: order.orderName || order.orderId,
@@ -692,28 +576,28 @@ function mapOrder(order: CustomerOrderSummary) {
   };
 }
 
-function matchesOrderQuery(order: ReturnType<typeof mapOrder>, q: string): boolean {
+function matchesOrderQuery(order: CustomerOrderCardData, q: string): boolean {
   const lower = q.toLowerCase();
   return order.name.toLowerCase().includes(lower) || order.id.toLowerCase().includes(lower);
 }
 
-type MappedOrder = ReturnType<typeof mapOrder>;
-
 // Recent orders: live customer orders from Solr (docType:ORDER, customerPartyId).
 const recentOrders = computed(() => {
-  const mapped: MappedOrder[] = recentOrdersSource.value.slice(0, 12).map(mapOrder);
+  const mapped = recentOrdersSource.value.slice(0, 12).map(mapOrder);
   const q = recentOrdersQuery.value.trim();
   return q ? mapped.filter((o) => matchesOrderQuery(o, q)) : mapped;
 });
 const allOrders = computed(() => {
-  const mapped: MappedOrder[] = recentOrdersSource.value.map(mapOrder);
+  const mapped = recentOrdersSource.value.map(mapOrder);
   const q = allOrdersQuery.value.trim();
   return q ? mapped.filter((o) => matchesOrderQuery(o, q)) : mapped;
 });
-const unfillableOrders = computed(() => recentOrdersSource.value.filter((o: CustomerOrderSummary) => o.isUnfillable).map(mapOrder));
+// Parked at the unfillable facility: the card reads warning regardless of the order's own progress colour.
+const unfillableOrders = computed(() => recentOrdersSource.value
+  .filter((o: CustomerOrderSummary) => o.isUnfillable)
+  .map((o: CustomerOrderSummary) => ({ ...mapOrder(o), progressColor: 'warning' })));
 const customerTaskCards = computed(() => openTasks.value.map(mapCustomerTaskCard));
 const dashboardTaskCards = computed(() => customerTaskCards.value.slice(0, 1));
-const returnRows = computed(() => customerReturns.value.map(mapReturnRow));
 
 function mapCustomerTaskCard(task: CustomerTaskSummary) {
   const customerName = customer.value?.name || '';
@@ -883,7 +767,7 @@ async function onExpireRelationship(relationship: { keyFields: { partyIdFrom: st
 }
 
 function loadSelectedSegment(segment = selectedSegment.value) {
-  if (segment === 'returns') return loadReturns();
+  if (segment === 'returns' && canViewReturns.value) return loadReturns();
   if (segment === 'comms') return loadCommunications();
 }
 
@@ -940,32 +824,38 @@ function formatTimestamp(value?: string | number) {
   return date?.isValid ? date.toFormat('h:mma d LLL yyyy') : '';
 }
 
-function mapReturnRow(returnRecord: CustomerReturnSummary) {
-  const primaryItem = returnRecord.items[0];
-  const orderId = returnRecord.items.find((item) => item.orderId)?.orderId || '';
-  const productLabel = primaryItem?.description || primaryItem?.productId || 'Return item';
-  const itemSummary = returnRecord.itemCount > 1
-    ? `${productLabel} + ${returnRecord.itemCount - 1} more`
-    : productLabel;
-
-  return {
-    returnId: returnRecord.returnId,
-    title: `RMA ${returnRecord.externalId || returnRecord.returnId}`,
-    dateLabel: formatLongDate(returnRecord.entryDate),
-    itemSummary,
-    amount: money(returnRecord.returnTotal, returnRecord.currencyUomId),
-    itemCountLabel: `${returnRecord.itemCount} ${returnRecord.itemCount === 1 ? 'item' : 'items'}`,
-    orderLabel: orderId ? `Order ${orderId}` : 'Order not linked',
-    facilityLabel: returnRecord.destinationFacilityId ? `Facility ${returnRecord.destinationFacilityId}` : '',
-    channelLabel: returnRecord.returnChannelEnumId ? seed.describe(returnRecord.returnChannelEnumId) || returnRecord.returnChannelEnumId : '',
-    thumbnailProductId: primaryItem?.productId || '',
-    returnRoute: `/returns/${returnRecord.returnId}`,
-    statusLabel: seed.describe(returnRecord.statusId) || returnRecord.statusId
-  };
+function openReturn(returnId: string) {
+  router.push(`/returns/${returnId}`);
 }
 
-function openReturnRow(returnRow: ReturnType<typeof mapReturnRow>) {
-  router.push(returnRow.returnRoute);
+function returnStatusLabel(statusId: string) {
+  return seed.statusDescription(statusId) || statusId || translate('Not specified');
+}
+
+function returnTypeLabel(returnHeaderTypeId?: string) {
+  if (returnHeaderTypeId === 'CUSTOMER_RETURN') return translate('Customer return');
+  if (returnHeaderTypeId === 'APPEASEMENT') return translate('Appeasement');
+
+  return returnHeaderTypeId ? seed.describe(returnHeaderTypeId) || returnHeaderTypeId : translate('Return');
+}
+
+function channelLabel(returnChannelEnumId?: string) {
+  return returnChannelEnumId ? seed.enumDescription(returnChannelEnumId) || returnChannelEnumId : translate('No channel');
+}
+
+function facilityLabel(destinationFacilityId?: string) {
+  return destinationFacilityId ? seed.facilityName(destinationFacilityId) || destinationFacilityId : translate('No destination facility');
+}
+
+function formatDate(value?: string | number) {
+  if (!value) return translate('Date not available');
+  const stringValue = String(value);
+  const numericValue = Number(value);
+  const date = /^\d+$/.test(stringValue)
+    ? DateTime.fromMillis(stringValue.length <= 10 ? numericValue * 1000 : numericValue)
+    : DateTime.fromISO(stringValue).isValid ? DateTime.fromISO(stringValue) : DateTime.fromSQL(stringValue);
+
+  return date.isValid ? date.toLocaleString(DateTime.DATE_MED) : stringValue;
 }
 </script>
 
@@ -1021,14 +911,6 @@ ion-card-header ion-card-title {
 
 .lifetime-value .overline {
   margin: 0 0 2px;
-}
-
-.overline {
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  font-size: 10px;
-  color: var(--ion-color-medium, #92949c);
-  margin: 0 0 4px;
 }
 
 .muted {
@@ -1089,12 +971,20 @@ ion-card-header ion-card-title {
   gap: 16px;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   padding: 8px;
+  align-items: start;
 }
 
-.return-row {
-  --columns-mobile: 2;
+.return-result-row {
+  --columns-desktop: 5;
   --columns-tablet: 4;
-  --columns-desktop: 4;
+  min-height: 4.75rem;
+  border-block-start: var(--border-medium);
+  cursor: pointer;
+  padding-inline: var(--spacer-sm);
+}
+
+.return-result-row > ion-label {
+  width: 100%;
 }
 
 .segment-placeholder {

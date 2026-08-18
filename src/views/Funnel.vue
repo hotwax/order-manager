@@ -110,11 +110,46 @@
         <!-- Card 2: Unfillable — trendline follow-up -->
         <!-- BUSINESS LOGIC COMMENT: Navigate to Unfillable Orders list on click -->
         <!-- stat: number of orders where facility id equals unfillable -->
-        <StatCard v-if="!unfillableError" button router-link="/unfillable" :title="translate('Unfillable')" :stat="unfillableLoading ? '' : totalUnfillable">
+        <StatCard
+          v-if="!unfillableError"
+          :title="translate('Unfillable')"
+          :stat="unfillableLoading ? '' : totalUnfillable"
+          :subtitle="unfillableLoading || !hasUnfillableTrend ? '' : unfillableTrendLabel"
+        >
           <template v-if="unfillableLoading" #stat>
             <ion-spinner name="crescent" />
           </template>
-          <Sparkline v-if="!unfillableLoading" :points="unfillableTrend" color="danger" />
+          <template v-if="!unfillableLoading">
+            <Sparkline
+              v-if="hasUnfillableTrend"
+              :points="unfillableTrend"
+              :label="unfillableTrendLabel"
+              color="danger"
+            />
+            <!-- Oldest order dates first: the queue is a backlog, so the days
+                 that have waited longest are the ones worth actioning. -->
+            <ion-list lines="none" class="hold-tasks-list">
+              <ion-item
+                v-for="day in unfillableOldestDays"
+                :key="day.date"
+                button
+                :detail="true"
+                :router-link="unfillableDayRoute(day.date)"
+              >
+                <ion-label>{{ formatOrderDate(day.date) }}</ion-label>
+                <p slot="end">{{ formatCount(day.orderCount) }} {{ translate(day.orderCount === 1 ? "order" : "orders") }}</p>
+              </ion-item>
+              <ion-item
+                v-if="unfillableRemainingDays"
+                button
+                :detail="true"
+                :router-link="unfillableRemainingRoute"
+              >
+                <ion-label>{{ unfillableRemainingLabel }}</ion-label>
+                <p slot="end">{{ formatCount(unfillableRemainingOrders) }} {{ translate(unfillableRemainingOrders === 1 ? "order" : "orders") }}</p>
+              </ion-item>
+            </ion-list>
+          </template>
         </StatCard>
         <StatCard v-else :title="translate('Unfillable')">
           <template #stat>
@@ -622,6 +657,54 @@ const facilityOrderVolume = computed(() => store.getFacilityOrderVolume);
 const facilityFulfillmentVelocity = computed(() => store.getFacilityFulfillmentVelocity);
 const facilityRejections = computed(() => store.getFacilityRejections);
 const unfillableTrend = computed(() => store.unfillableTrend);
+// An empty queue has no shape to draw, and a flat line pinned to the axis
+// reads as a broken chart rather than as "nothing here".
+const hasUnfillableTrend = computed(() => unfillableTrend.value.some((count) => count > 0));
+// Names what the line plots and how far back it reaches — the queue is a
+// backlog, so the span is whatever the oldest parked order date turns out to be.
+const unfillableTrendLabel = computed(() => {
+  const points = store.getUnfillableTrendPoints;
+  const items = unfillableTrend.value.reduce((total, count) => total + count, 0);
+  const oldest = DateTime.fromISO(points[0]?.date ?? '');
+  if (!oldest.isValid) return translate('{count} items by order date', { count: items });
+  return translate('{count} items by order date since {date}', {
+    count: items,
+    date: oldest.toFormat('d LLL yyyy')
+  });
+});
+
+// The drilldown rows: the oldest order dates individually, then everything
+// newer rolled into one row, so the card stays short but still totals the queue.
+const UNFILLABLE_DAY_ROWS = 4;
+const unfillableOrderDays = computed(() => store.getUnfillableOrderDays);
+const unfillableOldestDays = computed(() => unfillableOrderDays.value.slice(0, UNFILLABLE_DAY_ROWS));
+const unfillableRemaining = computed(() => unfillableOrderDays.value.slice(UNFILLABLE_DAY_ROWS));
+const unfillableRemainingDays = computed(() => unfillableRemaining.value.length);
+const unfillableRemainingOrders = computed(() =>
+  unfillableRemaining.value.reduce((total, day) => total + day.orderCount, 0)
+);
+const unfillableRemainingLabel = computed(() =>
+  translate(
+    unfillableRemainingDays.value === 1 ? '{count} later date' : '{count} later dates',
+    { count: unfillableRemainingDays.value }
+  )
+);
+
+function formatOrderDate(date: string) {
+  const parsed = DateTime.fromISO(date);
+  return parsed.isValid ? parsed.toFormat('d LLL yyyy') : date;
+}
+
+// Each row deep-links into the Unfillable queue with its order-date filter
+// already applied, so the user lands on exactly the orders the row counted.
+function unfillableDayRoute(date: string) {
+  return { path: '/unfillable', query: { dateFrom: date, dateThru: date } };
+}
+
+const unfillableRemainingRoute = computed(() => ({
+  path: '/unfillable',
+  query: { dateFrom: unfillableRemaining.value[0]?.date }
+}));
 const virtualLocationWorkRows = computed(() => store.getVirtualLocationCounts);
 
 const fulfillmentSyncData = computed(() => store.getFulfillmentSyncData);
