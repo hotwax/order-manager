@@ -3684,15 +3684,13 @@ async function parkSelectedItems(shipGroup: any) {
   if (!facilityId) return;
   const orderId = order.value!.id;
   try {
-    await Promise.all(
-      itemIds.map((orderItemSeqId) =>
-        api({
+    for(let orderItemSeqId of itemIds) {
+      await api({
         url: `oms/orders/${orderId}/moveItemToParking`,
         method: 'POST',
         data: { orderId, orderItemSeqId, shipGroupSeqId: shipGroup.id, toFacilityId: facilityId },
-        })
-      )
-    );
+      })
+    }
     selectedShipGroupItems.value[shipGroup.id] = new Set();
     await showToast(translate('Items moved to parking.'));
     await loadOrder(orderId, true);
@@ -3756,19 +3754,18 @@ async function releaseSelectedItems(shipGroup: any) {
   if (!facilityId) return;
   const orderId = order.value!.id;
   try {
-    await Promise.all(
-      itemIds.map((orderItemSeqId) =>
-        api({
+    for(let orderItemSeqId of itemIds) {
+      await api({
         url: `oms/orders/${orderId}/items/${orderItemSeqId}/allocation`,
         method: 'POST',
-        data: { facilityId,
-         orderFacilityChange:{
-         changeReasonEnumId: "RELEASED"
-         }
-         },
-        })
-      )
-    );
+        data: {
+          facilityId,
+          orderFacilityChange:{
+          changeReasonEnumId: "RELEASED"
+          }
+        },
+      })
+    }
     selectedShipGroupItems.value[shipGroup.id] = new Set();
     await showToast(translate('Items released to facility.'));
     await loadOrder(orderId, true);
