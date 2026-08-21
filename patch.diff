@@ -1,0 +1,33 @@
+--- src/views/Settings.vue
++++ src/views/Settings.vue
+@@ -113,8 +113,8 @@
+                 <ion-card-title>{{ translate('Data Fetch Status') }}</ion-card-title>
+                 <ion-card-subtitle v-if="cacheSubtitle">{{ cacheSubtitle }}</ion-card-subtitle>
+               </div>
+-              <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()">
+-                <ion-spinner v-if="refreshing === '*'" name="dots" />
++              <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()" :aria-label="translate('Refresh')">
++                <ion-spinner v-if="refreshing === '*'" name="dots" slot="icon-only" />
+                 <ion-icon v-else slot="icon-only" :icon="syncOutline" />
+               </ion-button>
+             </div>
+@@ -128,7 +128,7 @@
+                 <p v-if="item.status === 'success' && item.count !== undefined">{{ translate("Fetched") }} {{ item.count }} {{ translate("records") }}</p>
+                 <p v-else>{{ translate(getStatusLabel(item.status)) }}</p>
+               </ion-label>
+-              <ion-button slot="end" fill="clear" @click="item.refresh()">
++              <ion-button slot="end" fill="clear" @click="item.refresh()" :aria-label="translate('Refresh')">
+                 <ion-icon slot="icon-only" :icon="syncOutline" />
+               </ion-button>
+             </ion-item>
+@@ -148,8 +148,8 @@
+                   <template v-else> · {{ translate("not synced yet") }}</template>
+                 </p>
+               </ion-label>
+-              <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)">
+-                <ion-spinner v-if="refreshing === domain.name" name="dots" />
++              <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)" :aria-label="translate('Refresh')">
++                <ion-spinner v-if="refreshing === domain.name" name="dots" slot="icon-only" />
+                 <ion-icon v-else slot="icon-only" :icon="syncOutline" />
+               </ion-button>
+             </ion-item>
