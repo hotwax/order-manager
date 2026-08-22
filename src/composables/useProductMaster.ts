@@ -11,7 +11,7 @@ import { useProductCacheStore, type CachedProduct, type ProductIdentification } 
  * docs/ProductData.md and docs/Compromises.md). Consumers never touch the store directly.
  */
 
-const PRODUCT_FIELDS = "productId productName parentProductName internalName goodIdentifications mainImageUrl";
+const PRODUCT_FIELDS = "productId productName parentProductName internalName goodIdentifications mainImageUrl productFeatures";
 const BATCH_SIZE = 200;
 
 const cacheReady = ref(false);
@@ -49,6 +49,7 @@ function mapDocToProduct(doc: any): CachedProduct {
     parentProductName: doc.parentProductName || "",
     internalName: doc.internalName || "",
     mainImageUrl: doc.mainImageUrl || "",
+    productFeatures: Array.isArray(doc.productFeatures) ? doc.productFeatures : [],
     goodIdentifications,
     updatedAt: Date.now()
   };
@@ -92,11 +93,21 @@ async function getByIds(productIds: string[]): Promise<CachedProduct[]> {
   return products;
 }
 
+/**
+ * A product persisted before a field joined PRODUCT_FIELDS has no such key at all, and the
+ * never-refetch rule would strand it incomplete forever. Treat a missing key as a miss so it
+ * heals exactly once; an empty array is a real answer and stays cached. Add a key here
+ * whenever PRODUCT_FIELDS grows.
+ */
+function isFullyCached(product?: CachedProduct): boolean {
+  return !!product && "productFeatures" in product;
+}
+
 /** Fetch only the productIds not already cached, then store them. The never-refetch path. */
 async function prefetch(productIds: string[]) {
   const cache = useProductCacheStore();
   await cache.ensureHydrated(); // pull this OMS's persisted products from Dexie first
-  const idsToFetch = [...new Set(productIds.filter(Boolean))].filter((id) => !cache.has(id));
+  const idsToFetch = [...new Set(productIds.filter(Boolean))].filter((id) => !isFullyCached(cache.getProduct(id)));
   if (!idsToFetch.length) return;
 
   const products = await getByIds(idsToFetch);
@@ -108,7 +119,7 @@ async function getById(productId: string, opts?: { refresh?: boolean }) {
   const cache = useProductCacheStore();
   await cache.ensureHydrated();
   const existing = cache.getProduct(productId);
-  if (existing && !opts?.refresh) return { product: existing, status: "hit" as const };
+  if (isFullyCached(existing) && !opts?.refresh) return { product: existing, status: "hit" as const };
 
   const products = await getByIds([productId]);
   if (products.length) {

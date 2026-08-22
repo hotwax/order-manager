@@ -291,6 +291,7 @@
                 :primary="groupPrimaryIdentifier(group)"
                 :secondary="groupSecondaryIdentifier(group)"
                 :badge-label="isKit(group) ? translate('Kit') : ''"
+                :features="productFeatureLabel(group.productId)"
                 :image-url="getProduct(group.productId)?.mainImageUrl"
                 :preview-product="getProduct(group.productId)"
                 :selected="soleItem.selected"
@@ -299,8 +300,7 @@
                 :facility-label="soleItem.facilityName"
                 :facility-disabled="isItemFacilityActionDisabled(soleItem)"
                 :attributes-label="attributeChipLabel(soleItem.attributeCount)"
-                :status-label="soleItem.status"
-                :status-color="soleItem.statusColor"
+                :statuses="soleItem.statuses"
                 :status-detail="itemStatusDetail(soleItem)"
                 :amount="money(itemLineTotal(soleItem), order.currency)"
                 :adjustments="getItemAdjustmentRows(soleItem)"
@@ -327,6 +327,7 @@
                   :primary="groupPrimaryIdentifier(group)"
                   :secondary="groupSecondaryIdentifier(group)"
                   :badge-label="isKit(group) ? translate('Kit') : ''"
+                  :features="productFeatureLabel(group.productId)"
                   :image-url="getProduct(group.productId)?.mainImageUrl"
                   :preview-product="getProduct(group.productId)"
                   :selected="group.selected"
@@ -334,8 +335,7 @@
                   :quantity-label="translate('qty')"
                   :facility-label="groupLocationLabel(group)"
                   :facility-disabled="true"
-                  :status-label="group.status"
-                  :status-color="group.statusColor"
+                  :statuses="group.statuses"
                   :amount="money(group.totalPrice, order.currency)"
                   :adjustments="getGroupAdjustmentRows(group)"
                   @update:selected="group.selected = $event"
@@ -355,8 +355,7 @@
                       :facility-label="item.facilityName"
                       :facility-disabled="isItemFacilityActionDisabled(item)"
                       :attributes-label="attributeChipLabel(item.attributeCount)"
-                      :status-label="item.status"
-                      :status-color="item.statusColor"
+                      :statuses="item.statuses"
                       :status-detail="itemStatusDetail(item)"
                       :amount="money(itemLineTotal(item), order.currency)"
                       :adjustments="getItemAdjustmentRows(item)"
@@ -632,6 +631,8 @@
                         {{ shipGroupProductIdentification(productIdentificationPref.primaryId, item) || item.productId }}
                         <ion-badge class="kit-badge" color="dark" v-if="isKit(item)">{{ translate("Kit") }}</ion-badge>
                       </div>
+                      <p v-if="productFeatureLabel(item.productId)" class="ship-group-item-features"
+                        :title="productFeatureLabel(item.productId)">{{ productFeatureLabel(item.productId) }}</p>
                     </ion-label>
                     <ion-note slot="end">{{ item.quantity }} {{ translate('units') }}</ion-note>
                   </ion-item>
@@ -834,18 +835,19 @@
             </div>
 
             <div class="ship-group-actions">
-              <!-- Broker, park, pull back and release all move a group through fulfillment.
-                   A counter sale has none left, so only the order-level actions remain. -->
+              <!-- Broker, release, park and pull back all move a group through fulfillment, in
+                   the order a group travels them. A counter sale has none left, so only the
+                   order-level actions remain. -->
               <ion-button v-if="isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)" fill="clear"
                 :disabled="isShipGroupActionDisabled(shipGroup, 'BROKER')" @click="brokerShipGroup(shipGroup.id)">{{
-                translate('Broker ship group') }}</ion-button>
-              <ion-button v-if="!isPosCompleted(shipGroup)" fill="clear"
-                :disabled="isShipGroupActionDisabled(shipGroup, isVirtualFacility(shipGroup) ? 'PARK_ITEMS' : 'PULL_BACK')"
-                @click="isVirtualFacility(shipGroup) ? parkSelectedItems(shipGroup) : rejectSelectedItems(shipGroup)">{{
-                  isVirtualFacility(shipGroup) ? translate('Park Items') : translate('Pull back') }}</ion-button>
+                translate('Broker') }}</ion-button>
               <ion-button v-if="isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)" fill="clear"
                 :disabled="isShipGroupActionDisabled(shipGroup, 'RELEASE')" @click="releaseSelectedItems(shipGroup)">{{
                   translate('Release') }}</ion-button>
+              <ion-button v-if="!isPosCompleted(shipGroup)" fill="clear"
+                :disabled="isShipGroupActionDisabled(shipGroup, isVirtualFacility(shipGroup) ? 'PARK_ITEMS' : 'PULL_BACK')"
+                @click="isVirtualFacility(shipGroup) ? parkSelectedItems(shipGroup) : rejectSelectedItems(shipGroup)">{{
+                  isVirtualFacility(shipGroup) ? translate('Park') : translate('Pull back') }}</ion-button>
               <ion-button fill="clear" @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
               <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" fill="clear" @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
             </div>
@@ -1105,8 +1107,8 @@ import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
 import { getReturn } from '@/services/returns';
 import { showToast, isKit, riskLevelColor, sentimentCounts } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
-import { fulfillmentLineStatus, fulfillmentLineStatusColor } from '@/utils/fulfillmentLineStatus';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
+import { rollUpItemStatuses, type ItemStatusBadge } from '@/utils/itemStatusBadges';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useUserStore } from '@/store/user';
@@ -1682,7 +1684,7 @@ const facilityChangeDateByShipGroup = computed<Record<string, number>>(() => {
 /**
  * What the lifecycle strip and the progress bar read: the timeline endpoint's dates with
  * the brokered date resolved as above. Kept separate from `timelineByShipGroup` so the
- * action engine and the item status chips keep reading the endpoint's contract verbatim.
+ * action engine keeps reading the endpoint's contract verbatim.
  */
 const lifecycleByShipGroup = computed<Record<string, any>>(() => {
   const index: Record<string, any> = {};
@@ -1942,8 +1944,7 @@ const groupedItems = computed(() => {
     currency: string;
     totalQty: number;
     totalPrice: number;
-    status: string;
-    statusColor: string;
+    statuses: ItemStatusBadge[];
     selected: boolean;
     items: Array<{
       orderItemSeqId: string;
@@ -1955,6 +1956,7 @@ const groupedItems = computed(() => {
       statusId: string;
       status: string;
       statusColor: string;
+      statuses: ItemStatusBadge[];
       selected: boolean;
       unitPrice: number;
       returnedQty: number;
@@ -1973,11 +1975,8 @@ const groupedItems = computed(() => {
       const externalId = rawItem?.externalId || item.sku || item.id;
       const unitPrice = Number(rawItem?.unitPrice || 0);
       const statusId = rawItem?.statusId || '';
-      const lineStatus = fulfillmentLineStatus(timelineByShipGroup.value[sg.id]);
-      const status = lineStatus ? translate(lineStatus) : seed.statusDescription(statusId);
-      const statusColor = lineStatus
-        ? fulfillmentLineStatusColor(lineStatus)
-        : commonUtil.getStatusColor(statusId);
+      const status = seed.statusDescription(statusId);
+      const statusColor = commonUtil.getStatusColor(statusId);
       const returnedQty = orderDetailStore.returnedQtyByItemSeqIdByOrderId(props.orderId)[item.id] || 0;
       const returnableQty = Math.max(0, Number(item.quantity || 0) - returnedQty);
 
@@ -1991,9 +1990,7 @@ const groupedItems = computed(() => {
           currency: order.value.currency,
           totalQty: orderDetailStore.quantitiesByExternalId[externalId] || 0,
           totalPrice: orderDetailStore.totalsByExternalId[externalId] || 0,
-          status,
-          statusId,
-          statusColor,
+          statuses: [],
           get selected() { return this.items.length > 0 && this.items.every((i: any) => selectedItemIds.value.has(i.orderItemSeqId)); },
           set selected(v: boolean) { this.items.forEach((i: any) => v ? selectedItemIds.value.add(i.orderItemSeqId) : selectedItemIds.value.delete(i.orderItemSeqId)); },
           items: []
@@ -2009,6 +2006,7 @@ const groupedItems = computed(() => {
         statusId,
         status,
         statusColor,
+        statuses: status ? [{ label: status, color: statusColor }] : [],
         get selected() { return selectedItemIds.value.has(item.id); },
         set selected(v: boolean) { v ? selectedItemIds.value.add(item.id) : selectedItemIds.value.delete(item.id); },
         unitPrice,
@@ -2022,9 +2020,7 @@ const groupedItems = computed(() => {
   });
 
   return Object.values(groups).map((group) => {
-    const statuses = [...new Set(group.items.map((item) => item.status))];
-    group.status = statuses.join(' / ');
-    group.statusColor = statuses.length === 1 ? group.items[0].statusColor : 'medium';
+    group.statuses = rollUpItemStatuses(group.items);
     return group;
   });
 });
@@ -3071,6 +3067,15 @@ function getGroupAdjustments(group: any) {
     .filter(adj => adj.amount !== 0);
 }
 
+/**
+ * A variant's selectable features as one line ("SIZE/M" -> "M"). `productFeatures` is the
+ * Solr field the fulfillment app already renders this way, so the two apps agree on what a
+ * variant reads as. Empty when the product is uncached or carries no features.
+ */
+function productFeatureLabel(productId: string): string {
+  return commonUtil.getFeatures(getProduct(productId)?.productFeatures);
+}
+
 function groupPrimaryIdentifier(group: any): string {
   return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, getProduct(group.productId) || {})
     || group.name
@@ -3779,6 +3784,14 @@ async function releaseSelectedItems(shipGroup: any) {
 </script>
 
 <style scoped>
+/* A variant can carry many feature values — an e-gift card lists every denomination — and the
+   identity column is narrow. Keep features to one line and put the full value on hover. */
+.ship-group-item-features {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 ion-card-header {
   display: grid;
   grid-template-columns: 1fr auto;

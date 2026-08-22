@@ -636,7 +636,7 @@ export const OrderActionValidator = {
 
     switch (actionId) {
       /**
-       * BROKER — "Broker ship group" (OrderDetail.vue:604).
+       * BROKER — the "Broker" ship-group button.
        * Holds intentionally do NOT gate this (product decision 2026-06-11:
        * hold tasks never prevent a ship group from being brokered).
        */
@@ -648,9 +648,8 @@ export const OrderActionValidator = {
       }
 
       /**
-       * PARK_ITEMS — the "Park Items" face of the dual button (OrderDetail.vue:605,
-       * shown when virtual). Moves selected not-yet-brokered items to a parking
-       * facility.
+       * PARK_ITEMS — the "Park" face of the dual ship-group button (shown when
+       * virtual). Moves selected not-yet-brokered items to a parking facility.
        */
       case 'PARK_ITEMS': {
         if (!virtual) return { allowed: false, reason: 'Items can only be parked from a virtual/brokering facility.' };
@@ -858,11 +857,11 @@ export const OrderActionValidator = {
     const actions: ShipGroupAction[] = [];
 
     if (virtual) {
-      actions.push({ id: 'BROKER', label: 'Broker ship group', validation: this.validateShipGroupAction(order, shipGroup, 'BROKER', selectedItems, ctx) });
-      actions.push({ id: 'PARK_ITEMS', label: 'Park Items', validation: this.validateShipGroupAction(order, shipGroup, 'PARK_ITEMS', selectedItems, ctx) });
+      actions.push({ id: 'BROKER', label: 'Broker', validation: this.validateShipGroupAction(order, shipGroup, 'BROKER', selectedItems, ctx) });
+      actions.push({ id: 'PARK_ITEMS', label: 'Park', validation: this.validateShipGroupAction(order, shipGroup, 'PARK_ITEMS', selectedItems, ctx) });
       actions.push({ id: 'RELEASE', label: 'Release', validation: this.validateShipGroupAction(order, shipGroup, 'RELEASE', selectedItems, ctx) });
     } else {
-      // Physical facility: the dual button shows "Pull back" instead of "Park Items".
+      // Physical facility: the dual button shows "Pull back" instead of "Park".
       actions.push({ id: 'PULL_BACK', label: 'Pull back', validation: this.validateShipGroupAction(order, shipGroup, 'PULL_BACK', selectedItems, ctx) });
     }
 
