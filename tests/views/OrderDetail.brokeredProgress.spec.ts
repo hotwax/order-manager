@@ -42,11 +42,11 @@ describe('order detail ship-group brokered progress', () => {
   });
 
   it('separates the lifecycle view model from the endpoint contract', () => {
-    // The action engine and the item status chips keep reading the raw endpoint dates.
+    // The action engine keeps reading the raw endpoint dates.
     expect(source).toContain('const lifecycleByShipGroup = computed<Record<string, any>>');
     expect(source).toContain('firstBrokeredDate: shipGroupBrokeredDate(shipGroup)');
     expect(source).toContain('timeline: timelineByShipGroup.value[shipGroup.id],');
-    expect(source).toContain('fulfillmentLineStatus(timelineByShipGroup.value[sg.id])');
+    expect(source).toContain('timeline: timelineByShipGroup.value[item.shipGroupSeqId],');
   });
 
   it('distinguishes a brokered step with no recorded time from one still pending', () => {

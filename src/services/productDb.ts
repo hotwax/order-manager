@@ -12,6 +12,8 @@ export interface CachedProduct {
   parentProductName: string;
   internalName: string;
   mainImageUrl: string;
+  /** Solr `productFeatures` verbatim: `"SIZE/M"`-style entries, empty when the variant has none. */
+  productFeatures: string[];
   goodIdentifications: ProductIdentification[];
   updatedAt: number;
 }
