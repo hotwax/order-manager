@@ -224,27 +224,6 @@ export interface ShipmentPackage {
   contents: ShipmentPackageContent[];
 }
 
-export interface ShipmentRouteSegment {
-  id: string;
-  shipmentId: string;
-  carrier: string;
-  method: string;
-  trackingCode: string;
-  status: string;
-  actualCarrierCode: string;
-  estimatedShipDate: string;
-  estimatedArrivalDate: string;
-  statusDate: string;
-}
-
-export interface ShipmentStatusChange {
-  id: string;
-  shipmentId: string;
-  statusId: string;
-  statusDate: string;
-  changedBy: string;
-}
-
 export interface ReturnRecord {
   id: string;
   externalId?: string;
@@ -281,14 +260,6 @@ export interface ReturnItem {
   receivedQuantity: number;
   returnPrice: number;
   returnItemResponseId: string;
-}
-
-export interface ReturnStatusChange {
-  id: string;
-  returnId: string;
-  statusId: string;
-  statusDate: string;
-  changedBy: string;
 }
 
 export interface Customer {

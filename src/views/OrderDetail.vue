@@ -1070,9 +1070,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
-import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
 import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, chevronDown, chevronUp, closeCircleOutline, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pauseCircleOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, storefrontOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -3306,18 +3305,6 @@ async function brokerShipGroup(shipGroupSeqId: string) {
   }
 }
 
-async function parkShipGroup(shipGroupSeqId: string) {
-  const facilityId = await openFacilityModal();
-  if (!facilityId) return;
-  try {
-    await orderTaskStore.parkOrder(order.value!.id, shipGroupSeqId, facilityId);
-    await showToast(translate('Ship group successfully moved to parking.'));
-    await loadOrder(order.value!.id, true);
-  } catch {
-    await showToast(translate('Failed to park the ship group. Please try again.'));
-  }
-}
-
 async function cancelOrderItems() {
   const raw = orderDetailStore.orderById(props.orderId);
   if (!raw || !selectedItems.value.length) return;
@@ -3431,18 +3418,6 @@ async function cancelSingleItem(item: any) {
     ]
   });
   await alert.present();
-}
-
-async function parkFullOrder() {
-  const facilityId = await openFacilityModal();
-  if (!facilityId) return;
-  try {
-    await orderTaskStore.parkOrderFull(order.value!.id, facilityId);
-    await showToast(translate('Order successfully moved to parking.'));
-    await loadOrder(order.value!.id, true);
-  } catch {
-    await showToast(translate('Failed to park the order. Please try again.'));
-  }
 }
 
 async function viewInventory(productId: string) {
