@@ -641,6 +641,8 @@
   "Ready": "Ready",
   "Reason unavailable": "Reason unavailable",
   "Recommendation": "Recommendation",
+  "Refresh {label}": "Refresh {label}",
+  "Refresh all data": "Refresh all data",
   "Reject & release": "Reject & release",
   "Reject Items": "Reject Items",
   "rejected orders": "rejected orders",

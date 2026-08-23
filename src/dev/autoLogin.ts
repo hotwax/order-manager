@@ -59,7 +59,7 @@ export async function tryDevAutoLogin(): Promise<void> {
     accxuiConfig.value.current = userStore.current;
     redirectFromLogin();
     logger.info('[dev] auto-login succeeded for', username, 'on', oms);
-  } catch (err) {
+  } catch {
     // Never log the password. The composable already shows a toast on failure.
     logger.warn('[dev] auto-login failed; falling back to Login UI');
   }
