@@ -67,7 +67,8 @@
               :key="item.id"
               button
               :detail="true"
-              :router-link="virtualLocationRoute(item)"
+              :href="routeHref(virtualLocationRoute(item))"
+              @click="navigateRoute($event, virtualLocationRoute(item))"
             >
               <ion-label>{{ item.label }}</ion-label>
               <p slot="end">{{ formatCount(item.count) }} {{ translate(item.count === 1 ? "order" : "orders") }}</p>
@@ -80,15 +81,15 @@
             <ion-spinner name="crescent" />
           </template>
           <ion-list v-if="!brokeredWorkloadLoading" lines="none" class="hold-tasks-list">
-            <ion-item button :detail="true" router-link="/open">
+            <ion-item button :detail="true" :href="routeHref('/open')" @click="navigateRoute($event, '/open')">
               <ion-label>{{ translate("Open") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.open) }} {{ translate(brokeredWorkload.open === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" router-link="/inflight">
+            <ion-item button :detail="true" :href="routeHref('/inflight')" @click="navigateRoute($event, '/inflight')">
               <ion-label>{{ translate("Picked") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.inflight) }} {{ translate(brokeredWorkload.inflight === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" router-link="/packed">
+            <ion-item button :detail="true" :href="routeHref('/packed')" @click="navigateRoute($event, '/packed')">
               <ion-label>{{ translate("Packed and shipped") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.packed) }} {{ translate(brokeredWorkload.packed === 1 ? "order" : "orders") }}</p>
             </ion-item>
@@ -134,7 +135,8 @@
                 :key="day.date"
                 button
                 :detail="true"
-                :router-link="unfillableDayRoute(day.date)"
+                :href="routeHref(unfillableDayRoute(day.date))"
+                @click="navigateRoute($event, unfillableDayRoute(day.date))"
               >
                 <ion-label>{{ formatOrderDate(day.date) }}</ion-label>
                 <p slot="end">{{ formatCount(day.orderCount) }} {{ translate(day.orderCount === 1 ? "order" : "orders") }}</p>
@@ -143,7 +145,8 @@
                 v-if="unfillableRemainingDays"
                 button
                 :detail="true"
-                :router-link="unfillableRemainingRoute"
+                :href="routeHref(unfillableRemainingRoute)"
+                @click="navigateRoute($event, unfillableRemainingRoute)"
               >
                 <ion-label>{{ unfillableRemainingLabel }}</ion-label>
                 <p slot="end">{{ formatCount(unfillableRemainingOrders) }} {{ translate(unfillableRemainingOrders === 1 ? "order" : "orders") }}</p>
@@ -314,11 +317,11 @@
               </ion-item>
             </div>
             <ion-list class="fulfill">
-              <ion-item lines="full" :button="true" :detail="true" :router-link="workflowRoute('/open')">
+              <ion-item lines="full" :button="true" :detail="true" :href="routeHref(workflowRoute('/open'))" @click="navigateRoute($event, workflowRoute('/open'))">
                 <ion-icon :icon="mailUnreadOutline" slot="start" />
                 <ion-label>{{ facilityFulfillmentProgress?.openCount ?? 0 }} {{ translate("open") }}</ion-label>
               </ion-item>
-              <ion-item lines="none" :button="true" :detail="true" :router-link="workflowRoute('/inflight')">
+              <ion-item lines="none" :button="true" :detail="true" :href="routeHref(workflowRoute('/inflight'))" @click="navigateRoute($event, workflowRoute('/inflight'))">
                 <ion-icon :icon="mailOpenOutline" slot="start" />
                 <ion-label>{{ facilityFulfillmentProgress?.inProgressCount ?? 0 }} {{ translate("in progress") }}</ion-label>
               </ion-item>
@@ -620,6 +623,9 @@ import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import { useCurrentHourInZone } from '@/utils/funnelClock';
+import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
+import router from '@/router';
+import type { RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 import { DateTime } from 'luxon';
@@ -632,6 +638,14 @@ const userStore = useUserStore();
 const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const selectedTimeZone = computed(() => userStore.getUserTimeZone || userStore.getUserProfile?.userTimeZone || browserTimeZone);
 const hoursSinceDayStart = useCurrentHourInZone(selectedTimeZone, browserTimeZone);
+
+function routeHref(destination: RouteLocationRaw) {
+  return nativeRouteHref(router, destination);
+}
+
+function navigateRoute(event: MouseEvent, destination: RouteLocationRaw) {
+  return navigateNativeRoute(event, router, destination);
+}
 
 // Per-section load status helpers. These drive loading affordances and error
 // states so the dashboard never renders default zeros/empty copy while a group
