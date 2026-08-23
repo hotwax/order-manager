@@ -619,6 +619,8 @@
   "Ratelimit": "Límite de tasa",
   "Reason unavailable": "Motivo no disponible",
   "Recommendation": "Recomendación",
+  "Refresh {label}": "Actualizar {label}",
+  "Refresh all data": "Actualizar todos los datos",
   "Reject & release": "Rechazar y liberar",
   "Reject Items": "Reject Items",
   "rejected orders": "pedidos rechazados",
