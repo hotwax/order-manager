@@ -509,8 +509,6 @@ function segmentChange(modeValue: string) {
   modeValue === "search" ? enableSearch() : isScanningEnabled.value = false;
 }
 
-// Modal state
-const isModalOpen = ref(false);
 const orderResponseData = ref({
   shopifyOrderId: '',
   shopifyOrderName: ''

@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { api, commonUtil, useEmbeddedAppStore, logger, translate, useSolrSearch } from '@common'
+import { api, commonUtil, logger, translate, useSolrSearch } from '@common'
 import { useUserStore } from '@/store/user'
 import { useSeedStore } from "@/store/seed";
 const defaultProductStoreSettings = JSON.parse(import.meta.env.VITE_DEFAULT_PRODUCT_STORE_SETTINGS as string || '{"PRDT_IDEN_PREF":{"stateKey":"productIdentifier.productIdentificationPref","value":{"primaryId":"SKU","secondaryId":"productId"}}}')
@@ -148,7 +148,7 @@ export const useProductStore = defineStore('productStore', {
         let finalValue;
         try {
           finalValue = settingValue ? JSON.parse(settingValue) : value;
-        } catch (e) {
+        } catch {
           finalValue = settingValue; // fallback to raw value
         }
 

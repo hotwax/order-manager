@@ -13,7 +13,7 @@ import type {
   HoldTaskCounts
 } from '@/types/customerService';
 import { DEFAULT_WORKFLOW_ORDER_SORT } from '@/types/customerService';
-import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
+import { getPickProfileGroups, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import {
@@ -750,7 +750,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
       });
       try {
         await this.savePickProfile(activeProfile);
-        await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
+        await this.fetchFulfillmentSyncData(facilityId);
       } catch (error) {
         logger.error('Failed to update sort rules order', error);
         commonUtil.showToast(translate('Failed to reorder sort rules.'));
@@ -784,7 +784,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
       }
       try {
         await this.savePickProfile(activeProfile);
-        await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
+        await this.fetchFulfillmentSyncData(facilityId);
       } catch (error) {
         logger.error('Failed to add sort rule', error);
         commonUtil.showToast(translate('Failed to add sort rule.'));
@@ -809,7 +809,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         if (resp && commonUtil.hasError(resp)) {
           throw new Error('Failed to delete condition from server');
         }
-        await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
+        await this.fetchFulfillmentSyncData(facilityId);
       } catch (error) {
         logger.error('Failed to remove sort rule', error);
         commonUtil.showToast(translate('Failed to remove sort rule.'));
@@ -869,13 +869,13 @@ export const useCustomerServiceStore = defineStore('customerService', {
 
       try {
         await this.savePickProfile(activeProfile);
-        await this.fetchFulfillmentSyncData(facilityId, activeProfile.productStoreId);
+        await this.fetchFulfillmentSyncData(facilityId);
       } catch (error) {
         logger.error('Failed to update batch size', error);
         commonUtil.showToast(translate('Failed to update batch size.'));
       }
     },
-    async fetchFulfillmentSyncData(facilityId: string, productStoreId: string) {
+    async fetchFulfillmentSyncData(facilityId: string) {
       this.dashboardStatus.fulfillmentSyncData = 'loading';
       try {
         const params: any = {};
@@ -995,7 +995,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         this.dashboardStatus.fulfillmentSyncData = 'error';
       }
     },
-    async updateServiceJob(jobName: string, cronExpression: string, paused: string, facilityId: string, productStoreId: string) {
+    async updateServiceJob(jobName: string, cronExpression: string, paused: string, facilityId: string) {
       try {
         const resp = await api({
           url: `admin/serviceJobs/${jobName}`,
@@ -1008,7 +1008,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         if (resp && commonUtil.hasError(resp)) {
           throw new Error('Failed to update service job');
         }
-        await this.fetchFulfillmentSyncData(facilityId, productStoreId);
+        await this.fetchFulfillmentSyncData(facilityId);
         commonUtil.showToast(translate('Fulfillment sync schedule updated successfully.'));
       } catch (error) {
         logger.error('Failed to update service job', error);
