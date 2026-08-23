@@ -961,6 +961,7 @@ watch(selectedProductStoreId, (productStoreId, previousProductStoreId) => {
   if (productStoreId !== previousProductStoreId) {
     selectedFacilityId.value = '';
   }
+  if (!productStore.isProductStoreInitialized) return;
   refreshDashboardData();
 });
 
@@ -1050,7 +1051,8 @@ const fulfillmentStageMetrics = computed(() => {
   ];
 });
 
-onIonViewWillEnter(() => {
+onIonViewWillEnter(async () => {
+  await productStore.initializeProductStore();
   refreshDashboardData();
 });
 
