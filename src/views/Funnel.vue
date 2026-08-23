@@ -625,6 +625,7 @@ import { useUserStore } from '@/store/user';
 import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
 import { createLatestRequestScope } from '@/utils/latestRequestScope';
 import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
+import { reconcileSelectedFacilityId } from '@/utils/funnelFacilitySelection';
 import { facilityProgressAccessibleName } from '@/utils/funnelProgress';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
@@ -900,6 +901,7 @@ const facilityMetricKey = computed<DashboardStatusKey>(() => {
 });
 const facilityMetricsLoading = computed(() => store.isDashboardGroupLoading(facilityMetricKey.value));
 const facilityMetricsError = computed(() => store.isDashboardGroupError(facilityMetricKey.value));
+const facilityMetricStatus = computed(() => store.getDashboardStatus(facilityMetricKey.value));
 
 const totalUnfillable = computed(() => store.getUnfillable.totalCount || 0);
 // Match the side-menu "Brokering queue" badge and the /brokering page exactly: one
@@ -1179,15 +1181,12 @@ const maxMetricValue = computed(() => {
   return filteredFacilities.value[0].value || 1;
 });
 
-watch(filteredFacilities, (newList) => {
-  if (newList.length > 0) {
-    const exists = newList.some(item => item.facilityId === selectedFacilityId.value);
-    if (!exists) {
-      selectedFacilityId.value = newList[0].facilityId;
-    }
-  } else {
-    selectedFacilityId.value = '';
-  }
+watch([filteredFacilities, facilityMetricStatus], ([newList, status]) => {
+  selectedFacilityId.value = reconcileSelectedFacilityId(
+    selectedFacilityId.value,
+    newList,
+    status
+  );
 });
 
 const workflowRouteQuery = computed(() => ({
