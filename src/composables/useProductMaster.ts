@@ -1,6 +1,7 @@
 import { ref } from "vue";
 import { useSolrSearch, commonUtil, logger} from "@common";
 import { useProductCacheStore, type CachedProduct, type ProductIdentification } from "@/store/productCache";
+import { useProductStore } from "@/store/productStore";
 
 /**
  * Product master — fetch rich product data (name, SKU, image) from Solr, cached per
@@ -133,6 +134,40 @@ function upsertFromApi(docs: any[]) {
   useProductCacheStore().upsert(docs.map(mapDocToProduct));
 }
 
+/**
+ * Product identity — the operator-configured display name and secondary line (Settings >
+ * Product identifier), mirroring inventory-count/src/composables/useProductMaster.ts's
+ * primaryId/secondaryId. Every place that shows a product for an order, return, or swap item
+ * reads it through here instead of a hardcoded field (productName, sku, internalName, ...), so
+ * the store's chosen identifier (e.g. internalName/parentProductName on rails-oms) is honored
+ * everywhere rather than in whichever views happened to be written against it.
+ *
+ * `product` is whatever identity-bearing object is on hand for this row — a cached
+ * CachedProduct, a denormalized order/return/swap item, or nothing yet. commonUtil.
+ * getProductIdentificationValue throws on `undefined` (`Object.keys(undefined)`), so this
+ * always normalizes it first; callers never need to guard that themselves.
+ *
+ * `fallbacks` is an ordered list of this call site's own denormalized fields, used only when
+ * the preferred identifier has no value on this particular product — e.g. before the product
+ * cache has warmed, or when a custom line item has no catalog product at all. inventory-count's
+ * version has no such parameter (its fallback is a fixed SKU-then-productId chain); order-manager
+ * needed the caller-supplied list because its call sites' available fallback data genuinely
+ * differs row to row (a Shopify custom line item falls back to its own title, a ship-group item
+ * to its order-payload name).
+ */
+function resolveIdentity(idKey: string, product: any, fallbacks: Array<string | null | undefined>): string {
+  const preferred = commonUtil.getProductIdentificationValue(idKey, product || {});
+  return preferred || fallbacks.find((candidate) => !!candidate) || "";
+}
+
+function primaryId(product: any, fallbacks: Array<string | null | undefined> = []): string {
+  return resolveIdentity(useProductStore().getProductIdentificationPref.primaryId, product, fallbacks);
+}
+
+function secondaryId(product: any, fallbacks: Array<string | null | undefined> = []): string {
+  return resolveIdentity(useProductStore().getProductIdentificationPref.secondaryId, product, fallbacks);
+}
+
 export function useProductMaster() {
-  return { init, getById, getByIds, prefetch, upsertFromApi, cacheReady };
+  return { init, getById, getByIds, prefetch, upsertFromApi, cacheReady, primaryId, secondaryId };
 }

@@ -20,26 +20,22 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { IonContent, IonItem, IonLabel, IonList, IonListHeader, modalController, popoverController } from "@ionic/vue";
-import { commonUtil, translate } from "@common";
+import { translate } from "@common";
 import ProductInventoryModal from "@/components/inventory/ProductInventoryModal.vue";
 import CustomSwapModal from "@/components/swaps/CustomSwapModal.vue";
+import { useProductMaster } from "@/composables/useProductMaster";
 import { useProductCacheStore } from "@/store/productCache";
-import { useProductStore } from "@/store/productStore";
 
 const props = defineProps(["item", "task"]);
 
-const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+const productMaster = useProductMaster();
 
 const popoverTitle = computed(() => {
   const product = props.item?.productId
     ? useProductCacheStore().getProduct(props.item.productId)
     : undefined;
 
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, product || {})
-    || props.item?.productId
-    || props.item?.sku
-    || props.item?.internalName
-    || props.item?.productName
+  return productMaster.primaryId(product, [props.item?.productId, props.item?.sku, props.item?.internalName, props.item?.productName])
     || translate("Item");
 });
 

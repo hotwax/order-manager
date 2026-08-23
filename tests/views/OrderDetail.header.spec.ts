@@ -112,6 +112,20 @@ describe('order detail header', () => {
     expect(summaryStyleSource).toContain('align-items: start;');
   });
 
+  it('marks the terminal step with the done icon, not the in-progress one', () => {
+    // These two were swapped: "Approved for fulfillment" wore the double-check and
+    // "Order completed" the pulse, so the timeline read as finished before it was.
+    const source = readFileSync(resolve(process.cwd(), 'src/views/OrderDetail.vue'), 'utf8');
+    const step = (id: string) => {
+      const at = source.indexOf(`id: '${id}',`);
+      expect(at).toBeGreaterThan(-1);
+      return source.slice(at, source.indexOf('valueType', at));
+    };
+
+    expect(step('completedDate')).toContain('icon: checkmarkDoneOutline,');
+    expect(step('approvedDate')).toContain('icon: pulseOutline,');
+  });
+
   it('matches the BOPIS and Fulfillment timeline rail structure', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/views/OrderDetail.vue'), 'utf8');
     const timelineStart = source.indexOf('<div class="timeline order-detail-timeline">');

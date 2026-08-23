@@ -695,9 +695,17 @@ export const OrderActionValidator = {
         return { allowed: true };
       }
 
-      /** ADD_TASK — "Add Task" (OrderDetail.vue:607). Terminal-only gate. */
+      /**
+        * ADD_TASK — the "Add Task" ship-group button. Gated on the order being non-terminal
+        * and on the group still having work in it: a group whose every item is fulfilled has
+        * nothing left to task anyone with, even while the order as a whole is still open.
+        */
       case 'ADD_TASK': {
         if (this.isOrderTerminal(order)) return { allowed: false, reason: 'Cannot add tasks to a cancelled/completed order.' };
+        const groupItems = shipGroup?.items || [];
+        if (groupItems.length && groupItems.every((item: any) => this.isItemFulfilled(item))) {
+          return { allowed: false, reason: 'Every item in this ship group is already completed.' };
+        }
         return { allowed: true };
       }
 

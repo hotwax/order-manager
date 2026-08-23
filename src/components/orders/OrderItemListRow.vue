@@ -1,12 +1,9 @@
 <template>
-  <div class="list-item order-item-list-row">
-    <ion-item
-      class="order-item-list-key"
-      lines="none"
-      :button="rowSelects"
-      :detail="false"
-      @click="rowSelects && emit('update:selected', !selected)"
-    >
+  <div class="list-item order-item-list-row" :class="{ 'order-item-expands': expands }">
+    <ion-item class="order-item-list-key" lines="none" :detail="false">
+      <!-- The checkbox is the only way to select: it sits in the start slot and swallows its
+           own tap, so a row used as an `ion-accordion` header still toggles the group from
+           anywhere else but never selects, and selecting never toggles the group. -->
       <ion-checkbox
         v-if="selectable"
         slot="start"
@@ -34,13 +31,6 @@
         <p v-if="secondary">{{ secondary }}</p>
       </ion-label>
     </ion-item>
-
-    <ion-label class="tablet order-item-quantity">
-      <template v-if="showQuantity">
-        {{ quantity }}
-        <p>{{ quantityLabel }}</p>
-      </template>
-    </ion-label>
 
     <div class="tablet order-item-details">
       <ion-chip
@@ -86,7 +76,6 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import { IonBadge, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonThumbnail } from '@ionic/vue';
 import { businessOutline, listOutline } from 'ionicons/icons';
 import { DxpShopifyImg, translate } from '@common';
@@ -102,10 +91,8 @@ const props = withDefaults(defineProps<{
   previewProduct?: any;
   selectable?: boolean;
   selected?: boolean;
-  selectOnRowClick?: boolean;
-  quantity: string | number;
-  quantityLabel: string;
-  showQuantity?: boolean;
+  /** Whether clicking the row does anything — only an accordion header expands. */
+  expands?: boolean;
   facilityLabel?: string;
   facilityDisabled?: boolean;
   attributesLabel?: string;
@@ -122,8 +109,7 @@ const props = withDefaults(defineProps<{
   previewProduct: undefined,
   selectable: true,
   selected: false,
-  selectOnRowClick: true,
-  showQuantity: true,
+  expands: false,
   facilityLabel: '',
   facilityDisabled: false,
   attributesLabel: '',
@@ -132,14 +118,6 @@ const props = withDefaults(defineProps<{
   statusDetail: '',
   adjustments: () => [],
 });
-
-/**
- * Ionic does not forward an `ion-item` tap to a control in its `slot="start"`,
- * so the row drives selection from its own click and the checkbox is only the
- * indicator. Rows whose click already belongs to something else — an
- * `ion-accordion` header toggles the group — opt out with `selectOnRowClick`.
- */
-const rowSelects = computed(() => props.selectable && props.selectOnRowClick);
 
 function statusBadgeLabel(status: ItemStatusBadge): string {
   return status.count == undefined ? status.label : `${status.count} ${status.label}`;
@@ -161,18 +139,45 @@ const emit = defineEmits<{
   padding-inline-end: var(--spacer-xs);
 }
 
-.order-item-list-row.order-item-rollup-entry {
-  --columns-desktop: 4;
-  --columns-tablet: 4;
-}
-
-.order-item-list-row.order-item-detail-entry {
-  --columns-desktop: 5;
-  --columns-tablet: 5;
-}
-
 .order-item-list-key {
   width: 100%;
+}
+
+/*
+ * Ionic flags an item that wraps a control as `ion-activatable`, gives it a ripple and a
+ * pointer cursor, and treats the whole item as that control's hit area. It does not actually
+ * forward the click here, so the row rippled like a checkbox press that never happened.
+ * Selection comes from the checkbox alone, so the item must stop advertising itself as one.
+ */
+.order-item-list-key {
+  --ripple-color: transparent;
+  --background-activated: transparent;
+}
+
+.order-item-list-key::part(native) {
+  cursor: default;
+}
+
+/*
+ * Product identity carries the most text in the row — name, features and secondary id — so it
+ * takes two of the flexible tracks. Mobile shows only this column and the action column, with
+ * no track to spare, so the span waits for the same breakpoint theme.css uses for `.tablet`.
+ */
+@media (min-width: 700px) {
+  .order-item-list-key {
+    grid-column: span 2;
+  }
+}
+
+/*
+ * theme.css highlights and points at every .list-item on hover. Only a row that expands does
+ * anything when clicked, so the rest must not advertise a click. The hover background reaches
+ * the inner ion-item through --list-item-bg-hover, so clearing the variable covers both.
+ */
+.order-item-list-row:not(.order-item-expands):hover {
+  --list-item-bg-hover: transparent;
+  background: transparent;
+  cursor: default;
 }
 
 .order-item-details {
@@ -182,8 +187,7 @@ const emit = defineEmits<{
   justify-content: center;
 }
 
-.order-item-status,
-.order-item-quantity {
+.order-item-status {
   text-align: center;
 }
 

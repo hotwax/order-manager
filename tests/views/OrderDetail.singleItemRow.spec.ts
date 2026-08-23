@@ -32,7 +32,7 @@ describe('order detail single item rows', () => {
     expect(soloRow).toContain(':image-url="getProduct(group.productId)?.mainImageUrl"');
     expect(soloRow).toContain(':preview-product="getProduct(group.productId)"');
     expect(soloRow).toContain(`:badge-label="isKit(group) ? translate('Kit') : ''"`);
-    expect(soloRow).toContain(':quantity="soleItem.quantity"');
+    expect(soloRow).toContain(':features="productFeatureLabel(group.productId)"');
   });
 
   it('keeps the item information and actions that needed an expand to reach', () => {
@@ -56,6 +56,6 @@ describe('order detail single item rows', () => {
     expect(rolledUp).toContain('slot="header"');
     expect(rolledUp).toContain('<div slot="content">');
     expect(rolledUp).toContain('v-for="item in group.items"');
-    expect(rolledUp).toContain(':quantity="group.totalQty"');
+    expect(rolledUp).toContain(':statuses="group.statuses"');
   });
 });

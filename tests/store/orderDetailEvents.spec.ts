@@ -41,7 +41,7 @@ function mockOrderDetail(overrides: Record<string, any> = {}) {
     getRiskAssessments: vi.fn(),
     getFacilityChanges: vi.fn().mockResolvedValue({ data: [] }),
     getUnfillableAttempts: vi.fn().mockResolvedValue({ data: [] }),
-    getInventoryIssuance: vi.fn().mockResolvedValue({ data: [] }),
+    getInventoryIssuance: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as any);
 }
@@ -189,12 +189,10 @@ describe('order detail event sources', () => {
     // Real shape from rails-uat order 118954: one issuance row per line. lastQuantityOnHand
     // is the balance before the row, so after = last + diff.
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
+      getInventoryIssuance: vi.fn().mockResolvedValue([
           { orderItemSeqId: '01', inventoryItemId: '1008212', itemIssuanceId: '108495', quantityOnHandDiff: -1, lastQuantityOnHand: 12, effectiveDate: 1786895792358 },
           { orderItemSeqId: '02', inventoryItemId: '1008213', itemIssuanceId: '108496', quantityOnHandDiff: -1, lastQuantityOnHand: -2, effectiveDate: 1786895792367 },
-        ],
-      }),
+        ]),
     });
     const store = useOrderDetailStore();
 
@@ -209,12 +207,10 @@ describe('order detail event sources', () => {
 
   it('adds the stock positions when one line issues from two inventory items', async () => {
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
+      getInventoryIssuance: vi.fn().mockResolvedValue([
           { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '1', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 1 },
           { orderItemSeqId: '01', inventoryItemId: 'B', itemIssuanceId: '2', quantityOnHandDiff: -2, lastQuantityOnHand: 5, effectiveDate: 2 },
-        ],
-      }),
+        ]),
     });
     const store = useOrderDetailStore();
 
@@ -229,12 +225,10 @@ describe('order detail event sources', () => {
     // The second row's lastQuantityOnHand already reflects the first, so summing both
     // opening balances would report a stock position that never existed.
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
+      getInventoryIssuance: vi.fn().mockResolvedValue([
           { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '2', quantityOnHandDiff: -1, lastQuantityOnHand: 9, effectiveDate: 2 },
           { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '1', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 1 },
-        ],
-      }),
+        ]),
     });
     const store = useOrderDetailStore();
 
@@ -247,12 +241,10 @@ describe('order detail event sources', () => {
 
   it('ignores reservation rows that carry no issuance id', async () => {
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
+      getInventoryIssuance: vi.fn().mockResolvedValue([
           { orderItemSeqId: '01', inventoryItemId: 'A', reasonEnumId: 'INV_RES_CREATE', availableToPromiseDiff: -1, quantityOnHandDiff: 0, lastQuantityOnHand: 99 },
           { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '108495', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 2 },
-        ],
-      }),
+        ]),
     });
     const store = useOrderDetailStore();
 

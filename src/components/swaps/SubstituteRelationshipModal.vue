@@ -49,7 +49,7 @@
         </ion-thumbnail>
         <ion-label>
           {{ productLabel(product) }}
-          <p>{{ product.sku || product.productId }}</p>
+          <p>{{ productSecondaryLabel(product) }}</p>
         </ion-label>
         <ion-checkbox slot="end" :checked="selectedIds.has(product.productId)" />
       </ion-item>
@@ -120,6 +120,9 @@ interface SelectableProduct {
   internalName?: string;
   sku?: string;
   mainImageUrl?: string;
+  // Carried through so productMaster.primaryId/secondaryId can resolve a preference backed
+  // by a goodIdentification type (e.g. UPC) rather than one of the fields listed above.
+  goodIdentifications?: any[];
 }
 
 const props = defineProps<{
@@ -146,8 +149,12 @@ const dirty = computed(() => {
   return current.size !== initialIds.value.size || [...current].some((id) => !initialIds.value.has(id));
 });
 
-function productLabel(product: SelectableProduct) {
-  return product.productName || product.parentProductName || product.internalName || product.productId;
+function productLabel(product: SelectableProduct): string {
+  return productMaster.primaryId(product, [product.productName, product.parentProductName, product.internalName, product.productId]);
+}
+
+function productSecondaryLabel(product: SelectableProduct): string {
+  return productMaster.secondaryId(product, [product.sku, product.productId]);
 }
 
 function normalizeProduct(product: any): SelectableProduct {
@@ -158,6 +165,7 @@ function normalizeProduct(product: any): SelectableProduct {
     internalName: product.internalName,
     sku: product.sku,
     mainImageUrl: product.mainImageUrl,
+    goodIdentifications: product.goodIdentifications,
   };
 }
 

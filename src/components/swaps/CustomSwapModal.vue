@@ -47,12 +47,12 @@
           :disabled="!hasSubstituteStock(product.productId)"
           @click="selectSubstituteProduct(product.productId)"
         >
-          <ion-radio slot="start" :value="product.productId" :aria-label="getProduct(product.productId)?.productName || product.productName" />
+          <ion-radio slot="start" :value="product.productId" :aria-label="productMaster.primaryId(getProduct(product.productId), [product.productName])" />
           <ion-thumbnail slot="start">
             <DxpShopifyImg :src="getProduct(product.productId)?.mainImageUrl || product.mainImageUrl" size="small" />
           </ion-thumbnail>
           <ion-label>
-            {{ getProduct(product.productId)?.productName || product.productName }}
+            {{ productMaster.primaryId(getProduct(product.productId), [product.productName]) }}
             <p>{{ translate('SKU') }}: {{ getProduct(product.productId)?.internalName || product.internalName }}</p>
             <p>{{ money(product.price) }}</p>
           </ion-label>
@@ -91,13 +91,13 @@
             :disabled="!hasSearchStock(product)"
             @click="selectSearchProduct(product)"
           >
-            <ion-radio slot="start" :value="product.productId" :aria-label="product.productName" />
+            <ion-radio slot="start" :value="product.productId" :aria-label="productMaster.primaryId(getProduct(product.productId) || product, [product.parentProductName, product.productName])" />
             <ion-thumbnail slot="start">
               <DxpShopifyImg :src="product.mainImageUrl" size="small" />
             </ion-thumbnail>
             <ion-label>
-              {{ product.parentProductName }}
-              <p>{{ product.productName }}</p>
+              {{ productMaster.primaryId(getProduct(product.productId) || product, [product.parentProductName, product.productName]) }}
+              <p>{{ productMaster.secondaryId(getProduct(product.productId) || product, [product.productName]) }}</p>
               <p>{{ translate('SKU') }}: {{ product.internalName || product.sku }}</p>
             </ion-label>
             <ion-note class="facility-label ion-no-padding" slot="end">{{ facilityStockLabel(product.inventoryConfig?.computedLastInventoryCount) }}</ion-note>
@@ -177,6 +177,8 @@ const facilityLabel = computed(() => seedStore.facilityName(props.facilityId) ||
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);
 }
+
+const productMaster = useProductMaster();
 
 function getSubstituteStock(productId: string) {
   return useStockStore().getProductStock(productId, props.facilityId);

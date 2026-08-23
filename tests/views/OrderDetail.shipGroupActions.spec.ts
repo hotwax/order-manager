@@ -38,8 +38,34 @@ describe('order detail ship group actions', () => {
     expect(validator).toContain("id: 'PARK_ITEMS', label: 'Park'");
   });
 
-  it('shows selectable features under the product identity in the ship group item list', () => {
-    expect(source).toContain('<p v-if="productFeatureLabel(item.productId)" class="ship-group-item-features"');
+  it('names the ship group the status detail refers to', () => {
+    // A bare "#00002" under a status badge says nothing about what the number is.
+    expect(source).toContain("`${translate('Shipgroup')} ${translate('#')}${item.shipGroupSeqId}`");
+  });
+
+  it('lets the validator govern Add Task like every other ship group action', () => {
+    expect(actions).toContain(`:disabled="isShipGroupActionDisabled(shipGroup, 'ADD_TASK')"`);
+    expect(validator).toContain("reason: 'Every item in this ship group is already completed.'");
+    expect(validator).toContain('groupItems.every((item: any) => this.isItemFulfilled(item))');
+  });
+
+  it('shows selectable features under the product identity in both ship group item lists', () => {
+    const featureLines = source.match(/<p v-if="productFeatureLabel\(item\.productId\)" class="ship-group-item-features"/g) || [];
+    expect(featureLines).toHaveLength(2);
     expect(source).toContain('.ship-group-item-features {');
+  });
+
+  it('routes ship group item identity through the shared composable, not a raw productId', () => {
+    // The preference itself is real (verified against rails-oms: primaryId "internalName",
+    // secondaryId "parentProductName") — these rows just never consulted it, and fell through
+    // straight to item.productId, an internal id, whenever the product cache had not warmed yet.
+    const template = source.slice(0, source.indexOf('</template>'));
+    expect(template).not.toContain('item.productId }}');
+    expect(template).not.toContain('|| item.productId');
+    expect(source).toContain('function shipGroupItemPrimary(item: any): string {');
+    expect(source).toContain('productMaster.primaryId(getProduct(item.productId), [item.name, item.sku, item.productId]);');
+    // Both lists go through the shared chain rather than calling the raw resolver.
+    const primaries = source.match(/shipGroupItemPrimary\(item\)/g) || [];
+    expect(primaries.length).toBeGreaterThanOrEqual(2);
   });
 });

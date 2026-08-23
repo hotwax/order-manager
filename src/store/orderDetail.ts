@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { api, commonUtil, logger} from "@common";
-import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from "@/composables/useOrderDetail";
+import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail, type IssuanceLookupLine } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useSeedStore } from "./seed";
 
@@ -183,6 +183,22 @@ export interface ItemIssuanceSummary {
  * — the second one's "before" is the first one's "after", and summing both would count
  * the opening balance twice.
  */
+/**
+ * The (product, facility) pairs whose inventory item we need to read issuance from. Only counter
+ * sales get an issuance badge, so only their ship groups are worth the lookup — a shipped group's
+ * stock leaves the books through the shipment instead.
+ */
+function issuanceLookupLines(order: any): IssuanceLookupLine[] {
+  const lines: IssuanceLookupLine[] = [];
+  (order?.shipGroups || []).forEach((shipGroup: any) => {
+    if (shipGroup?.shipmentMethodTypeId !== "POS_COMPLETED" || !shipGroup.facilityId) return;
+    (shipGroup.items || []).forEach((item: any) => {
+      if (item?.productId) lines.push({ productId: item.productId, facilityId: shipGroup.facilityId });
+    });
+  });
+  return lines;
+}
+
 function summariseIssuance(rows: any[]): Record<string, ItemIssuanceSummary> {
   const byItemAndInventory: Record<string, Record<string, any[]>> = {};
 
@@ -858,10 +874,9 @@ export const useOrderDetailStore = defineStore("orderDetail", {
 
       this.issuanceStatusByOrderId[orderId] = "loading";
       try {
-        const resp = await useOrderDetail().getInventoryIssuance(orderId);
-        if (commonUtil.hasError(resp)) throw resp.data;
+        const rows = await useOrderDetail().getInventoryIssuance(orderId, issuanceLookupLines(this.byOrderId[orderId]?.payload));
 
-        this.issuanceByOrderId[orderId] = summariseIssuance(responseList(resp.data));
+        this.issuanceByOrderId[orderId] = summariseIssuance(rows);
         this.issuanceStatusByOrderId[orderId] = "loaded";
       } catch (error: any) {
         logger.error(`Failed to load inventory issuance for [${orderId}]`, error);

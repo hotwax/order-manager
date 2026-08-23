@@ -127,8 +127,8 @@
                   </ion-thumbnail>
                   <ion-label>
                     {{ commonUtil.getProductIdentificationValue(barcodeIdentifier, getProduct(searchedProduct.productId)) }}
-                    <p>{{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(searchedProduct.productId)) ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(searchedProduct.productId)) : getProduct(searchedProduct.productId)?.internalName }}</p>
-                    <p v-if="commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(searchedProduct.productId)) !== null">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(searchedProduct.productId)) }}</p>
+                    <p>{{ productMaster.primaryId(getProduct(searchedProduct.productId), [getProduct(searchedProduct.productId)?.internalName]) }}</p>
+                    <p v-if="productMaster.secondaryId(getProduct(searchedProduct.productId))">{{ productMaster.secondaryId(getProduct(searchedProduct.productId)) }}</p>
                   </ion-label>
                   <ion-icon :icon="checkmarkDoneOutline" color="success" slot="end" />
                 </ion-item>
@@ -185,8 +185,8 @@
                       <DxpShopifyImg :src="searchedProduct.mainImageUrl" :key="searchedProduct.mainImageUrl" />
                     </ion-thumbnail>
                     <ion-label>
-                      {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(searchedProduct.productId)) }}
-                      <p v-if="commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(searchedProduct.productId)) !== 'null'">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(searchedProduct.productId)) }}</p>
+                      {{ productMaster.primaryId(getProduct(searchedProduct.productId), [getProduct(searchedProduct.productId)?.internalName]) }}
+                      <p v-if="productMaster.secondaryId(getProduct(searchedProduct.productId))">{{ productMaster.secondaryId(getProduct(searchedProduct.productId)) }}</p>
                     </ion-label>
                     <template v-if="!isItemInOrder">
                       <ion-button slot="end" fill="outline" @click="addLineItem(searchedProduct)">
@@ -227,8 +227,8 @@
                   <DxpShopifyImg :src="lineItem.mainImageUrl" :key="lineItem.mainImageUrl"/>
                 </ion-thumbnail>
                 <ion-label>
-                  {{ lineItem.productId ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(lineItem.productId)) : lineItem.title }}
-                  <p v-if="lineItem.productId && commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(lineItem.productId)) !== 'null'">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, getProduct(lineItem.productId)) }}</p>
+                  {{ lineItem.productId ? productMaster.primaryId(getProduct(lineItem.productId), [getProduct(lineItem.productId)?.internalName]) : lineItem.title }}
+                  <p v-if="lineItem.productId && productMaster.secondaryId(getProduct(lineItem.productId))">{{ productMaster.secondaryId(getProduct(lineItem.productId)) }}</p>
                 </ion-label>
               </ion-item>
               <div class="tablet">
@@ -306,7 +306,7 @@ const isScanningEnabled = ref(false);
 
 const barcodeIdentifier = computed(() => useProductStore().getBarcodeIdentifierPref);
 const barcodeIdentificationDesc = computed(() => useProductStore().getBarcodeIdentifierOptions);
-const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+const productMaster = useProductMaster();
 const isItemInOrder = computed(() => orderForm.value.lineItems.some((lineItem: any) => lineItem.productId === searchedProduct.value.productId))
 
 let timeoutId: any = null;

@@ -208,8 +208,8 @@
                   </ion-thumbnail>
                   <ion-label class="ion-text-wrap">
                     <h2>{{ itemLabel(item) }}</h2>
-                    <p v-if="item.sku || item.productId">
-                      {{ item.sku || item.productId }}
+                    <p v-if="itemSecondaryLabel(item)">
+                      {{ itemSecondaryLabel(item) }}
                     </p>
                   </ion-label>
                 </div>
@@ -675,8 +675,15 @@ function itemAmount(item: ReturnItemDetail) {
   return money(amount, returnRecord.value?.currencyUomId);
 }
 
-function itemLabel(item: ReturnItemDetail) {
-  return item.productName || item.description || item.sku || item.productId || translate("Return item");
+function itemLabel(item: ReturnItemDetail): string {
+  const product = item.productId ? productCache.getProduct(item.productId) : undefined;
+  return productMaster.primaryId(product, [item.productName, item.description, item.sku, item.productId])
+    || translate("Return item");
+}
+
+function itemSecondaryLabel(item: ReturnItemDetail): string {
+  const product = item.productId ? productCache.getProduct(item.productId) : undefined;
+  return productMaster.secondaryId(product, [item.sku, item.productId]);
 }
 
 function itemReferenceLabel(item: ReturnItemDetail) {

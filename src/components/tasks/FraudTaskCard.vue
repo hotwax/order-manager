@@ -94,7 +94,7 @@ import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
-import { useProductStore } from '@/store/productStore';
+import { useProductMaster } from '@/composables/useProductMaster';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
@@ -113,7 +113,7 @@ const emit = defineEmits<{
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
-const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+const productMaster = useProductMaster();
 
 const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'resolve', label: translate('Resolve task'), kind: 'primary' },
@@ -145,15 +145,11 @@ function productImageUrl(productId: string): string {
 }
 
 function orderedItemPrimary(item: any): string {
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, getProduct(item.productId) || {})
-    || item.productId;
+  return productMaster.primaryId(getProduct(item.productId), [item.productId]);
 }
 
 function orderedItemSecondary(item: any): string {
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.secondaryId, getProduct(item.productId) || {})
-    || item.internalName
-    || item.itemDescription
-    || '';
+  return productMaster.secondaryId(getProduct(item.productId), [item.internalName, item.itemDescription]);
 }
 
 function paymentMethodLabel(payment: any): string {

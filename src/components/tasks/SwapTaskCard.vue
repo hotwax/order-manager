@@ -144,7 +144,7 @@ import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
-import { useProductStore } from '@/store/productStore';
+import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
 import { isSwapItemUnavailable } from '@/utils/swapItems';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
@@ -167,7 +167,7 @@ const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'cancel', label: translate('Cancel order'), kind: 'danger' },
 ] as TaskCardAction[]).filter((action) => !(HIDE_SHOPIFY_UNSYNCED_ACTIONS && action.id === 'cancel')));
 
-const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+const productMaster = useProductMaster();
 
 function getCustomerName(customer: any): string {
   return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');
@@ -291,15 +291,11 @@ function productImageUrl(productId: string): string {
 }
 
 function productPrimary(item: any): string {
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, getProduct(item.productId) || {})
-    || item.productId;
+  return productMaster.primaryId(getProduct(item.productId), [item.productId]);
 }
 
 function productSecondary(item: any): string {
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.secondaryId, getProduct(item.productId) || {})
-    || item.internalName
-    || item.itemDescription
-    || '';
+  return productMaster.secondaryId(getProduct(item.productId), [item.internalName, item.itemDescription]);
 }
 
 function orderedSwapActionItem(item: any) {

@@ -1,4 +1,4 @@
-import { api } from "@common";
+import { api, commonUtil } from "@common";
 
 /**
  * OrderFacilityChange reason written for every failed brokering attempt. A single
@@ -6,6 +6,12 @@ import { api } from "@common";
  * the timeline excludes them from the row-level fetch and shows a count instead.
  */
 export const UNFILLABLE_REASON_ID = "UNFILLABLE";
+
+/** An order line to resolve an inventory item for: its product at its ship group's facility. */
+export interface IssuanceLookupLine {
+  productId: string;
+  facilityId: string;
+}
 
 /**
  * How many UNFILLABLE rows to pull when summarising failed brokering.
@@ -108,12 +114,46 @@ export function useOrderDetail() {
    * `reasonEnumId` and no issuance id. `itemIssuanceId_op=empty` + `_not=Y` keeps only
    * the issuance rows, so the response is one row per issued line rather than two.
    *
-   * There is no REST resource for ItemIssuance itself — this view is the only exposed
-   * path to the same fact.
+   * There is no REST resource for ItemIssuance itself — InventoryItemAndDetail is the only
+   * exposed path to the same fact, and it is reachable only per inventory item:
+   * `GET oms/inventoryItem/{inventoryItemId}/detail`, with `orderId` as a query filter.
+   * `orderId` alone will not do: `oms/inventoryItem/detail?orderId=…` makes Moqui read the
+   * literal `detail` as the id and answer 405 on every verb, which is what this used to do.
+   *
+   * The inventory item comes from ProductFacility — an order line's productId plus its ship
+   * group's facilityId resolve to that facility's primary `inventoryItemId`.
    */
-  async function getInventoryIssuance(orderId: string): Promise<any> {
-    return api({
-      url: "oms/inventoryItem/detail",
+  async function getInventoryIssuance(orderId: string, lines: IssuanceLookupLine[]): Promise<any[]> {
+    const productIds = [...new Set(lines.map((line) => line.productId).filter(Boolean))];
+    const facilityIds = [...new Set(lines.map((line) => line.facilityId).filter(Boolean))];
+    if (!productIds.length || !facilityIds.length) return [];
+
+    // One call covers every product/facility combination, but the response is the whole cross
+    // product, so keep only the pairs the order actually has.
+    const wantedPairs = new Set(lines.map((line) => `${line.productId}|${line.facilityId}`));
+    const facilityResp = await api({
+      url: "oms/productFacilities",
+      method: "GET",
+      params: {
+        productId_op: "in",
+        productId: productIds.join(","),
+        facilityId_op: "in",
+        facilityId: facilityIds.join(","),
+        pageSize: 500
+      }
+    }) as any;
+    if (commonUtil.hasError(facilityResp)) throw facilityResp.data;
+
+    const inventoryItemIds = [...new Set((Array.isArray(facilityResp.data) ? facilityResp.data : [])
+      .filter((row: any) => wantedPairs.has(`${row.productId}|${row.facilityId}`))
+      .map((row: any) => row.inventoryItemId)
+      .filter(Boolean))];
+    if (!inventoryItemIds.length) return [];
+
+    // `inventoryItemId` is a path segment, so this is one call per inventory item. A counter
+    // sale is a handful of lines at a single facility, so that is a handful of calls.
+    const detailResponses = await Promise.all(inventoryItemIds.map((inventoryItemId) => api({
+      url: `oms/inventoryItem/${inventoryItemId}/detail`,
       method: "GET",
       params: {
         orderId,
@@ -121,7 +161,14 @@ export function useOrderDetail() {
         itemIssuanceId_not: "Y",
         pageSize: 500
       }
+    }) as Promise<any>));
+
+    const rows: any[] = [];
+    detailResponses.forEach((resp) => {
+      if (commonUtil.hasError(resp)) throw resp.data;
+      rows.push(...(Array.isArray(resp.data) ? resp.data : (resp.data?.docs || [])));
     });
+    return rows;
   }
 
   return {

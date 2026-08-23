@@ -121,8 +121,8 @@ import {
 } from '@ionic/vue';
 import { closeOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
+import { useProductMaster } from '@/composables/useProductMaster';
 import { useProductCacheStore } from '@/store/productCache';
-import { useProductStore } from '@/store/productStore';
 
 withDefaults(defineProps<{
   grandTotal?: number;
@@ -138,7 +138,7 @@ withDefaults(defineProps<{
   substitutedItems: () => [],
 });
 
-const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+const productMaster = useProductMaster();
 
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);
@@ -149,15 +149,11 @@ function productImageUrl(productId: string): string {
 }
 
 function productPrimary(item: any): string {
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, getProduct(item.productId) || {})
-    || item.productId;
+  return productMaster.primaryId(getProduct(item.productId), [item.productId]);
 }
 
 function productSecondary(item: any): string {
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.secondaryId, getProduct(item.productId) || {})
-    || item.internalName
-    || item.itemDescription
-    || '';
+  return productMaster.secondaryId(getProduct(item.productId), [item.internalName, item.itemDescription]);
 }
 
 function itemPrice(item: any): number {

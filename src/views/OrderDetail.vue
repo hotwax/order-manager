@@ -295,8 +295,6 @@
                 :image-url="getProduct(group.productId)?.mainImageUrl"
                 :preview-product="getProduct(group.productId)"
                 :selected="soleItem.selected"
-                :quantity="soleItem.quantity"
-                :quantity-label="translate('qty')"
                 :facility-label="soleItem.facilityName"
                 :facility-disabled="isItemFacilityActionDisabled(soleItem)"
                 :attributes-label="attributeChipLabel(soleItem.attributeCount)"
@@ -310,7 +308,7 @@
               >
                 <template #actions>
                   <ion-button
-                    v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(soleItem.statusId)"
+                    v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS && !['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(soleItem.statusId)"
                     fill="clear"
                     size="small"
                     color="danger"
@@ -323,7 +321,7 @@
               <ion-accordion v-else :value="group.externalId">
                 <OrderItemListRow
                   slot="header"
-                  :select-on-row-click="false"
+                  :expands="true"
                   :primary="groupPrimaryIdentifier(group)"
                   :secondary="groupSecondaryIdentifier(group)"
                   :badge-label="isKit(group) ? translate('Kit') : ''"
@@ -331,8 +329,6 @@
                   :image-url="getProduct(group.productId)?.mainImageUrl"
                   :preview-product="getProduct(group.productId)"
                   :selected="group.selected"
-                  :quantity="group.totalQty"
-                  :quantity-label="translate('qty')"
                   :facility-label="groupLocationLabel(group)"
                   :facility-disabled="true"
                   :statuses="group.statuses"
@@ -349,9 +345,6 @@
                       :primary="`${translate('Item')} ${item.orderItemSeqId}`"
                       :secondary="item.externalId && item.externalId !== 'null' ? `${translate('External ID')}: ${item.externalId}` : ''"
                       :selected="item.selected"
-                      :quantity="item.quantity"
-                      :quantity-label="translate('qty')"
-                      :show-quantity="false"
                       :facility-label="item.facilityName"
                       :facility-disabled="isItemFacilityActionDisabled(item)"
                       :attributes-label="attributeChipLabel(item.attributeCount)"
@@ -364,7 +357,7 @@
                       @attributes-click="openItemAttributesModal(item)"
                     >
                       <template #actions>
-                        <ion-button v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)" fill="clear"
+                        <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS && !['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)" fill="clear"
                           size="small" color="danger" @click.stop="cancelSingleItem(item)">
                           {{ translate('Cancel') }}
                         </ion-button>
@@ -625,10 +618,9 @@
                       <DxpShopifyImg :src="item?.imageUrl" :key="getProduct(item.productId)?.mainImageUrl" size="small" />
                     </ion-thumbnail>
                     <ion-label>
-                      <p class="overline">{{ shipGroupProductIdentification(productIdentificationPref.secondaryId, item)
-                        }}</p>
+                      <p class="overline">{{ shipGroupItemSecondary(item) }}</p>
                       <div>
-                        {{ shipGroupProductIdentification(productIdentificationPref.primaryId, item) || item.productId }}
+                        {{ shipGroupItemPrimary(item) }}
                         <ion-badge class="kit-badge" color="dark" v-if="isKit(item)">{{ translate("Kit") }}</ion-badge>
                       </div>
                       <p v-if="productFeatureLabel(item.productId)" class="ship-group-item-features"
@@ -681,11 +673,12 @@
                     </ion-thumbnail>
                     <ion-label>
                       <div>
-                        {{ shipGroupProductIdentification(productIdentificationPref.primaryId, item) || item.productId
-                        }}
+                        {{ shipGroupItemPrimary(item) }}
                         <ion-badge class="kit-badge" color="dark" v-if="isKit(item)">{{ translate("Kit") }}</ion-badge>
                       </div>
-                      <p>{{ shipGroupProductIdentification(productIdentificationPref.secondaryId, item) }}</p>
+                      <p v-if="productFeatureLabel(item.productId)" class="ship-group-item-features"
+                        :title="productFeatureLabel(item.productId)">{{ productFeatureLabel(item.productId) }}</p>
+                      <p>{{ shipGroupItemSecondary(item) }}</p>
                     </ion-label>
 
                     <!-- Inventory lookup answers "can we still fulfil this?"; the goods have
@@ -848,7 +841,8 @@
                 :disabled="isShipGroupActionDisabled(shipGroup, isVirtualFacility(shipGroup) ? 'PARK_ITEMS' : 'PULL_BACK')"
                 @click="isVirtualFacility(shipGroup) ? parkSelectedItems(shipGroup) : rejectSelectedItems(shipGroup)">{{
                   isVirtualFacility(shipGroup) ? translate('Park') : translate('Pull back') }}</ion-button>
-              <ion-button fill="clear" @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
+              <ion-button fill="clear" :disabled="isShipGroupActionDisabled(shipGroup, 'ADD_TASK')"
+                @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
               <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" fill="clear" @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
             </div>
           <!-- Gift message modal -->
@@ -1106,6 +1100,7 @@ import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
 import { getReturn } from '@/services/returns';
 import { showToast, isKit, riskLevelColor, sentimentCounts } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
 import { rollUpItemStatuses, type ItemStatusBadge } from '@/utils/itemStatusBadges';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
@@ -1130,7 +1125,7 @@ const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_
 const loading = computed(() => orderDetailStore.loadingById(props.orderId));
 const error = computed(() => orderDetailStore.errorById(props.orderId));
 
-const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+const productMaster = useProductMaster();
 const customerPartyId = computed(() => orderDetailStore.customerPartyIdByOrderId(props.orderId));
 
 // Shopify Admin deep-link. Primary source is the order's own shopifyShopOrder record
@@ -1540,7 +1535,7 @@ const orderTimeline = computed(() => {
       label: 'Approved for fulfillment',
       id: 'approvedDate',
       value: approvedDate,
-      icon: checkmarkDoneOutline,
+      icon: pulseOutline,
       valueType: 'date-time-millis',
       timeDiff: findTimeDiff(orderDate, approvedDate)
     });
@@ -1564,7 +1559,7 @@ const orderTimeline = computed(() => {
       label: 'Order completed',
       id: 'completedDate',
       value: completedDate,
-      icon: pulseOutline,
+      icon: checkmarkDoneOutline,
       valueType: 'date-time-millis',
       timeDiff: findTimeDiff(orderDate, completedDate)
     });
@@ -2263,9 +2258,19 @@ function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);
 }
 
-function shipGroupProductIdentification(identificationPref: string, item: any): string {
-  const product = getProduct(item.productId);
-  return product ? commonUtil.getProductIdentificationValue(identificationPref, product) : '';
+/**
+ * Product identity for a ship group row. Before the product cache warms — or when the
+ * preferred identifier has no value on this particular product — falls back to what the
+ * order payload itself carries, so a row never prints a raw internal productId like `118414`.
+ */
+function shipGroupItemPrimary(item: any): string {
+  return productMaster.primaryId(getProduct(item.productId), [item.name, item.sku, item.productId]);
+}
+
+/** The secondary line, skipped when it would only repeat the primary. */
+function shipGroupItemSecondary(item: any): string {
+  const skuIfDistinct = item.sku && item.sku !== shipGroupItemPrimary(item) ? item.sku : undefined;
+  return productMaster.secondaryId(getProduct(item.productId), [skuIfDistinct]);
 }
 
 // Ionic caches routed page instances: navigating /orders/A → /orders/B and back re-activates
@@ -3076,14 +3081,11 @@ function productFeatureLabel(productId: string): string {
 }
 
 function groupPrimaryIdentifier(group: any): string {
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, getProduct(group.productId) || {})
-    || group.name
-    || group.externalId;
+  return productMaster.primaryId(getProduct(group.productId), [group.name, group.externalId]);
 }
 
 function groupSecondaryIdentifier(group: any): string {
-  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.secondaryId, getProduct(group.productId) || {})
-    || group.externalId;
+  return productMaster.secondaryId(getProduct(group.productId), [group.externalId]);
 }
 
 // Same location-chip semantics as the Find Orders list rows: the group's items act as the
@@ -3119,7 +3121,8 @@ function getItemAdjustmentRows(item: any): Array<{ label: string; amount: string
 }
 
 function itemStatusDetail(item: any): string {
-  return item.shipGroupSeqId ? `${translate('#')}${item.shipGroupSeqId}` : '';
+  // A bare "#00002" reads as nothing in particular; say which sequence it belongs to.
+  return item.shipGroupSeqId ? `${translate('Shipgroup')} ${translate('#')}${item.shipGroupSeqId}` : '';
 }
 
 function itemLineTotal(item: any): number {

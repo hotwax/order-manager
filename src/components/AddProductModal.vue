@@ -26,8 +26,8 @@
           <DxpShopifyImg :src="product.mainImageUrl" />
         </ion-thumbnail>
         <ion-label>
-          <h2>{{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, product) ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, product) : product?.internalName }}</h2>
-          <p v-if="commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) !== 'null'">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) }}</p>
+          <h2>{{ productMaster.primaryId(product, [product?.internalName]) }}</h2>
+          <p v-if="productMaster.secondaryId(product)">{{ productMaster.secondaryId(product) }}</p>
         </ion-label>
 
         <!-- Show Add button if product is NOT in order -->
@@ -55,13 +55,13 @@
 import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonSearchbar, IonSpinner, IonText, IonThumbnail, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { checkmarkCircle, closeOutline } from "ionicons/icons";
 import { computed, onMounted, ref } from 'vue';
-import { translate, logger, commonUtil, useSolrSearch } from "@common";
-import { useProductStore } from '@/store/productStore';
+import { translate, logger, useSolrSearch } from "@common";
 import { useProductMaster } from '@/composables/useProductMaster';
+import { useProductStore } from '@/store/productStore';
 import { DxpShopifyImg } from '@common';
 
 const props = defineProps(["query", "addProductToQueue", "isProductInOrder", "pendingProductIds"]);
-const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+const productMaster = useProductMaster();
 
 const queryString = ref(props.query);
 const products = ref([]) as any;

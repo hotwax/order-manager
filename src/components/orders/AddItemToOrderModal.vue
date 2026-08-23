@@ -38,8 +38,8 @@
           <DxpShopifyImg :src="product.mainImageUrl" :key="product.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
-          <p class="overline">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) }}</p>
-          {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, product) ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, product) : product.productId }}
+          <p class="overline">{{ productMaster.secondaryId(product) }}</p>
+          {{ productMaster.primaryId(product, [product.productId]) }}
         </ion-label>
         <!-- Show success check if already added, spinner while adding, Add button otherwise -->
         <ion-icon v-if="addedProductIds.has(product.productId)" slot="end" color="success" :icon="checkmarkCircle" />
@@ -61,13 +61,13 @@
 <script setup lang="ts">
 import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonSearchbar, IonSpinner, IonThumbnail, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { checkmarkCircle, closeOutline } from 'ionicons/icons';
-import { ref, computed } from 'vue';
-import { api, commonUtil, DxpShopifyImg, translate } from '@common';
+import { ref } from 'vue';
+import { api, DxpShopifyImg, translate } from '@common';
 import { useSolrSearch } from '@common/composables/useSolrSearch';
+import { useProductMaster } from '@/composables/useProductMaster';
 import { showToast } from '@/utils';
-import { useProductStore } from '@/store/productStore';
 
-const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+const productMaster = useProductMaster();
 
 const props = defineProps<{
   orderId: string;

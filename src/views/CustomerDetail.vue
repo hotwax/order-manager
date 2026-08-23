@@ -490,6 +490,8 @@ import ErrorState from '@/components/common/ErrorState.vue';
 import CustomerOrderCard from '@/components/orders/CustomerOrderCard.vue';
 import RelationshipHistoryModal from '@/components/RelationshipHistoryModal.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
+import { useProductMaster } from '@/composables/useProductMaster';
+import { useProductCacheStore } from '@/store/productCache';
 import { useCustomerDetail } from '@/composables/useCustomerDetail';
 import router from '@/router';
 import { deleteCustomerDetails, indexCustomer } from '@/services/customer';
@@ -546,12 +548,20 @@ const {
   expireContact
 } = useCustomerDetail(() => props.customerId);
 
+const productMaster = useProductMaster();
+const productCache = useProductCacheStore();
+
 const mergingIds = ref<string[]>([]);
 
 const customerReturns = computed(() => customerReturnsSource.value as ReturnSummary[]);
 const customerCommunications = computed(() => customerCommunicationsSource.value as import('@/types/customer').CustomerCommunicationSummary[]);
 const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW));
 const hasActiveDuplicateRelationship = computed(() => duplicateRelationships.value.some((duplicate) => duplicate.active));
+
+watch(recentOrdersSource, (orders) => {
+  const productIds = orders.flatMap((order) => (order.items || []).map((item) => item.productId)).filter(Boolean);
+  if (productIds.length) void useProductMaster().prefetch(productIds);
+}, { immediate: true });
 
 const customerSince = computed(() => formatMonthYear(customerSinceRaw.value));
 const createdAtLabel = computed(() => (timeline.value[0]?.at ? formatTimestamp(timeline.value[0].at) : ''));
@@ -569,8 +579,8 @@ function mapOrder(order: CustomerOrderSummary): CustomerOrderCardData {
     isUnfillable: order.isUnfillable,
     items: (order.items || []).map((item) => ({
       productId: item.productId || '',
-      name: item.name || item.sku || 'Item',
-      secondary: item.sku || '',
+      name: productMaster.primaryId(productCache.getProduct(item.productId), [item.name, item.sku]) || 'Item',
+      secondary: productMaster.secondaryId(productCache.getProduct(item.productId), [item.sku]),
       imageUrl: item.imageUrl || ''
     }))
   };

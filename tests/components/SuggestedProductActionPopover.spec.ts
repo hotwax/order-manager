@@ -9,8 +9,10 @@ describe('suggested product action popover', () => {
     expect(source).toContain('<ion-list lines="full">');
     expect(source).toContain('<ion-list-header>');
     expect(source).toContain('popoverTitle');
-    expect(source).toContain('commonUtil.getProductIdentificationValue');
-    expect(source).toContain('productIdentificationPref.value.primaryId');
+    // Title is resolved through useProductMaster's shared primaryId(), not a hardcoded field
+    // or a direct call to getProductIdentificationValue — every item display goes through it.
+    expect(source).toContain('productMaster.primaryId(product,');
+    expect(source).not.toContain('commonUtil.getProductIdentificationValue');
     expect(source).toContain('function defaultCustomSwapSearchTerm');
     expect(source).toContain('product?.parentProductName');
     expect(source).toContain('defaultSearchKeyword: defaultCustomSwapSearchTerm(originalItem)');
