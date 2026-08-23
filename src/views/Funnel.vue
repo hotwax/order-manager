@@ -40,7 +40,7 @@
             <!-- Order Count today -->
             <h1 class="big-number">{{ (fulfillmentProgress.totalOrdersCount || 0).toLocaleString() }}</h1>
             <!-- Time since day start -->
-            <p class="time-elapsed">{{ timeSinceDayStart() }} {{ translate("hours since day start") }}</p>
+            <p class="time-elapsed">{{ hoursSinceDayStart }} {{ translate("hours since day start") }}</p>
           </div>
 
           <div class="metrics">
@@ -618,6 +618,8 @@ import { UNFILLABLE_FACILITY_ID, useCustomerServiceStore, type DashboardStatusKe
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
+import { useUserStore } from '@/store/user';
+import { useCurrentHourInZone } from '@/utils/funnelClock';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 import { DateTime } from 'luxon';
@@ -626,6 +628,10 @@ const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
 const seedStore = useSeedStore();
+const userStore = useUserStore();
+const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const selectedTimeZone = computed(() => userStore.getUserTimeZone || userStore.getUserProfile?.userTimeZone || browserTimeZone);
+const hoursSinceDayStart = useCurrentHourInZone(selectedTimeZone, browserTimeZone);
 
 // Per-section load status helpers. These drive loading affordances and error
 // states so the dashboard never renders default zeros/empty copy while a group
@@ -1279,10 +1285,6 @@ function handleBatchSizeChange(event: any) {
   }
 }
 
-function timeSinceDayStart() {
-  const now = DateTime.now();
-  return Math.floor(now.diff(now.startOf("day"), "hours").hours)
-}
 </script>
 
 <style scoped>
