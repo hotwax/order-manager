@@ -51,8 +51,11 @@
           v-else-if="productUrl(candidate.productId)"
           fill="outline"
           :href="productUrl(candidate.productId) || undefined"
+          target="_blank"
+          rel="noopener noreferrer"
         >
           {{ translate('Open in Products') }}
+          <ion-icon slot="end" :icon="openOutline" />
         </ion-button>
         <ion-button
           v-if="configuredProductIds.includes(candidate.productId)"
@@ -66,7 +69,9 @@
 </template>
 
 <script setup lang="ts">
+import { openOutline } from 'ionicons/icons';
 import {
+  IonIcon,
   IonButton,
   IonButtons,
   IonCard,

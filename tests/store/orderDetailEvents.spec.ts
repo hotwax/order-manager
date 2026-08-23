@@ -9,6 +9,7 @@ vi.mock('@common', async (importOriginal) => {
     ...actual,
     api: vi.fn(),
     cookieHelper: vi.fn(() => ({ get: vi.fn(), set: vi.fn(), remove: vi.fn() })),
+    logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn(), debug: vi.fn() },
   };
 });
 

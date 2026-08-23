@@ -27,7 +27,6 @@ for (const f of files) {
     for (const [m, op] of Object.entries(methods)) {
       if (typeof op !== 'object' || !op) continue;
       const params = (op.parameters ?? []).map(pa => `${pa.in}:${pa.name}${pa.required ? '*' : ''}`);
-      const has200 = !!op.responses?.['200'];
       const schema200 = op.responses?.['200']?.schema?.$ref || op.responses?.['200']?.schema?.type || '';
       ops.push({ p, m: m.toUpperCase(), summary: op.summary || '', params, schema200 });
     }

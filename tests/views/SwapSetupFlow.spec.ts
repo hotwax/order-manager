@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('Swap proactive setup flow', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/views/SwapOrders.vue'), 'utf8');
+  const panelSource = readFileSync(resolve(process.cwd(), 'src/components/swaps/SwapSetupPanel.vue'), 'utf8');
 
   it('shows filtered empty copy separately from proactive setup', () => {
     expect(source).toContain('!swapTasks.length && isSuccess && hasFilters');
@@ -21,5 +22,12 @@ describe('Swap proactive setup flow', () => {
     expect(source).toContain('fetchUnfillableShipGroupsForProduct(productStoreId, candidate.productId)');
     expect(source).toContain('orderTaskStore.brokerShipGroup({');
     expect(source).toContain('RoutingGroupModal');
+  });
+
+  it('marks the Products handoff as an external link', () => {
+    expect(panelSource).toContain(':href="productUrl(candidate.productId) || undefined"');
+    expect(panelSource).toContain('target="_blank"');
+    expect(panelSource).toContain('rel="noopener noreferrer"');
+    expect(panelSource).toContain('<ion-icon slot="end" :icon="openOutline" />');
   });
 });
