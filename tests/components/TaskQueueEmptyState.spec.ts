@@ -25,4 +25,9 @@ describe('TaskQueueEmptyState', () => {
     expect(source).toContain('https://help.shopify.com/en/manual/shopify-flow/reference/actions/create-order-risk-assessment');
     expect(source).toContain('rel="noopener noreferrer"');
   });
+
+  it('marks the Company setup action as an external link', () => {
+    expect(source).toContain(':href="companyCarrierUrl" target="_blank" rel="noopener noreferrer"');
+    expect(source).toContain('<ion-icon slot="end" :icon="openOutline" />');
+  });
 });
