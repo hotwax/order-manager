@@ -113,7 +113,7 @@
                 <ion-card-title>{{ translate('Data Fetch Status') }}</ion-card-title>
                 <ion-card-subtitle v-if="cacheSubtitle">{{ cacheSubtitle }}</ion-card-subtitle>
               </div>
-              <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()" :aria-label="translate('Refresh all')">
+              <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()">
                 <ion-spinner v-if="refreshing === '*'" name="dots" />
                 <ion-icon v-else slot="icon-only" :icon="syncOutline" />
               </ion-button>
@@ -128,7 +128,7 @@
                 <p v-if="item.status === 'success' && item.count !== undefined">{{ translate("Fetched") }} {{ item.count }} {{ translate("records") }}</p>
                 <p v-else>{{ translate(getStatusLabel(item.status)) }}</p>
               </ion-label>
-              <ion-button slot="end" fill="clear" @click="item.refresh()" :aria-label="translate('Refresh data')">
+              <ion-button slot="end" fill="clear" @click="item.refresh()">
                 <ion-icon slot="icon-only" :icon="syncOutline" />
               </ion-button>
             </ion-item>
@@ -148,7 +148,7 @@
                   <template v-else> · {{ translate("not synced yet") }}</template>
                 </p>
               </ion-label>
-              <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)" :aria-label="translate('Refresh data')">
+              <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)">
                 <ion-spinner v-if="refreshing === domain.name" name="dots" />
                 <ion-icon v-else slot="icon-only" :icon="syncOutline" />
               </ion-button>
