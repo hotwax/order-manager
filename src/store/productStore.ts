@@ -42,7 +42,6 @@ export const useProductStore = defineStore('productStore', {
     },
 
     async fetchProductStores() {
-      let stores = []
       try {
         const payload = {
           fieldsToSelect: ["productStoreId", "storeName"],
@@ -56,16 +55,19 @@ export const useProductStore = defineStore('productStore', {
         });
 
         if (!commonUtil.hasError(resp)) {
-          stores = resp.data
+          const stores = resp.data
+          this.productStores = stores
+          if (stores.length) {
+            const selectedStore = stores.find((store: any) => store.productStoreId === this.currentProductStore?.productStoreId)
+            this.currentProductStore = selectedStore || stores[0]
+          } else {
+            this.currentProductStore = {}
+          }
         } else {
           throw resp.data
         }
       } catch (err) {
         logger.error("Failed to fetch product stores", err)
-      }
-      this.productStores = stores
-      if (stores.length && !this.currentProductStore?.productStoreId) {
-        this.currentProductStore = stores[0]
       }
     },
 
@@ -84,8 +86,12 @@ export const useProductStore = defineStore('productStore', {
         const preferredStoreId = preferredStoreResp.data?.[0]?.preferenceValue
         if (preferredStoreId) {
           const store = this.productStores?.find((store: any) => store.productStoreId === preferredStoreId);
-          store && this.setCurrentProductStore(store)
-        } else if (this.productStores?.length && !this.currentProductStore?.productStoreId) {
+          if (store) {
+            this.setCurrentProductStore(store)
+            return
+          }
+        }
+        if (this.productStores?.length && !this.productStores.some((store: any) => store.productStoreId === this.currentProductStore?.productStoreId)) {
           this.setCurrentProductStore(this.productStores[0])
         }
       } catch (err) {

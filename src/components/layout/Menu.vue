@@ -221,7 +221,7 @@ onMounted(async () => {
   refreshSelectedZoneTime();
   clockTimer = setInterval(refreshSelectedZoneTime, 30000);
 
-  if (isAuthenticated.value && !productStores.value.length) {
+  if (isAuthenticated.value) {
     await productStore.fetchProductStores();
     await productStore.fetchProductStorePreference();
   }
