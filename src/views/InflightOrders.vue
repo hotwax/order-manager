@@ -105,7 +105,6 @@ import {
   IonHeader,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
-  IonItem,
   IonLabel,
   IonList,
   IonListHeader,

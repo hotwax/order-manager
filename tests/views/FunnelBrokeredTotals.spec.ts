@@ -14,9 +14,10 @@ describe('Funnel Brokered workload totals', () => {
   });
 
   it('navigates to the unfiltered operational queues', () => {
-    expect(source).toContain('router-link="/open"');
-    expect(source).toContain('router-link="/inflight"');
-    expect(source).toContain('router-link="/packed"');
+    for (const path of ['/open', '/inflight', '/packed']) {
+      expect(source).toContain(`:href="routeHref('${path}')"`);
+      expect(source).toContain(`@click="navigateRoute($event, '${path}')"`);
+    }
     expect(source).not.toContain("{ path: '/open', query: { dateFrom: todayDateStr } }");
     expect(source).not.toContain("{ path: '/inflight', query: { dateFrom: todayDateStr } }");
     expect(source).not.toContain("{ path: '/packed', query: { dateFrom: todayDateStr } }");
