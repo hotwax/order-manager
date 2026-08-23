@@ -622,7 +622,7 @@ import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
-import { useCurrentHourInZone } from '@/utils/funnelClock';
+import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
 import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
 import { facilityProgressAccessibleName } from '@/utils/funnelProgress';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
@@ -638,7 +638,7 @@ const userStore = useUserStore();
 const router = useRouter();
 const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const selectedTimeZone = computed(() => userStore.getUserTimeZone || userStore.getUserProfile?.userTimeZone || browserTimeZone);
-const hoursSinceDayStart = useCurrentHourInZone(selectedTimeZone, browserTimeZone);
+const hoursSinceDayStart = useElapsedHoursSinceDayStart(selectedTimeZone, browserTimeZone);
 
 function routeHref(destination: RouteLocationRaw) {
   return nativeRouteHref(router, destination);
@@ -976,6 +976,7 @@ watch(selectedProductStoreId, (productStoreId, previousProductStoreId) => {
   if (productStoreId !== previousProductStoreId) {
     selectedFacilityId.value = '';
   }
+  if (!productStore.isProductStoreInitialized) return;
   refreshDashboardData();
 });
 
@@ -1065,7 +1066,8 @@ const fulfillmentStageMetrics = computed(() => {
   ];
 });
 
-onIonViewWillEnter(() => {
+onIonViewWillEnter(async () => {
+  await productStore.initializeProductStore();
   refreshDashboardData();
 });
 
