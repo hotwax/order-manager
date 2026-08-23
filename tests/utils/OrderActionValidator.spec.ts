@@ -97,7 +97,7 @@ describe('getOrderFooterActions (unified footer)', () => {
     expect(actions.find((a) => a.id === 'CLONE')!.kind).toBe('footer');
   });
 
-  it('the cancel button morphs: "Cancel order" with no selection, "Cancel items" once items are selected (never both)', () => {
+  it('keeps the bulk "Cancel items" half hidden while cancel does not sync to Shopify, leaving whole-order cancel intact', () => {
     const noSelection = OrderActionValidator.getOrderFooterActions(createdOrder, createdOrderTransitions(), [], { allItems: [] });
     expect(noSelection.map((a) => a.id)).toContain('ORDER_CANCELLED');
     expect(noSelection.map((a) => a.id)).not.toContain('CANCEL_ITEMS');
@@ -109,20 +109,30 @@ describe('getOrderFooterActions (unified footer)', () => {
       selected,
       { allItems: selected, orderAllowedToStatusIds: new Set(['ORDER_APPROVED', 'ORDER_CANCELLED']) }
     );
-    expect(withSelection.map((a) => a.id)).toContain('CANCEL_ITEMS');
-    expect(withSelection.map((a) => a.id)).not.toContain('ORDER_CANCELLED');
-    // morphing cancel stays on the end (kind 'footer') so it converts in place
-    expect(withSelection.find((a) => a.id === 'CANCEL_ITEMS')!.kind).toBe('footer');
+    // selecting items no longer morphs the button into the bulk cancel...
+    expect(withSelection.map((a) => a.id)).not.toContain('CANCEL_ITEMS');
+    // ...it stays the whole-order cancel, still on the end so the button never disappears
+    expect(withSelection.map((a) => a.id)).toContain('ORDER_CANCELLED');
+    expect(withSelection.find((a) => a.id === 'ORDER_CANCELLED')!.kind).toBe('footer');
   });
 
-  it('surfaces Return once the order has a completed item', () => {
+  it('keeps Return out of the footer while returns do not sync to Shopify', () => {
     const actions = OrderActionValidator.getOrderFooterActions(
       createdOrder,
       createdOrderTransitions(),
       [],
       { allItems: [{ statusId: 'ITEM_COMPLETED' }] }
     );
-    expect(actions.map((a) => a.id)).toContain('RETURN');
+    expect(actions.map((a) => a.id)).not.toContain('RETURN');
+  });
+
+  it('still validates the hidden bulk actions, so clearing the flag restores them', () => {
+    const selected = [{ orderItemSeqId: '1', statusId: 'ITEM_CREATED' }];
+    const cancellable = OrderActionValidator.getFooterActions(createdOrder, selected, { allItems: selected });
+    expect(cancellable.find((a) => a.id === 'CANCEL_ITEMS')!.validation.allowed).toBe(true);
+
+    const returnable = OrderActionValidator.getFooterActions(createdOrder, [], { allItems: [{ statusId: 'ITEM_COMPLETED' }] });
+    expect(returnable.find((a) => a.id === 'RETURN')!.validation.allowed).toBe(true);
   });
 
   it('a terminal order yields no status transitions (Clone still valid)', () => {
@@ -178,6 +188,28 @@ describe('ship-group fulfillment approval gate', () => {
       virtualShipGroup,
       'RELEASE',
       selectedItems,
+      { isVirtual: true }
+    ).allowed).toBe(true);
+  });
+
+  it('treats the item list as a filter, not a precondition', () => {
+    // The view passes the whole ship group when nothing is checked, so an
+    // empty list means the ship group itself has nothing to act on.
+    const empty = OrderActionValidator.validateShipGroupAction(
+      approvedOrder,
+      virtualShipGroup,
+      'PARK_ITEMS',
+      [],
+      { isVirtual: true }
+    );
+    expect(empty.allowed).toBe(false);
+    expect(empty.reason).toBe('This ship group has no items to park.');
+
+    expect(OrderActionValidator.validateShipGroupAction(
+      approvedOrder,
+      virtualShipGroup,
+      'PARK_ITEMS',
+      [{ orderItemSeqId: '01', statusId: 'ITEM_CREATED' }, { orderItemSeqId: '02', statusId: 'ITEM_CANCELLED' }],
       { isVirtual: true }
     ).allowed).toBe(true);
   });

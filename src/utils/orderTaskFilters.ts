@@ -24,6 +24,8 @@ export function buildTaskQueueRequest(
     params.orderName_op = 'contains';
   }
   if (filters.salesChannelEnumId !== 'All') params.salesChannelEnumId = filters.salesChannelEnumId;
+  // `workEffortPurposeTypeId` is deliberately not set here: the store owns it,
+  // because 'All' on the Hold queue is a NOT-IN query rather than an absent param.
 
   addDateRange(params, 'orderDate', filters.orderDateFrom, filters.orderDateThru);
   addDateRange(params, 'workEffortCreatedDate', filters.taskCreatedFrom, filters.taskCreatedThru);
@@ -43,6 +45,7 @@ export function buildTaskQueueRequest(
 export function hasTaskFilters(filters: OrderTaskFilters): boolean {
   return !!(
     filters.query.trim()
+    || filters.workEffortPurposeTypeId !== 'All'
     || filters.salesChannelEnumId !== 'All'
     || filters.orderDateFrom
     || filters.orderDateThru

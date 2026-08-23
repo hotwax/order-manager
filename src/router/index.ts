@@ -6,6 +6,7 @@ import { useUserStore } from '@/store/user';
 import { showToast } from '@/utils';
 import OrderSearch from '@/views/OrderSearch.vue';
 import OrderDetail from '@/views/OrderDetail.vue';
+import Returns from '@/views/Returns.vue';
 import ReturnDetail from '@/views/ReturnDetail.vue';
 import Customers from '@/views/Customers.vue';
 import CustomerDetail from '@/views/CustomerDetail.vue';
@@ -67,13 +68,22 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/returns',
+    name: 'Returns',
+    component: Returns,
+    beforeEnter: authGuard,
+    meta: {
+      permissionId: Actions.APP_ORDER_RETURN_VIEW
+    }
+  },
+  {
     path: '/returns/:returnId',
     name: 'ReturnDetail',
     component: ReturnDetail,
     props: true,
     beforeEnter: authGuard,
     meta: {
-      permissionId: `${Actions.APP_ORDERS_VIEW} OR ${Actions.APP_CUSTOMERS_VIEW}`
+      permissionId: Actions.APP_ORDER_RETURN_VIEW
     }
   },
   {

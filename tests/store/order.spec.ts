@@ -4,14 +4,18 @@ import { api } from '@common';
 import { useOrderStore } from '@/store/order';
 import { fetchOrderRowEnrichment } from '@/services/order';
 
-vi.mock('@common', () => ({
-  api: vi.fn(),
-  cookieHelper: vi.fn(() => ({
-    get: vi.fn(),
-    set: vi.fn(),
-    remove: vi.fn(),
-  })),
-}));
+vi.mock('@common', async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    api: vi.fn(),
+    cookieHelper: vi.fn(() => ({
+      get: vi.fn(),
+      set: vi.fn(),
+      remove: vi.fn(),
+    })),
+  };
+});
 
 vi.mock('@/store/seed', () => ({
   useSeedStore: vi.fn(() => ({
@@ -120,6 +124,39 @@ describe('order workflow store', () => {
       M100001: { orderId: 'M100001', itemDocuments: [] },
       M100003: { orderId: 'M100003', itemDocuments: [] }
     });
+  });
+
+  it('sends the selected workflow sort as the OMS orderByField', async () => {
+    const store = useOrderStore();
+    const filters = {
+      query: '', customerName: '', productStoreId: 'All', salesChannelEnumId: 'All',
+      facilityId: 'All', shipmentMethodTypeId: 'All', priority: null, dateFrom: '', dateThru: '',
+      sort: 'highestTotal'
+    };
+    vi.mocked(api).mockResolvedValue({ data: { ordersCount: 0, orders: [] } });
+
+    await store.fetchWorkflowOrders('packed', filters as any);
+
+    expect(api).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'oms/orders/salesOrders/packed',
+      params: expect.objectContaining({ orderByField: '-grandTotal,-orderId' })
+    }));
+  });
+
+  // A store persisted before the sort control existed rehydrates without a `sort` key, so the
+  // queue must still ask for a valid order instead of sending orderByField=undefined.
+  it('falls back to the default sort when filters carry no sort', async () => {
+    const store = useOrderStore();
+    vi.mocked(api).mockResolvedValue({ data: { ordersCount: 0, orders: [] } });
+
+    await store.fetchWorkflowOrders('open', {
+      query: '', customerName: '', productStoreId: 'All', salesChannelEnumId: 'All',
+      facilityId: 'All', shipmentMethodTypeId: 'All', priority: null, dateFrom: '', dateThru: ''
+    } as any);
+
+    expect(api).toHaveBeenCalledWith(expect.objectContaining({
+      params: expect.objectContaining({ orderByField: 'orderDate,orderId' })
+    }));
   });
 
   it('clears workflow enrichment when filters replace the result set', async () => {

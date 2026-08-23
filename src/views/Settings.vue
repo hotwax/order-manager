@@ -70,20 +70,6 @@
 
         <ion-card>
           <ion-card-header>
-            <ion-card-title>{{ translate("Barcode Identifier") }}</ion-card-title>
-          </ion-card-header>
-          <ion-card-content>
-            {{ translate("Specify which product identifier should be used to scan barcodes to look up products.") }}
-          </ion-card-content>
-          <ion-item lines="none">
-            <ion-select :label="translate('Barcode Identifier')" interface="popover" :placeholder="translate('Select')" :value="barcodeIdentificationPref" @ionChange="setBarcodeIdentificationPref($event.detail.value)">
-              <ion-select-option v-for="identification in barcodeIdentificationOptions" :key="identification.goodIdentificationTypeId" :value="identification.goodIdentificationTypeId">{{ identification.description ? identification.description : identification.goodIdentificationTypeId }}</ion-select-option>
-            </ion-select>
-          </ion-item>
-        </ion-card>
-
-        <ion-card>
-          <ion-card-header>
             <ion-card-title>{{ translate("Timezone") }}</ion-card-title>
           </ion-card-header>
           <ion-card-content>
@@ -118,6 +104,56 @@
               <ion-select-option value="es-ES">Español</ion-select-option>
             </ion-select>
           </ion-item>
+        </ion-card>
+
+        <ion-card>
+          <ion-card-header>
+            <div class="card-header">
+              <div>
+                <ion-card-title>{{ translate('Data Fetch Status') }}</ion-card-title>
+                <ion-card-subtitle v-if="cacheSubtitle">{{ cacheSubtitle }}</ion-card-subtitle>
+              </div>
+              <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()">
+                <ion-spinner v-if="refreshing === '*'" name="dots" />
+                <ion-icon v-else slot="icon-only" :icon="syncOutline" />
+              </ion-button>
+            </div>
+          </ion-card-header>
+          <ion-list lines="none">
+            <!-- Session data: held in memory, not in the local cache. -->
+            <ion-item v-for="item in sessionFetchStatus" :key="item.label">
+              <ion-icon slot="start" :icon="getStatusIcon(item.status)" :color="getStatusColor(item.status)" />
+              <ion-label>
+                {{ item.label }}
+                <p v-if="item.status === 'success' && item.count !== undefined">{{ translate("Fetched") }} {{ item.count }} {{ translate("records") }}</p>
+                <p v-else>{{ translate(getStatusLabel(item.status)) }}</p>
+              </ion-label>
+              <ion-button slot="end" fill="clear" @click="item.refresh()">
+                <ion-icon slot="icon-only" :icon="syncOutline" />
+              </ion-button>
+            </ion-item>
+
+            <!-- Local cache (IndexedDB): live row counts straight from the database. -->
+            <ion-item-divider>
+              <ion-label>{{ translate("Local cache") }} · {{ totalRows }} {{ translate("records") }}</ion-label>
+            </ion-item-divider>
+            <ion-item v-for="domain in domains" :key="domain.name">
+              <ion-icon slot="start" :icon="getStatusIcon(domain.status)" :color="getStatusColor(domain.status)" />
+              <ion-label>
+                {{ translate(domain.label) }}
+                <p>
+                  {{ domain.count }} {{ translate("records") }}
+                  <template v-if="domain.syncedAt"> · {{ translate("synced") }} {{ formatSyncTime(domain.syncedAt) }}</template>
+                  <template v-else-if="domain.syncClass === 'A'"> · {{ translate("live while in use") }}</template>
+                  <template v-else> · {{ translate("not synced yet") }}</template>
+                </p>
+              </ion-label>
+              <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)">
+                <ion-spinner v-if="refreshing === domain.name" name="dots" />
+                <ion-icon v-else slot="icon-only" :icon="syncOutline" />
+              </ion-button>
+            </ion-item>
+          </ion-list>
         </ion-card>
       </section>
 
@@ -184,14 +220,17 @@
 </template>
 
 <script setup lang="ts">
-import { IonAvatar, IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonPage, IonRadio, IonRadioGroup, IonSearchbar, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToolbar } from '@ionic/vue';
-import { closeOutline, openOutline, saveOutline } from 'ionicons/icons';
+import { IonAvatar, IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonPage, IonRadio, IonRadioGroup, IonSearchbar, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToolbar } from '@ionic/vue';
+import { checkmarkCircle, closeCircle, closeOutline, openOutline, saveOutline, syncOutline } from 'ionicons/icons';
 import { DateTime } from 'luxon';
 import { computed, onBeforeMount, ref } from 'vue';
 import { api, commonUtil, cookieHelper, i18n, translate } from '@common';
+import { useCacheStatus } from '@common/cache';
 import { useAuth } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';
-import { useProductStore } from '@/store/productStore'
+import { useProductStore } from '@/store/productStore';
+import { orderManagerDb } from '@/cache/appCacheDb';
+import { ORDER_MANAGER_CACHE_CATALOG } from '@/config/appSyncConfig';
 import DxpProductIdentifier from "@/components/settings/DxpProductIdentifier.vue";
 import DxpAppVersionInfo from "@/components/settings/DxpAppVersionInfo.vue";
 import Actions from "@/authorization/actions";
@@ -200,17 +239,9 @@ const userStore = useUserStore();
 const userProfile = computed(() => userStore.getUserProfile);
 const currentProductStore = computed(() => useProductStore().getCurrentProductStore);
 const productStores = computed(() => useProductStore().getProductStores || []);
-const barcodeIdentificationPref = computed(() => useProductStore().getBarcodeIdentifierPref);
-const barcodeIdentificationOptions = computed(() => useProductStore().getBarcodeIdentifierOptions);
 const timeZones = computed(() => userStore.getAvailableTimeZones);
 const currentTimeZone = computed(() => userStore.getUserTimeZone || userProfile.value?.userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone);
 const omsInstance = computed(() => cookieHelper().get('oms') || userStore.oms);
-const appInfo = (import.meta.env.VITE_VERSION_INFO ? JSON.parse(import.meta.env.VITE_VERSION_INFO as string) : {}) as any;
-const appVersion = computed(() => {
-  if (appInfo.branch && appInfo.revision) return `${appInfo.branch}-${appInfo.revision}`;
-  return appInfo.tag || appInfo.version || '0.1.0';
-});
-const builtDateTime = computed(() => appInfo.builtTime ? DateTime.fromMillis(appInfo.builtTime).setZone(currentTimeZone.value).toLocaleString(DateTime.DATETIME_MED) : '');
 const userInitials = computed(() => {
   const name = userProfile.value?.userFullName || userProfile.value?.partyId || userProfile.value?.userId || '';
   return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]?.toUpperCase()).join('') || 'OM';
@@ -290,14 +321,6 @@ function setCurrentProductStore(event: CustomEvent) {
   }
 }
 
-async function setBarcodeIdentificationPref(value: string) {
-  await useProductStore().setProductStoreSetting(
-    currentProductStore.value.productStoreId,
-    "BARCODE_IDEN_PREF",
-    value
-  )
-}
-
 async function saveUserTimeZone() {
   await userStore.setUserTimeZone(timeZoneId.value);
   closeModal();
@@ -341,4 +364,94 @@ function clearSearch() {
   filteredTimeZones.value = [];
   isLoading.value = true;
 }
+
+// Live IndexedDB cache status
+const {
+  domains, refreshing, totalRows, oldestSyncedAt, lastSyncedAt, refreshDomain, refreshAll,
+} = useCacheStatus(orderManagerDb, ORDER_MANAGER_CACHE_CATALOG);
+
+const formatSyncTime = (millis: number) =>
+  DateTime.fromMillis(millis).toLocaleString(DateTime.DATETIME_MED);
+
+const cacheSubtitle = computed(() => {
+  if (!lastSyncedAt.value) return translate("Cache not synced yet");
+  const parts = [`${translate("Last sync:")} ${formatSyncTime(lastSyncedAt.value)}`];
+  if (oldestSyncedAt.value && oldestSyncedAt.value !== lastSyncedAt.value) {
+    parts.push(`${translate("oldest:")} ${formatSyncTime(oldestSyncedAt.value)}`);
+  }
+  return parts.join(" · ");
+});
+
+const userFetchStatus = computed(() => userStore.fetchStatus);
+
+const sessionFetchStatus = computed(() => [
+  {
+    label: translate("User Profile"),
+    status: userFetchStatus.value.profile,
+    count: userProfile.value ? 1 : 0,
+    refresh: () => userStore.fetchUserProfile()
+  },
+  {
+    label: translate("Permissions"),
+    status: userFetchStatus.value.permissions,
+    count: userStore.permissions?.length || 0,
+    refresh: () => userStore.fetchPermissions()
+  }
+]);
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case 'success': return checkmarkCircle;
+    case 'error': return closeCircle;
+    case 'pending': return syncOutline;
+    default: return syncOutline;
+  }
+};
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case 'success': return 'success';
+    case 'error': return 'danger';
+    case 'pending': return 'medium';
+    default: return 'medium';
+  }
+};
+
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case 'success': return 'Success';
+    case 'error': return 'Error';
+    case 'pending': return 'Pending';
+    default: return 'Not fetched';
+  }
+};
 </script>
+
+<style scoped>
+ion-card > ion-button {
+  margin: var(--spacer-xs);
+}
+section {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  align-items: start;
+}
+.user-profile {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+}
+hr {
+  border-top: 1px solid var(--border-medium);
+}
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacer-xs) 10px 0px;
+}
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+</style>

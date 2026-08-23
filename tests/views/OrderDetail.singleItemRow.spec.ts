@@ -42,7 +42,7 @@ describe('order detail single item rows', () => {
     expect(soloRow).toContain(':status-detail="itemStatusDetail(soleItem)"');
     expect(soloRow).toContain(':amount="money(itemLineTotal(soleItem), order.currency)"');
     expect(soloRow).toContain(':adjustments="getItemAdjustmentRows(soleItem)"');
-    expect(soloRow).toContain('@facility-click="rejectAndReleaseItem(soleItem, group.productId)"');
+    expect(soloRow).toContain('@facility-click="rejectAndReleaseItem(soleItem)"');
     expect(soloRow).toContain('@attributes-click="openItemAttributesModal(soleItem)"');
     expect(soloRow).toContain('@click.stop="cancelSingleItem(soleItem)"');
   });

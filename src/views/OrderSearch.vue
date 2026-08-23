@@ -160,7 +160,7 @@
       <ion-toolbar>
         <ion-title size="small">{{ selectedOrderIds.length }} {{ translate('selected') }}</ion-title>
         <ion-buttons slot="end" class="bulk-action-buttons">
-          <ion-button :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
+          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
           <ion-button :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
           <ion-button :disabled="!selectedOrderIds.length || !canCreateOrderTasks" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
         </ion-buttons>
@@ -200,7 +200,7 @@ import { translate } from '@common';
 import { chevronDownOutline } from 'ionicons/icons';
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useOrderStore } from '@/store/order';
+import { useOrderStore, DEFAULT_ORDER_SEARCH_SORT } from '@/store/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
@@ -217,6 +217,7 @@ import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import { toSearchOrderRowViewModel } from '@/utils/orderRows';
 import { showToast } from '@/utils';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import Actions from "@/authorization/actions";
 
 const orderStore = useOrderStore();
@@ -263,7 +264,7 @@ const someCurrentPageSelected = computed(() => {
 const canCancelOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_CANCEL));
 const canUpdateOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_UPDATE));
 const canCreateOrderTasks = computed(() => userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE));
-const canUseBulkActions = computed(() => canCancelOrders.value || canUpdateOrders.value || canCreateOrderTasks.value);
+const canUseBulkActions = computed(() => (!HIDE_SHOPIFY_UNSYNCED_ACTIONS && canCancelOrders.value) || canUpdateOrders.value || canCreateOrderTasks.value);
 
 onMounted(async () => {
   orderStore.searchFilters.productStoreId = selectedProductStoreId.value;
@@ -354,7 +355,7 @@ async function openEditShippingMethodModal() {
 
 function clearFilters() {
   orderStore.searchQuery = '';
-  orderStore.searchSort = 'orderDate desc';
+  orderStore.searchSort = DEFAULT_ORDER_SEARCH_SORT;
   selectedOrderIds.value = [];
   orderStore.searchFilters = {
     status: [],

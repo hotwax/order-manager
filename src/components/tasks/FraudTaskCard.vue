@@ -95,6 +95,7 @@ import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import type { TaskCardAction } from '@/types/taskCard';
@@ -114,10 +115,10 @@ const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 
-const cardActions = computed<TaskCardAction[]>(() => [
+const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'resolve', label: translate('Resolve task'), kind: 'primary' },
   { id: 'cancel', label: translate('Cancel order'), kind: 'danger' },
-]);
+] as TaskCardAction[]).filter((action) => !(HIDE_SHOPIFY_UNSYNCED_ACTIONS && action.id === 'cancel')));
 
 const taskFacts = computed<any[]>(() => (props.task.risks || []).flatMap((risk: any) => risk.facts || []));
 const negativeFacts = computed(() => taskFacts.value.filter((fact) => fact.sentimentEnumId === 'SENT_NEGATIVE'));

@@ -75,8 +75,10 @@ const copy = {
     message: 'Shopify orders appear here when risk recommends Investigate, or when it recommends Cancel and automatic cancellation is off. Review Shopify fraud-analysis eligibility and configure how high-risk orders should be handled.',
   },
   hold: {
-    title: 'No manual holds',
-    message: 'Create a hold from an order\'s Holds tab, or select orders in Find Order and choose Add task.',
+    // This queue is every hold purpose without its own page, not just manual ones,
+    // so the copy covers system-raised holds alongside the operator-created ones.
+    title: 'No open holds',
+    message: 'Holds without a dedicated queue appear here. Create one from an order\'s Holds tab, or select orders in Find Order and choose Add task.',
   },
 } as const;
 

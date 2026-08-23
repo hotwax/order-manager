@@ -96,6 +96,24 @@ export interface CustomerOrderSummary {
   }>;
 }
 
+/** View-model a CustomerOrderSummary is mapped to before it is rendered as an order card. */
+export interface CustomerOrderCardData {
+  id: string;
+  name: string;
+  subtitle: string;
+  progressLabel: string;
+  progressValue: number;
+  progressColor: string;
+  orderDate: string;
+  isUnfillable: boolean;
+  items: Array<{
+    productId: string;
+    name: string;
+    secondary: string;
+    imageUrl: string;
+  }>;
+}
+
 export interface CustomerTaskSummary {
   workEffortId: string;
   workEffortName: string;
@@ -117,31 +135,6 @@ export interface CustomerTaskSummary {
   notes?: string;
   resolution?: string;
   dueDate?: string;
-}
-
-export interface CustomerReturnSummary {
-  returnId: string;
-  externalId?: string;
-  statusId: string;
-  entryDate: string;
-  returnTotal: number;
-  currencyUomId: string;
-  destinationFacilityId?: string;
-  returnChannelEnumId?: string;
-  itemCount: number;
-  items: Array<{
-    returnItemSeqId: string;
-    productId?: string;
-    orderId?: string;
-    orderItemSeqId?: string;
-    statusId: string;
-    returnReasonId?: string;
-    returnTypeId?: string;
-    returnQuantity: number;
-    receivedQuantity?: number;
-    returnPrice: number;
-    description?: string;
-  }>;
 }
 
 export interface CustomerCommunicationSummary {

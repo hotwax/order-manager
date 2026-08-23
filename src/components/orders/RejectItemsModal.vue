@@ -60,23 +60,37 @@ function confirm() {
 }
 
 async function loadRejectionReasons() {
-  isLoading.value = true;
-  try {
-    await Promise.all([
-      seed.loadEnumsByParentType('REPORT_AN_ISSUE'),
-      seed.loadEnumsByParentType('RPRT_NO_VAR_LOG'),
-    ]);
-    const reasons = [
-      ...seed.getEnumsByParentType('REPORT_AN_ISSUE'),
-      ...seed.getEnumsByParentType('RPRT_NO_VAR_LOG'),
-    ];
-    // Deduplicate by enumId
+  const cachedReasons = [
+    ...seed.getEnumsByParentType('REPORT_AN_ISSUE'),
+    ...seed.getEnumsByParentType('RPRT_NO_VAR_LOG'),
+  ];
+  if (cachedReasons.length) {
     const seen = new Set<string>();
-    rejectionReasons.value = reasons.filter((r) => {
+    rejectionReasons.value = cachedReasons.filter((r) => {
       if (seen.has(r.enumId)) return false;
       seen.add(r.enumId);
       return true;
     });
+  } else {
+    isLoading.value = true;
+  }
+  try {
+    if (!cachedReasons.length) {
+      await Promise.all([
+        seed.loadEnumsByParentType('REPORT_AN_ISSUE'),
+        seed.loadEnumsByParentType('RPRT_NO_VAR_LOG'),
+      ]);
+      const reasons = [
+        ...seed.getEnumsByParentType('REPORT_AN_ISSUE'),
+        ...seed.getEnumsByParentType('RPRT_NO_VAR_LOG'),
+      ];
+      const seen = new Set<string>();
+      rejectionReasons.value = reasons.filter((r) => {
+        if (seen.has(r.enumId)) return false;
+        seen.add(r.enumId);
+        return true;
+      });
+    }
   } finally {
     isLoading.value = false;
   }

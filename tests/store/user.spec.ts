@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
-import { useUserStore } from '@/store/user';
+import { useProductStore } from '@/store/productStore';
 import { api } from '@common';
 
 vi.mock('@common', () => ({
@@ -21,7 +21,7 @@ vi.mock('@common/composables/useAuth', () => ({
   }),
 }));
 
-describe('user store', () => {
+describe('product store', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.mocked(api).mockReset();
@@ -35,19 +35,16 @@ describe('user store', () => {
       ],
     });
 
-    const userStore = useUserStore();
-    await userStore.fetchProductStores();
+    const productStore = useProductStore();
+    await productStore.fetchProductStores();
 
-    expect(api).toHaveBeenCalledWith({
-      url: 'admin/productStores',
-      method: 'get',
-      baseURL: 'https://maarg.example/rest/s1/',
-    });
-    expect(userStore.current.stores).toEqual([
+    expect(api).toHaveBeenCalledWith(expect.objectContaining({
+      url: '/admin/productStores',
+      method: 'GET',
+    }));
+    expect(productStore.getProductStores).toEqual([
       { productStoreId: 'STORE_A', storeName: 'Store A' },
       { productStoreId: 'STORE_B', storeName: 'Store B' },
-      { productStoreId: '', storeName: 'None' },
     ]);
-    expect(userStore.currentProductStore).toEqual({ productStoreId: 'STORE_A', storeName: 'Store A' });
   });
 });

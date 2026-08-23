@@ -24,7 +24,7 @@ const IonLabelStub = defineComponent({
 });
 
 describe('Funnel hold task rows', () => {
-  it('renders every configured purpose and routes specialized and future purposes correctly', () => {
+  it('renders every configured purpose alphabetically and routes specialized and future purposes correctly', () => {
     const wrapper = mount(HoldTaskCountList, {
       props: {
         holdTaskCounts: [
@@ -48,13 +48,22 @@ describe('Funnel hold task rows', () => {
     const rows = wrapper.findAllComponents(IonItemStub);
 
     expect(rows).toHaveLength(6);
+    // Rows are sorted by their rendered label, not by the order the API returned them.
+    expect(rows.map((row) => row.text().replace(/\d+ tasks$/, '').trim())).toEqual([
+      'Bad Address',
+      'Customer Requested Hold',
+      'Fraud Risk',
+      'Future Hold',
+      'Manual Hold',
+      'Substitute',
+    ]);
     expect(rows.map((row) => row.props('routerLink'))).toEqual([
-      '/swap',
       '/bad-address',
-      '/fraud',
-      { path: '/hold', query: { purpose: 'ORD_HOLD_MANUAL' } },
       { path: '/hold', query: { purpose: 'ORD_HOLD_CUST_REQ' } },
+      '/fraud',
       { path: '/hold', query: { purpose: 'FUTURE_HOLD' } },
+      { path: '/hold', query: { purpose: 'ORD_HOLD_MANUAL' } },
+      '/swap',
     ]);
     expect(wrapper.text()).toContain('Substitute4 tasks');
     expect(wrapper.text()).toContain('Bad Address3 tasks');

@@ -28,7 +28,12 @@
             @ion-change="toggleCurrentPageSelection($event.detail.checked)"
           />
           <ion-label>{{ resultsSummary }}</ion-label>
-          <ion-button fill="clear" size="small" @click="toggleSelectMode">
+          <OrderSortPopover
+            v-model="filters.sort"
+            :options="sortOptions"
+            trigger-id="packed-order-sort-trigger"
+          />
+          <ion-button v-if="actions.length" fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
@@ -64,7 +69,7 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <ion-footer v-if="selectMode">
+    <ion-footer v-if="selectMode && actions.length">
       <ion-toolbar>
         <ion-title size="small">{{ selectedIds.size }} {{ translate('selected') }}</ion-title>
         <ion-buttons slot="end">
@@ -119,9 +124,11 @@ import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
+import { WORKFLOW_ORDER_SORT_OPTIONS } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
+import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, translate } from '@common';
 import router from '@/router';
@@ -176,6 +183,7 @@ const resultsSummary = computed(() =>
   `${orders.value.length} of ${orderTotal.value} ${orderTotal.value === 1 ? translate('order') : translate('orders')}`
 );
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
+const sortOptions = WORKFLOW_ORDER_SORT_OPTIONS;
 
 function orderRow(order: WorkflowOrder) {
   return toWorkflowOrderRowViewModel(order, orderStore.workflowEnrichment(bucket, order.orderId));
@@ -266,7 +274,8 @@ watch(
     filters.value.facilityId,
     filters.value.shipmentMethodTypeId,
     filters.value.dateFrom,
-    filters.value.dateThru
+    filters.value.dateThru,
+    filters.value.sort
   ],
   loadWorkflowOrders
 );

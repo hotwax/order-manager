@@ -86,10 +86,10 @@
           />
         </div>
 
-       <ion-infinite-scroll
-          @ionInfinite="loadMoreSwapTasks($event)"
+        <ion-infinite-scroll
+          :disabled="!isScrollable"
           threshold="100px"
-          v-if="isScrollable"
+          @ionInfinite="loadMoreSwapTasks($event)"
         >
           <ion-infinite-scroll-content
             loading-spinner="crescent"
@@ -102,7 +102,7 @@
     <ion-footer v-if="selectMode">
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-button color="danger" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkCancelOrders">
+          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" color="danger" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkCancelOrders">
             {{ translate('Cancel orders') }}
           </ion-button>
           <ion-button color="medium" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkParkOrders">
@@ -135,6 +135,7 @@ import { useProductMaster } from '@/composables/useProductMaster';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import { fetchUnfillableProductCandidates, fetchUnfillableShipGroupsForProduct } from '@/services/order';
@@ -388,11 +389,14 @@ async function rebrokerProductOrders(candidate: SwapSetupCandidate) {
 }
 
 async function loadMoreSwapTasks(event: any) {
-  await fetchSwapTasks(
-    undefined,
-    Math.ceil(swapTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
-  );
-  await event.target.complete();
+  try {
+    await fetchSwapTasks(
+      undefined,
+      Math.ceil(swapTasks.value?.length / (import.meta.env.VITE_VIEW_SIZE as any)).toString()
+    );
+  } finally {
+    await event.target.complete();
+  }
 }
 
 onIonViewWillEnter(() => {

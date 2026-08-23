@@ -1,0 +1,36 @@
+import type { CacheDomainCatalogItem } from "@common/cache";
+
+export const ORDER_MANAGER_CACHE_CATALOG: CacheDomainCatalogItem[] = [
+  { name: "productStore", table: "productStores", label: "Product Stores", syncClass: "B" },
+  { name: "status", table: "statuses", label: "Statuses", syncClass: "B" },
+  { name: "enum", table: "enums", label: "Enumerations", syncClass: "B" },
+  { name: "enumType", table: "enumTypes", label: "Enumeration Types", syncClass: "B" },
+  { name: "facility", table: "facilities", label: "Facilities", syncClass: "B" },
+  { name: "facilityType", table: "facilityTypes", label: "Facility Types", syncClass: "B" },
+  { name: "facilityGroup", table: "facilityGroups", label: "Facility Groups", syncClass: "B" },
+  { name: "groupFacility", table: "groupFacilities", label: "Facility Group Members", syncClass: "B" },
+  { name: "carrier", table: "carriers", label: "Shipping Carriers", syncClass: "B" },
+  { name: "shipmentMethodType", table: "shipmentMethodTypes", label: "Shipment Methods", syncClass: "B" },
+  { name: "carrierShipmentMethod", table: "carrierShipmentMethods", label: "Carrier Shipment Methods", syncClass: "B" },
+  { name: "productStoreShipmentMethod", table: "productStoreShipmentMethods", label: "Store Shipment Methods", syncClass: "B" },
+  { name: "productStoreFacility", table: "productStoreFacilities", label: "Store Facilities", syncClass: "B" },
+  { name: "productStoreFacilityGroup", table: "productStoreFacilityGroups", label: "Store Facility Groups", syncClass: "B" },
+  { name: "productStoreEmailSetting", table: "productStoreEmailSettings", label: "Store Email Settings", syncClass: "B" },
+  { name: "contactMechPurposeType", table: "contactMechPurposeTypes", label: "Contact Purpose Types", syncClass: "B" },
+  { name: "partyRelationshipType", table: "partyRelationshipTypes", label: "Relationship Types", syncClass: "B" },
+  { name: "roleType", table: "roleTypes", label: "Role Types", syncClass: "B" },
+  { name: "orderAdjustmentType", table: "orderAdjustmentTypes", label: "Order Adjustment Types", syncClass: "B" },
+  { name: "paymentMethodType", table: "paymentMethodTypes", label: "Payment Methods", syncClass: "B" },
+  { name: "returnReason", table: "returnReasons", label: "Return Reasons", syncClass: "B" },
+  { name: "returnType", table: "returnTypes", label: "Return Types", syncClass: "B" },
+  { name: "returnItemType", table: "returnItemTypes", label: "Return Item Types", syncClass: "B" },
+  { name: "communicationEventType", table: "communicationEventTypes", label: "Communication Types", syncClass: "B" },
+  { name: "geo", table: "geos", label: "Geographic Regions", syncClass: "B" },
+  { name: "geoAssoc", table: "geoAssocs", label: "Geo Associations", syncClass: "B" },
+];
+
+export const appSyncConfig = {
+  dbName: "OrderManagerCacheDB",
+  baseTickMs: 0, // Reference domains only need 1 sync per login; 0 = no periodic polling
+};
+

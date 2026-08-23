@@ -82,13 +82,16 @@ const seed = useSeedStore();
 const selectedCarrierId = ref('');
 const selectedMethodId = ref('');
 
-const availableCarriers = computed(() =>
-  [...orderDetailStore.carrierParties].sort((a, b) => {
+const availableCarriers = computed(() => {
+  const list = orderDetailStore.carrierParties.length
+    ? orderDetailStore.carrierParties
+    : seed.carriers.ids.map((id) => seed.carriers.byId[id]);
+  return [...list].sort((a, b) => {
     const nameA = [a.firstName, a.lastName].filter(Boolean).join(' ') || a.groupName || a.partyId;
     const nameB = [b.firstName, b.lastName].filter(Boolean).join(' ') || b.groupName || b.partyId;
     return nameA.localeCompare(nameB);
-  })
-);
+  });
+});
 
 const methodsForCarrier = computed(() =>
   [...orderDetailStore.shippingMethodsByCarrier(selectedCarrierId.value)].sort(

@@ -12,34 +12,32 @@ import type {
   VirtualLocationWorkCount,
   HoldTaskCounts
 } from '@/types/customerService';
+import { DEFAULT_WORKFLOW_ORDER_SORT } from '@/types/customerService';
 import { getPickProfileGroups, type FulfillmentSyncData, type SortRule } from '@/services/fulfillmentSync';
 import { useSeedStore } from '@/store/seed';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { fetchVirtualLocationOrderCounts, getActivePhysicalFacilityOrderVolume, searchOrders } from '@/services/order';
+import {
+  EMPTY_UNFILLABLE_TREND,
+  fetchUnfillableTrend,
+  fetchVirtualLocationOrderCounts,
+  getActivePhysicalFacilityOrderVolume,
+  searchOrders,
+  UNFILLABLE_QUEUE_ORDER_STATUSES,
+  type UnfillableTrend
+} from '@/services/order';
 import { getDashboardDateFilter } from '@/utils/dashboardDate';
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { useUserStore } from '@/store/user';
 
 const CHANNELS = ['WEB_SALES_CHANNEL', 'POS_SALES_CHANNEL', 'MOBILE_SALES_CHANNEL', 'MARKETPLACE_CHANNEL'];
 const BROKERABLE_ORDER_STATUSES = ['ORDER_CREATED', 'ORDER_APPROVED'];
 // The Unfillable queue should only count orders whose parked item is still active
 // (created/approved) — not items that were since cancelled or completed.
-const UNFILLABLE_FACILITY_ID = 'UNFILLABLE_PARKING';
+export const UNFILLABLE_FACILITY_ID = 'UNFILLABLE_PARKING';
 const UNFILLABLE_ITEM_STATUSES = ['ITEM_CREATED', 'ITEM_APPROVED'];
+// Holds already completed/cancelled orders per its own backend description, so it is an
+// archive rather than a work queue. It is the one virtual facility left out of the list.
 const GENERAL_OPS_PARKING_FACILITY_ID = 'GENERAL_OPS_PARKING';
-const REQUIRED_VIRTUAL_LOCATION_GROUPS = [
-  // The _NA_ parking holds orders that have never been brokered. Labelled distinctly
-  // from the side-menu "Brokering queue" (the whole queue, incl. rejected items) so
-  // the same name never shows two different counts.
-  { id: 'brokering', label: 'Awaiting brokering', facilityIds: ['_NA_'] },
-  { id: 'rejected', label: 'Rejected queue', facilityIds: ['REJECTED_ITM_PARKING', 'REJECTED_PARKING'] },
-  { id: 'unfillable', label: 'Unfillable queue', facilityIds: ['UNFILLABLE_PARKING'] }
-];
-const DEFAULT_VIRTUAL_LOCATION_NAMES: Record<string, string> = {
-  _NA_: 'Awaiting brokering',
-  REJECTED_ITM_PARKING: 'Rejected queue',
-  REJECTED_PARKING: 'Rejected queue',
-  UNFILLABLE_PARKING: 'Unfillable queue'
-};
 const VIRTUAL_OR_PARKING_FACILITY_IDS = new Set([
   '_NA_',
   'REJECTED_ITM_PARKING',
@@ -48,14 +46,13 @@ const VIRTUAL_OR_PARKING_FACILITY_IDS = new Set([
   GENERAL_OPS_PARKING_FACILITY_ID
 ]);
 
-// Map each hold-task purpose the dashboard reports to its side-menu badge. The
-// two user-hold purposes roll up into the single "Hold" queue, matching the page.
-const HOLD_TASK_PURPOSE_TO_NAV_KEY: Record<string, string> = {
+// Map each hold-task purpose the dashboard reports to its side-menu badge. Only
+// the three purposes with a dedicated page get their own badge; everything else
+// rolls up into "Hold", matching that page's "no dedicated queue" population.
+const DEDICATED_PURPOSE_NAV_KEYS: Record<string, string> = {
   INVALID_ADDRESS: 'badAddress',
   NEG_RES_REVIEW: 'swap',
-  REVIEW_RISK_ORDER: 'fraud',
-  ORD_HOLD_MANUAL: 'hold',
-  ORD_HOLD_CUST_REQ: 'hold'
+  REVIEW_RISK_ORDER: 'fraud'
 };
 
 // Publish the badAddress/swap/hold/fraud badges from the hold-task breakdown the
@@ -66,8 +63,8 @@ function publishHoldTaskNavCounts(holdTaskCounts: { workEffortPurposeTypeId: str
   try {
     const totals: Record<string, number> = {};
     for (const { workEffortPurposeTypeId, taskCount } of holdTaskCounts) {
-      const navKey = HOLD_TASK_PURPOSE_TO_NAV_KEY[workEffortPurposeTypeId];
-      if (!navKey) continue;
+      if (!workEffortPurposeTypeId) continue;
+      const navKey = DEDICATED_PURPOSE_NAV_KEYS[workEffortPurposeTypeId] ?? 'hold';
       totals[navKey] = (totals[navKey] ?? 0) + (Number(taskCount) || 0);
     }
     const orderStore = useOrderStore();
@@ -79,9 +76,13 @@ function publishHoldTaskNavCounts(holdTaskCounts: { workEffortPurposeTypeId: str
   }
 }
 
-function getUserDashboardDateFilter() {
+function getUserTimeZone(): string | undefined {
   const userProfile = useUserStore().current;
-  return getDashboardDateFilter(userProfile?.timeZone || userProfile?.userTimeZone);
+  return userProfile?.timeZone || userProfile?.userTimeZone || undefined;
+}
+
+function getUserDashboardDateFilter() {
+  return getDashboardDateFilter(getUserTimeZone());
 }
 
 function getUserDashboardDateRange() {
@@ -98,8 +99,7 @@ function facilityIdOf(facility: any) {
 }
 
 function facilityNameOf(facility: any) {
-  const facilityId = facilityIdOf(facility);
-  return facility?.facilityName || facility?.name || DEFAULT_VIRTUAL_LOCATION_NAMES[facilityId] || facilityId;
+  return facility?.facilityName || facility?.name || facilityIdOf(facility);
 }
 
 function uniqueValues(values: string[]) {
@@ -115,24 +115,14 @@ function normalizeVirtualFacilities(facilities: any[]) {
     byId.set(facilityId, facilityNameOf(facility));
   });
 
-  REQUIRED_VIRTUAL_LOCATION_GROUPS.flatMap((group) => group.facilityIds).forEach((facilityId) => {
-    if (!byId.has(facilityId)) {
-      byId.set(facilityId, DEFAULT_VIRTUAL_LOCATION_NAMES[facilityId] || facilityId);
-    }
-  });
-
   return Array.from(byId.entries()).map(([facilityId, facilityName]) => ({ facilityId, facilityName }));
 }
 
+// Every virtual queue holding orders gets its own row, under the name the backend gives
+// it. Nothing is merged, renamed, or pinned to the top: which queues a store actually
+// uses differs per instance, so the list simply reports what is there.
 function buildVirtualLocationWorkCounts(facilities: { facilityId: string; facilityName: string }[], countMap: Map<string, number>): VirtualLocationWorkCount[] {
-  const requiredFacilityIds = new Set(REQUIRED_VIRTUAL_LOCATION_GROUPS.flatMap((group) => group.facilityIds));
-  const rows = REQUIRED_VIRTUAL_LOCATION_GROUPS.map((group) => ({
-    ...group,
-    count: group.facilityIds.reduce((total, facilityId) => total + (countMap.get(facilityId) || 0), 0)
-  }));
-
-  const dynamicRows = facilities
-    .filter((facility) => !requiredFacilityIds.has(facility.facilityId))
+  return facilities
     .map((facility) => ({
       id: facility.facilityId,
       label: facility.facilityName,
@@ -140,9 +130,7 @@ function buildVirtualLocationWorkCounts(facilities: { facilityId: string; facili
       count: countMap.get(facility.facilityId) || 0
     }))
     .filter((row) => row.count > 0)
-    .sort((left, right) => right.count - left.count || left.label.localeCompare(right.label));
-
-  return [...rows, ...dynamicRows];
+    .sort((left, right) => left.label.localeCompare(right.label));
 }
 
 // Load-status keys for the funnel dashboard metric groups. Each group's fetch
@@ -187,7 +175,8 @@ function emptyFilters(): WorkflowFilters {
     shipmentMethodTypeId: 'All',
     priority: null,
     dateFrom: '',
-    dateThru: ''
+    dateThru: '',
+    sort: DEFAULT_WORKFLOW_ORDER_SORT
   };
 }
 
@@ -290,7 +279,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
       oldestOpenOrderDate: null as number | null
     },
     unfillable: {
-      unfillableHourlyCounts: [] as { entryDateHour: string; shipGroupCount: number }[],
+      trend: { ...EMPTY_UNFILLABLE_TREND } as UnfillableTrend,
       totalCount: 0
     },
     holdTasks: {
@@ -349,18 +338,13 @@ export const useCustomerServiceStore = defineStore('customerService', {
         packed: workflowOrders.packed.length
       };
     },
+    // Item counts only, oldest order date first — the shape <Sparkline> plots.
     unfillableTrend(state): number[] {
-      const todayStr = getUserDashboardDateFilter();
-      return Array.from({ length: 24 }, (_, h) => {
-        const match = state.unfillable.unfillableHourlyCounts?.find((d) => {
-          const parsed = DateTime.fromSQL(d.entryDateHour).isValid
-            ? DateTime.fromSQL(d.entryDateHour)
-            : DateTime.fromISO(d.entryDateHour);
-          return parsed.isValid && parsed.toFormat('yyyy-MM-dd') === todayStr && parsed.hour === h;
-        });
-        return match ? match.shipGroupCount : 0;
-      });
+      return (state.unfillable.trend.points || []).map((point) => point.itemCount);
     },
+    getUnfillableTrendPoints: (state) => state.unfillable.trend.points || [],
+    getUnfillableOrderDays: (state) => state.unfillable.trend.days || [],
+    getUnfillableTrendOrderTotal: (state) => state.unfillable.trend.totalOrders || 0,
     getFulfillmentProgress: (state) => state.fulfillmentProgress,
     getOpenOrders: (state) => state.openOrders,
     getUnfillable: (state) => state.unfillable,
@@ -417,33 +401,27 @@ export const useCustomerServiceStore = defineStore('customerService', {
     async fetchUnfillable(productStoreId?: string) {
       this.dashboardStatus.unfillable = 'loading';
       try {
-        const todayStr = getUserDashboardDateFilter();
-        const params: any = { dateFilter: todayStr };
-        if (productStoreId) params.productStoreId = productStoreId;
-        const resp = await api({
-          url: 'oms/orders/funnelDashboard/unfillable',
-          method: 'GET',
-          params
-        });
-        if (resp.data) {
-          this.unfillable = {
-            ...this.unfillable,
-            ...resp.data,
-            unfillableHourlyCounts: resp.data.unfillableHourlyCounts || []
-          };
-        }
-
         // Card count is the full unfillable queue (matches the Unfillable page), not today-scoped.
         const solrParams: any = {
-          facilityIds: ['UNFILLABLE_PARKING'],
-          status: ['ORDER_CREATED', 'ORDER_APPROVED', 'ORDER_HOLD'],
+          facilityIds: [UNFILLABLE_FACILITY_ID],
+          status: UNFILLABLE_QUEUE_ORDER_STATUSES,
           pageSize: 0
         };
         if (productStoreId && productStoreId !== 'All') {
           solrParams.productStoreId = productStoreId;
         }
 
-        const solrResult = await searchOrders(solrParams);
+        // The trend reads the same queue as the count, bucketed by order date,
+        // so the line explains the number above it. The funnelDashboard/
+        // unfillable endpoint is deliberately not used: it only returns
+        // today's hourly ship-group counts, which are empty for a backlog
+        // queue and rendered the card's sparkline as a flat zero line.
+        const [solrResult, trend] = await Promise.all([
+          searchOrders(solrParams),
+          fetchUnfillableTrend(productStoreId, getUserTimeZone())
+        ]);
+
+        this.unfillable.trend = trend;
         this.unfillable.totalCount = solrResult.total || 0;
         // Publish the Unfillable side-menu badge from the same full-queue count.
         // Best-effort: a badge-publish failure must not fail the dashboard fetch.
@@ -1121,7 +1099,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
   }
 });
 
-export const BULK_ACTIONS: Record<WorkflowBucket, BulkActionDefinition[]> = {
+const ALL_BULK_ACTIONS: Record<WorkflowBucket, BulkActionDefinition[]> = {
   unfillable: [
     { id: 'rebroker', label: 'Rebroker order' },
     { id: 'cancel', label: 'Cancel', confirmText: 'Cancel selected orders?' }
@@ -1140,3 +1118,10 @@ export const BULK_ACTIONS: Record<WorkflowBucket, BulkActionDefinition[]> = {
     { id: 'ship', label: 'Ship orders' }
   ]
 };
+
+// Bulk cancel is withheld while cancels do not reach Shopify; see HIDE_SHOPIFY_UNSYNCED_ACTIONS.
+export const BULK_ACTIONS: Record<WorkflowBucket, BulkActionDefinition[]> = HIDE_SHOPIFY_UNSYNCED_ACTIONS
+  ? Object.fromEntries(
+    Object.entries(ALL_BULK_ACTIONS).map(([bucket, actions]) => [bucket, actions.filter((action) => action.id !== 'cancel')])
+  ) as Record<WorkflowBucket, BulkActionDefinition[]>
+  : ALL_BULK_ACTIONS;

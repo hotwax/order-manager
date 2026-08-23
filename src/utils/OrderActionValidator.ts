@@ -100,6 +100,8 @@ export type AnyActionId = OrderFooterActionId | ShipGroupActionId | OrderItemAct
 
 /* ── Result + descriptor shapes (mirror the transfers structure) ──────────── */
 
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
+
 export interface ActionValidationResult {
   allowed: boolean;
   reason?: string;
@@ -357,6 +359,11 @@ export const OrderActionValidator = {
     return TERMINAL_ITEM_STATUSES.includes(item?.statusId);
   },
 
+  /** Item is still early enough in its lifecycle to be brokered/parked/released. */
+  isItemPreFulfill(item: any): boolean {
+    return PRE_FULFILL_ITEM_STATUSES.includes(item?.statusId);
+  },
+
   /** Item has been fulfilled (terminal completed). */
   isItemFulfilled(item: any): boolean {
     return item?.statusId === 'ITEM_COMPLETED';
@@ -484,7 +491,10 @@ export const OrderActionValidator = {
     // "Cancel N items" (the view supplies the count); otherwise, if the order
     // itself can be cancelled, it is the whole-order "Cancel order". The two
     // never coexist. Placed on the right (kind 'footer').
-    const bulkCancelValid = footer.some((action) => action.id === 'CANCEL_ITEMS' && action.validation.allowed);
+    // Hidden while cancel does not reach Shopify; the button then falls through to
+    // the whole-order "Cancel order" below, which is unaffected.
+    const bulkCancelValid = !HIDE_SHOPIFY_UNSYNCED_ACTIONS &&
+      footer.some((action) => action.id === 'CANCEL_ITEMS' && action.validation.allowed);
     const orderCancelValid = statusActions.some((transition) => transition.id === 'ORDER_CANCELLED');
     if (bulkCancelValid) {
       actions.push({ id: 'CANCEL_ITEMS', kind: 'footer', label: 'Cancel items', color: 'danger', fill: 'outline' });
@@ -496,6 +506,7 @@ export const OrderActionValidator = {
     // Remaining lifecycle actions on the end (cancel handled above).
     for (const action of footer) {
       if (action.id === 'CANCEL_ITEMS') continue;
+      if (HIDE_SHOPIFY_UNSYNCED_ACTIONS && action.id === 'RETURN') continue;
       if (!action.validation.allowed) continue;
       actions.push({
         id: action.id,
@@ -606,6 +617,11 @@ export const OrderActionValidator = {
    * The view's selectedItemsForShipGroup() returns string ids, so map them to
    * the ship group's item rows (with statusId joined in) before calling, or
    * the status checks silently misfire (strings have no .statusId).
+   *
+   * Item selection is a NARROWING filter, not a precondition: the view passes
+   * every item in the ship group when nothing is checked (product decision
+   * 2026-08-16), so an empty array here means the ship group itself has no
+   * items — hence the "no items" reasons rather than "select some items".
    * ════════════════════════════════════════════════════════════════════════ */
 
   validateShipGroupAction(
@@ -638,9 +654,9 @@ export const OrderActionValidator = {
        */
       case 'PARK_ITEMS': {
         if (!virtual) return { allowed: false, reason: 'Items can only be parked from a virtual/brokering facility.' };
-        if (!hasSelection) return { allowed: false, reason: 'Select one or more items to park.' };
+        if (!hasSelection) return { allowed: false, reason: 'This ship group has no items to park.' };
         const anyParkable = selectedItems.some((it) => !this.isItemTerminal(it));
-        if (!anyParkable) return { allowed: false, reason: 'Selected items are already cancelled or completed.' };
+        if (!anyParkable) return { allowed: false, reason: 'The items to park are already cancelled or completed.' };
         return { allowed: true };
       }
 
@@ -653,7 +669,7 @@ export const OrderActionValidator = {
       case 'PULL_BACK': {
         if (virtual) return { allowed: false, reason: 'Pull back only applies to items at a physical facility.' };
         if (this.isOrderTerminal(order)) return { allowed: false, reason: 'Order is already cancelled or completed.' };
-        if (!hasSelection) return { allowed: false, reason: 'Select one or more items to pull back.' };
+        if (!hasSelection) return { allowed: false, reason: 'This ship group has no items to pull back.' };
         if (ctx?.policy?.pullBackAllowedWhen) {
           const phase = this.getShipGroupPhase(shipGroup, ctx);
           if (!this.phaseExprAllows(ctx.policy.pullBackAllowedWhen, phase)) {
@@ -661,7 +677,7 @@ export const OrderActionValidator = {
           }
         }
         const anyPullable = selectedItems.some((it) => !this.isItemTerminal(it));
-        if (!anyPullable) return { allowed: false, reason: 'Selected items are already cancelled or completed.' };
+        if (!anyPullable) return { allowed: false, reason: 'The items to pull back are already cancelled or completed.' };
         return { allowed: true };
       }
 
@@ -672,11 +688,11 @@ export const OrderActionValidator = {
        */
       case 'RELEASE': {
         if (!virtual) return { allowed: false, reason: 'Release only applies to items on a virtual/brokering facility.' };
-        if (!hasSelection) return { allowed: false, reason: 'Select one or more items to release.' };
+        if (!hasSelection) return { allowed: false, reason: 'This ship group has no items to release.' };
         if (this.isOrderTerminal(order)) return { allowed: false, reason: 'Cannot release items on a cancelled/completed order.' };
         if (!this.isOrderApproved(order)) return { allowed: false, reason: 'Order must be approved before releasing items to a facility.' };
-        const anyReleasable = selectedItems.some((it) => PRE_FULFILL_ITEM_STATUSES.includes(it?.statusId));
-        if (!anyReleasable) return { allowed: false, reason: 'Selected items are not in a releasable status.' };
+        const anyReleasable = selectedItems.some((it) => this.isItemPreFulfill(it));
+        if (!anyReleasable) return { allowed: false, reason: 'No items in a releasable status.' };
         return { allowed: true };
       }
 
