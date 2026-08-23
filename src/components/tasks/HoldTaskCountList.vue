@@ -20,12 +20,12 @@ import { computed } from 'vue';
 import { translate } from '@common';
 import type { HoldTaskCount } from '@/types/customerService';
 import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
-import router from '@/router';
-import type { RouteLocationRaw } from 'vue-router';
+import { useRouter, type RouteLocationRaw } from 'vue-router';
 
 const props = defineProps<{
   holdTaskCounts: HoldTaskCount[];
 }>();
+const router = useRouter();
 
 const knownPurposeLabels: Record<string, string> = {
   NEG_RES_REVIEW: 'Substitute',
