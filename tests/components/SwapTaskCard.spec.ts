@@ -54,7 +54,7 @@ describe('swap task card Figma routing block', () => {
     expect(source).toContain("{ id: 'release', label: translate('Release updated order'), kind: 'primary' }");
     expect(source).toContain("{ id: 'park', label: translate('Park'), kind: 'neutral' }");
     expect(source).toContain("{ id: 'cancel', label: translate('Cancel order'), kind: 'danger' }");
-    expect(source).toContain("if (actionId === 'cancel') return cancelOrder(props.task);");
+    expect(source).toContain("if (actionId === 'cancel') return cancelOrder();");
     expect(source).not.toContain('function getCardTitle(task: any)');
     expect(source).not.toContain('<template #heading-end>');
     expect(source).not.toContain("//await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_CANCELLED')");

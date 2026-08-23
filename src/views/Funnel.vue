@@ -973,7 +973,7 @@ async function fetchBrokeredWorkload(productStoreId: string) {
 function fetchSelectedFacilityDashboardData(productStoreId: string) {
   if (selectedFacilityId.value) {
     store.fetchFacilityFulfillmentProgress(selectedFacilityId.value, productStoreId);
-    store.fetchFulfillmentSyncData(selectedFacilityId.value, productStoreId);
+    store.fetchFulfillmentSyncData(selectedFacilityId.value);
   }
 }
 
@@ -1004,7 +1004,7 @@ watch(selectedProductStoreId, (productStoreId, previousProductStoreId) => {
 watch(selectedFacilityId, (newFacilityId) => {
   if (newFacilityId && selectedProductStoreId.value) {
     store.fetchFacilityFulfillmentProgress(newFacilityId, selectedProductStoreId.value);
-    store.fetchFulfillmentSyncData(newFacilityId, selectedProductStoreId.value);
+    store.fetchFulfillmentSyncData(newFacilityId);
   } else {
     store.clearSelectedFacilityDashboardScope();
   }
@@ -1116,7 +1116,7 @@ function retryFacilityProgress() {
   if (selectedFacilityId.value) store.fetchFacilityFulfillmentProgress(selectedFacilityId.value, selectedProductStoreId.value);
 }
 function retrySyncData() {
-  if (selectedFacilityId.value) store.fetchFulfillmentSyncData(selectedFacilityId.value, selectedProductStoreId.value);
+  if (selectedFacilityId.value) store.fetchFulfillmentSyncData(selectedFacilityId.value);
 }
 
 function getFacilityName(facilityId: string) {
@@ -1277,7 +1277,7 @@ const nextRunTime = computed(() => {
   if (!cronExpressionInput.value) return '-';
   try {
     return commonUtil.getNextExecutionTime(cronExpressionInput.value);
-  } catch (error) {
+  } catch {
     return translate('Invalid expression');
   }
 });
@@ -1318,8 +1318,7 @@ async function saveSchedule() {
     settings.jobName,
     cronExpressionInput.value,
     isJobActive.value ? 'N' : 'Y',
-    selectedFacilityId.value,
-    selectedProductStoreId.value
+    selectedFacilityId.value
   );
   
   closeScheduleModal();
