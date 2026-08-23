@@ -51,7 +51,7 @@
                   <p>{{ metric.percent }}%</p>
                 </div>
                 <ion-note>{{ formatCount(metric.count) }} / {{ formatCount(fulfillmentStats.totalShipGroups) }} {{ translate("ship groups") }}</ion-note>
-                <ion-progress-bar :value="metric.value"></ion-progress-bar>
+                <ion-progress-bar :value="metric.value" :aria-label="metric.label"></ion-progress-bar>
               </div>
             </ion-item>
           </div>
@@ -248,7 +248,7 @@
                 <ion-label>{{ item.name }}</ion-label>
                 <ion-note>{{ item.label }}</ion-note>
               </div>
-              <ion-progress-bar :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0" color="primary" />
+              <ion-progress-bar :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0" :aria-label="item.accessibleName" color="primary" />
             </div>
           </ion-item>
           <ion-item v-if="!filteredFacilities.length" lines="none">
@@ -624,6 +624,7 @@ import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import { useCurrentHourInZone } from '@/utils/funnelClock';
 import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
+import { facilityProgressAccessibleName } from '@/utils/funnelProgress';
 import router from '@/router';
 import type { RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
@@ -881,7 +882,7 @@ const queueSegments = computed(() => {
 const selectedFacilityId = ref('');
 const hoveredSegmentId = ref<string | null>(null);
 const searchQuery = ref('');
-const selectedDimension = ref('volume');
+const selectedDimension = ref<'volume' | 'velocity' | 'rejections'>('volume');
 const currentProductStore = computed(() => productStore.getCurrentProductStore || {});
 const selectedProductStoreId = computed(() => currentProductStore.value.productStoreId || '');
 const selectedStoreName = computed(
@@ -1116,6 +1117,7 @@ const filteredFacilities = computed(() => {
       facilityId: item.facilityId,
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.activeFacilityFallback ? item.lastOrderCount : (item.fulfillmentVelocity || 0),
+      activeFacilityFallback: item.activeFacilityFallback,
       label: item.activeFacilityFallback
         ? `${item.lastOrderCount || 0} ${translate("active orders")}`
         : `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
@@ -1130,6 +1132,16 @@ const filteredFacilities = computed(() => {
         : `${item.lastOrderCount || 0} ${translate("active orders")}`
     }));
   }
+
+  list = list.map(item => ({
+    ...item,
+    accessibleName: facilityProgressAccessibleName(
+      item.name,
+      selectedDimension.value,
+      Boolean(item.activeFacilityFallback),
+      translate
+    )
+  }));
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
