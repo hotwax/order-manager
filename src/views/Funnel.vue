@@ -619,7 +619,7 @@ import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
-import { useCurrentHourInZone } from '@/utils/funnelClock';
+import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 import { DateTime } from 'luxon';
@@ -631,7 +631,7 @@ const seedStore = useSeedStore();
 const userStore = useUserStore();
 const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 const selectedTimeZone = computed(() => userStore.getUserTimeZone || userStore.getUserProfile?.userTimeZone || browserTimeZone);
-const hoursSinceDayStart = useCurrentHourInZone(selectedTimeZone, browserTimeZone);
+const hoursSinceDayStart = useElapsedHoursSinceDayStart(selectedTimeZone, browserTimeZone);
 
 // Per-section load status helpers. These drive loading affordances and error
 // states so the dashboard never renders default zeros/empty copy while a group
