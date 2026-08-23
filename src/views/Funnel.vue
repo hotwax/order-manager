@@ -623,6 +623,7 @@ import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import { useCurrentHourInZone } from '@/utils/funnelClock';
+import { createLatestRequestScope } from '@/utils/latestRequestScope';
 import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
 import { facilityProgressAccessibleName } from '@/utils/funnelProgress';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
@@ -669,6 +670,7 @@ const fulfillmentProgress = computed(() => store.getFulfillmentProgress);
 const brokeredWorkload = ref<WorkflowOrderTotals>({ open: 0, inflight: 0, packed: 0 });
 const brokeredWorkloadLoading = ref(false);
 const brokeredWorkloadError = ref(false);
+const brokeredWorkloadRequestScope = createLatestRequestScope();
 const brokeredWorkloadTotal = computed(() =>
   brokeredWorkload.value.open + brokeredWorkload.value.inflight + brokeredWorkload.value.packed
 );
@@ -941,20 +943,29 @@ function fetchStoreDashboardData(productStoreId: string) {
 }
 
 async function fetchBrokeredWorkload(productStoreId: string) {
-  brokeredWorkloadLoading.value = true;
-  brokeredWorkloadError.value = false;
-  try {
-    brokeredWorkload.value = await fetchWorkflowOrderTotals(productStoreId);
-    // Share the brokered totals with the side-menu rollup badges (first-come preload).
-    orderStore.setNavCount('open', brokeredWorkload.value.open);
-    orderStore.setNavCount('inflight', brokeredWorkload.value.inflight);
-    orderStore.setNavCount('packed', brokeredWorkload.value.packed);
-  } catch (error) {
-    console.error('Failed to fetch brokered workload totals', error);
-    brokeredWorkloadError.value = true;
-  } finally {
-    brokeredWorkloadLoading.value = false;
-  }
+  await brokeredWorkloadRequestScope.run(
+    () => fetchWorkflowOrderTotals(productStoreId),
+    {
+      onStart: () => {
+        brokeredWorkloadLoading.value = true;
+        brokeredWorkloadError.value = false;
+      },
+      onSuccess: (nextBrokeredWorkload) => {
+        brokeredWorkload.value = nextBrokeredWorkload;
+        // Share the brokered totals with the side-menu rollup badges (first-come preload).
+        orderStore.setNavCount('open', brokeredWorkload.value.open);
+        orderStore.setNavCount('inflight', brokeredWorkload.value.inflight);
+        orderStore.setNavCount('packed', brokeredWorkload.value.packed);
+      },
+      onError: (error) => {
+        console.error('Failed to fetch brokered workload totals', error);
+        brokeredWorkloadError.value = true;
+      },
+      onSettled: () => {
+        brokeredWorkloadLoading.value = false;
+      }
+    }
+  );
 }
 
 function fetchSelectedFacilityDashboardData(productStoreId: string) {
@@ -966,7 +977,14 @@ function fetchSelectedFacilityDashboardData(productStoreId: string) {
 
 function refreshDashboardData() {
   const productStoreId = selectedProductStoreId.value;
-  if (!productStoreId) return;
+  if (!productStoreId) {
+    brokeredWorkloadRequestScope.invalidate();
+    brokeredWorkload.value = { open: 0, inflight: 0, packed: 0 };
+    brokeredWorkloadLoading.value = false;
+    brokeredWorkloadError.value = false;
+    store.clearFunnelDashboardScope();
+    return;
+  }
 
   fetchStoreDashboardData(productStoreId);
   fetchSelectedFacilityDashboardData(productStoreId);
@@ -975,6 +993,7 @@ function refreshDashboardData() {
 watch(selectedProductStoreId, (productStoreId, previousProductStoreId) => {
   if (productStoreId !== previousProductStoreId) {
     selectedFacilityId.value = '';
+    store.clearSelectedFacilityDashboardScope();
   }
   refreshDashboardData();
 });
@@ -983,6 +1002,8 @@ watch(selectedFacilityId, (newFacilityId) => {
   if (newFacilityId && selectedProductStoreId.value) {
     store.fetchFacilityFulfillmentProgress(newFacilityId, selectedProductStoreId.value);
     store.fetchFulfillmentSyncData(newFacilityId, selectedProductStoreId.value);
+  } else {
+    store.clearSelectedFacilityDashboardScope();
   }
 });
 
