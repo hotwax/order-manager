@@ -3,6 +3,14 @@ import { createPinia, setActivePinia } from 'pinia';
 import { useProductStore } from '@/store/productStore';
 import { api } from '@common';
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 vi.mock('@common', () => ({
   api: vi.fn(),
   commonUtil: {
@@ -126,5 +134,41 @@ describe('product store', () => {
 
     expect(productStore.getProductStores).toEqual([]);
     expect(productStore.getCurrentProductStore).toEqual({});
+  });
+
+  it('finishes catalog and preference reconciliation before publishing initialization readiness', async () => {
+    const catalog = deferred<any>();
+    const preference = deferred<any>();
+    vi.mocked(api).mockImplementation((request: any) => {
+      if (request.url === '/admin/productStores') return catalog.promise;
+      if (request.url === 'admin/user/preferences') return preference.promise;
+      return Promise.resolve({ data: [] });
+    });
+
+    const productStore = useProductStore();
+    productStore.currentProductStore = { productStoreId: 'REMOVED', storeName: 'Removed Store' };
+
+    const firstInitialization = productStore.initializeProductStore();
+    const concurrentInitialization = productStore.initializeProductStore();
+
+    expect(productStore.isProductStoreInitialized).toBe(false);
+    expect(api).toHaveBeenCalledTimes(1);
+
+    catalog.resolve({
+      data: [
+        { productStoreId: 'STORE_A', storeName: 'Store A' },
+        { productStoreId: 'STORE_B', storeName: 'Store B' },
+      ],
+    });
+    await Promise.resolve();
+    preference.resolve({ data: [{ preferenceValue: 'STORE_B' }] });
+    await Promise.all([firstInitialization, concurrentInitialization]);
+
+    expect(api).toHaveBeenCalledTimes(2);
+    expect(productStore.getCurrentProductStore).toEqual({
+      productStoreId: 'STORE_B',
+      storeName: 'Store B',
+    });
+    expect(productStore.isProductStoreInitialized).toBe(true);
   });
 });
