@@ -40,7 +40,7 @@
             <!-- Order Count today -->
             <h1 class="big-number">{{ (fulfillmentProgress.totalOrdersCount || 0).toLocaleString() }}</h1>
             <!-- Time since day start -->
-            <p class="time-elapsed">{{ timeSinceDayStart() }} {{ translate("hours since day start") }}</p>
+            <p class="time-elapsed">{{ hoursSinceDayStart }} {{ translate("hours since day start") }}</p>
           </div>
 
           <div class="metrics">
@@ -51,7 +51,7 @@
                   <p>{{ metric.percent }}%</p>
                 </div>
                 <ion-note>{{ formatCount(metric.count) }} / {{ formatCount(fulfillmentStats.totalShipGroups) }} {{ translate("ship groups") }}</ion-note>
-                <ion-progress-bar :value="metric.value"></ion-progress-bar>
+                <ion-progress-bar :value="metric.value" :aria-label="metric.label"></ion-progress-bar>
               </div>
             </ion-item>
           </div>
@@ -67,7 +67,8 @@
               :key="item.id"
               button
               :detail="true"
-              :router-link="virtualLocationRoute(item)"
+              :href="routeHref(virtualLocationRoute(item))"
+              @click="navigateRoute($event, virtualLocationRoute(item))"
             >
               <ion-label>{{ item.label }}</ion-label>
               <p slot="end">{{ formatCount(item.count) }} {{ translate(item.count === 1 ? "order" : "orders") }}</p>
@@ -80,15 +81,15 @@
             <ion-spinner name="crescent" />
           </template>
           <ion-list v-if="!brokeredWorkloadLoading" lines="none" class="hold-tasks-list">
-            <ion-item button :detail="true" router-link="/open">
+            <ion-item button :detail="true" :href="routeHref('/open')" @click="navigateRoute($event, '/open')">
               <ion-label>{{ translate("Open") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.open) }} {{ translate(brokeredWorkload.open === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" router-link="/inflight">
+            <ion-item button :detail="true" :href="routeHref('/inflight')" @click="navigateRoute($event, '/inflight')">
               <ion-label>{{ translate("Picked") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.inflight) }} {{ translate(brokeredWorkload.inflight === 1 ? "order" : "orders") }}</p>
             </ion-item>
-            <ion-item button :detail="true" router-link="/packed">
+            <ion-item button :detail="true" :href="routeHref('/packed')" @click="navigateRoute($event, '/packed')">
               <ion-label>{{ translate("Packed and shipped") }}</ion-label>
               <p slot="end">{{ formatCount(brokeredWorkload.packed) }} {{ translate(brokeredWorkload.packed === 1 ? "order" : "orders") }}</p>
             </ion-item>
@@ -134,7 +135,8 @@
                 :key="day.date"
                 button
                 :detail="true"
-                :router-link="unfillableDayRoute(day.date)"
+                :href="routeHref(unfillableDayRoute(day.date))"
+                @click="navigateRoute($event, unfillableDayRoute(day.date))"
               >
                 <ion-label>{{ formatOrderDate(day.date) }}</ion-label>
                 <p slot="end">{{ formatCount(day.orderCount) }} {{ translate(day.orderCount === 1 ? "order" : "orders") }}</p>
@@ -143,7 +145,8 @@
                 v-if="unfillableRemainingDays"
                 button
                 :detail="true"
-                :router-link="unfillableRemainingRoute"
+                :href="routeHref(unfillableRemainingRoute)"
+                @click="navigateRoute($event, unfillableRemainingRoute)"
               >
                 <ion-label>{{ unfillableRemainingLabel }}</ion-label>
                 <p slot="end">{{ formatCount(unfillableRemainingOrders) }} {{ translate(unfillableRemainingOrders === 1 ? "order" : "orders") }}</p>
@@ -245,7 +248,7 @@
                 <ion-label>{{ item.name }}</ion-label>
                 <ion-note>{{ item.label }}</ion-note>
               </div>
-              <ion-progress-bar :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0" color="primary" />
+              <ion-progress-bar :value="maxMetricValue > 0 ? (item.value / maxMetricValue) : 0" :aria-label="item.accessibleName" color="primary" />
             </div>
           </ion-item>
           <ion-item v-if="!filteredFacilities.length" lines="none">
@@ -314,11 +317,11 @@
               </ion-item>
             </div>
             <ion-list class="fulfill">
-              <ion-item lines="full" :button="true" :detail="true" :router-link="workflowRoute('/open')">
+              <ion-item lines="full" :button="true" :detail="true" :href="routeHref(workflowRoute('/open'))" @click="navigateRoute($event, workflowRoute('/open'))">
                 <ion-icon :icon="mailUnreadOutline" slot="start" />
                 <ion-label>{{ facilityFulfillmentProgress?.openCount ?? 0 }} {{ translate("open") }}</ion-label>
               </ion-item>
-              <ion-item lines="none" :button="true" :detail="true" :router-link="workflowRoute('/inflight')">
+              <ion-item lines="none" :button="true" :detail="true" :href="routeHref(workflowRoute('/inflight'))" @click="navigateRoute($event, workflowRoute('/inflight'))">
                 <ion-icon :icon="mailOpenOutline" slot="start" />
                 <ion-label>{{ facilityFulfillmentProgress?.inProgressCount ?? 0 }} {{ translate("in progress") }}</ion-label>
               </ion-item>
@@ -618,6 +621,11 @@ import { UNFILLABLE_FACILITY_ID, useCustomerServiceStore, type DashboardStatusKe
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
+import { useUserStore } from '@/store/user';
+import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
+import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
+import { facilityProgressAccessibleName } from '@/utils/funnelProgress';
+import { useRouter, type RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 import { DateTime } from 'luxon';
@@ -626,6 +634,19 @@ const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
 const seedStore = useSeedStore();
+const userStore = useUserStore();
+const router = useRouter();
+const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+const selectedTimeZone = computed(() => userStore.getUserTimeZone || userStore.getUserProfile?.userTimeZone || browserTimeZone);
+const hoursSinceDayStart = useElapsedHoursSinceDayStart(selectedTimeZone, browserTimeZone);
+
+function routeHref(destination: RouteLocationRaw) {
+  return nativeRouteHref(router, destination);
+}
+
+function navigateRoute(event: MouseEvent, destination: RouteLocationRaw) {
+  return navigateNativeRoute(event, router, destination);
+}
 
 // Per-section load status helpers. These drive loading affordances and error
 // states so the dashboard never renders default zeros/empty copy while a group
@@ -861,7 +882,7 @@ const queueSegments = computed(() => {
 const selectedFacilityId = ref('');
 const hoveredSegmentId = ref<string | null>(null);
 const searchQuery = ref('');
-const selectedDimension = ref('volume');
+const selectedDimension = ref<'volume' | 'velocity' | 'rejections'>('volume');
 const currentProductStore = computed(() => productStore.getCurrentProductStore || {});
 const selectedProductStoreId = computed(() => currentProductStore.value.productStoreId || '');
 const selectedStoreName = computed(
@@ -955,6 +976,7 @@ watch(selectedProductStoreId, (productStoreId, previousProductStoreId) => {
   if (productStoreId !== previousProductStoreId) {
     selectedFacilityId.value = '';
   }
+  if (!productStore.isProductStoreInitialized) return;
   refreshDashboardData();
 });
 
@@ -1044,7 +1066,8 @@ const fulfillmentStageMetrics = computed(() => {
   ];
 });
 
-onIonViewWillEnter(() => {
+onIonViewWillEnter(async () => {
+  await productStore.initializeProductStore();
   refreshDashboardData();
 });
 
@@ -1096,6 +1119,7 @@ const filteredFacilities = computed(() => {
       facilityId: item.facilityId,
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.activeFacilityFallback ? item.lastOrderCount : (item.fulfillmentVelocity || 0),
+      activeFacilityFallback: item.activeFacilityFallback,
       label: item.activeFacilityFallback
         ? `${item.lastOrderCount || 0} ${translate("active orders")}`
         : `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
@@ -1110,6 +1134,16 @@ const filteredFacilities = computed(() => {
         : `${item.lastOrderCount || 0} ${translate("active orders")}`
     }));
   }
+
+  list = list.map(item => ({
+    ...item,
+    accessibleName: facilityProgressAccessibleName(
+      item.name,
+      selectedDimension.value,
+      Boolean(item.activeFacilityFallback),
+      translate
+    )
+  }));
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
@@ -1279,10 +1313,6 @@ function handleBatchSizeChange(event: any) {
   }
 }
 
-function timeSinceDayStart() {
-  const now = DateTime.now();
-  return Math.floor(now.diff(now.startOf("day"), "hours").hours)
-}
 </script>
 
 <style scoped>

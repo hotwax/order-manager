@@ -1,6 +1,7 @@
 import { defineComponent } from 'vue';
 import { mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
+import { createMemoryHistory, createRouter } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 
 vi.mock('@common', () => ({
@@ -14,7 +15,7 @@ const IonListStub = defineComponent({
 
 const IonItemStub = defineComponent({
   name: 'IonItem',
-  props: ['routerLink'],
+  props: ['href'],
   template: '<div class="hold-task-row"><slot /></div>',
 });
 
@@ -24,7 +25,14 @@ const IonLabelStub = defineComponent({
 });
 
 describe('Funnel hold task rows', () => {
-  it('renders every configured purpose alphabetically and routes specialized and future purposes correctly', () => {
+  it('renders every configured purpose alphabetically and routes specialized and future purposes correctly', async () => {
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/:pathMatch(.*)*', component: defineComponent({ template: '<div />' }) }],
+    });
+    await router.push('/');
+    await router.isReady();
+
     const wrapper = mount(HoldTaskCountList, {
       props: {
         holdTaskCounts: [
@@ -37,6 +45,7 @@ describe('Funnel hold task rows', () => {
         ],
       },
       global: {
+        plugins: [router],
         stubs: {
           IonList: IonListStub,
           IonItem: IonItemStub,
@@ -57,12 +66,12 @@ describe('Funnel hold task rows', () => {
       'Manual Hold',
       'Substitute',
     ]);
-    expect(rows.map((row) => row.props('routerLink'))).toEqual([
+    expect(rows.map((row) => row.props('href'))).toEqual([
       '/bad-address',
-      { path: '/hold', query: { purpose: 'ORD_HOLD_CUST_REQ' } },
+      '/hold?purpose=ORD_HOLD_CUST_REQ',
       '/fraud',
-      { path: '/hold', query: { purpose: 'FUTURE_HOLD' } },
-      { path: '/hold', query: { purpose: 'ORD_HOLD_MANUAL' } },
+      '/hold?purpose=FUTURE_HOLD',
+      '/hold?purpose=ORD_HOLD_MANUAL',
       '/swap',
     ]);
     expect(wrapper.text()).toContain('Substitute4 tasks');

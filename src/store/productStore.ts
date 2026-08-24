@@ -3,6 +3,7 @@ import { api, commonUtil, useEmbeddedAppStore, logger, translate, useSolrSearch 
 import { useUserStore } from '@/store/user'
 import { useSeedStore } from "@/store/seed";
 const defaultProductStoreSettings = JSON.parse(import.meta.env.VITE_DEFAULT_PRODUCT_STORE_SETTINGS as string || '{"PRDT_IDEN_PREF":{"stateKey":"productIdentifier.productIdentificationPref","value":{"primaryId":"SKU","secondaryId":"productId"}}}')
+const productStoreInitialization = new WeakMap<object, Promise<void>>()
 
 export const useProductStore = defineStore('productStore', {
   state: () => ({
@@ -23,6 +24,7 @@ export const useProductStore = defineStore('productStore', {
       },
     } as any,
     productStores: [] as any[],
+    isProductStoreInitialized: false,
   }),
 
   getters: {
@@ -37,12 +39,30 @@ export const useProductStore = defineStore('productStore', {
   },
 
   actions: {
+    async initializeProductStore() {
+      if (this.isProductStoreInitialized) return
+
+      const pendingInitialization = productStoreInitialization.get(this)
+      if (pendingInitialization) return pendingInitialization
+
+      const initialization = (async () => {
+        await this.fetchProductStores()
+        await this.fetchProductStorePreference()
+        this.isProductStoreInitialized = true
+      })()
+
+      productStoreInitialization.set(this, initialization)
+      try {
+        await initialization
+      } finally {
+        productStoreInitialization.delete(this)
+      }
+    },
     async setCurrentProductStore(store: any) {
       this.currentProductStore = store
     },
 
     async fetchProductStores() {
-      let stores = []
       try {
         const payload = {
           fieldsToSelect: ["productStoreId", "storeName"],
@@ -56,16 +76,19 @@ export const useProductStore = defineStore('productStore', {
         });
 
         if (!commonUtil.hasError(resp)) {
-          stores = resp.data
+          const stores = resp.data
+          this.productStores = stores
+          if (stores.length) {
+            const selectedStore = stores.find((store: any) => store.productStoreId === this.currentProductStore?.productStoreId)
+            this.currentProductStore = selectedStore || stores[0]
+          } else {
+            this.currentProductStore = {}
+          }
         } else {
           throw resp.data
         }
       } catch (err) {
         logger.error("Failed to fetch product stores", err)
-      }
-      this.productStores = stores
-      if (stores.length && !this.currentProductStore?.productStoreId) {
-        this.currentProductStore = stores[0]
       }
     },
 
@@ -84,8 +107,12 @@ export const useProductStore = defineStore('productStore', {
         const preferredStoreId = preferredStoreResp.data?.[0]?.preferenceValue
         if (preferredStoreId) {
           const store = this.productStores?.find((store: any) => store.productStoreId === preferredStoreId);
-          store && this.setCurrentProductStore(store)
-        } else if (this.productStores?.length && !this.currentProductStore?.productStoreId) {
+          if (store) {
+            this.setCurrentProductStore(store)
+            return
+          }
+        }
+        if (this.productStores?.length && !this.productStores.some((store: any) => store.productStoreId === this.currentProductStore?.productStoreId)) {
           this.setCurrentProductStore(this.productStores[0])
         }
       } catch (err) {
@@ -268,5 +295,7 @@ export const useProductStore = defineStore('productStore', {
       }
     }
   },
-  persist: true
+  persist: {
+    omit: ['isProductStoreInitialized']
+  }
 })
