@@ -28,4 +28,10 @@
 ## 2024-05-24 - External Link Indicators
 **Learning:** Adding an `openOutline` icon to buttons with `target="_blank"` improves predictability by visually warning users that the action will open in a new tab.
 **Action:** Always append `<ion-icon slot="end" :icon="openOutline" />` to elements that open external resources in a new tab.
-## 2026-08-08 - Adding loading states to destructive actions\n**Learning:** Destructive actions, such as deleting a customer profile, often use an icon-only button (e.g., trash icon) without visual feedback during asynchronous processing. In Vue and Ionic applications, these async processes typically have a reactive state flag (e.g., `deleting`).\n**Action:** When inspecting destructive or asynchronous actions in icon-only buttons, replace the default icon with an `<ion-spinner>` when the async state is true. Ensure the `<ion-spinner>` has the `slot="icon-only"` attribute to maintain proper alignment during loading.
+## 2026-08-08 - Adding loading states to destructive actions
+**Learning:** Destructive actions, such as deleting a customer profile, often use an icon-only button (e.g., trash icon) without visual feedback during asynchronous processing. In Vue and Ionic applications, these async processes typically have a reactive state flag (e.g., `deleting`).
+**Action:** When inspecting destructive or asynchronous actions in icon-only buttons, replace the default icon with an `<ion-spinner>` when the async state is true. Ensure the `<ion-spinner>` has the `slot="icon-only"` attribute to maintain proper alignment during loading.
+
+## 2024-05-19 - Ionic icon-only buttons with spinners
+**Learning:** When using `<ion-button>` with a conditional `<ion-spinner>` inside, the `<ion-spinner>` needs the `slot="icon-only"` attribute, just like the `<ion-icon>` it replaces. Otherwise, the button layout can jump or deform during loading states.
+**Action:** Always add `slot="icon-only"` to both `<ion-icon>` and `<ion-spinner>` inside icon-only Ionic buttons.

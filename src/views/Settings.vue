@@ -114,7 +114,7 @@
                 <ion-card-subtitle v-if="cacheSubtitle">{{ cacheSubtitle }}</ion-card-subtitle>
               </div>
               <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()">
-                <ion-spinner v-if="refreshing === '*'" name="dots" />
+                <ion-spinner v-if="refreshing === '*'" slot="icon-only" name="dots" />
                 <ion-icon v-else slot="icon-only" :icon="syncOutline" />
               </ion-button>
             </div>
@@ -149,7 +149,7 @@
                 </p>
               </ion-label>
               <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)">
-                <ion-spinner v-if="refreshing === domain.name" name="dots" />
+                <ion-spinner v-if="refreshing === domain.name" slot="icon-only" name="dots" />
                 <ion-icon v-else slot="icon-only" :icon="syncOutline" />
               </ion-button>
             </ion-item>
