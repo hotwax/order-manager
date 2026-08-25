@@ -2520,12 +2520,13 @@ async function lookupPostalCoordinates(zips: string[]): Promise<Record<string, {
   const coords: Record<string, { lat: number; lon: number }> = {};
   if (!zips.length) return coords;
   try {
-    const { runSolrQuery } = useSolrSearch();
-    const resp = await runSolrQuery({
-      coreName: 'postalCode',
-      json: {
-        query: `postcode:(${zips.map((zip) => `"${zip}"`).join(' OR ')})`,
-        params: { rows: zips.length, fl: 'postcode,latitude,longitude' }
+    const resp = await api({
+      url: 'api/geocode',
+      method: 'POST',
+      data: {
+        json: {
+          query: `postcode:(${zips.map((zip) => `"${zip}"`).join(' OR ')})`
+        }
       }
     });
     (resp?.data?.response?.docs ?? []).forEach((doc: any) => {
@@ -2535,7 +2536,7 @@ async function lookupPostalCoordinates(zips: string[]): Promise<Record<string, {
       if (zip && lat !== undefined && lon !== undefined) coords[zip] = { lat, lon };
     });
   } catch (error) {
-    console.error('Failed to look up postal-code coordinates from Solr:', error);
+    console.error('Failed to look up postal-code coordinates:', error);
   }
   return coords;
 }
