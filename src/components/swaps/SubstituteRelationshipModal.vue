@@ -174,7 +174,7 @@ async function initialize() {
       productId,
       normalizeProduct(enrichedById[productId] || { productId }),
     ]));
-  } catch (cause) {
+  } catch {
     error.value = translate('Failed to load existing substitute relationships. Please try again.');
   } finally {
     loading.value = false;
@@ -194,7 +194,7 @@ async function search() {
     products.value = (result.products || [])
       .filter((product: any) => product.productId && !isSameProduct(product, sourceProduct.value))
       .map(normalizeProduct);
-  } catch (cause) {
+  } catch {
     error.value = translate('Product search failed. Please try again.');
   } finally {
     loading.value = false;
@@ -228,7 +228,7 @@ async function save() {
       ...removals.map((productId) => expireSubstituteAssociation(props.productId, existingById.value[productId])),
     ]);
     modalController.dismiss({ hasSubstitutes: currentIds.size > 0, selectedProductIds: [...currentIds] }, 'confirm');
-  } catch (cause) {
+  } catch {
     error.value = translate('Failed to save substitute relationships. Please try again.');
   } finally {
     saving.value = false;
