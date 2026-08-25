@@ -110,37 +110,21 @@
       </ion-list>
     </ion-content>
 
-    <ion-footer v-if="isAuthenticated">
-      <ion-toolbar>
-        <ion-item lines="none">
-          <ion-label class="ion-text-wrap">
-            <p class="overline">{{ omsInstanceLabel() }}</p>
-          </ion-label>
-          <ion-note v-if="currentTimeZone" slot="end" class="ion-text-end" :color="isTimeZoneMismatched ? 'danger' : ''">
-            {{ currentTimeZone }}
-            <p v-if="isTimeZoneMismatched">{{ selectedZoneTime }}</p>
-          </ion-note>
-        </ion-item>
-        <ion-item v-if="productStores.length > 1" lines="none">
-          <ion-select :label="translate('Select store')" interface="popover" :value="currentProductStore.productStoreId" @ionChange="setCurrentProductStore($event)">
-            <ion-select-option v-for="store in productStores" :key="store.productStoreId" :value="store.productStoreId">
-              {{ store.storeName || store.productStoreId }}
-            </ion-select-option>
-          </ion-select>
-        </ion-item>
-        <ion-item v-else-if="currentProductStore?.productStoreId" lines="none">
-          <ion-label class="ion-text-wrap">
-            <p class="overline">{{ translate("Product Store") }}</p>
-            {{ currentProductStore.storeName || currentProductStore.productStoreId }}
-          </ion-label>
-        </ion-item>
-      </ion-toolbar>
-    </ion-footer>
+    <DxpOmsInstanceFooter
+      v-if="isAuthenticated"
+      :instance-label="omsInstanceLabel()"
+      :product-stores="productStores"
+      :current-product-store-id="currentProductStore?.productStoreId"
+      :time-zone="currentTimeZone"
+      :time-zone-mismatched="isTimeZoneMismatched"
+      :zone-time="isTimeZoneMismatched ? selectedZoneTime : ''"
+      @update:product-store="setCurrentProductStore"
+    />
   </ion-menu>
 </template>
 
 <script setup lang="ts">
-import { IonBadge, IonContent, IonFooter, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonMenu, IonMenuToggle, IonNote, IonSelect, IonSelectOption, IonTitle, IonToolbar } from '@ionic/vue';
+import { IonBadge, IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonMenu, IonMenuToggle, IonTitle, IonToolbar } from '@ionic/vue';
 import {
   airplaneOutline,
   alertCircleOutline,
@@ -157,7 +141,7 @@ import {
   settingsOutline,
   shieldHalfOutline
 } from 'ionicons/icons';
-import { commonUtil, translate } from '@common';
+import { commonUtil, DxpOmsInstanceFooter, translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 import router from '@/router';
 import { useOrderStore } from '@/store/order';
@@ -230,9 +214,9 @@ onUnmounted(() => {
   clearInterval(clockTimer);
 })
 
-function setCurrentProductStore(event: CustomEvent) {
-  if (currentProductStore.value.productStoreId !== event.detail.value) {
-    const selectedProductStore = productStores.value.find((store: any) => store.productStoreId == event.detail.value)
+function setCurrentProductStore(productStoreId: string) {
+  if (currentProductStore.value.productStoreId !== productStoreId) {
+    const selectedProductStore = productStores.value.find((store: any) => store.productStoreId == productStoreId)
     if (selectedProductStore) {
       productStore.setProductStorePreference(selectedProductStore)
     }
