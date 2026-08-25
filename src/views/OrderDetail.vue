@@ -585,9 +585,7 @@
                     lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], 'pick') }}</p>
                   {{ translate('Pick') }}
                 </ion-label>
-                <ion-note slot="end">{{ formatTime(lifecycleByShipGroup[shipGroup.id]?.picklistDate) ||
-                  translate('Pending')
-                  }}</ion-note>
+                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, lifecycleByShipGroup[shipGroup.id]?.picklistDate) }}</ion-note>
               </ion-item>
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="cubeOutline" />
@@ -596,9 +594,7 @@
                     lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], 'pack') }}</p>
                   {{ translate('Pack') }}
                 </ion-label>
-                <ion-note slot="end">{{ formatTime(lifecycleByShipGroup[shipGroup.id]?.packedDate) ||
-                  translate('Pending')
-                  }}</ion-note>
+                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, lifecycleByShipGroup[shipGroup.id]?.packedDate) }}</ion-note>
               </ion-item>
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="sendOutline" />
@@ -607,9 +603,7 @@
                     lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], 'ship') }}</p>
                   {{ translate('Ship') }}
                 </ion-label>
-                <ion-note slot="end">{{ formatTime(lifecycleByShipGroup[shipGroup.id]?.shippedDate) ||
-                  translate('Pending')
-                  }}</ion-note>
+                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, lifecycleByShipGroup[shipGroup.id]?.shippedDate) }}</ion-note>
               </ion-item>
             </div>
 
@@ -1107,6 +1101,7 @@ import { showToast, isKit, riskLevelColor, sentimentCounts } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { fulfillmentLineStatus, fulfillmentLineStatusColor } from '@/utils/fulfillmentLineStatus';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
+import { shipGroupItemStates as itemStatesFor } from '@/utils/shipGroupItemStates';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useUserStore } from '@/store/user';
@@ -1294,7 +1289,10 @@ const order = computed(() => {
           name: product?.parentProductName || product?.productName || item.itemDescription || item.productId,
           sku: product?.sku || item.productId,
           imageUrl: product?.mainImageUrl || '',
-          quantity: item.quantity
+          quantity: item.quantity,
+          // The card's progress and lifecycle read this: a group whose items are all terminal
+          // is finished no matter what the fulfillment timeline did or did not record.
+          statusId: item.statusId
         };
       })
     }))
@@ -1771,10 +1769,22 @@ function isShipGroupBrokered(shipGroup: any): boolean {
   return !isVirtualFacility(shipGroup) || !!shipGroupBrokeredDate(shipGroup);
 }
 
+/** Item-derived state for this group; see utils/shipGroupItemStates for why it is the authority. */
+function shipGroupItemStates(shipGroup: any) {
+  return itemStatesFor(shipGroup?.items);
+}
+
 function shipGroupProgress(shipGroup: any): number {
   // A counter sale is finished the moment it is recorded; there is no lifecycle to
   // measure and no timeline row to measure it from.
   if (isPosCompleted(shipGroup)) return 1;
+
+  const states = shipGroupItemStates(shipGroup);
+  // Item status wins for a stopped group; the timeline only describes one still in motion.
+  if (states.allFulfilled) return 1;
+  if (states.allCancelled) return 0;
+  if (states.partiallyFulfilled) return states.fulfilled / states.total;
+
   const tl = timelineByShipGroup.value[shipGroup.id];
   let progress = 0;
   if (isShipGroupBrokered(shipGroup)) progress += 0.25;
@@ -1784,10 +1794,18 @@ function shipGroupProgress(shipGroup: any): number {
   return progress;
 }
 
+/** A step that never got a date: still to come, or already behind us and simply not recorded. */
+function lifecycleStepNote(shipGroup: any, date: any): string {
+  return formatTime(date)
+    || (shipGroupItemStates(shipGroup).settled ? translate('No date') : translate('Pending'));
+}
+
 /** The brokered step's time, or why there is none: not brokered yet vs. brokered untimed. */
 function brokeredStepNote(shipGroup: any): string {
   return formatTime(shipGroupBrokeredDate(shipGroup))
-    || (isShipGroupBrokered(shipGroup) ? translate('No date') : translate('Pending'));
+    || (isShipGroupBrokered(shipGroup) || shipGroupItemStates(shipGroup).settled
+      ? translate('No date')
+      : translate('Pending'));
 }
 
 function isShipGroupExpanded(shipGroupId: string): boolean {
@@ -1850,6 +1868,12 @@ function shipGroupHeaderTitle(shipGroup: any): string {
 function shipGroupStatusLabel(shipGroup: any): string {
   if (isPosCompleted(shipGroup)) return translate('Sold in store');
   if (isVirtualFacility(shipGroup)) return translate('Not Brokered');
+
+  // A stopped group is not a point on the way to shipping, so a percentage misreads it.
+  const states = shipGroupItemStates(shipGroup);
+  if (states.allCancelled) return translate('Cancelled');
+  if (states.partiallyFulfilled) return translate('Partially complete');
+
   // A physical facility is always at least brokered, so there is no 0% case left to
   // label — the old fallback here read "Brokered", which collided with the step name.
   return `${Math.round(shipGroupProgress(shipGroup) * 100)}% ${translate('Complete')}`;
