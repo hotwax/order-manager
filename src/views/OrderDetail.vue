@@ -1070,9 +1070,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
-import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
 import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, chevronDown, chevronUp, closeCircleOutline, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pauseCircleOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, storefrontOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -2521,12 +2520,13 @@ async function lookupPostalCoordinates(zips: string[]): Promise<Record<string, {
   const coords: Record<string, { lat: number; lon: number }> = {};
   if (!zips.length) return coords;
   try {
-    const { runSolrQuery } = useSolrSearch();
-    const resp = await runSolrQuery({
-      coreName: 'postalCode',
-      json: {
-        query: `postcode:(${zips.map((zip) => `"${zip}"`).join(' OR ')})`,
-        params: { rows: zips.length, fl: 'postcode,latitude,longitude' }
+    const resp = await api({
+      url: 'api/geocode',
+      method: 'POST',
+      data: {
+        json: {
+          query: `postcode:(${zips.map((zip) => `"${zip}"`).join(' OR ')})`
+        }
       }
     });
     (resp?.data?.response?.docs ?? []).forEach((doc: any) => {
@@ -2536,7 +2536,7 @@ async function lookupPostalCoordinates(zips: string[]): Promise<Record<string, {
       if (zip && lat !== undefined && lon !== undefined) coords[zip] = { lat, lon };
     });
   } catch (error) {
-    console.error('Failed to look up postal-code coordinates from Solr:', error);
+    console.error('Failed to look up postal-code coordinates:', error);
   }
   return coords;
 }
@@ -3306,18 +3306,6 @@ async function brokerShipGroup(shipGroupSeqId: string) {
   }
 }
 
-async function parkShipGroup(shipGroupSeqId: string) {
-  const facilityId = await openFacilityModal();
-  if (!facilityId) return;
-  try {
-    await orderTaskStore.parkOrder(order.value!.id, shipGroupSeqId, facilityId);
-    await showToast(translate('Ship group successfully moved to parking.'));
-    await loadOrder(order.value!.id, true);
-  } catch {
-    await showToast(translate('Failed to park the ship group. Please try again.'));
-  }
-}
-
 async function cancelOrderItems() {
   const raw = orderDetailStore.orderById(props.orderId);
   if (!raw || !selectedItems.value.length) return;
@@ -3431,18 +3419,6 @@ async function cancelSingleItem(item: any) {
     ]
   });
   await alert.present();
-}
-
-async function parkFullOrder() {
-  const facilityId = await openFacilityModal();
-  if (!facilityId) return;
-  try {
-    await orderTaskStore.parkOrderFull(order.value!.id, facilityId);
-    await showToast(translate('Order successfully moved to parking.'));
-    await loadOrder(order.value!.id, true);
-  } catch {
-    await showToast(translate('Failed to park the order. Please try again.'));
-  }
 }
 
 async function viewInventory(productId: string) {
@@ -3684,15 +3660,13 @@ async function parkSelectedItems(shipGroup: any) {
   if (!facilityId) return;
   const orderId = order.value!.id;
   try {
-    await Promise.all(
-      itemIds.map((orderItemSeqId) =>
-        api({
+    for(let orderItemSeqId of itemIds) {
+      await api({
         url: `oms/orders/${orderId}/moveItemToParking`,
         method: 'POST',
         data: { orderId, orderItemSeqId, shipGroupSeqId: shipGroup.id, toFacilityId: facilityId },
-        })
-      )
-    );
+      })
+    }
     selectedShipGroupItems.value[shipGroup.id] = new Set();
     await showToast(translate('Items moved to parking.'));
     await loadOrder(orderId, true);

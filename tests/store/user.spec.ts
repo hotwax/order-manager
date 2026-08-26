@@ -3,6 +3,14 @@ import { createPinia, setActivePinia } from 'pinia';
 import { useProductStore } from '@/store/productStore';
 import { api } from '@common';
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 vi.mock('@common', () => ({
   api: vi.fn(),
   commonUtil: {
@@ -10,6 +18,9 @@ vi.mock('@common', () => ({
     getOmsURL: () => 'https://oms.example/api/',
     hasError: () => false,
     showToast: vi.fn(),
+  },
+  logger: {
+    error: vi.fn(),
   },
   translate: (message: string) => message,
 }));
@@ -46,5 +57,118 @@ describe('product store', () => {
       { productStoreId: 'STORE_A', storeName: 'Store A' },
       { productStoreId: 'STORE_B', storeName: 'Store B' },
     ]);
+  });
+
+  it('reconciles persisted selected store metadata with the refreshed catalog', async () => {
+    vi.mocked(api).mockResolvedValue({
+      data: [{ productStoreId: 'STORE', storeName: 'Demo Store' }],
+    });
+
+    const productStore = useProductStore();
+    productStore.currentProductStore = { productStoreId: 'STORE', storeName: 'gorjana' };
+    productStore.productStores = [{ productStoreId: 'STORE', storeName: 'gorjana' }];
+
+    await productStore.fetchProductStores();
+
+    expect(productStore.getCurrentProductStore).toEqual({
+      productStoreId: 'STORE',
+      storeName: 'Demo Store',
+    });
+  });
+
+  it('preserves a usable persisted selection when the catalog refresh fails', async () => {
+    vi.mocked(api).mockRejectedValue(new Error('catalog unavailable'));
+
+    const productStore = useProductStore();
+    const persistedStore = { productStoreId: 'STORE', storeName: 'Demo Store' };
+    productStore.currentProductStore = persistedStore;
+    productStore.productStores = [persistedStore];
+
+    await productStore.fetchProductStores();
+
+    expect(productStore.getProductStores).toEqual([persistedStore]);
+    expect(productStore.getCurrentProductStore).toEqual(persistedStore);
+  });
+
+  it('preserves a usable persisted selection when its cached catalog is unavailable', async () => {
+    vi.mocked(api).mockRejectedValue(new Error('catalog unavailable'));
+
+    const productStore = useProductStore();
+    const persistedStore = { productStoreId: 'STORE', storeName: 'Demo Store' };
+    productStore.currentProductStore = persistedStore;
+    productStore.productStores = [];
+
+    await productStore.fetchProductStores();
+
+    expect(productStore.getCurrentProductStore).toEqual(persistedStore);
+  });
+
+  it('falls back to the first current catalog store when the saved preference is invalid', async () => {
+    vi.mocked(api).mockResolvedValue({
+      data: [{ preferenceValue: 'REMOVED_STORE' }],
+    });
+
+    const productStore = useProductStore();
+    productStore.productStores = [
+      { productStoreId: 'STORE_A', storeName: 'Store A' },
+      { productStoreId: 'STORE_B', storeName: 'Store B' },
+    ];
+    productStore.currentProductStore = { productStoreId: 'REMOVED_STORE', storeName: 'Removed Store' };
+
+    await productStore.fetchProductStorePreference();
+
+    expect(productStore.getCurrentProductStore).toEqual({
+      productStoreId: 'STORE_A',
+      storeName: 'Store A',
+    });
+  });
+
+  it('clears a persisted selection after a successful empty catalog refresh', async () => {
+    vi.mocked(api).mockResolvedValue({ data: [] });
+
+    const productStore = useProductStore();
+    productStore.productStores = [{ productStoreId: 'REMOVED_STORE', storeName: 'Removed Store' }];
+    productStore.currentProductStore = { productStoreId: 'REMOVED_STORE', storeName: 'Removed Store' };
+
+    await productStore.fetchProductStores();
+
+    expect(productStore.getProductStores).toEqual([]);
+    expect(productStore.getCurrentProductStore).toEqual({});
+  });
+
+  it('finishes catalog and preference reconciliation before publishing initialization readiness', async () => {
+    const catalog = deferred<any>();
+    const preference = deferred<any>();
+    vi.mocked(api).mockImplementation((request: any) => {
+      if (request.url === '/admin/productStores') return catalog.promise;
+      if (request.url === 'admin/user/preferences') return preference.promise;
+      return Promise.resolve({ data: [] });
+    });
+
+    const productStore = useProductStore();
+    productStore.currentProductStore = { productStoreId: 'REMOVED', storeName: 'Removed Store' };
+
+    const firstInitialization = productStore.initializeProductStore();
+    const concurrentInitialization = productStore.initializeProductStore();
+
+    expect(productStore.isProductStoreInitialized).toBe(false);
+    expect(api).toHaveBeenCalledTimes(1);
+
+    catalog.resolve({
+      data: [
+        { productStoreId: 'STORE_A', storeName: 'Store A' },
+        { productStoreId: 'STORE_B', storeName: 'Store B' },
+      ],
+    });
+    await Promise.resolve();
+    preference.resolve({ data: [{ preferenceValue: 'STORE_B' }] });
+    await Promise.all([firstInitialization, concurrentInitialization]);
+
+    expect(api).toHaveBeenCalledTimes(2);
+    expect(productStore.getCurrentProductStore).toEqual({
+      productStoreId: 'STORE_B',
+      storeName: 'Store B',
+    });
+    expect(productStore.isProductStoreInitialized).toBe(true);
   });
 });
