@@ -3385,11 +3385,10 @@ async function rejectAndReleaseItem(item: any) {
   // Step 3 — release to chosen facility
   try {
     await api({
-      url: `oms/orders/${orderId}/allocation-with-reuse`,
+      url: `oms/orders/${orderId}/release/${facilityId}`,
       method: 'POST',
       data: {
-        facilityId,
-        orderItemSeqId: item.orderItemSeqId,
+        orderItemSeqIds: [item.orderItemSeqId],
         orderFacilityChange: {
           changeReasonEnumId: "RELEASED"
         }
@@ -3758,10 +3757,9 @@ async function releaseSelectedItems(shipGroup: any) {
   const orderId = order.value!.id;
   try {
     await api({
-      url: `oms/orders/${orderId}/allocation-with-reuse`,
+      url: `oms/orders/${orderId}/release/${facilityId}`,
       method: 'POST',
       data: {
-        facilityId,
         orderItemSeqIds: itemIds,
         orderFacilityChange: {
           changeReasonEnumId: "RELEASED"
