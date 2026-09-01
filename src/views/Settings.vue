@@ -11,8 +11,8 @@
       <div class="user-profile">
         <ion-card>
           <ion-item lines="full">
-            <ion-avatar slot="start">
-              <ion-label>{{ userInitials }}</ion-label>
+            <ion-avatar slot="start" v-if="userProfile?.partyImageUrl">
+              <Image :src="userProfile.partyImageUrl"/>
             </ion-avatar>
             <ion-card-header class="ion-no-padding ion-padding-vertical">
               <ion-card-subtitle>{{ userProfile.username || userProfile.emailAddress || userProfile.userId }}</ion-card-subtitle>
@@ -242,10 +242,6 @@ const productStores = computed(() => useProductStore().getProductStores || []);
 const timeZones = computed(() => userStore.getAvailableTimeZones);
 const currentTimeZone = computed(() => userStore.getUserTimeZone || userProfile.value?.userTimeZone || Intl.DateTimeFormat().resolvedOptions().timeZone);
 const omsInstance = computed(() => cookieHelper().get('oms') || userStore.oms);
-const userInitials = computed(() => {
-  const name = userProfile.value?.userFullName || userProfile.value?.partyId || userProfile.value?.userId || '';
-  return name.split(/\s+/).filter(Boolean).slice(0, 2).map((part: string) => part[0]?.toUpperCase()).join('') || 'OM';
-});
 
 const locale = computed(() => i18n.global.locale.value);
 
