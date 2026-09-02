@@ -46,8 +46,8 @@ describe('order detail ship group card', () => {
     expect(source).toContain('function actionableItemObjectsForShipGroup(shipGroup: any)');
     expect(source).toContain('if (!itemIds.size) return items;');
     expect(source).not.toContain('function selectedItemObjectsForShipGroup');
-    // Park / pull back / release all act on the fallback set, not the raw selection.
-    expect(source.match(/actionableItemObjectsForShipGroup\(shipGroup\)/g)?.length).toBe(4);
+    // Park / pull back / release / request transfer all act on the fallback set, not the raw selection.
+    expect(source.match(/actionableItemObjectsForShipGroup\(shipGroup\)/g)?.length).toBe(5);
     expect(source).not.toContain('const itemIds = selectedItemsForShipGroup(shipGroup.id);');
   });
 });
