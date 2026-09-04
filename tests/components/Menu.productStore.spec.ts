@@ -92,14 +92,14 @@ describe('menu footer layout', () => {
     expect(source).not.toContain('translate("Product Store")');
   });
 
-  it('feeds the component this app\'s own instance, store and timezone state', () => {
+  it('feeds the component this app\'s own instance and store state', () => {
     expect(source).toContain(':instance-label="omsInstanceLabel()"');
     expect(source).toContain(':product-stores="productStores"');
     expect(source).toContain(':current-product-store-id="currentProductStore?.productStoreId"');
-    expect(source).toContain(':time-zone="currentTimeZone"');
-    expect(source).toContain(':time-zone-mismatched="isTimeZoneMismatched"');
-    // order-manager only surfaces its clock when the zone differs from the browser's.
-    expect(source).toContain(':zone-time="isTimeZoneMismatched ? selectedZoneTime : \'\'"');
+    // Timezone, browser mismatch, and clock are internalized in DxpOmsInstanceFooter
+    expect(source).not.toContain(':time-zone=');
+    expect(source).not.toContain(':time-zone-mismatched=');
+    expect(source).not.toContain(':zone-time=');
   });
 
   it('takes the selected store id from the event, not a raw CustomEvent', () => {

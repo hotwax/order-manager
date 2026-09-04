@@ -115,9 +115,6 @@
       :instance-label="omsInstanceLabel()"
       :product-stores="productStores"
       :current-product-store-id="currentProductStore?.productStoreId"
-      :time-zone="currentTimeZone"
-      :time-zone-mismatched="isTimeZoneMismatched"
-      :zone-time="isTimeZoneMismatched ? selectedZoneTime : ''"
       @update:product-store="setCurrentProductStore"
     />
   </ion-menu>
@@ -147,7 +144,7 @@ import router from '@/router';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted } from 'vue';
 import Actions from "@/authorization/actions";
 
 const HOTWAX_HOST_SUFFIX = ".hotwax.io";
@@ -172,22 +169,6 @@ function omsInstanceLabel() {
   return host.endsWith(HOTWAX_HOST_SUFFIX) ? host.slice(0, -HOTWAX_HOST_SUFFIX.length) : host;
 }
 
-// Mirrors the Settings page resolution so the footer and Settings never disagree.
-const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const currentTimeZone = computed(() => userStore.getUserTimeZone || userProfile.value?.userTimeZone || browserTimeZone);
-const isTimeZoneMismatched = computed(() => !!currentTimeZone.value && currentTimeZone.value !== browserTimeZone);
-
-// The menu footer stays mounted for the life of the session, so the clock is driven by a
-// timer instead of being frozen at whatever the last render happened to be.
-const selectedZoneTime = ref("");
-let clockTimer: ReturnType<typeof setInterval> | undefined;
-
-function refreshSelectedZoneTime() {
-  selectedZoneTime.value = commonUtil.getCurrentTime(currentTimeZone.value, "t");
-}
-
-watch(currentTimeZone, refreshSelectedZoneTime);
-
 // Queue rollups shown as menu badges. Each count is published to this shared map as
 // a byproduct of the matching page (or the Funnel) fetching its own data, so the
 // badge reflects the latest count the app has loaded. A missing key = not yet loaded.
@@ -202,16 +183,9 @@ const selectedPage = computed(() => {
 })
 
 onMounted(async () => {
-  refreshSelectedZoneTime();
-  clockTimer = setInterval(refreshSelectedZoneTime, 30000);
-
   if (isAuthenticated.value) {
     await productStore.initializeProductStore();
   }
-})
-
-onUnmounted(() => {
-  clearInterval(clockTimer);
 })
 
 function setCurrentProductStore(productStoreId: string) {
