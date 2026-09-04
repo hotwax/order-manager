@@ -1,7 +1,10 @@
 import { defineStore } from "pinia";
 import { liveQuery } from "dexie";
 import { api, commonUtil, logger } from "@common";
-import { orderManagerDb } from "@/cache/appCacheDb";
+import { getOrderManagerDb } from "@/cache/appCacheDb";
+
+/** The cache for the signed-in OMS. Resolved per call so reads follow an instance switch. */
+const currentDb = () => getOrderManagerDb(commonUtil.getOMSInstanceName());
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error";
 
@@ -269,6 +272,7 @@ export const useSeedStore = defineStore("seed", {
     },
     async populateFromCache() {
       try {
+        const orderManagerDb = currentDb();
         const [
           productStores,
           statuses,
@@ -471,9 +475,9 @@ export const useSeedStore = defineStore("seed", {
         }
       }
       try {
-        liveQuery(() => orderManagerDb.table("statuses").count()).subscribe({ next: () => this.populateFromCache() });
-        liveQuery(() => orderManagerDb.table("geos").count()).subscribe({ next: () => this.populateFromCache() });
-        liveQuery(() => orderManagerDb.table("facilities").count()).subscribe({ next: () => this.populateFromCache() });
+        liveQuery(() => currentDb().table("statuses").count()).subscribe({ next: () => this.populateFromCache() });
+        liveQuery(() => currentDb().table("geos").count()).subscribe({ next: () => this.populateFromCache() });
+        liveQuery(() => currentDb().table("facilities").count()).subscribe({ next: () => this.populateFromCache() });
       } catch {
         // Safe fallback in test environments without liveQuery BroadcastChannel
       }
@@ -724,7 +728,7 @@ export const useSeedStore = defineStore("seed", {
       if (existing?.status === "loaded" && existing.ids.length > 0) return;
 
       try {
-        const cached = await orderManagerDb.table("geoAssocs").where("geoId").equals(countryGeoId).toArray();
+        const cached = await currentDb().table("geoAssocs").where("geoId").equals(countryGeoId).toArray();
         if (cached && cached.length > 0) {
           this.geoAssocsByCountry[countryGeoId] = {
             ids: cached.map((r: any) => r.toGeoId || r.raw?.toGeoId).filter(Boolean),
