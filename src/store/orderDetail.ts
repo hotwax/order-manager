@@ -718,7 +718,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     riskAssessmentsStatus: (state): LoadStatus => state.riskAssessmentsStatusByOrderId[state.currentOrderId] || "idle",
     riskAssessmentsError: (state): string => state.riskAssessmentsErrorByOrderId[state.currentOrderId] || "",
 
-    /** Shipping methods for a given carrier partyId, derived from the fetched carrierShipmentMethods list or local cache. */
+    /** Shipping methods for a given carrier partyId, derived from the fetched carrierShipmentMethods list or the local database. */
     shippingMethodsByCarrier: (state) => (carrierPartyId: string) => {
       const fromDetail = state.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId);
       if (fromDetail.length) return fromDetail;

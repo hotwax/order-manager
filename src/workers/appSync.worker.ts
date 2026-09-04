@@ -2,8 +2,8 @@
  * Order Manager Web Worker Entry.
  */
 
-import { exposeWorkerHarness, registerCommonSeedDomains } from "@common/cache";
-import { getOrderManagerDb } from "@/cache/appCacheDb";
+import { exposeWorkerHarness, registerCommonSeedDomains } from "@common/db";
+import { getOrderManagerDb } from "@/db/orderManagerDb";
 
 // Register all standard HotWax OMS reference domains
 registerCommonSeedDomains((omsInstance) => getOrderManagerDb(omsInstance));

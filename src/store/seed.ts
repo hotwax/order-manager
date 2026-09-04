@@ -1,9 +1,10 @@
 import { defineStore } from "pinia";
 import { liveQuery } from "dexie";
 import { api, commonUtil, logger } from "@common";
-import { getOrderManagerDb } from "@/cache/appCacheDb";
+import { DB_SYNC_CHANNEL } from "@common/db";
+import { getOrderManagerDb } from "@/db/orderManagerDb";
 
-/** The cache for the signed-in OMS. Resolved per call so reads follow an instance switch. */
+/** The local database for the signed-in OMS. Resolved per call so reads follow an instance switch. */
 const currentDb = () => getOrderManagerDb(commonUtil.getOMSInstanceName());
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error";
@@ -266,11 +267,11 @@ export const useSeedStore = defineStore("seed", {
     }
   },
   actions: {
-    async initSeedCache() {
-      await this.populateFromCache();
-      this.subscribeToCacheUpdates();
+    async initSeedDb() {
+      await this.populateFromDb();
+      this.subscribeToDbUpdates();
     },
-    async populateFromCache() {
+    async populateFromDb() {
       try {
         const orderManagerDb = currentDb();
         const [
@@ -460,24 +461,24 @@ export const useSeedStore = defineStore("seed", {
           });
         }
       } catch (error) {
-        logger.warn("[seedStore] Error populating from cache:", error);
+        logger.warn("[seedStore] Error populating from the local database:", error);
       }
     },
-    subscribeToCacheUpdates() {
+    subscribeToDbUpdates() {
       if (typeof BroadcastChannel !== "undefined") {
         try {
-          const channel = new BroadcastChannel("hotwax-cache-sync");
+          const channel = new BroadcastChannel(DB_SYNC_CHANNEL);
           channel.onmessage = () => {
-            this.populateFromCache();
+            this.populateFromDb();
           };
         } catch {
           // Ignore
         }
       }
       try {
-        liveQuery(() => currentDb().table("statuses").count()).subscribe({ next: () => this.populateFromCache() });
-        liveQuery(() => currentDb().table("geos").count()).subscribe({ next: () => this.populateFromCache() });
-        liveQuery(() => currentDb().table("facilities").count()).subscribe({ next: () => this.populateFromCache() });
+        liveQuery(() => currentDb().table("statuses").count()).subscribe({ next: () => this.populateFromDb() });
+        liveQuery(() => currentDb().table("geos").count()).subscribe({ next: () => this.populateFromDb() });
+        liveQuery(() => currentDb().table("facilities").count()).subscribe({ next: () => this.populateFromDb() });
       } catch {
         // Safe fallback in test environments without liveQuery BroadcastChannel
       }
@@ -728,16 +729,16 @@ export const useSeedStore = defineStore("seed", {
       if (existing?.status === "loaded" && existing.ids.length > 0) return;
 
       try {
-        const cached = await currentDb().table("geoAssocs").where("geoId").equals(countryGeoId).toArray();
-        if (cached && cached.length > 0) {
+        const stored = await currentDb().table("geoAssocs").where("geoId").equals(countryGeoId).toArray();
+        if (stored && stored.length > 0) {
           this.geoAssocsByCountry[countryGeoId] = {
-            ids: cached.map((r: any) => r.toGeoId || r.raw?.toGeoId).filter(Boolean),
+            ids: stored.map((r: any) => r.toGeoId || r.raw?.toGeoId).filter(Boolean),
             status: "loaded"
           };
           return;
         }
       } catch (err) {
-        console.warn("Failed to query cached geoAssocs:", err);
+        console.warn("Failed to query stored geoAssocs:", err);
       }
 
       if (!this.geoAssocsByCountry[countryGeoId]) {
