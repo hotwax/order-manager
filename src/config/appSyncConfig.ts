@@ -1,6 +1,6 @@
-import type { CacheDomainCatalogItem } from "@common/cache";
+import type { SyncDomainCatalogItem } from "@common/db";
 
-export const ORDER_MANAGER_CACHE_CATALOG: CacheDomainCatalogItem[] = [
+export const ORDER_MANAGER_SYNC_CATALOG: SyncDomainCatalogItem[] = [
   { name: "productStore", table: "productStores", label: "Product Stores", syncClass: "B" },
   { name: "status", table: "statuses", label: "Statuses", syncClass: "B" },
   { name: "enum", table: "enums", label: "Enumerations", syncClass: "B" },
@@ -28,9 +28,4 @@ export const ORDER_MANAGER_CACHE_CATALOG: CacheDomainCatalogItem[] = [
   { name: "geo", table: "geos", label: "Geographic Regions", syncClass: "B" },
   { name: "geoAssoc", table: "geoAssocs", label: "Geo Associations", syncClass: "B" },
 ];
-
-export const appSyncConfig = {
-  dbName: "OrderManagerCacheDB",
-  baseTickMs: 0, // Reference domains only need 1 sync per login; 0 = no periodic polling
-};
 
