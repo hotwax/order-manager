@@ -3,10 +3,10 @@
  */
 
 import { exposeWorkerHarness, registerCommonSeedDomains } from "@common/cache";
-import { orderManagerDb } from "@/cache/appCacheDb";
+import { getOrderManagerDb } from "@/cache/appCacheDb";
 
 // Register all standard HotWax OMS reference domains
-registerCommonSeedDomains(() => orderManagerDb);
+registerCommonSeedDomains((omsInstance) => getOrderManagerDb(omsInstance));
 
 // Expose the harness across Comlink to the main thread
-exposeWorkerHarness(() => orderManagerDb);
+exposeWorkerHarness((omsInstance) => getOrderManagerDb(omsInstance));
