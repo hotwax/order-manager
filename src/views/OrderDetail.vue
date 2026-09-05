@@ -3373,10 +3373,10 @@ async function rejectAndReleaseItem(item: any) {
   // Step 3 — release to chosen facility
   try {
     await api({
-      url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/allocation`,
+      url: `oms/orders/${orderId}/release/${facilityId}`,
       method: 'POST',
       data: {
-        facilityId,
+        orderItemSeqIds: [item.orderItemSeqId],
         orderFacilityChange: {
           changeReasonEnumId: "RELEASED"
         }
@@ -3730,18 +3730,16 @@ async function releaseSelectedItems(shipGroup: any) {
   if (!facilityId) return;
   const orderId = order.value!.id;
   try {
-    for(let orderItemSeqId of itemIds) {
-      await api({
-        url: `oms/orders/${orderId}/items/${orderItemSeqId}/allocation`,
-        method: 'POST',
-        data: {
-          facilityId,
-          orderFacilityChange:{
+    await api({
+      url: `oms/orders/${orderId}/release/${facilityId}`,
+      method: 'POST',
+      data: {
+        orderItemSeqIds: itemIds,
+        orderFacilityChange: {
           changeReasonEnumId: "RELEASED"
-          }
-        },
-      })
-    }
+        }
+      },
+    });
     selectedShipGroupItems.value[shipGroup.id] = new Set();
     await showToast(translate('Items released to facility.'));
     await loadOrder(orderId, true);
