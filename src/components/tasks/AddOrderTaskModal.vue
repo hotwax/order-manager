@@ -108,8 +108,7 @@ import {
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
-import { useSeedTable } from '@/db/omDb';
-import { getEnumsByType } from '@/db/seedLookups';
+import { getEnumsByType } from '@/db/useSeedData';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
 
 const props = defineProps<{
@@ -123,7 +122,6 @@ const props = defineProps<{
   defaultWorkEffortPurposeTypeId?: string;
 }>();
 
-const { records: enums } = useSeedTable('enums');
 const WORK_EFFORT_TYPE_ID = 'RESOLVE_ONHOLD_ORDER';
 const OPERATOR_HOLD_PURPOSE_IDS = new Set(['ORD_HOLD_MANUAL', 'ORD_HOLD_CUST_REQ']);
 
@@ -141,7 +139,9 @@ const taskNameEdited = ref(false);
 
 // Address, reservation, and fraud purposes are created by their owning backend flows. In
 // particular, fraud is order-scoped and must never be fanned out through this ship-group modal.
-const taskPurposes = computed(() => getEnumsByType(enums.value, WORK_EFFORT_TYPE_ID)
+const workEffortEnums = ref<any[]>([]);
+onMounted(async () => { workEffortEnums.value = await getEnumsByType(WORK_EFFORT_TYPE_ID); });
+const taskPurposes = computed(() => workEffortEnums.value
   .filter((purpose: any) => OPERATOR_HOLD_PURPOSE_IDS.has(purpose.enumId)));
 
 const selectedPurpose = computed(() => taskPurposes.value.find((option) => option.enumId === form.workEffortPurposeTypeId));

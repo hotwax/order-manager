@@ -60,12 +60,11 @@ import {
   modalController
 } from '@ionic/vue';
 import { closeOutline } from 'ionicons/icons';
-import { computed, onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { translate } from '@common';
 import { DateTime } from 'luxon';
 import { useCustomerStore } from '@/store/customer';
-import { useSeedTable } from '@/db/omDb';
-import { partyRelationshipDescription } from '@/db/seedLookups';
+import { getPartyRelationshipDescriptions } from '@/db/useSeedData';
 
 const props = defineProps<{
   currentPartyId: string;
@@ -74,7 +73,15 @@ const props = defineProps<{
 }>();
 
 const store = useCustomerStore() as any;
-const { records: partyRelationshipTypes } = useSeedTable('partyRelationshipTypes');
+
+// One read covers every relationship type label on the list, plus the DUPLICATE marker.
+const relationshipLabels = ref<Record<string, string>>({});
+watch(() => store.personalRelationships(props.currentPartyId), async (personal: any[]) => {
+  relationshipLabels.value = await getPartyRelationshipDescriptions([
+    'DUPLICATE',
+    ...(personal || []).map((rel: any) => rel.partyRelationshipTypeId),
+  ]);
+}, { immediate: true, deep: true });
 
 onMounted(() => {
   store.loadCustomerRelationships(props.currentPartyId, true);
@@ -107,7 +114,7 @@ const timeline = computed(() => {
 
   const personalEntries = personal.map((rel: any) => ({
     key: rel.key,
-    typeLabel: partyRelationshipDescription(partyRelationshipTypes.value, rel.partyRelationshipTypeId),
+    typeLabel: relationshipLabels.value[rel.partyRelationshipTypeId] ?? rel.partyRelationshipTypeId,
     partyName: rel.relatedPartyName,
     partyId: rel.relatedPartyId,
     fromDate: rel.fromDate,
@@ -117,7 +124,7 @@ const timeline = computed(() => {
 
   const duplicateEntries = duplicates.map((rel: any) => ({
     key: rel.key,
-    typeLabel: partyRelationshipDescription(partyRelationshipTypes.value, 'DUPLICATE'),
+    typeLabel: relationshipLabels.value.DUPLICATE ?? 'DUPLICATE',
     partyName: rel.isCanonical ? rel.duplicatePartyName : rel.canonicalPartyName,
     partyId: rel.isCanonical ? rel.duplicatePartyId : rel.canonicalPartyId,
     fromDate: rel.fromDate,

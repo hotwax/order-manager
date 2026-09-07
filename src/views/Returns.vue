@@ -195,7 +195,7 @@ import SearchFilterCard from "@/components/common/SearchFilterCard.vue";
 import UniformFilterLayout from "@/components/common/UniformFilterLayout.vue";
 import router from "@/router";
 import { useReturnsStore } from "@/store/returns";
-import { useSeedTable } from '@/db/omDb';
+import { useSeedTable } from '@/db/orderManagerDb';
 import { enumDescription, facilityName, getEnumsByType, getStatusItemsByType, statusDescription } from '@/db/seedLookups';
 
 const returnsStore = useReturnsStore();

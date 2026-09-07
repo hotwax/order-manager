@@ -144,8 +144,7 @@ import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import { computed, onMounted, ref, watch } from 'vue';
 import { api, emitter, logger, translate } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { useSeedTable } from '@/db/omDb';
-import { geoName } from '@/db/seedLookups';
+import { getGeoName, getShopifyShops } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
 import { createShopifyCustomer, searchShopifyCustomers } from '@/services/customer';
 import { showToast } from '@/utils';
@@ -155,8 +154,6 @@ import { buildClonePayload, cloneCustomerName, cloneEmail, clonePhone, defaultCl
 const SHOPIFY_CUSTOMER_ID_TYPE = 'SHOPIFY_CUST_ID';
 
 const orderDetailStore = useOrderDetailStore();
-const { records: shopifyShops } = useSeedTable('shopifyShops');
-const { records: geos } = useSeedTable('geos');
 const productCache = useProductCacheStore();
 
 const raw = computed(() => orderDetailStore.current);
@@ -174,8 +171,9 @@ const email = computed(() => cloneEmail(raw.value));
 // ── Shop resolution: ShopifyShopOrder mapping first, manual pick from seed shops as fallback.
 const shopStatus = ref<'resolving' | 'resolved' | 'manual'>('resolving');
 const shopId = ref('');
-const shops = computed(() => shopifyShops.value);
-const shopLabel = computed(() => shopifyShops.value.find((s: any) => s.shopId === shopId.value)?.name || shopId.value);
+const shops = ref<any[]>([]);
+onMounted(async () => { shops.value = await getShopifyShops(); });
+const shopLabel = computed(() => shops.value.find((s: any) => s.shopId === shopId.value)?.name || shopId.value);
 
 // ── Customer resolution: PartyIdentification → Shopify email search → create at submit.
 const customerStatus = ref<'resolving' | 'resolved' | 'error'>('resolving');
@@ -332,7 +330,7 @@ async function confirm() {
       note: note.value,
       shopId: shopId.value,
       shopifyCustomerId: customerId,
-      geoName: (geoId: string) => geoName(geos.value, geoId),
+      geoName: getGeoName,
       getProduct: productCache.getProduct,
     });
 

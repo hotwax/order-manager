@@ -152,8 +152,7 @@ import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderStore } from '@/store/order';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useProductStore } from '@/store/productStore';
-import { useSeedTable } from '@/db/omDb';
-import { facility, facilityType, getEnumsByType, getShipmentMethodOptions } from '@/db/seedLookups';
+import { getEnumsByType, getFacilities, getFacilityParentTypeIds, getShipmentMethodOptions } from '@/db/useSeedData';
 import type { Order } from '@/types/order';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
@@ -204,10 +203,6 @@ const orderDetailStore = useOrderDetailStore();
 const orderStore = useOrderStore();
 const orderTaskStore = useOrderTaskStore();
 const productStore = useProductStore();
-const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
-const { records: enums } = useSeedTable('enums');
-const { records: facilityTypes } = useSeedTable('facilityTypes');
-const { records: facilities } = useSeedTable('facilities');
 const ionRouter = useIonRouter();
 
 const PAGE_SIZE = 50;
@@ -230,8 +225,18 @@ const debounceTimer = ref<ReturnType<typeof setTimeout>>();
 const selectMode = ref(false);
 const selectedOrderIds = ref<string[]>([]);
 
-const salesChannels = computed(() => getEnumsByType(enums.value, 'ORDER_SALES_CHANNEL'));
-const shipmentMethodOptions = computed(() => getShipmentMethodOptions(shipmentMethodTypes.value));
+// Seed labels live in the local database, so they resolve after mount, not in a computed.
+const salesChannels = ref<any[]>([]);
+const shipmentMethodOptions = ref<Array<{ id: string; label: string }>>([]);
+
+async function loadSeedData() {
+  const [channels, methods] = await Promise.all([
+    getEnumsByType('ORDER_SALES_CHANNEL'),
+    getShipmentMethodOptions(),
+  ]);
+  salesChannels.value = channels;
+  shipmentMethodOptions.value = methods;
+}
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const hasMore = computed(() => searchResults.value.length < searchTotal.value);
 
@@ -247,7 +252,10 @@ function hasGlobalAction(action: QueueGlobalAction): boolean {
   return props.globalActions?.includes(action) ?? false;
 }
 
-onMounted(runSearch);
+onMounted(() => {
+  loadSeedData();
+  runSearch();
+});
 
 watch(searchQuery, scheduleSearch);
 watch(() => props.facilityIds, () => runSearch(), { deep: true });
@@ -443,6 +451,13 @@ async function brokerSelectedOrderShipGroups(orderIds: string[], routingGroupId:
 }
 
 async function brokerableShipGroupsForOrders(orderIds: string[]) {
+  // Read the facility rows once for the whole sweep rather than per ship group.
+  const facilityRows = await getFacilities();
+  const facilityById = new Map(facilityRows.map((row: any) => [row.facilityId, row]));
+  const parentTypeByFacilityType = await getFacilityParentTypeIds(
+    facilityRows.map((row: any) => row.facilityTypeId),
+  );
+
   const shipGroupsByOrder = await Promise.all(
     orderIds.map(async (orderId) => ({
       orderId,
@@ -452,7 +467,7 @@ async function brokerableShipGroupsForOrders(orderIds: string[]) {
 
   return shipGroupsByOrder.flatMap(({ orderId, shipGroups }) =>
     shipGroups
-      .filter(isVirtualShipGroup)
+      .filter((shipGroup: any) => isVirtualShipGroup(shipGroup, facilityById, parentTypeByFacilityType))
       .map((shipGroup) => ({ orderId, shipGroupSeqId: shipGroupSeqId(shipGroup) }))
       .filter((shipGroup) => shipGroup.shipGroupSeqId)
   );
@@ -467,13 +482,20 @@ function shipGroupSeqId(shipGroup: any) {
   return shipGroup.shipGroupSeqId || shipGroup.id || '';
 }
 
-function isVirtualShipGroup(shipGroup: any) {
+function isVirtualShipGroup(
+  shipGroup: any,
+  facilityById: Map<string, any>,
+  parentTypeByFacilityType: Record<string, string>,
+) {
   const facilityId = shipGroup.facilityId || shipGroup.facility?.facilityId || '';
   if (!facilityId) return true;
 
-  const facility = facility(facilities.value, facilityId);
-  const facilityTypeId = shipGroup.facilityTypeId || shipGroup.facility?.facilityTypeId || facility?.facilityTypeId;
-  const parentTypeId = shipGroup.facilityParentTypeId || shipGroup.parentFacilityTypeId || facilityType(facilityTypes.value, facilityTypeId)?.parentTypeId;
+  const facilityRow = facilityById.get(facilityId);
+  const facilityTypeId = shipGroup.facilityTypeId || shipGroup.facility?.facilityTypeId || facilityRow?.facilityTypeId;
+  // The parent type of the facility TYPE, not of the facility — the two are different fields.
+  const parentTypeId = shipGroup.facilityParentTypeId
+    || shipGroup.parentFacilityTypeId
+    || parentTypeByFacilityType[facilityTypeId];
 
   return facilityTypeId === 'VIRTUAL_FACILITY' || parentTypeId === 'VIRTUAL_FACILITY';
 }

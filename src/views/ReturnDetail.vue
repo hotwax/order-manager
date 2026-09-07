@@ -431,7 +431,7 @@ import { useProductMaster } from "@/composables/useProductMaster";
 import { useOrderDetailStore } from "@/store/orderDetail";
 import { useProductCacheStore } from "@/store/productCache";
 import { useReturnsStore } from "@/store/returns";
-import { useSeedTable } from '@/db/omDb';
+import { useSeedTable } from '@/db/orderManagerDb';
 import { enumDescription, facilityName, paymentMethodDescription, returnItemTypeDescription, returnReasonDescription, returnTypeDescription, statusDescription } from '@/db/seedLookups';
 import { useUserStore } from "@/store/user";
 import type { ReturnItemDetail, ReturnStatusHistory, ReturnSyncState } from "@/types/returns";

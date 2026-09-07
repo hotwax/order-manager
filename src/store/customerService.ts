@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
-import { seedRows } from '@/db/omDb';
-import { getEnumsByType } from '@/db/seedLookups';
+import { omDb } from '@/db/orderManagerDb';
 import { DateTime } from 'luxon';
 import { useOrderStore } from '@/store/order';
 import { api, commonUtil, logger, translate } from '@common';
@@ -280,6 +279,15 @@ function activeFacilityRowsWithRejections(facilities: any[], rejectionRows: any[
 
 function inBucket(order: WorkflowOrder, bucket: WorkflowBucket): boolean {
   return order.bucket === bucket;
+}
+
+/** Enums of one type, read straight from IndexedDB. */
+async function readEnumsByType(enumTypeId: string): Promise<any[]> {
+  try {
+    return (await omDb().all('enums')).filter((row: any) => row.enumTypeId === enumTypeId);
+  } catch {
+    return [];
+  }
 }
 
 export const useCustomerServiceStore = defineStore('customerService', {
@@ -1056,8 +1064,8 @@ export const useCustomerServiceStore = defineStore('customerService', {
           .filter((f: any) => f.conditionTypeEnumId === 'ENTCT_SORT_BY')
           .sort((a: any, b: any) => (a.sequenceNum ?? 0) - (b.sequenceNum ?? 0));
 
-        // Stamped into the returned sortRules, so read the rows rather than a live slice.
-        const sortParamEnums = getEnumsByType(await seedRows('enums'), 'PP_SORT_PARAM_TYPE');
+        // Stamped into the returned sortRules, so read the rows up front.
+        const sortParamEnums = await readEnumsByType('PP_SORT_PARAM_TYPE');
 
         const sortRules: SortRule[] = sortConditions.map((cond: any) => {
           const enumRecord = sortParamEnums.find((e: any) => e.enumCode === cond.fieldName);

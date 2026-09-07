@@ -137,8 +137,7 @@ import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedTable } from '@/db/omDb';
-import { getEnumsByType, getShipmentMethodOptions } from '@/db/seedLookups';
+import { getEnumsByType, getShipmentMethodOptions } from '@/db/useSeedData';
 import { fetchUnfillableProductCandidates, fetchUnfillableShipGroupsForProduct } from '@/services/order';
 import { fetchActiveSubstitutes } from '@/services/productAssociations';
 import { showToast } from '@/utils';
@@ -146,8 +145,6 @@ import { countTaskTargets, runGroupedTaskMutation, shipGroupTaskTarget } from '@
 import Actions from "@/authorization/actions";
 
 const orderTaskStore = useOrderTaskStore();
-const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
-const { records: enums } = useSeedTable('enums');
 const productStore = useProductStore();
 const userStore = useUserStore();
 const productCache = useProductCacheStore();
@@ -156,11 +153,18 @@ const productMaster = useProductMaster();
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'swap');
 const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
-const channelOptions = computed<TaskFilterOption[]>(() => getEnumsByType(enums.value, 'ORDER_SALES_CHANNEL').map((channel: any) => ({
-  id: channel.enumId,
-  label: channel.description || channel.enumId,
-})));
-const shipmentMethodOptions = computed<TaskFilterOption[]>(() => getShipmentMethodOptions(shipmentMethodTypes.value));
+// Seed labels live in the local database, so they resolve after mount, not in a computed.
+const channelOptions = ref<TaskFilterOption[]>([]);
+const shipmentMethodOptions = ref<TaskFilterOption[]>([]);
+
+async function loadSeedData() {
+  const [channels, methods] = await Promise.all([
+    getEnumsByType('ORDER_SALES_CHANNEL'),
+    getShipmentMethodOptions(),
+  ]);
+  channelOptions.value = channels.map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId }));
+  shipmentMethodOptions.value = methods;
+}
 const sortOptions = taskSortOptions('swap');
 const selectMode = ref(false);
 const selectedTasks = ref<Record<string, boolean>>({});
@@ -402,6 +406,7 @@ async function loadMoreSwapTasks(event: any) {
 }
 
 onIonViewWillEnter(() => {
+  loadSeedData();
   loadPhysicalFacilities();
   replaceSwapTasks();
 });

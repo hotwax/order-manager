@@ -158,9 +158,8 @@ import {
   modalController
 } from '@ionic/vue';
 import { arrowBackOutline, arrowForwardOutline, checkmarkCircle, closeOutline } from 'ionicons/icons';
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { translate } from '@common';
-import { useSeedTable } from '@/db/omDb';
 import { searchCustomers } from '@/services/customer';
 
 interface RelatableParty {
@@ -173,8 +172,6 @@ const props = defineProps<{
   currentPartyId: string;
 }>();
 
-const { records: partyRelationshipTypes } = useSeedTable('partyRelationshipTypes');
-const { records: roleTypes } = useSeedTable('roleTypes');
 
 const step = ref<'party' | 'relationship'>('party');
 const queryString = ref('');
@@ -189,15 +186,19 @@ const comments = ref('');
 // Guards against an earlier search resolving after a later one and overwriting it.
 let latestSearchId = 0;
 
-const relationshipTypes = computed(() =>
-  partyRelationshipTypes.value
-    .filter(Boolean)
-);
+// Read from the local database; both fill in shortly after mount.
+const partyRelationshipTypes = ref<any[]>([]);
+const roleTypes = ref<any[]>([]);
 
-const availableRoleTypes = computed(() =>
-  roleTypes.value
-    .filter(Boolean)
-);
+onMounted(async () => {
+  [partyRelationshipTypes.value, roleTypes.value] = await Promise.all([
+    getPartyRelationshipTypes(),
+    getRoleTypes(),
+  ]);
+});
+
+const relationshipTypes = computed(() => partyRelationshipTypes.value.filter(Boolean));
+const availableRoleTypes = computed(() => roleTypes.value.filter(Boolean));
 
 const hasSearchTerm = computed(() => queryString.value.trim().length > 0);
 

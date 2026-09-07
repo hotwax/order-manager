@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
-import { seedRows } from "@/db/omDb";
-import { orderAdjustmentTypeDescription, shippingMethodsByCarrier } from "@/db/seedLookups";
+import { omDb } from "@/db/orderManagerDb";
 import { api, commonUtil, logger} from "@common";
 import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
@@ -22,11 +21,11 @@ const newEntry = (): OrderEntry => ({ payload: null, status: "idle", loadedAt: "
 // comment/description — fall back to the seeded enum description so rows show "Sales Tax"
 // rather than the raw "SALES_TAX" id. This also backs the rollup grouping key below, so
 // adjustments only merge under their human-readable label, not the raw type id.
-const adjustmentDisplayLabel = (adj: any) =>
+const adjustmentDisplayLabel = (adj: any, adjustmentTypes: any[]) =>
   adj.comments
   || adj.comment
   || adj.description
-  || orderAdjustmentTypeDescription(adj.orderAdjustmentTypeId)
+  || adjustmentTypes.find((type: any) => type.orderAdjustmentTypeId === adj.orderAdjustmentTypeId)?.description
   || adj.orderAdjustmentTypeId
   || "OTHER_ADJUSTMENT";
 
@@ -727,7 +726,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       const fromDetail = state.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId);
       if (fromDetail.length) return fromDetail;
       try {
-        return shippingMethodsByCarrier(state.carrierShipmentMethods, carrierPartyId);
+        return state.carrierShipmentMethods.filter((m: any) => m.partyId === carrierPartyId);
       } catch {
         return [];
       }
@@ -909,8 +908,8 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     async loadReferenceRows() {
       try {
         const [adjustmentTypes, carrierMethods] = await Promise.all([
-          seedRows("orderAdjustmentTypes"),
-          seedRows("carrierShipmentMethods"),
+          omDb().all("orderAdjustmentTypes"),
+          omDb().all("carrierShipmentMethods"),
         ]);
         this.orderAdjustmentTypes = adjustmentTypes;
         this.carrierShipmentMethods = carrierMethods;

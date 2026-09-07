@@ -109,8 +109,7 @@ import TaskQueueListHeader from '@/components/tasks/TaskQueueListHeader.vue';
 import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedTable } from '@/db/omDb';
-import { getEnumsByType, getStatusItemsByType } from '@/db/seedLookups';
+import { getEnumsByType, getStatusItemsByType } from '@/db/useSeedData';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
@@ -119,15 +118,30 @@ import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
-const { records: statuses } = useSeedTable('statuses');
-const { records: enums } = useSeedTable('enums');
 
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'fraud');
-const channelOptions = computed<TaskFilterOption[]>(() => getEnumsByType(enums.value, 'ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
-const orderStatusOptions = computed<TaskFilterOption[]>(() => getStatusItemsByType(statuses.value, 'ORDER_STATUS').map((status: any) => ({ id: status.statusId, label: status.description || status.statusId })));
-const riskRecommendationOptions = computed<TaskFilterOption[]>(() => getEnumsByType(enums.value, 'ORDER_RISK_RECOMMENDATION').map((recommendation: any) => ({ id: recommendation.enumId, label: recommendation.description || recommendation.enumId })));
-const riskLevelOptions = computed<TaskFilterOption[]>(() => getEnumsByType(enums.value, 'ORDER_RISK_LEVEL').map((level: any) => ({ id: level.enumId, label: level.description || level.enumId })));
+// Seed labels live in the local database, so they resolve after mount, not in a computed.
+const channelOptions = ref<TaskFilterOption[]>([]);
+const orderStatusOptions = ref<TaskFilterOption[]>([]);
+const riskRecommendationOptions = ref<TaskFilterOption[]>([]);
+const riskLevelOptions = ref<TaskFilterOption[]>([]);
+
+const asEnumOptions = (rows: any[]): TaskFilterOption[] =>
+  rows.map((row: any) => ({ id: row.enumId, label: row.description || row.enumId }));
+
+async function loadSeedData() {
+  const [channels, orderStatuses, recommendations, levels] = await Promise.all([
+    getEnumsByType('ORDER_SALES_CHANNEL'),
+    getStatusItemsByType('ORDER_STATUS'),
+    getEnumsByType('ORDER_RISK_RECOMMENDATION'),
+    getEnumsByType('ORDER_RISK_LEVEL'),
+  ]);
+  channelOptions.value = asEnumOptions(channels);
+  orderStatusOptions.value = orderStatuses.map((status: any) => ({ id: status.statusId, label: status.description || status.statusId }));
+  riskRecommendationOptions.value = asEnumOptions(recommendations);
+  riskLevelOptions.value = asEnumOptions(levels);
+}
 const sortOptions = taskSortOptions('fraud');
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
@@ -303,6 +317,7 @@ async function runBulkResults(getResults: () => Promise<PromiseSettledResult<unk
 }
 
 onIonViewWillEnter(() => {
+  loadSeedData();
   replaceFraudTasks();
 });
 </script>

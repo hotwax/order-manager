@@ -191,7 +191,7 @@ import { IonAccordion, IonAccordionGroup, IonAvatar, IonButton, IonButtons, IonC
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api, DxpShopifyImg, logger, translate } from '@common';
-import { seedRows } from '@/db/omDb';
+import { seedRows } from '@/db/orderManagerDb';
 import { facilityName, productStoreFacilities } from '@/db/seedLookups';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
 import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';

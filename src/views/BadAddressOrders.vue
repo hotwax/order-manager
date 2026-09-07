@@ -107,8 +107,7 @@ import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedTable } from '@/db/omDb';
-import { getCountries, getEnumsByType, getShipmentMethodOptions } from '@/db/seedLookups';
+import { getCountries, getEnumsByType, getShipmentMethodOptions } from '@/db/useSeedData';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
@@ -117,18 +116,27 @@ import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
-const { records: geos } = useSeedTable('geos');
-const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
-const { records: enums } = useSeedTable('enums');
 
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'badAddress');
 const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
-const channelOptions = computed<TaskFilterOption[]>(() => getEnumsByType(enums.value, 'ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
-const shipmentMethodOptions = computed<TaskFilterOption[]>(() => getShipmentMethodOptions(shipmentMethodTypes.value));
+// Seed labels live in the local database, so they resolve after mount, not in a computed.
+const channelOptions = ref<TaskFilterOption[]>([]);
+const shipmentMethodOptions = ref<TaskFilterOption[]>([]);
+const countries = ref<any[]>([]);
+
+async function loadSeedData() {
+  const [channels, methods, countryRows] = await Promise.all([
+    getEnumsByType('ORDER_SALES_CHANNEL'),
+    getShipmentMethodOptions(),
+    getCountries(),
+  ]);
+  channelOptions.value = channels.map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId }));
+  shipmentMethodOptions.value = methods;
+  countries.value = countryRows;
+}
 const sortOptions = taskSortOptions('badAddress');
 // Computed once here and passed as a prop — avoids N per-card reactive subscriptions.
-const countries = computed(() => getCountries(geos.value));
 const companyCarrierUrl = buildAppUrl('company', '/carriers');
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
@@ -338,6 +346,7 @@ async function loadMoreAddressValidationTasks(event: any) {
 }
 
 onIonViewWillEnter(() => {
+  loadSeedData();
   loadPhysicalFacilities();
   replaceAddressValidationTasks();
 });

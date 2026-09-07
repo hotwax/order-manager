@@ -130,7 +130,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
 import { arrowUndoOutline, chevronForwardOutline, closeCircleOutline, ellipsisVerticalOutline, gitBranchOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
@@ -142,8 +142,7 @@ import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductAc
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedTable } from '@/db/omDb';
-import { facilityName } from '@/db/seedLookups';
+import { getFacilityName } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
@@ -160,7 +159,6 @@ const props = withDefaults(defineProps<{ task: any; selectable?: boolean; select
 const emit = defineEmits<{ (e: 'update:selected', value: boolean): void; (e: 'completed'): void }>();
 
 const orderTaskStore = useOrderTaskStore();
-const { records: facilities } = useSeedTable('facilities');
 
 const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'release', label: translate('Release updated order'), kind: 'primary' },
@@ -169,13 +167,17 @@ const cardActions = computed<TaskCardAction[]>(() => ([
 ] as TaskCardAction[]).filter((action) => !(HIDE_SHOPIFY_UNSYNCED_ACTIONS && action.id === 'cancel')));
 
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+const facilityLabel = ref('');
+watch(() => props.task?.facilityId, async (facilityId) => {
+  facilityLabel.value = await getFacilityName(facilityId ?? '');
+}, { immediate: true });
 
 function getCustomerName(customer: any): string {
   return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');
 }
 
 function routingFacilityName(task: any): string {
-  return facilityName(facilities.value, task.facilityId)
+  return facilityLabel.value
     || task.routingFacilityName
     || task.facilityName
     || task.facilityId

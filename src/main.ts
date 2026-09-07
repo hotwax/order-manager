@@ -31,12 +31,15 @@ import "@common/css/theme.css"
 import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import localeMessages from './locales';
-import { createDxpI18n, imagePreview, initialiseConfig, logger } from '@common';
+import { commonUtil, createDxpI18n, imagePreview, initialiseConfig, logger } from '@common';
 import { registerCommonSeedDomains } from '@common/db';
-import { getOrderManagerDb } from './db/orderManagerDb';
+import { getOrderManagerDb, setOmsInstanceResolver } from './db/orderManagerDb';
 import { useUserStore } from './store/user';
 
 registerCommonSeedDomains((omsInstance) => getOrderManagerDb(omsInstance));
+
+// Keeps commonUtil out of db/orderManagerDb.ts, and therefore out of the sync worker chunk.
+setOmsInstanceResolver(() => commonUtil.getOMSInstanceName());
 
 const pinia = createPinia().use(piniaPluginPersistedstate);
 const i18n = createDxpI18n(localeMessages)

@@ -1,5 +1,4 @@
 import type { AddressForm, AddressState } from '@/types/order';
-import { getGeoIdByCode } from '@/db/seedLookups';
 
 // Builds the editable address-form state a BadAddressTaskCard renders from.
 // Shared by the /bad-address list and the OrderDetail "Holds" segment so both
@@ -20,6 +19,13 @@ function buildAddressForm(src: any, task: any): AddressForm {
   };
 }
 
+/** Resolve a geo code against rows the caller already read. */
+function geoIdByCode(geos: Array<Record<string, any>>, code: string): string {
+  if (!code) return '';
+
+  return geos.find((geo) => geo.geoCodeAlpha2 === code || geo.geoCode === code)?.geoId ?? '';
+}
+
 function buildSuggestedForm(geos: Array<Record<string, any>>, task: any): AddressForm {
   let parsed: any = {};
   try { parsed = task.locationDesc ? JSON.parse(task.locationDesc) : {}; } catch { parsed = {}; }
@@ -28,8 +34,8 @@ function buildSuggestedForm(geos: Array<Record<string, any>>, task: any): Addres
     address2: parsed.address2 ?? '',
     city: parsed.city ?? '',
     postalCode: parsed.postalCode ?? '',
-    stateProvinceGeoId: getGeoIdByCode(geos, parsed.stateOrProvinceCode ?? ''),
-    countryGeoId: getGeoIdByCode(geos, parsed.countryCode ?? ''),
+    stateProvinceGeoId: geoIdByCode(geos, parsed.stateOrProvinceCode ?? ''),
+    countryGeoId: geoIdByCode(geos, parsed.countryCode ?? ''),
     contactMechId: task?.shippingAddress?.contactMechId ?? '',
     contactMechPurposeTypeId: task?.shippingAddress?.contactMechPurposeTypeId || 'SHIPPING_LOCATION',
     partyId: task?.customer?.partyId ?? '',

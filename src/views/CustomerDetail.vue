@@ -493,7 +493,7 @@ import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useCustomerDetail } from '@/composables/useCustomerDetail';
 import router from '@/router';
 import { deleteCustomerDetails, indexCustomer } from '@/services/customer';
-import { useSeedTable } from '@/db/omDb';
+import { useSeedTable } from '@/db/orderManagerDb';
 import { communicationEventTypeDescription, contactPurposeDescription, enumDescription, facilityName, partyRelationshipDescription, statusDescription } from '@/db/seedLookups';
 import { useUserStore } from '@/store/user';
 import Actions from '@/authorization/actions';

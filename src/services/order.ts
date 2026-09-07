@@ -1,6 +1,5 @@
 import { api, commonUtil, useSolrSearch } from '@common';
-import { seedRows } from '@/db/omDb';
-import { facilityType } from '@/db/seedLookups';
+import { omDb } from '@/db/orderManagerDb';
 import type { Order } from '@/types/order';
 import type {
   AllocationItemDocument,
@@ -273,7 +272,7 @@ export async function searchOrders(params: OrderSearchParams = {}): Promise<Orde
   if (commonUtil.hasError(response)) return Promise.reject(response.data);
 
   // facilityParentTypeId is stamped onto the normalized rows, so it cannot self-correct.
-  const facilityTypeRows = await seedRows('facilityTypes');
+  const facilityTypeRows = await readFacilityTypes();
   const result = normalizeOrderSolrResponse(response.data, params.allocationSummary, facilityTypeRows);
   if (params.allocationSummary?.mode !== 'queue-first' || !result.orders.length) return result;
 
@@ -334,7 +333,7 @@ export async function fetchOrderRowEnrichment(orderIds: readonly string[]): Prom
   if (!uniqueOrderIds.length) return {};
   const response = await useSolrSearch().runSolrQuery(buildOrderRowEnrichmentPayload(uniqueOrderIds));
   if (commonUtil.hasError(response)) return Promise.reject(response.data);
-  return normalizeOrderRowEnrichment(response.data, await seedRows('facilityTypes'));
+  return normalizeOrderRowEnrichment(response.data, await readFacilityTypes());
 }
 
 export function buildActivePhysicalFacilityOrderVolumePayload(params: { productStoreId?: string } = {}) {
@@ -785,18 +784,32 @@ export function summarizeBrokeredFacilities(docs: any[], facilityTypeRows: any[]
   };
 }
 
+/** Facility type rows, read straight from IndexedDB; unavailable means no parent types. */
+async function readFacilityTypes(): Promise<any[]> {
+  try {
+    return await omDb().all('facilityTypes');
+  } catch {
+    return [];
+  }
+}
+
+/** Parent type of a facility TYPE, from rows the caller already read. */
+function parentTypeOf(facilityTypeRows: any[], facilityTypeId: string): string {
+  return facilityTypeRows.find((row: any) => row.facilityTypeId === facilityTypeId)?.parentTypeId ?? '';
+}
+
 function isVirtualFacilityDoc(doc: any, facilityTypeRows: any[]) {
   const facilityTypeId = toStringValue(doc.facilityTypeId);
   if (facilityTypeId === 'VIRTUAL_FACILITY') return true;
 
   if (!facilityTypeId) return false;
 
-  return facilityType(facilityTypeRows, facilityTypeId)?.parentTypeId === 'VIRTUAL_FACILITY';
+  return parentTypeOf(facilityTypeRows, facilityTypeId) === 'VIRTUAL_FACILITY';
 }
 
 /**
  * Stamps facilityParentTypeId onto each document, so the caller must already hold the
- * facilityTypes rows — the async entry points read them via `seedRows` and thread them down.
+ * facilityTypes rows — the async entry points read them from IndexedDB and thread them down.
  */
 function allocationDocuments(docs: readonly any[], facilityTypeRows: any[]): AllocationItemDocument[] {
   return docs.map((doc) => {
@@ -807,7 +820,7 @@ function allocationDocuments(docs: readonly any[], facilityTypeRows: any[]): All
       facilityId: toStringValue(doc.facilityId),
       facilityName: toStringValue(doc.facilityName),
       facilityTypeId,
-      facilityParentTypeId: facilityType(facilityTypeRows, facilityTypeId)?.parentTypeId
+      facilityParentTypeId: parentTypeOf(facilityTypeRows, facilityTypeId)
     };
   });
 }

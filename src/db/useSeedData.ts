@@ -1,16 +1,13 @@
 /**
  * Seed data lookups, read straight from the local database.
  *
- * This is the only seed module view pages import. Every getter opens IndexedDB, reads what
- * it needs, applies whatever filtering or joining the answer requires, and returns a value.
+ * The only seed module the app imports. Every getter opens IndexedDB, reads what it needs,
+ * applies whatever filtering or joining the answer requires, and returns a value.
  * Nothing is cached here and nothing is subscribed — the sync worker keeps the database
  * current, and each call reads the current state.
  *
- * Two entry points:
- *   - view pages use the composables at the bottom, which own a ref and fill it in
- *   - stores, services and utils read IndexedDB directly via `omDb()`
- *
- * Reads are asynchronous because IndexedDB has no synchronous API. Plural variants
+ * Reads are asynchronous because IndexedDB has no synchronous API, so callers hold the
+ * result in a ref (views) or await it inline (stores, services, utils). Plural variants
  * (`getStatusDescriptions(ids)`) exist for lists: they read the table once and return a map,
  * so rendering fifty rows costs one read rather than fifty.
  *
@@ -21,8 +18,7 @@
  */
 
 import { commonUtil } from "@common";
-import { type MaybeRefOrGetter, type Ref, ref, toValue, watchEffect } from "vue";
-import { omDb } from "@/db/omDb";
+import { omDb } from "@/db/orderManagerDb";
 
 export type Row = Record<string, any>;
 
@@ -359,124 +355,3 @@ export async function getAllowedTransitions(statusId: string): Promise<AllowedTr
       return (left.toStatusId || "").localeCompare(right.toStatusId || "");
     });
 }
-
-// ── Composables — view pages only ─────────────────────────────────────────────────────
-//
-// Stores, services and utils read IndexedDB directly through `omDb()`; composables need a
-// component scope, so they belong to views alone. Each owns a ref that starts at a sensible
-// fallback and fills in once its read resolves, re-running whenever its inputs change.
-//
-// Two shapes, because Vue only allows composables at the top of `setup()`:
-//   singular, for one id  -> const label = useFacilityName(() => props.facilityId)
-//   plural, for a list    -> const labels = useFacilityNames(() => rows.value.map(r => r.facilityId))
-// A `v-for` cannot call a composable per row, so lists index into the plural form's map.
-
-/** Reactive result of an async read, recomputed when anything it depends on changes. */
-function useSeedValue<T>(load: () => Promise<T>, initial: T): Ref<T> {
-  const value = ref(initial) as Ref<T>;
-
-  watchEffect(async () => {
-    value.value = await load();
-  });
-
-  return value;
-}
-
-/** One label, showing the raw id until it resolves. */
-function useSeedLabel(get: (id: string) => Promise<string>, id: MaybeRefOrGetter<string>): Ref<string> {
-  const text = ref(toValue(id) ?? "");
-
-  watchEffect(async () => {
-    text.value = await get(toValue(id) ?? "");
-  });
-
-  return text;
-}
-
-/** id -> label for a list, one read per change. */
-function useSeedLabels(
-  get: (ids: readonly string[]) => Promise<Record<string, string>>,
-  ids: MaybeRefOrGetter<readonly string[]>,
-): Ref<Record<string, string>> {
-  const map = ref<Record<string, string>>({});
-
-  watchEffect(async () => {
-    map.value = await get(toValue(ids) ?? []);
-  });
-
-  return map;
-}
-
-// Single labels
-export const useStatusDescription = (id: MaybeRefOrGetter<string>) => useSeedLabel(getStatusDescription, id);
-export const useEnumDescription = (id: MaybeRefOrGetter<string>) => useSeedLabel(getEnumDescription, id);
-export const useFacilityName = (id: MaybeRefOrGetter<string>) => useSeedLabel(getFacilityName, id);
-export const useProductStoreName = (id: MaybeRefOrGetter<string>) => useSeedLabel(getProductStoreName, id);
-export const useShipmentMethodDescription = (id: MaybeRefOrGetter<string>) =>
-  useSeedLabel(getShipmentMethodDescription, id);
-export const useCarrierName = (id: MaybeRefOrGetter<string>) => useSeedLabel(getCarrierName, id);
-export const useGeoName = (id: MaybeRefOrGetter<string>) => useSeedLabel(getGeoName, id);
-export const usePaymentMethodDescription = (id: MaybeRefOrGetter<string>) =>
-  useSeedLabel(getPaymentMethodDescription, id);
-export const useOrderAdjustmentTypeDescription = (id: MaybeRefOrGetter<string>) =>
-  useSeedLabel(getOrderAdjustmentTypeDescription, id);
-export const usePartyRelationshipDescription = (id: MaybeRefOrGetter<string>) =>
-  useSeedLabel(getPartyRelationshipDescription, id);
-export const useOrderIdentificationTypeDescription = (id: MaybeRefOrGetter<string>) =>
-  useSeedLabel(getOrderIdentificationTypeDescription, id);
-
-// Batched label maps, for lists
-export const useStatusDescriptions = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels(getStatusDescriptions, ids);
-export const useEnumDescriptions = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels(getEnumDescriptions, ids);
-export const useFacilityNames = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels(getFacilityNames, ids);
-export const useShipmentMethodDescriptions = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels(getShipmentMethodDescriptions, ids);
-export const usePaymentMethodDescriptions = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels(getPaymentMethodDescriptions, ids);
-export const useOrderAdjustmentTypeDescriptions = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels(getOrderAdjustmentTypeDescriptions, ids);
-export const useGeoNames = (ids: MaybeRefOrGetter<readonly string[]>) => useSeedLabels(getGeoNames, ids);
-export const useContactPurposeDescriptions = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels(getContactPurposeDescriptions, ids);
-export const useCommunicationEventTypeDescriptions = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels(getCommunicationEventTypeDescriptions, ids);
-export const usePartyRelationshipDescriptions = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels(getPartyRelationshipDescriptions, ids);
-export const useReturnTypeDescriptions = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels((values) => labels("returnTypes", "returnTypeId", values), ids);
-export const useReturnReasonDescriptions = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels((values) => labels("returnReasons", "returnReasonId", values), ids);
-export const useReturnItemTypeDescriptions = (ids: MaybeRefOrGetter<readonly string[]>) =>
-  useSeedLabels((values) => labels("returnItemTypes", "returnItemTypeId", values), ids);
-
-// Collections and option lists
-export const useCountries = () => useSeedValue(getCountries, [] as Row[]);
-export const useStates = () => useSeedValue(getStates, [] as Row[]);
-export const useStatesForCountry = (countryGeoId: MaybeRefOrGetter<string>) =>
-  useSeedValue(() => getStatesForCountry(toValue(countryGeoId) ?? ""), [] as Row[]);
-export const useFacilities = () => useSeedValue(getFacilities, [] as Row[]);
-export const useCarriers = () => useSeedValue(getCarriers, [] as Row[]);
-export const useShopifyShops = () => useSeedValue(getShopifyShops, [] as Row[]);
-export const useShopifyShopLocations = () => useSeedValue(getShopifyShopLocations, [] as Row[]);
-export const usePartyRelationshipTypes = () => useSeedValue(getPartyRelationshipTypes, [] as Row[]);
-export const useRoleTypes = () => useSeedValue(getRoleTypes, [] as Row[]);
-export const useShipmentMethodOptions = () =>
-  useSeedValue(getShipmentMethodOptions, [] as Array<{ id: string; label: string }>);
-export const useOrderIdentificationTypeOptions = () =>
-  useSeedValue(getOrderIdentificationTypeOptions, [] as Array<{ enumId: string; description: string }>);
-
-export const useEnumsByType = (enumTypeId: MaybeRefOrGetter<string>) =>
-  useSeedValue(() => getEnumsByType(toValue(enumTypeId) ?? ""), [] as Row[]);
-export const useEnumsByParentType = (parentTypeId: MaybeRefOrGetter<string>) =>
-  useSeedValue(() => getEnumsByParentType(toValue(parentTypeId) ?? ""), [] as Row[]);
-export const useStatusItemsByType = (statusTypeId: MaybeRefOrGetter<string>) =>
-  useSeedValue(() => getStatusItemsByType(toValue(statusTypeId) ?? ""), [] as Row[]);
-export const useProductStoreFacilities = (productStoreId: MaybeRefOrGetter<string>) =>
-  useSeedValue(() => getProductStoreFacilities(toValue(productStoreId) ?? ""), [] as Row[]);
-export const useShippingMethodsByCarrier = (carrierPartyId: MaybeRefOrGetter<string>) =>
-  useSeedValue(() => getShippingMethodsByCarrier(toValue(carrierPartyId) ?? ""), [] as Row[]);
-export const useAllowedTransitions = (statusId: MaybeRefOrGetter<string>) =>
-  useSeedValue(() => getAllowedTransitions(toValue(statusId) ?? ""), [] as AllowedTransition[]);

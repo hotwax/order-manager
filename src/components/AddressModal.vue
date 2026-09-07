@@ -61,11 +61,10 @@ import {
   IonToolbar, 
   modalController
 } from '@ionic/vue';
-import { computed, onMounted, ref } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { translate } from "@common";
-import { useSeedTable } from '@/db/omDb';
-import { getCountries, getStatesForCountry } from '@/db/seedLookups';
+import { getCountries, getStatesForCountry } from '@/db/useSeedData';
 
 const address = ref({
   address1: "",
@@ -78,12 +77,16 @@ const address = ref({
 })
 
 const props = defineProps(["customerAddress"])
-const { records: geos } = useSeedTable('geos');
-const { records: geoAssocs } = useSeedTable('geoAssocs');
-const countries = computed(() => getCountries(geos.value))
-const states = computed(() => getStatesForCountry(geos.value, geoAssocs.value, address.value.country))
+// Geography comes from the local database, so it resolves after mount.
+const countries = ref<any[]>([])
+const states = ref<any[]>([])
 
-onMounted(() => {
+watch(() => address.value.country, async (countryGeoId) => {
+  states.value = countryGeoId ? await getStatesForCountry(countryGeoId) : []
+}, { immediate: true })
+
+onMounted(async () => {
+  countries.value = await getCountries();
   prepareAddress();
 })
 

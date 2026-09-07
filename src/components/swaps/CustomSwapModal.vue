@@ -123,15 +123,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonRadio, IonRadioGroup, IonSearchbar, IonSegment, IonSegmentButton, IonSpinner, IonThumbnail, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { api, DxpShopifyImg, translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
-import { useSeedTable } from '@/db/omDb';
-import { facilityName } from '@/db/seedLookups';
+import { getFacilityName } from '@/db/useSeedData';
 
 const props = defineProps<{
   substituteProducts: any[];
@@ -167,13 +166,15 @@ const searchResults = ref<any[]>([]);
 const isSearching = ref(false);
 const searchPageIndex = ref(0);
 const searchTotalCount = ref(0);
-const { records: facilities } = useSeedTable('facilities');
 
 const isSearchScrollable = computed(() =>
   searchResults.value.length > 0 && searchResults.value.length < searchTotalCount.value
 );
 
-const facilityLabel = computed(() => facilityName(facilities.value, props.facilityId) || props.facilityId);
+const facilityLabel = ref('');
+watch(() => props.facilityId, async (facilityId) => {
+  facilityLabel.value = await getFacilityName(facilityId ?? '');
+}, { immediate: true });
 
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);

@@ -42,7 +42,7 @@ import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, Ion
 import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import { onMounted, ref } from 'vue';
 import { translate } from '@common';
-import { seedRows, useSeedTable } from '@/db/omDb';
+import { seedRows, useSeedTable } from '@/db/orderManagerDb';
 import { getEnumsByParentType } from '@/db/seedLookups';
 
 const { records: enums } = useSeedTable('enums');

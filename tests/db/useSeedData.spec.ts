@@ -1,19 +1,20 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BaseDB, COMMON_DB_SCHEMA, dbClient } from '@common/db';
+import { setOmsInstanceResolver } from '@/db/orderManagerDb';
 
 let oms = '';
 let n = 0;
 
+// Only getStatusColor is still needed from @common; the OMS instance arrives via the
+// resolver the app registers at boot.
 vi.mock('@common', () => ({
-  commonUtil: {
-    getOMSInstanceName: () => oms,
-    getStatusColor: () => 'medium',
-  },
+  commonUtil: { getStatusColor: () => 'medium' },
 }));
 
 async function seedDb(): Promise<void> {
   oms = `useSeedDataTest-${n++}`;
+  setOmsInstanceResolver(() => oms);
   const db = new BaseDB(`${oms}-OrderManagerDB`, COMMON_DB_SCHEMA);
   await db.open();
   const c = dbClient(db);

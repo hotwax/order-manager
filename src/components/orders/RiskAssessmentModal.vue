@@ -17,7 +17,7 @@
           <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(risk.riskLevelEnumId)" />
           <ion-label>
             {{ risk.providerName || risk.providerId || translate('Risk provider') }}
-            <p>{{ translate('Risk level') }}: {{ enumDescription(enums.value, risk.riskLevelEnumId) }}</p>
+            <p>{{ translate('Risk level') }}: {{ enumLabels[risk.riskLevelEnumId] ?? risk.riskLevelEnumId }}</p>
           </ion-label>
           <ion-note v-if="risk.createdDate" slot="end">{{ formatDate(risk.createdDate) }}</ion-note>
         </ion-item>
@@ -25,7 +25,7 @@
           <ion-icon slot="start" :icon="factSentimentIcon(fact.sentimentEnumId)" :color="factSentimentColor(fact.sentimentEnumId)" />
           <ion-label class="ion-text-wrap">
             {{ fact.description }}
-            <p>{{ enumDescription(enums.value, fact.sentimentEnumId) }}</p>
+            <p>{{ enumLabels[fact.sentimentEnumId] ?? fact.sentimentEnumId }}</p>
           </ion-label>
         </ion-item>
       </ion-list>
@@ -41,17 +41,26 @@
 <script setup lang="ts">
 import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonNote, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { closeOutline, shieldOutline } from 'ionicons/icons';
+import { ref, watch } from 'vue';
 import { DateTime } from 'luxon';
 import { translate } from '@common';
-import { useSeedTable } from '@/db/omDb';
-import { enumDescription } from '@/db/seedLookups';
+import { getEnumDescriptions } from '@/db/useSeedData';
 import { factSentimentColor, factSentimentIcon, riskLevelColor, sortFactsBySentiment } from '@/utils';
 
-withDefaults(defineProps<{ risks?: any[] }>(), {
+const props = withDefaults(defineProps<{ risks?: any[] }>(), {
   risks: () => [],
 });
 
-const { records: enums } = useSeedTable('enums');
+// Risk level and sentiment labels are enums in the local database — one read covers both.
+const enumLabels = ref<Record<string, string>>({});
+watch(() => props.risks, async (risks) => {
+  const ids = (risks || []).flatMap((risk: any) => [
+    risk.riskLevelEnumId,
+    ...(risk.facts || []).map((fact: any) => fact.sentimentEnumId),
+  ]);
+  enumLabels.value = await getEnumDescriptions(ids);
+}, { immediate: true, deep: true });
+
 
 function dismiss() {
   modalController.dismiss();

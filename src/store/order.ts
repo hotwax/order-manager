@@ -10,8 +10,7 @@ import type { Customer, Order, ReturnRecord, Shipment } from '@/types/order';
 import type { WorkflowOrder, WorkflowFilters } from '@/types/customerService';
 import { DEFAULT_WORKFLOW_ORDER_SORT, WORKFLOW_ORDER_SORT_ORDER_BY } from '@/types/customerService';
 import type { OrderRowEnrichment } from '@/types/orderRow';
-import { seedRows } from '@/db/omDb';
-import { productStore as seedProductStore, shipmentMethod as seedShipmentMethod } from '@/db/seedLookups';
+import { omDb } from '@/db/orderManagerDb';
 import { useProductStore } from './productStore';
 import { queueCountFetchers } from '@/services/navCounts';
 
@@ -19,6 +18,28 @@ import { queueCountFetchers } from '@/services/navCounts';
 // the orders that have been waiting longest rather than on the freshest arrivals.
 export const DEFAULT_ORDER_SEARCH_SORT = 'orderDate asc';
 
+
+/**
+ * Product store and shipment method rows, keyed for stamping onto order rows. Read from
+ * IndexedDB directly; an unavailable database leaves the raw ids in place.
+ */
+async function readOrderRowSeedRows() {
+  try {
+    const [productStores, shipmentMethods] = await Promise.all([
+      omDb().all('productStores'),
+      omDb().all('shipmentMethodTypes'),
+    ]);
+
+    return {
+      storeById: new Map(productStores.map((r: any) => [r.productStoreId, r])),
+      methodById: new Map(shipmentMethods.map((r: any) => [r.shipmentMethodTypeId, r])),
+    };
+  } catch (error) {
+    logger.warn('Could not read order row seed data from the local database', error);
+
+    return { storeById: new Map(), methodById: new Map() };
+  }
+}
 
 async function fetchWorkflowPage(
   bucket: 'open' | 'inflight' | 'packed',
@@ -46,10 +67,7 @@ async function fetchWorkflowPage(
   const total: number = resp.data?.ordersCount ?? docs.length;
 
   // Stamped onto row data, so it cannot self-correct later — read the rows up front.
-  const [productStoreRows, shipmentMethodRows] = await Promise.all([
-    seedRows('productStores'),
-    seedRows('shipmentMethodTypes'),
-  ]);
+  const { storeById, methodById } = await readOrderRowSeedRows();
 
   const orders = docs.map((doc: any) => {
     return {
@@ -59,7 +77,7 @@ async function fetchWorkflowPage(
       statusId: toStringValue(doc.orderStatusId) || toStringValue(doc.statusId) || 'ORDER_APPROVED',
       orderDate: toStringValue(doc.orderDate),
       productStoreId: toStringValue(doc.productStoreId),
-      productStoreName: (() => { const s = seedProductStore(productStoreRows, toStringValue(doc.productStoreId)); return s?.storeName || s?.companyName || toStringValue(doc.productStoreId); })(),
+      productStoreName: (() => { const s = storeById.get(toStringValue(doc.productStoreId)); return s?.storeName || s?.companyName || toStringValue(doc.productStoreId); })(),
       salesChannelEnumId: toStringValue(doc.salesChannelEnumId),
       customerName: `${toStringValue(doc.firstName)} ${toStringValue(doc.lastName)}`,
       customerPartyId: toStringValue(doc.billToPartyId),
@@ -70,7 +88,7 @@ async function fetchWorkflowPage(
       shipmentId: toStringValue(doc.shipmentId),
       shipmentStatusId: toStringValue(doc.shipmentStatusId),
       shippingMethodTypeId: toStringValue(doc.shipmentMethodTypeId),
-      shipmentMethodDesc: (() => { const m = seedShipmentMethod(shipmentMethodRows, toStringValue(doc.shipmentMethodTypeId)); return m?.description || toStringValue(doc.shipmentMethodTypeId); })(),
+      shipmentMethodDesc: (() => { const m = methodById.get(toStringValue(doc.shipmentMethodTypeId)); return m?.description || toStringValue(doc.shipmentMethodTypeId); })(),
       carrierPartyId: toStringValue(doc.carrierPartyId),
       priority: (() => {
         const p = Number(doc.priority);

@@ -1,7 +1,6 @@
 import { DateTime } from 'luxon';
 import { defineStore } from 'pinia';
-import { seedRows } from '@/db/omDb';
-import { statusAge } from '@/db/seedLookups';
+import { omDb } from '@/db/orderManagerDb';
 import {
   createPartyEmail,
   createPartyPostalAddress,
@@ -148,6 +147,17 @@ function allRelationships(profile: CustomerProfile | null, loadedRelationships: 
 
 function triggerCustomerIndex(partyId: string): void {
   indexCustomer(partyId).catch((e) => console.error(`[customer index] failed for ${partyId}:`, e));
+}
+
+/** statusId -> statusAge, read straight from IndexedDB. */
+async function readStatusAges(): Promise<Map<string, number>> {
+  try {
+    const statuses = await omDb().all('statuses');
+
+    return new Map(statuses.map((row: any) => [row.statusId, Number(row.statusAge ?? 0)]));
+  } catch {
+    return new Map();
+  }
 }
 
 export const useCustomerStore = defineStore('customerDetail', {
@@ -371,15 +381,15 @@ export const useCustomerStore = defineStore('customerDetail', {
         // Real progress for the rendered cards: hydrate each via the official get-order API
         // (not Solr) and compute from order-item (+ shipment-item) status ages.
         // statusAge is stamped into each card's progress value, so read the rows up front.
-        const statusRows = await seedRows('statuses');
+        const ageByStatusId = await readStatusAges();
         const displayCount = 12;
         await Promise.all(result.orders.slice(0, displayCount).map(async (order) => {
           try {
             const statusIds = await getOrderProgressStatuses(order.orderId);
             if (statusIds.length) {
-              order.progressValue = computeProgress(statusIds, (statusId) => statusAge(statusRows, statusId));
+              order.progressValue = computeProgress(statusIds, (statusId) => ageByStatusId.get(statusId) ?? 0);
               order.progressLabel = `${Math.round(order.progressValue * 100)}% complete`;
-              order.progressColor = progressStatusColor(statusIds, (statusId) => statusAge(statusRows, statusId));
+              order.progressColor = progressStatusColor(statusIds, (statusId) => ageByStatusId.get(statusId) ?? 0);
             }
           } catch {
             // keep the Solr status fallback on a per-order failure

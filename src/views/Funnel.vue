@@ -620,7 +620,7 @@ import { translate, StatCard, Sparkline, commonUtil } from '@common';
 import { UNFILLABLE_FACILITY_ID, useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
-import { useSeedTable } from '@/db/omDb';
+import { useSeedTable } from '@/db/orderManagerDb';
 import { facilityName, getEnumsByType, shipmentMethod } from '@/db/seedLookups';
 import { useUserStore } from '@/store/user';
 import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';

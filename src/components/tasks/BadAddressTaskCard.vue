@@ -131,7 +131,7 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { seedRows, useSeedTable } from '@/db/omDb';
+import { seedRows, useSeedTable } from '@/db/orderManagerDb';
 import { carrierName, facilityName, getStatesForCountry, shipmentMethodDescription } from '@/db/seedLookups';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import { buildAddressState } from '@/utils/badAddressState';

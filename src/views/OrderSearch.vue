@@ -203,8 +203,7 @@ import { useOrderStore, DEFAULT_ORDER_SEARCH_SORT } from '@/store/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
-import { useSeedTable } from '@/db/omDb';
-import { getEnumsByType, getShipmentMethodOptions, getStatusItemsByType, statusDescription } from '@/db/seedLookups';
+import { getEnumsByType, getShipmentMethodOptions, getStatusItemsByType } from '@/db/useSeedData';
 import router from '@/router';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
@@ -224,9 +223,6 @@ const orderStore = useOrderStore();
 const orderDetailStore = useOrderDetailStore();
 const userStore = useUserStore();
 const productStore = useProductStore();
-const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
-const { records: statuses } = useSeedTable('statuses');
-const { records: enums } = useSeedTable('enums');
 const { searchQuery, searchFilters, searchSort, searchResults, searchTotal, loading, error, hasMore } = storeToRefs(orderStore);
 
 function handleOrderRowClick(order: any) {
@@ -240,9 +236,21 @@ const debounceTimer = ref<ReturnType<typeof setTimeout>>();
 const selectMode = ref(false);
 const selectedOrderIds = ref<string[]>([]);
 
-const orderStatuses = computed(() => getStatusItemsByType(statuses.value, 'ORDER_STATUS'));
-const salesChannels = computed(() => getEnumsByType(enums.value, 'ORDER_SALES_CHANNEL'));
-const shipmentMethodOptions = computed(() => getShipmentMethodOptions(shipmentMethodTypes.value));
+// Seed labels live in the local database, so they resolve after mount, not in a computed.
+const orderStatuses = ref<any[]>([]);
+const salesChannels = ref<any[]>([]);
+const shipmentMethodOptions = ref<Array<{ id: string; label: string }>>([]);
+
+async function loadSeedData() {
+  const [statusRows, channelRows, methods] = await Promise.all([
+    getStatusItemsByType('ORDER_STATUS'),
+    getEnumsByType('ORDER_SALES_CHANNEL'),
+    getShipmentMethodOptions(),
+  ]);
+  orderStatuses.value = statusRows;
+  salesChannels.value = channelRows;
+  shipmentMethodOptions.value = methods;
+}
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const selectedStatusIds = computed(() => {
   const status = searchFilters.value.status as string[] | string;
@@ -269,6 +277,7 @@ const canCreateOrderTasks = computed(() => userStore.hasPermission(Actions.APP_O
 const canUseBulkActions = computed(() => (!HIDE_SHOPIFY_UNSYNCED_ACTIONS && canCancelOrders.value) || canUpdateOrders.value || canCreateOrderTasks.value);
 
 onMounted(async () => {
+  await loadSeedData();
   orderStore.searchFilters.productStoreId = selectedProductStoreId.value;
   await orderStore.runSearch();
 });
@@ -431,7 +440,8 @@ function setStatusFilter(statusId: string, checked: boolean) {
 }
 
 function statusDescription(statusId: string) {
-  return statusDescription(statuses.value, statusId);
+  // orderStatuses is already loaded by loadSeedData; no second read needed.
+  return orderStatuses.value.find((status: any) => status.statusId === statusId)?.description || statusId;
 }
 
 </script>

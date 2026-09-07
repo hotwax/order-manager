@@ -294,8 +294,7 @@ import AddressModal from '@/components/AddressModal.vue';
 import AddCustomerModal from '@/components/AddCustomerModal.vue';
 import AddProductModal from '@/components/AddProductModal.vue';
 import AddCustomLineModal from '@/components/AddCustomLineModal.vue';
-import { useSeedTable } from '@/db/omDb';
-import { productStoreFacilities } from '@/db/seedLookups';
+import { getProductStoreFacilities, getShopifyShopLocations } from '@/db/useSeedData';
 
 const currencies = ref([]) as any;
 const shopsList = ref<any[]>([]);
@@ -312,21 +311,29 @@ const isItemInOrder = computed(() => orderForm.value.lineItems.some((lineItem: a
 
 let timeoutId: any = null;
 const productSearchCount = ref(0);
-const { records: productStoreFacilityRows } = useSeedTable('productStoreFacilities');
-const { records: shopifyShopLocations } = useSeedTable('shopifyShopLocations');
+
+// Read from the local database; both fill in shortly after mount.
+const currentStoreId = computed(() => useProductStore().getCurrentProductStore?.productStoreId ?? '');
+const storeFacilityRows = ref<any[]>([]);
+const shopLocationRows = ref<any[]>([]);
+
+watch(currentStoreId, async (productStoreId) => {
+  storeFacilityRows.value = productStoreId ? await getProductStoreFacilities(productStoreId) : [];
+}, { immediate: true });
+
+onMounted(async () => { shopLocationRows.value = await getShopifyShopLocations(); });
 
 const facilities = computed(() => {
-  const productStoreId = useProductStore().getCurrentProductStore?.productStoreId;
-  if (!productStoreId) return [];
+  if (!currentStoreId.value) return [];
 
-  const storeFacilities = productStoreFacilities(productStoreFacilityRows.value, productStoreId);
+  const storeFacilities = storeFacilityRows.value;
   if (!storeFacilities.length) return [];
 
   if (!orderForm.value.shopId) {
     return storeFacilities;
   }
 
-  const shopLocations = shopifyShopLocations.value;
+  const shopLocations = shopLocationRows.value;
   const allowedFacilityIds = shopLocations
     .filter((loc: any) => loc.shopId === orderForm.value.shopId)
     .map((loc: any) => loc.facilityId);

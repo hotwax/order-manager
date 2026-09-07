@@ -1075,7 +1075,7 @@ import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, Io
 import { DateTime } from 'luxon';
 import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, chevronDown, chevronUp, closeCircleOutline, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pauseCircleOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, storefrontOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { useSeedTable } from '@/db/omDb';
+import { useSeedTable } from '@/db/orderManagerDb';
 import { allowedTransitions as allowedTransitionsFor, enumDescription, facility, facilityName, facilityType, geoName, getCountries, getStates, orderAdjustmentTypeDescription, orderIdentificationTypeDescription, paymentMethodDescription, productStoreName, shipmentMethodDescription, shopifyShop, statusDescription } from '@/db/seedLookups';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
