@@ -195,10 +195,10 @@ import SearchFilterCard from "@/components/common/SearchFilterCard.vue";
 import UniformFilterLayout from "@/components/common/UniformFilterLayout.vue";
 import router from "@/router";
 import { useReturnsStore } from "@/store/returns";
-import { useSeedStore } from "@/store/seed";
+import { useSeedData } from '@/db/useSeedData';
 
 const returnsStore = useReturnsStore();
-const seed = useSeedStore();
+const seed = useSeedData();
 const { returns, total, query, loading, error, hasMore } = storeToRefs(returnsStore);
 
 const returnStatuses = computed(() => seed.getStatusItemsByType("ORDER_RETURN_STTS"));

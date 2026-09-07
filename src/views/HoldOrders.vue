@@ -126,7 +126,7 @@ import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useUserStore } from '@/store/user';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
@@ -136,13 +136,13 @@ import Actions from "@/authorization/actions";
 
 const orderTaskStore = useOrderTaskStore();
 const userStore = useUserStore();
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'hold');
 const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
 const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
-const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions);
+const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions());
 const sortOptions = taskSortOptions('hold');
 // Only purposes without a dedicated queue page are offered — picking Bad Address,
 // Swap or Fraud here would show tasks that belong on those pages.
@@ -311,7 +311,6 @@ onIonViewWillEnter(() => {
   loadPhysicalFacilities();
   // No-op once loaded; guarantees the purpose filter has options even when the
   // page is opened directly rather than after a full seed load.
-  seedStore.loadEnumType(HOLD_TASK_PURPOSE_ENUM_TYPE_ID);
   replaceHoldTasks();
 });
 </script>

@@ -137,7 +137,7 @@ import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { fetchUnfillableProductCandidates, fetchUnfillableShipGroupsForProduct } from '@/services/order';
 import { fetchActiveSubstitutes } from '@/services/productAssociations';
 import { showToast } from '@/utils';
@@ -145,7 +145,7 @@ import { countTaskTargets, runGroupedTaskMutation, shipGroupTaskTarget } from '@
 import Actions from "@/authorization/actions";
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 const productStore = useProductStore();
 const userStore = useUserStore();
 const productCache = useProductCacheStore();
@@ -158,7 +158,7 @@ const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByTy
   id: channel.enumId,
   label: channel.description || channel.enumId,
 })));
-const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions);
+const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions());
 const sortOptions = taskSortOptions('swap');
 const selectMode = ref(false);
 const selectedTasks = ref<Record<string, boolean>>({});

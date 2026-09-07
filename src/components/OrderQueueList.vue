@@ -152,7 +152,7 @@ import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderStore } from '@/store/order';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useProductStore } from '@/store/productStore';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import type { Order } from '@/types/order';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
@@ -203,7 +203,7 @@ const orderDetailStore = useOrderDetailStore();
 const orderStore = useOrderStore();
 const orderTaskStore = useOrderTaskStore();
 const productStore = useProductStore();
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 const ionRouter = useIonRouter();
 
 const PAGE_SIZE = 50;
@@ -227,7 +227,7 @@ const selectMode = ref(false);
 const selectedOrderIds = ref<string[]>([]);
 
 const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
-const shipmentMethodOptions = computed(() => seedStore.getShipmentMethodOptions);
+const shipmentMethodOptions = computed(() => seedStore.getShipmentMethodOptions());
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const hasMore = computed(() => searchResults.value.length < searchTotal.value);
 

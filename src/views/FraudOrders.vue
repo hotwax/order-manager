@@ -109,7 +109,7 @@ import TaskQueueListHeader from '@/components/tasks/TaskQueueListHeader.vue';
 import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
@@ -118,7 +118,7 @@ import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'fraud');

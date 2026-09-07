@@ -620,7 +620,7 @@ import { translate, StatCard, Sparkline, commonUtil } from '@common';
 import { UNFILLABLE_FACILITY_ID, useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { useUserStore } from '@/store/user';
 import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
 import { createLatestRequestScope } from '@/utils/latestRequestScope';
@@ -635,7 +635,7 @@ import { DateTime } from 'luxon';
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 const userStore = useUserStore();
 const router = useRouter();
 const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -764,7 +764,7 @@ const queueSegments = computed(() => {
   const topSortField = sortRules[0]?.id || 'deliveryDays';
   let segments: any[] = [];
 
-  const seedStore = useSeedStore() as any;
+  const seedStore = useSeedData();
 
   if (topSortField === 'deliveryDays' || topSortField === 'shipmentMethodTypeId') {
     // Dynamic combinations grouping
@@ -789,7 +789,7 @@ const queueSegments = computed(() => {
 
     let runningMinutes = 0;
     segments = sortedCombinations.map((item, index) => {
-      const shipmentMethod = seedStore.shipmentMethodTypes?.byId?.[item.shipmentMethodTypeId];
+      const shipmentMethod = seedStore.shipmentMethod(item.shipmentMethodTypeId);
       const label = `${item.deliveryDays}d - ${shipmentMethod?.description || item.shipmentMethodTypeId || 'None'}`;
       const segmentMinutes = Math.ceil(item.count / batchSize) * cronIntervalMinutes;
       runningMinutes += segmentMinutes;
@@ -1238,7 +1238,7 @@ const handleReorder = (event: any) => {
 
 
 const availableSortOptions = computed(() => {
-  const seedStore = useSeedStore() as any;
+  const seedStore = useSeedData();
   const allParams = seedStore.getEnumsByType('PP_SORT_PARAM_TYPE') || [];
   const currentIds = sortRules.value.map(r => r.id);
   return allParams.filter((e: any) => !currentIds.includes(e.enumCode));
