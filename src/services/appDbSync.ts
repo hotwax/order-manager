@@ -1,5 +1,5 @@
 /**
- * Main-thread entry point for the Order Manager background cache sync.
+ * Main-thread entry point for the Order Manager background database sync.
  *
  * Both boot paths (a restored session in App.vue and a fresh login in store/user)
  * start the same worker with the same config, so the wiring lives here once.
@@ -10,17 +10,17 @@
  */
 
 import { commonUtil, cookieHelper } from "@common";
-import { startCacheBootstrap, type SyncHarness } from "@common/cache";
+import { startDbBootstrap, type SyncHarness } from "@common/db";
 import { WorkerFactory } from "@common/core/workerFactory";
 import { useAuth } from "@common/composables/useAuth";
-import { getOrderManagerDb } from "@/cache/appCacheDb";
-import { ORDER_MANAGER_CACHE_CATALOG } from "@/config/appSyncConfig";
+import { getOrderManagerDb } from "@/db/orderManagerDb";
+import { ORDER_MANAGER_SYNC_CATALOG } from "@/config/appSyncConfig";
 // `?worker&url` lets Vite bundle the worker as its own chunk and hand back its URL,
 // so the factory resolves the same asset in dev and in a production build.
 import appSyncWorkerUrl from "../workers/appSync.worker.ts?worker&url";
 
 /** The session token the sync worker should start with, or "" when there is none. */
-export function getCacheSyncToken(): string {
+export function getSyncToken(): string {
   return cookieHelper().get("api_key")
     || cookieHelper().get("token")
     || (useAuth() as any).token?.value
@@ -28,20 +28,20 @@ export function getCacheSyncToken(): string {
 }
 
 /**
- * Start the background cache sync and repopulate the in-memory seed store once the
+ * Start the background database sync and repopulate the in-memory seed store once the
  * first pass lands. Never rejects — a sync failure must not break boot or login.
  */
-export function startAppCacheSync(token: string, onSynced?: () => void): Promise<void> {
+export function startAppDbSync(token: string, onSynced?: () => void): Promise<void> {
   // Resolved here on the main thread and handed to the worker, which has no cookies to read it from.
   const omsInstance = commonUtil.getOMSInstanceName();
 
-  return startCacheBootstrap({
+  return startDbBootstrap({
     workerFactory: () => WorkerFactory.createWorker<SyncHarness>(new URL(appSyncWorkerUrl, import.meta.url)).worker,
     token,
     maargUrl: commonUtil.getMaargURL(),
     omsInstance,
     db: getOrderManagerDb(omsInstance),
-    domains: ORDER_MANAGER_CACHE_CATALOG.map((domain) => domain.name),
+    domains: ORDER_MANAGER_SYNC_CATALOG.map((domain) => domain.name),
   }).then(() => {
     onSynced?.();
   });

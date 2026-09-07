@@ -32,8 +32,8 @@ import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import localeMessages from './locales';
 import { createDxpI18n, imagePreview, initialiseConfig, logger } from '@common';
-import { registerCommonSeedDomains } from '@common/cache';
-import { getOrderManagerDb } from './cache/appCacheDb';
+import { registerCommonSeedDomains } from '@common/db';
+import { getOrderManagerDb } from './db/orderManagerDb';
 import { useUserStore } from './store/user';
 
 registerCommonSeedDomains((omsInstance) => getOrderManagerDb(omsInstance));

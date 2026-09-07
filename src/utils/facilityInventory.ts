@@ -38,7 +38,7 @@ export type FacilityCoverageRow = {
   facilityId: string;
   facilityName: string;
   allowBrokering: string;
-  /** From the cached facility record: null is unlimited, zero is no capacity. */
+  /** From the stored facility record: null is unlimited, zero is no capacity. */
   orderLimit: number | null;
   consumedToday: number;
   remainingCapacity: number | null;
