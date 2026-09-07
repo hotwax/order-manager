@@ -18,8 +18,9 @@ vi.mock('@/composables/useOrderDetail', async (importOriginal) => {
   return { ...actual, useOrderDetail: vi.fn() };
 });
 
-vi.mock('@/store/seed', () => ({
-  useSeedStore: vi.fn(() => ({ orderAdjustmentTypeDescription: (id: string) => id })),
+vi.mock('@/db/useSeedData', () => ({
+  orderAdjustmentTypeDescription: (id: string) => id,
+  shippingMethodsByCarrier: () => [],
 }));
 
 const ORDER_ID = 'M102510';

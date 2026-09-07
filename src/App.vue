@@ -19,8 +19,6 @@ import { getSyncToken, startAppDbSync } from '@/services/appDbSync';
 import Menu from '@/components/layout/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';
-import { useSeedStore } from '@/store/seed';
-import { useProductStore } from '@/store/productStore';
 
 const loader = ref<HTMLIonLoadingElement | null>(null);
 const { isAuthenticated } = useAuth();
@@ -60,31 +58,19 @@ onMounted(async () => {
   const timeZone = userProfile.value?.timeZone || userProfile.value?.userTimeZone;
   if (timeZone) Settings.defaultZone = timeZone;
 
-  // Initialize the in-memory seed store from IndexedDB on startup/reload. Awaited so the stored
-  // datasets are in place before the API fallback below decides what still needs fetching.
-  await useSeedStore().initSeedDb();
-
-  // On authenticated boot, start the background Web Worker database bootstrap to ensure sync
+  // On authenticated boot, start the background Web Worker database bootstrap to ensure sync.
+  // Seed lookups need no boot step: their slices build on first access, straight from the
+  // local database.
   if (isAuthenticated.value) {
     await userStore.fetchPermissions().catch(() => undefined);
 
     const token = getSyncToken();
     if (token) {
-      startAppDbSync(token, () => useSeedStore().populateFromDb())
+      startAppDbSync(token)
         .catch((err) => {
           console.warn("Background database bootstrap notice:", err);
         });
     }
-  }
-
-  // Ensure seed reference data is loaded on an authenticated boot. Store-scoped datasets need
-  // product store ids, but the global ones must load regardless — gating the whole call on
-  // having stores left every unfilled dataset resolving labels to raw ids.
-  if (isAuthenticated.value) {
-    const productStoreIds = (useProductStore().productStores || [])
-      .map((store: any) => store.productStoreId)
-      .filter(Boolean);
-    useSeedStore().loadInitialSeedData(productStoreIds).catch(() => undefined);
   }
 });
 

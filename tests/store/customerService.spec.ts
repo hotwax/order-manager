@@ -48,12 +48,9 @@ vi.mock('@/store/order', () => ({
   })),
 }));
 
-vi.mock('@/store/seed', () => ({
-  useSeedStore: vi.fn(() => ({
-    productStores: { byId: {} },
-    shipmentMethodTypes: { byId: {} },
-    getEnumsByType: vi.fn(() => []),
-  })),
+vi.mock('@/db/useSeedData', () => ({
+  ensureLoaded: vi.fn(async () => {}),
+  getEnumsByType: vi.fn(() => []),
 }));
 
 vi.mock('@/store/orderDetail', () => ({

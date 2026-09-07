@@ -16,13 +16,13 @@
  * barrel into the worker chunk.
  */
 
-import { shallowRef, type ShallowRef } from "vue";
-import type { Subscription } from "dexie";
 import { commonUtil } from "@common";
 import type { BaseDB } from "@common/db";
 import { dbClient, hasSyncedThisLogin } from "@common/db";
-import { getOrderManagerDb } from "@/db/orderManagerDb";
+import type { Subscription } from "dexie";
+import { type ShallowRef, shallowRef } from "vue";
 import { ORDER_MANAGER_SYNC_CATALOG } from "@/config/appSyncConfig";
+import { getOrderManagerDb } from "@/db/orderManagerDb";
 
 type Row = Record<string, any>;
 
@@ -67,43 +67,41 @@ function keyFieldOf(db: BaseDB, table: string): string {
 
 function groupBy(rows: Row[], keyField: string): Map<string, Row[]> {
   const grouped = new Map<string, Row[]>();
-  for (const row of rows) {
+  for(const row of rows) {
     const key = row[keyField];
-    if (!key) continue;
+    if(!key) {continue;}
     const bucket = grouped.get(key);
-    if (bucket) bucket.push(row);
-    else grouped.set(key, [row]);
+    if(bucket) {bucket.push(row);} else {grouped.set(key, [row]);}
   }
+
   return grouped;
 }
 
 /** Rebuild whichever secondary indexes derive from this table. */
 function rebuildSecondary(table: string, rows: Row[]) {
-  if (table === "statuses") {
+  if(table === "statuses") {
     statusesByType = groupBy(rows, "statusTypeId");
-  } else if (table === "enums") {
+  } else if(table === "enums") {
     enumsByType = groupBy(rows, "enumTypeId");
-  } else if (table === "enumTypes") {
+  } else if(table === "enumTypes") {
     const byParent = new Map<string, string[]>();
-    for (const type of rows) {
-      if (!type.parentTypeId || !type.enumTypeId) continue;
+    for(const type of rows) {
+      if(!type.parentTypeId || !type.enumTypeId) {continue;}
       const bucket = byParent.get(type.parentTypeId);
-      if (bucket) { if (!bucket.includes(type.enumTypeId)) bucket.push(type.enumTypeId); }
-      else byParent.set(type.parentTypeId, [type.enumTypeId]);
+      if(bucket) { if(!bucket.includes(type.enumTypeId)) {bucket.push(type.enumTypeId);} } else {byParent.set(type.parentTypeId, [type.enumTypeId]);}
     }
     enumChildTypesByParent = byParent;
-  } else if (table === "geoAssocs") {
+  } else if(table === "geoAssocs") {
     const byCountry = new Map<string, string[]>();
-    for (const assoc of rows) {
-      if (!assoc.geoId || !assoc.toGeoId) continue;
+    for(const assoc of rows) {
+      if(!assoc.geoId || !assoc.toGeoId) {continue;}
       const bucket = byCountry.get(assoc.geoId);
-      if (bucket) { if (!bucket.includes(assoc.toGeoId)) bucket.push(assoc.toGeoId); }
-      else byCountry.set(assoc.geoId, [assoc.toGeoId]);
+      if(bucket) { if(!bucket.includes(assoc.toGeoId)) {bucket.push(assoc.toGeoId);} } else {byCountry.set(assoc.geoId, [assoc.toGeoId]);}
     }
     geoAssocsByCountry = byCountry;
-  } else if (table === "carrierShipmentMethods") {
+  } else if(table === "carrierShipmentMethods") {
     carrierShipmentMethodsByParty = groupBy(rows, "partyId");
-  } else if (table === "statusFlowTransitions") {
+  } else if(table === "statusFlowTransitions") {
     transitionsByStatus = groupBy(rows, "statusId");
   }
 }
@@ -111,12 +109,12 @@ function rebuildSecondary(table: string, rows: Row[]) {
 function applyRows(table: string, keyField: string, rows: Row[], gen: number) {
   // Dropped by resetSeedData while this load was in flight — discard the result.
   const slice = slices.get(table);
-  if (!slice || gen !== generation) return;
+  if(!slice || gen !== generation) {return;}
 
   const next = new Map<string, Row>();
-  for (const row of rows) {
+  for(const row of rows) {
     const key = row[keyField];
-    if (key) next.set(String(key), row);
+    if(key) {next.set(String(key), row);}
   }
   // Replacing the ref's value is what makes dependent computeds re-run.
   slice.value = next;
@@ -126,7 +124,7 @@ function applyRows(table: string, keyField: string, rows: Row[], gen: number) {
 /** Read the table once, then keep it fresh. Idempotent per table. */
 function loadAndSubscribe(table: string): Promise<void> {
   const inFlight = loading.get(table);
-  if (inFlight) return inFlight;
+  if(inFlight) {return inFlight;}
 
   const gen = generation;
 
@@ -140,6 +138,7 @@ function loadAndSubscribe(table: string): Promise<void> {
       // No database available (no OMS instance yet, or a failed open). Leave the slice
       // empty: lookups fall back to raw ids rather than breaking the caller.
       console.warn(`[seed] Cannot resolve the database for ${table}:`, error);
+
       return;
     }
     const client = dbClient(db);
@@ -150,13 +149,13 @@ function loadAndSubscribe(table: string): Promise<void> {
       console.warn(`[seed] Initial read failed for ${table}:`, error);
     }
 
-    if (gen !== generation || subscriptions.has(table)) return;
+    if(gen !== generation || subscriptions.has(table)) {return;}
 
     try {
       const subscription = client.live(table).subscribe({
         next: (rows: Row[]) => {
           const pending = timers.get(table);
-          if (pending) clearTimeout(pending);
+          if(pending) {clearTimeout(pending);}
           timers.set(table, setTimeout(() => {
             timers.delete(table);
             applyRows(table, keyField, rows, gen);
@@ -166,14 +165,14 @@ function loadAndSubscribe(table: string): Promise<void> {
       });
 
       // A reset may have landed while we were subscribing.
-      if (gen !== generation) subscription.unsubscribe();
-      else subscriptions.set(table, subscription);
+      if(gen !== generation) {subscription.unsubscribe();} else {subscriptions.set(table, subscription);}
     } catch (error) {
       console.warn(`[seed] Failed to subscribe to ${table}:`, error);
     }
   })();
 
   loading.set(table, promise);
+
   return promise;
 }
 
@@ -183,11 +182,12 @@ function loadAndSubscribe(table: string): Promise<void> {
  */
 function sliceOf(table: string): Map<string, Row> {
   let slice = slices.get(table);
-  if (!slice) {
+  if(!slice) {
     slice = shallowRef(new Map<string, Row>());
     slices.set(table, slice);
     void loadAndSubscribe(table);
   }
+
   return slice.value;
 }
 
@@ -202,25 +202,28 @@ const rowOf = (table: string, id: string): Row | undefined => (id ? sliceOf(tabl
  */
 async function waitForDomainSync(table: string, timeoutMs = SYNC_WAIT_TIMEOUT_MS): Promise<void> {
   const domain = domainOfTable.get(table);
-  if (!domain) return;
+  if(!domain) {return;}
 
   let db: BaseDB;
   try {
     db = resolveDb();
-    if (await hasSyncedThisLogin(db, domain)) return;
+    if(await hasSyncedThisLogin(db, domain)) {return;}
   } catch {
-    return;   // no database to wait on; the caller proceeds with whatever is present
+    return; // no database to wait on; the caller proceeds with whatever is present
   }
 
   await new Promise<void>((resolve) => {
     let done = false;
-    let subscription: Subscription | undefined;
+    // A holder rather than a plain binding: liveQuery may emit before subscribe() returns,
+    // so finish() can run before the subscription is in hand. Assigning into an object lets
+    // the post-subscribe check below clean up in that case.
+    const held: { subscription?: Subscription } = {};
 
     const finish = () => {
-      if (done) return;
+      if(done) {return;}
       done = true;
       clearTimeout(timer);
-      try { subscription?.unsubscribe(); } catch { /* already closed */ }
+      try { held.subscription?.unsubscribe(); } catch { /* already closed */ }
       resolve();
     };
 
@@ -229,9 +232,14 @@ async function waitForDomainSync(table: string, timeoutMs = SYNC_WAIT_TIMEOUT_MS
       finish();
     }, timeoutMs);
 
-    subscription = dbClient(db)
+    held.subscription = dbClient(db)
       .live("syncMeta", { equals: { key: `loginSync:${domain}` } })
-      .subscribe({ next: (rows: Row[]) => { if (rows.length) finish(); }, error: finish });
+      .subscribe({ next: (rows: Row[]) => { if(rows.length) {finish();} }, error: finish });
+
+    // finish() already ran (a synchronous emit) — it could not have unsubscribed.
+    if(done) {
+      try { held.subscription.unsubscribe(); } catch { /* already closed */ }
+    }
   });
 }
 
@@ -248,7 +256,7 @@ export async function ensureLoaded(tables: string[], timeoutMs = SYNC_WAIT_TIMEO
   // the order fetch, customer dashboard or address form that called it.
   await Promise.all(tables.map(async (table) => {
     try {
-      if (!slices.has(table)) slices.set(table, shallowRef(new Map<string, Row>()));
+      if(!slices.has(table)) {slices.set(table, shallowRef(new Map<string, Row>()));}
       await waitForDomainSync(table, timeoutMs);
       await loadAndSubscribe(table);
     } catch (error) {
@@ -261,12 +269,12 @@ export async function ensureLoaded(tables: string[], timeoutMs = SYNC_WAIT_TIMEO
 export function resetSeedData(): void {
   generation += 1;
 
-  for (const subscription of subscriptions.values()) {
+  for(const subscription of subscriptions.values()) {
     try { subscription.unsubscribe(); } catch { /* already closed */ }
   }
   subscriptions.clear();
 
-  for (const timer of timers.values()) clearTimeout(timer);
+  for(const timer of timers.values()) {clearTimeout(timer);}
   timers.clear();
 
   loading.clear();
@@ -300,15 +308,18 @@ export const statusAge = (statusId: string): number => Number(rowOf("statuses", 
 export const enumDescription = (enumId: string) => itemDescription(rowOf("enums", enumId), enumId);
 
 export const getStatusItemsByType = (typeId: string): Row[] => {
-  sliceOf("statuses");                       // ensure the slice exists and is tracked
+  sliceOf("statuses"); // ensure the slice exists and is tracked
+
   return statusesByType.get(typeId) ?? [];
 };
 export const getEnumsByType = (typeId: string): Row[] => {
   sliceOf("enums");
+
   return enumsByType.get(typeId) ?? [];
 };
 export const getEnumsByParentType = (parentTypeId: string): Row[] => {
   sliceOf("enumTypes");
+
   return (enumChildTypesByParent.get(parentTypeId) ?? []).flatMap((childTypeId) => getEnumsByType(childTypeId));
 };
 
@@ -320,15 +331,16 @@ const DESCRIBE_FALLBACK_TABLES = [
 ];
 
 export function describe(id: string): string {
-  if (!id) return "";
+  if(!id) {return "";}
   const statusRow = rowOf("statuses", id);
-  if (statusRow) return itemDescription(statusRow, id);
+  if(statusRow) {return itemDescription(statusRow, id);}
   const enumRow = rowOf("enums", id);
-  if (enumRow) return itemDescription(enumRow, id);
-  for (const table of DESCRIBE_FALLBACK_TABLES) {
+  if(enumRow) {return itemDescription(enumRow, id);}
+  for(const table of DESCRIBE_FALLBACK_TABLES) {
     const row = rowOf(table, id);
-    if (row) return itemDescription(row, id);
+    if(row) {return itemDescription(row, id);}
   }
+
   return id;
 }
 
@@ -354,6 +366,7 @@ export const carriers = (): Row[] => rowsOf("carriers");
 export const carrier = (partyId: string) => rowOf("carriers", partyId);
 export const carrierName = (partyId: string) => {
   const row = rowOf("carriers", partyId);
+
   return row ? carrierLabel(row) : partyId;
 };
 
@@ -369,6 +382,7 @@ export const getShipmentMethodOptions = (): Array<{ id: string; label: string }>
 
 export const shippingMethodsByCarrier = (carrierPartyId: string): Row[] => {
   sliceOf("carrierShipmentMethods");
+
   return carrierPartyId ? carrierShipmentMethodsByParty.get(carrierPartyId) ?? [] : [];
 };
 
@@ -401,8 +415,9 @@ const byGeoName = (left: Row, right: Row) => (left.geoName || "").localeCompare(
 export const geoName = (geoId: string) => itemDescription(rowOf("geos", geoId), geoId, ["geoName"]);
 
 export const getGeoIdByCode = (code: string): string => {
-  if (!code) return "";
+  if(!code) {return "";}
   const match = rowsOf("geos").find((geo) => geo.geoCodeAlpha2 === code || geo.geoCode === code);
+
   return match?.geoId ?? "";
 };
 
@@ -416,6 +431,7 @@ export const getStates = (): Row[] =>
 
 export const getStatesForCountry = (countryGeoId: string): Row[] => {
   sliceOf("geoAssocs");
+
   return (geoAssocsByCountry.get(countryGeoId) ?? [])
     .map((geoId) => rowOf("geos", geoId))
     .filter(Boolean)
@@ -426,9 +442,11 @@ export const getStatesForCountry = (countryGeoId: string): Row[] => {
 
 export const allowedTransitions = (statusId: string) => {
   sliceOf("statusFlowTransitions");
+
   return (transitionsByStatus.get(statusId) ?? [])
     .map((transition) => {
       const toStatusDescription = itemDescription(rowOf("statuses", transition.toStatusId), transition.toStatusId);
+
       return {
         ...transition,
         toStatusDescription,
@@ -438,7 +456,8 @@ export const allowedTransitions = (statusId: string) => {
     .sort((left, right) => {
       const leftSequence = left.transitionSequence ?? Number.MAX_SAFE_INTEGER;
       const rightSequence = right.transitionSequence ?? Number.MAX_SAFE_INTEGER;
-      if (leftSequence !== rightSequence) return leftSequence - rightSequence;
+      if(leftSequence !== rightSequence) {return leftSequence - rightSequence;}
+
       return (left.toStatusId || "").localeCompare(right.toStatusId || "");
     });
 };

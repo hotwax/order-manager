@@ -1,10 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildAddressState } from '@/utils/badAddressState';
 
-vi.mock('@/store/seed', () => ({
-  useSeedStore: () => ({
-    getGeoIdByCode: () => '',
-  }),
+vi.mock('@/db/useSeedData', () => ({
+  getGeoIdByCode: () => '',
 }));
 
 describe('bad address state', () => {
