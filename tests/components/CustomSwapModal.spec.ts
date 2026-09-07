@@ -6,9 +6,9 @@ describe('custom swap modal facility stock labels', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/swaps/CustomSwapModal.vue'), 'utf8');
 
   it('labels substitute and search stock as facility-scoped inventory', () => {
-    expect(source).toContain("import { useSeedData } from '@/db/useSeedData';");
+    expect(source).toContain("import { useSeedTable } from '@/db/omDb';");
     // A computed, so it re-renders when the facilities slice fills — no explicit load.
-    expect(source).toContain('seedStore.facilityName(props.facilityId)');
+    expect(source).toContain('facilityName(facilities.value, props.facilityId)');
     expect(source).toContain('function facilityStockLabel');
     expect(source).toContain("translate('Available at {facility}: {count}'");
     expect(source).toContain("translate('Available: {count}'");

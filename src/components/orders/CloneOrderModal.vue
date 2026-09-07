@@ -144,7 +144,8 @@ import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import { computed, onMounted, ref, watch } from 'vue';
 import { api, emitter, logger, translate } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { geoName } from '@/db/seedLookups';
 import { useProductCacheStore } from '@/store/productCache';
 import { createShopifyCustomer, searchShopifyCustomers } from '@/services/customer';
 import { showToast } from '@/utils';
@@ -154,7 +155,8 @@ import { buildClonePayload, cloneCustomerName, cloneEmail, clonePhone, defaultCl
 const SHOPIFY_CUSTOMER_ID_TYPE = 'SHOPIFY_CUST_ID';
 
 const orderDetailStore = useOrderDetailStore();
-const seed = useSeedData();
+const { records: shopifyShops } = useSeedTable('shopifyShops');
+const { records: geos } = useSeedTable('geos');
 const productCache = useProductCacheStore();
 
 const raw = computed(() => orderDetailStore.current);
@@ -172,8 +174,8 @@ const email = computed(() => cloneEmail(raw.value));
 // ── Shop resolution: ShopifyShopOrder mapping first, manual pick from seed shops as fallback.
 const shopStatus = ref<'resolving' | 'resolved' | 'manual'>('resolving');
 const shopId = ref('');
-const shops = computed(() => seed.shopifyShops());
-const shopLabel = computed(() => seed.shopifyShops().find((s: any) => s.shopId === shopId.value)?.name || shopId.value);
+const shops = computed(() => shopifyShops.value);
+const shopLabel = computed(() => shopifyShops.value.find((s: any) => s.shopId === shopId.value)?.name || shopId.value);
 
 // ── Customer resolution: PartyIdentification → Shopify email search → create at submit.
 const customerStatus = ref<'resolving' | 'resolved' | 'error'>('resolving');
@@ -330,7 +332,7 @@ async function confirm() {
       note: note.value,
       shopId: shopId.value,
       shopifyCustomerId: customerId,
-      geoName: seed.geoName,
+      geoName: (geoId: string) => geoName(geos.value, geoId),
       getProduct: productCache.getProduct,
     });
 

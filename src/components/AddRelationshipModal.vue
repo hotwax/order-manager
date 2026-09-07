@@ -160,7 +160,7 @@ import {
 import { arrowBackOutline, arrowForwardOutline, checkmarkCircle, closeOutline } from 'ionicons/icons';
 import { computed, ref } from 'vue';
 import { translate } from '@common';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
 import { searchCustomers } from '@/services/customer';
 
 interface RelatableParty {
@@ -173,7 +173,8 @@ const props = defineProps<{
   currentPartyId: string;
 }>();
 
-const seed = useSeedData();
+const { records: partyRelationshipTypes } = useSeedTable('partyRelationshipTypes');
+const { records: roleTypes } = useSeedTable('roleTypes');
 
 const step = ref<'party' | 'relationship'>('party');
 const queryString = ref('');
@@ -189,12 +190,12 @@ const comments = ref('');
 let latestSearchId = 0;
 
 const relationshipTypes = computed(() =>
-  seed.partyRelationshipTypes()
+  partyRelationshipTypes.value
     .filter(Boolean)
 );
 
 const availableRoleTypes = computed(() =>
-  seed.roleTypes()
+  roleTypes.value
     .filter(Boolean)
 );
 

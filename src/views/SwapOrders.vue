@@ -137,7 +137,8 @@ import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { getEnumsByType, getShipmentMethodOptions } from '@/db/seedLookups';
 import { fetchUnfillableProductCandidates, fetchUnfillableShipGroupsForProduct } from '@/services/order';
 import { fetchActiveSubstitutes } from '@/services/productAssociations';
 import { showToast } from '@/utils';
@@ -145,7 +146,8 @@ import { countTaskTargets, runGroupedTaskMutation, shipGroupTaskTarget } from '@
 import Actions from "@/authorization/actions";
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedData();
+const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
+const { records: enums } = useSeedTable('enums');
 const productStore = useProductStore();
 const userStore = useUserStore();
 const productCache = useProductCacheStore();
@@ -154,11 +156,11 @@ const productMaster = useProductMaster();
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'swap');
 const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
-const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({
+const channelOptions = computed<TaskFilterOption[]>(() => getEnumsByType(enums.value, 'ORDER_SALES_CHANNEL').map((channel: any) => ({
   id: channel.enumId,
   label: channel.description || channel.enumId,
 })));
-const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions());
+const shipmentMethodOptions = computed<TaskFilterOption[]>(() => getShipmentMethodOptions(shipmentMethodTypes.value));
 const sortOptions = taskSortOptions('swap');
 const selectMode = ref(false);
 const selectedTasks = ref<Record<string, boolean>>({});

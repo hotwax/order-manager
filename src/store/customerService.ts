@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
-import { ensureLoaded, getEnumsByType } from '@/db/useSeedData';
+import { seedRows } from '@/db/omDb';
+import { getEnumsByType } from '@/db/seedLookups';
 import { DateTime } from 'luxon';
 import { useOrderStore } from '@/store/order';
 import { api, commonUtil, logger, translate } from '@common';
@@ -1055,9 +1056,8 @@ export const useCustomerServiceStore = defineStore('customerService', {
           .filter((f: any) => f.conditionTypeEnumId === 'ENTCT_SORT_BY')
           .sort((a: any, b: any) => (a.sequenceNum ?? 0) - (b.sequenceNum ?? 0));
 
-        // Stamped into the returned sortRules, so the slice must be loaded first.
-        await ensureLoaded(['enums']);
-        const sortParamEnums = getEnumsByType('PP_SORT_PARAM_TYPE') || [];
+        // Stamped into the returned sortRules, so read the rows rather than a live slice.
+        const sortParamEnums = getEnumsByType(await seedRows('enums'), 'PP_SORT_PARAM_TYPE');
 
         const sortRules: SortRule[] = sortConditions.map((cond: any) => {
           const enumRecord = sortParamEnums.find((e: any) => e.enumCode === cond.fieldName);

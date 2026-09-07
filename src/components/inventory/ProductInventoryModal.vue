@@ -26,7 +26,7 @@
       </ion-list-header>
       <ion-item v-for="entry in facilityStock" :key="entry.facilityId">
         <ion-label>
-          {{ seedStore.facilityName(entry.facilityId) }}
+          {{ facilityName(facilities, entry.facilityId) }}
           <p>{{ entry.facilityId }}</p>
         </ion-label>
         <ion-label slot="end" class="stock-col">{{ entry.lastInventoryCount ?? 0 }}</ion-label>
@@ -40,12 +40,13 @@ import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabe
 import { closeOutline } from 'ionicons/icons';
 import { ref, onMounted } from 'vue';
 import { api, logger, translate } from '@common';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { facilityName } from '@/db/seedLookups';
 import { useProductCacheStore } from '@/store/productCache';
 
 const props = defineProps<{ productId: string }>();
 
-const seedStore = useSeedData();
+const { records: facilities } = useSeedTable('facilities');
 const product = useProductCacheStore().getProduct(props.productId);
 
 const isLoading = ref(false);

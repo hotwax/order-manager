@@ -48,10 +48,7 @@ vi.mock('@/store/order', () => ({
   })),
 }));
 
-vi.mock('@/db/useSeedData', () => ({
-  ensureLoaded: vi.fn(async () => {}),
-  getEnumsByType: vi.fn(() => []),
-}));
+vi.mock('@/db/omDb', () => ({ seedRows: vi.fn(async () => []) }));
 
 vi.mock('@/store/orderDetail', () => ({
   useOrderDetailStore: vi.fn(() => ({})),

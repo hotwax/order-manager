@@ -195,14 +195,17 @@ import SearchFilterCard from "@/components/common/SearchFilterCard.vue";
 import UniformFilterLayout from "@/components/common/UniformFilterLayout.vue";
 import router from "@/router";
 import { useReturnsStore } from "@/store/returns";
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { enumDescription, facilityName, getEnumsByType, getStatusItemsByType, statusDescription } from '@/db/seedLookups';
 
 const returnsStore = useReturnsStore();
-const seed = useSeedData();
+const { records: statuses } = useSeedTable('statuses');
+const { records: enums } = useSeedTable('enums');
+const { records: facilities } = useSeedTable('facilities');
 const { returns, total, query, loading, error, hasMore } = storeToRefs(returnsStore);
 
-const returnStatuses = computed(() => seed.getStatusItemsByType("ORDER_RETURN_STTS"));
-const returnChannels = computed(() => seed.getEnumsByType("RETURN_CHANNEL"));
+const returnStatuses = computed(() => getStatusItemsByType(statuses.value, "ORDER_RETURN_STTS"));
+const returnChannels = computed(() => getEnumsByType(enums.value, "RETURN_CHANNEL"));
 const searchPlaceholder = computed(() => ({
   RETURN_ID: translate("Exact return ID"),
   ORDER_ID: translate("Exact internal order ID"),
@@ -245,7 +248,7 @@ function openReturn(returnId: string) {
 }
 
 function statusLabel(statusId: string) {
-  return seed.statusDescription(statusId) || statusId || translate("Not specified");
+  return statusDescription(statuses.value, statusId) || statusId || translate("Not specified");
 }
 
 function returnCustomerLabel(returnRecord: any) {
@@ -259,15 +262,16 @@ function returnTypeLabel(returnHeaderTypeId?: string) {
   if(returnHeaderTypeId === "CUSTOMER_RETURN") {return translate("Customer return");}
   if(returnHeaderTypeId === "APPEASEMENT") {return translate("Appeasement");}
 
-  return returnHeaderTypeId ? seed.describe(returnHeaderTypeId) || returnHeaderTypeId : translate("Return");
+  // returnHeaderTypeId has no seed table, so the old describe() call always returned the id.
+  return returnHeaderTypeId || translate("Return");
 }
 
 function channelLabel(returnChannelEnumId?: string) {
-  return returnChannelEnumId ? seed.enumDescription(returnChannelEnumId) || returnChannelEnumId : translate("No channel");
+  return returnChannelEnumId ? enumDescription(enums.value, returnChannelEnumId) || returnChannelEnumId : translate("No channel");
 }
 
 function facilityLabel(destinationFacilityId?: string) {
-  return destinationFacilityId ? seed.facilityName(destinationFacilityId) || destinationFacilityId : translate("No destination facility");
+  return destinationFacilityId ? facilityName(facilities.value, destinationFacilityId) || destinationFacilityId : translate("No destination facility");
 }
 
 function formatDate(value?: string | number) {

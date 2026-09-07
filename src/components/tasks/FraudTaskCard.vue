@@ -92,7 +92,8 @@ import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { showToast, sentimentCounts } from '@/utils';
 import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { enumDescription, paymentMethodDescription, statusDescription } from '@/db/seedLookups';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
@@ -112,7 +113,9 @@ const emit = defineEmits<{
 }>();
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedData();
+const { records: statuses } = useSeedTable('statuses');
+const { records: enums } = useSeedTable('enums');
+const { records: paymentMethodTypes } = useSeedTable('paymentMethodTypes');
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 
 const cardActions = computed<TaskCardAction[]>(() => ([
@@ -158,13 +161,13 @@ function orderedItemSecondary(item: any): string {
 
 function paymentMethodLabel(payment: any): string {
   return payment.paymentMethodDescription
-    || seedStore.paymentMethodDescription(payment.paymentMethodTypeId)
+    || paymentMethodDescription(paymentMethodTypes.value, payment.paymentMethodTypeId)
     || payment.paymentMethodTypeId;
 }
 
 function paymentStatusLabel(payment: any): string {
   return payment.statusDescription
-    || seedStore.statusDescription(payment.statusId)
+    || statusDescription(statuses.value, payment.statusId)
     || payment.statusId;
 }
 
@@ -179,8 +182,8 @@ function paymentStatusColor(payment: any): string | undefined {
 
 function suggestedActionLabel(task: any): string {
   return task.suggestedAction
-    || seedStore.enumDescription(task.riskRecommendationEnumId)
-    || seedStore.enumDescription(task.recommendationEnumId)
+    || enumDescription(enums.value, task.riskRecommendationEnumId)
+    || enumDescription(enums.value, task.recommendationEnumId)
     || translate('Review');
 }
 

@@ -64,7 +64,8 @@ import { computed, onMounted } from 'vue';
 import { translate } from '@common';
 import { DateTime } from 'luxon';
 import { useCustomerStore } from '@/store/customer';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { partyRelationshipDescription } from '@/db/seedLookups';
 
 const props = defineProps<{
   currentPartyId: string;
@@ -73,7 +74,7 @@ const props = defineProps<{
 }>();
 
 const store = useCustomerStore() as any;
-const seed = useSeedData();
+const { records: partyRelationshipTypes } = useSeedTable('partyRelationshipTypes');
 
 onMounted(() => {
   store.loadCustomerRelationships(props.currentPartyId, true);
@@ -106,7 +107,7 @@ const timeline = computed(() => {
 
   const personalEntries = personal.map((rel: any) => ({
     key: rel.key,
-    typeLabel: seed.describe(rel.partyRelationshipTypeId) as string,
+    typeLabel: partyRelationshipDescription(partyRelationshipTypes.value, rel.partyRelationshipTypeId),
     partyName: rel.relatedPartyName,
     partyId: rel.relatedPartyId,
     fromDate: rel.fromDate,
@@ -116,7 +117,7 @@ const timeline = computed(() => {
 
   const duplicateEntries = duplicates.map((rel: any) => ({
     key: rel.key,
-    typeLabel: seed.describe('DUPLICATE') as string,
+    typeLabel: partyRelationshipDescription(partyRelationshipTypes.value, 'DUPLICATE'),
     partyName: rel.isCanonical ? rel.duplicatePartyName : rel.canonicalPartyName,
     partyId: rel.isCanonical ? rel.duplicatePartyId : rel.canonicalPartyId,
     fromDate: rel.fromDate,

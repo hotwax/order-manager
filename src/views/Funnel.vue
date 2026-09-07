@@ -620,7 +620,8 @@ import { translate, StatCard, Sparkline, commonUtil } from '@common';
 import { UNFILLABLE_FACILITY_ID, useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { facilityName, getEnumsByType, shipmentMethod } from '@/db/seedLookups';
 import { useUserStore } from '@/store/user';
 import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
 import { createLatestRequestScope } from '@/utils/latestRequestScope';
@@ -635,7 +636,9 @@ import { DateTime } from 'luxon';
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
-const seedStore = useSeedData();
+const { records: enums } = useSeedTable('enums');
+const { records: facilities } = useSeedTable('facilities');
+const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
 const userStore = useUserStore();
 const router = useRouter();
 const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -764,7 +767,6 @@ const queueSegments = computed(() => {
   const topSortField = sortRules[0]?.id || 'deliveryDays';
   let segments: any[] = [];
 
-  const seedStore = useSeedData();
 
   if (topSortField === 'deliveryDays' || topSortField === 'shipmentMethodTypeId') {
     // Dynamic combinations grouping
@@ -789,7 +791,7 @@ const queueSegments = computed(() => {
 
     let runningMinutes = 0;
     segments = sortedCombinations.map((item, index) => {
-      const shipmentMethod = seedStore.shipmentMethod(item.shipmentMethodTypeId);
+      const shipmentMethod = shipmentMethod(shipmentMethodTypes.value, item.shipmentMethodTypeId);
       const label = `${item.deliveryDays}d - ${shipmentMethod?.description || item.shipmentMethodTypeId || 'None'}`;
       const segmentMinutes = Math.ceil(item.count / batchSize) * cronIntervalMinutes;
       runningMinutes += segmentMinutes;
@@ -1120,7 +1122,7 @@ function retrySyncData() {
 }
 
 function getFacilityName(facilityId: string) {
-  return seedStore.facilityName(facilityId);
+  return facilityName(facilities.value, facilityId);
 }
 
 const selectedFacilityName = computed(() => {
@@ -1238,8 +1240,7 @@ const handleReorder = (event: any) => {
 
 
 const availableSortOptions = computed(() => {
-  const seedStore = useSeedData();
-  const allParams = seedStore.getEnumsByType('PP_SORT_PARAM_TYPE') || [];
+  const allParams = getEnumsByType(enums.value, 'PP_SORT_PARAM_TYPE') || [];
   const currentIds = sortRules.value.map(r => r.id);
   return allParams.filter((e: any) => !currentIds.includes(e.enumCode));
 });

@@ -121,7 +121,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { getEnumsByType, getShipmentMethodOptions } from '@/db/seedLookups';
 import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
 import { WORKFLOW_ORDER_SORT_OPTIONS } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
@@ -137,7 +138,8 @@ const VIRTUAL_FACILITY_TYPE_ID = 'VIRTUAL_FACILITY';
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore();
-const seedStore = useSeedData();
+const { records: enums } = useSeedTable('enums');
+const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
 const ionRouter = useIonRouter();
 const toastMessage = ref('');
 
@@ -148,16 +150,13 @@ const filters = computed({
 const physicalFacilities = ref<FacilityOption[]>([]);
 
 const channelOptions = computed(() =>
-  seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((enumeration: any) => enumeration.enumId)
+  getEnumsByType(enums.value, 'ORDER_SALES_CHANNEL').map((enumeration: any) => enumeration.enumId)
 );
 
 const facilityOptions = computed(() => physicalFacilities.value);
 
 const shipmentMethodOptions = computed(() =>
-  seedStore.shipmentMethodTypes().map((method: any) => ({
-    id: method.shipmentMethodTypeId,
-    label: method.description || method.shipmentMethodTypeId,
-  }))
+  getShipmentMethodOptions(shipmentMethodTypes.value)
 );
 
 const channelFilterOptions = computed(() => channelOptions.value.map((channel) => ({ id: channel, label: formatChannel(channel) })));

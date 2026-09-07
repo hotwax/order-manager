@@ -130,7 +130,8 @@ import { api, DxpShopifyImg, translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { facilityName } from '@/db/seedLookups';
 
 const props = defineProps<{
   substituteProducts: any[];
@@ -166,13 +167,13 @@ const searchResults = ref<any[]>([]);
 const isSearching = ref(false);
 const searchPageIndex = ref(0);
 const searchTotalCount = ref(0);
-const seedStore = useSeedData();
+const { records: facilities } = useSeedTable('facilities');
 
 const isSearchScrollable = computed(() =>
   searchResults.value.length > 0 && searchResults.value.length < searchTotalCount.value
 );
 
-const facilityLabel = computed(() => seedStore.facilityName(props.facilityId) || props.facilityId);
+const facilityLabel = computed(() => facilityName(facilities.value, props.facilityId) || props.facilityId);
 
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);

@@ -142,7 +142,8 @@ import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductAc
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { facilityName } from '@/db/seedLookups';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
@@ -159,7 +160,7 @@ const props = withDefaults(defineProps<{ task: any; selectable?: boolean; select
 const emit = defineEmits<{ (e: 'update:selected', value: boolean): void; (e: 'completed'): void }>();
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedData();
+const { records: facilities } = useSeedTable('facilities');
 
 const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'release', label: translate('Release updated order'), kind: 'primary' },
@@ -174,7 +175,7 @@ function getCustomerName(customer: any): string {
 }
 
 function routingFacilityName(task: any): string {
-  return seedStore.facilityName(task.facilityId)
+  return facilityName(facilities.value, task.facilityId)
     || task.routingFacilityName
     || task.facilityName
     || task.facilityId

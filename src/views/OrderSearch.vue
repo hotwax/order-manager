@@ -203,7 +203,8 @@ import { useOrderStore, DEFAULT_ORDER_SEARCH_SORT } from '@/store/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { getEnumsByType, getShipmentMethodOptions, getStatusItemsByType, statusDescription } from '@/db/seedLookups';
 import router from '@/router';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
@@ -223,7 +224,9 @@ const orderStore = useOrderStore();
 const orderDetailStore = useOrderDetailStore();
 const userStore = useUserStore();
 const productStore = useProductStore();
-const seedStore = useSeedData();
+const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
+const { records: statuses } = useSeedTable('statuses');
+const { records: enums } = useSeedTable('enums');
 const { searchQuery, searchFilters, searchSort, searchResults, searchTotal, loading, error, hasMore } = storeToRefs(orderStore);
 
 function handleOrderRowClick(order: any) {
@@ -237,9 +240,9 @@ const debounceTimer = ref<ReturnType<typeof setTimeout>>();
 const selectMode = ref(false);
 const selectedOrderIds = ref<string[]>([]);
 
-const orderStatuses = computed(() => seedStore.getStatusItemsByType('ORDER_STATUS'));
-const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
-const shipmentMethodOptions = computed(() => seedStore.getShipmentMethodOptions());
+const orderStatuses = computed(() => getStatusItemsByType(statuses.value, 'ORDER_STATUS'));
+const salesChannels = computed(() => getEnumsByType(enums.value, 'ORDER_SALES_CHANNEL'));
+const shipmentMethodOptions = computed(() => getShipmentMethodOptions(shipmentMethodTypes.value));
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const selectedStatusIds = computed(() => {
   const status = searchFilters.value.status as string[] | string;
@@ -428,7 +431,7 @@ function setStatusFilter(statusId: string, checked: boolean) {
 }
 
 function statusDescription(statusId: string) {
-  return seedStore.statusDescription(statusId);
+  return statusDescription(statuses.value, statusId);
 }
 
 </script>

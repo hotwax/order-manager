@@ -28,7 +28,7 @@
             </p>
           </ion-label>
           <ion-badge v-if="returnRecord.statusId" slot="end" :color="returnStatusColor(returnRecord.statusId)">
-            {{ describe(returnRecord.statusId) }}
+            {{ notSpecified(statusDescription(statuses, returnRecord.statusId)) }}
           </ion-badge>
         </ion-item>
 
@@ -116,7 +116,7 @@
                 <ion-label>
                   <p>{{ translate('Shopify status') }}</p>
                   <ion-badge :color="shopifyStatusColor(returnRecord.shopifySync.returnStatusId)">
-                    {{ describe(returnRecord.shopifySync.returnStatusId) }}
+                    {{ notSpecified(statusDescription(statuses, returnRecord.shopifySync.returnStatusId)) }}
                   </ion-badge>
                 </ion-label>
               </ion-item>
@@ -224,10 +224,10 @@
 
                 <ion-label class="tablet return-item-status">
                   <ion-badge v-if="item.statusId" :color="returnStatusColor(item.statusId)">
-                    {{ describe(item.statusId) }}
+                    {{ notSpecified(statusDescription(statuses, item.statusId)) }}
                   </ion-badge>
                   <p v-if="item.returnTypeId">
-                    {{ describe(item.returnTypeId) }}
+                    {{ notSpecified(returnTypeDescription(returnTypes, item.returnTypeId)) }}
                   </p>
                 </ion-label>
 
@@ -247,7 +247,7 @@
                     {{ translate('Return reason') }}
                   </p>
                   <p class="return-item-detail-value">
-                    {{ item.returnReasonDescription || describe(item.returnReasonId) }}
+                    {{ item.returnReasonDescription || notSpecified(returnReasonDescription(returnReasons, item.returnReasonId)) }}
                   </p>
                 </div>
 
@@ -270,7 +270,7 @@
                   </div>
                   <div v-if="item.returnItemTypeId" class="return-item-fact">
                     <dt>{{ translate('Return item type') }}</dt>
-                    <dd>{{ describe(item.returnItemTypeId) }}</dd>
+                    <dd>{{ notSpecified(returnItemTypeDescription(returnItemTypes, item.returnItemTypeId)) }}</dd>
                   </div>
                 </dl>
 
@@ -431,7 +431,8 @@ import { useProductMaster } from "@/composables/useProductMaster";
 import { useOrderDetailStore } from "@/store/orderDetail";
 import { useProductCacheStore } from "@/store/productCache";
 import { useReturnsStore } from "@/store/returns";
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { enumDescription, facilityName, paymentMethodDescription, returnItemTypeDescription, returnReasonDescription, returnTypeDescription, statusDescription } from '@/db/seedLookups';
 import { useUserStore } from "@/store/user";
 import type { ReturnItemDetail, ReturnStatusHistory, ReturnSyncState } from "@/types/returns";
 
@@ -440,7 +441,13 @@ const props = defineProps<{
 }>();
 
 const returnsStore = useReturnsStore();
-const seed = useSeedData();
+const { records: statuses } = useSeedTable('statuses');
+const { records: enums } = useSeedTable('enums');
+const { records: facilities } = useSeedTable('facilities');
+const { records: paymentMethodTypes } = useSeedTable('paymentMethodTypes');
+const { records: returnTypes } = useSeedTable('returnTypes');
+const { records: returnReasons } = useSeedTable('returnReasons');
+const { records: returnItemTypes } = useSeedTable('returnItemTypes');
 const productCache = useProductCacheStore();
 const productMaster = useProductMaster();
 const orderDetailStore = useOrderDetailStore();
@@ -486,10 +493,10 @@ const sourceOrderPayments = computed(() => sourceOrderIds.value.flatMap((orderId
     orderId,
     orderName,
     paymentMethodTypeId: payment.paymentMethodTypeId || "",
-    paymentMethodTypeDescription: seed.paymentMethodDescription(payment.paymentMethodTypeId) || payment.paymentMethodTypeId || translate("Payment preference"),
+    paymentMethodTypeDescription: paymentMethodDescription(paymentMethodTypes.value, payment.paymentMethodTypeId) || payment.paymentMethodTypeId || translate("Payment preference"),
     amount: Number(payment.maxAmount ?? payment.presentmentAmount ?? 0),
     statusId: payment.statusId || "UNKNOWN",
-    statusDescription: seed.statusDescription(payment.statusId) || payment.statusId || translate("Unknown status"),
+    statusDescription: statusDescription(statuses.value, payment.statusId) || payment.statusId || translate("Unknown status"),
     createdDate: payment.createdDate || payment.createdStamp
   }));
 }));
@@ -549,17 +556,18 @@ const returnTypeLabel = computed(() => {
   if(returnRecord.value?.returnHeaderTypeId === "CUSTOMER_RETURN") {return translate("Customer return");}
   if(returnRecord.value?.returnHeaderTypeId === "APPEASEMENT") {return translate("Appeasement");}
 
-  return describe(returnRecord.value?.returnHeaderTypeId);
+  // returnHeaderTypeId has no seed table, so describe() always returned the raw id here.
+  return notSpecified(returnRecord.value?.returnHeaderTypeId);
 });
 const facilityLabel = computed(() => {
   const facilityId = returnRecord.value?.destinationFacilityId;
 
-  return facilityId ? seed.facilityName(facilityId) || facilityId : translate("Not specified");
+  return facilityId ? facilityName(facilities.value, facilityId) || facilityId : translate("Not specified");
 });
 const channelLabel = computed(() => {
   const channelId = returnRecord.value?.returnChannelEnumId;
 
-  return channelId ? seed.enumDescription(channelId) || channelId : translate("Not specified");
+  return channelId ? enumDescription(enums.value, channelId) || channelId : translate("Not specified");
 });
 const syncError = computed(() => {
   const sync = returnRecord.value?.shopifySync;
@@ -656,9 +664,7 @@ async function loadReturn() {
   await Promise.all(exchangeOriginalOrderIds.value.map((orderId) => orderDetailStore.fetchOrder(orderId)));
 }
 
-function describe(value?: string) {
-  return value ? seed.describe(value) || value : translate("Not specified");
-}
+const notSpecified = (value?: string) => value || translate("Not specified");
 
 function money(value: number, currency = "USD") {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "USD" }).format(value);
@@ -693,7 +699,7 @@ function inventoryStatusLabel(statusId: string) {
     INV_NOT_RETURNED: "Do not return to inventory"
   };
 
-  return labels[statusId] ? translate(labels[statusId]) : describe(statusId);
+  return labels[statusId] ? translate(labels[statusId]) : notSpecified(statusDescription(statuses.value, statusId));
 }
 
 function returnStatusColor(statusId: string) {
@@ -763,7 +769,7 @@ function returnTimelineLabel(status: ReturnStatusHistory, isConfirmedRestock: bo
     return statusItem(status) ? translate("Item completed") : translate("Return completed");
   }
 
-  return describe(status.statusId);
+  return notSpecified(statusDescription(statuses.value, status.statusId));
 }
 
 function sameMoment(left?: string | number, right?: string | number) {

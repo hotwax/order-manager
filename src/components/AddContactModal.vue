@@ -194,7 +194,8 @@ import {
 import { closeOutline, saveOutline, trashOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive } from 'vue';
 import { translate } from '@common';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { getCountries, getStates, getStatesForCountry } from '@/db/seedLookups';
 import type { CustomerContactMech } from '@/types/customer';
 
 const props = defineProps<{
@@ -203,7 +204,8 @@ const props = defineProps<{
   existingContact?: CustomerContactMech;
 }>();
 
-const seed = useSeedData();
+const { records: geos } = useSeedTable('geos');
+const { records: geoAssocs } = useSeedTable('geoAssocs');
 
 const isEditMode = computed(() => !!props.existingContact);
 
@@ -235,11 +237,11 @@ const form = reactive<Record<string, string>>({
   countryGeoId: ''
 });
 
-const countries = computed(() => seed.getCountries() as Array<{ geoId: string; geoName: string }>);
+const countries = computed(() => getCountries(geos.value) as Array<{ geoId: string; geoName: string }>);
 
 const stateOptions = computed(() => {
   if (!form.countryGeoId) return [];
-  return (seed.getStatesForCountry(form.countryGeoId) as Array<{ geoId: string; geoName: string }>);
+  return (getStatesForCountry(geos.value, geoAssocs.value, form.countryGeoId) as Array<{ geoId: string; geoName: string }>);
 });
 
 // The geo slices fill from the local database; there is no per-country fetch to wait on.
@@ -313,7 +315,7 @@ function normalizeStateProvinceGeoId(value: string) {
 
   const candidates = stateOptions.value.length
     ? stateOptions.value
-    : (seed.getStates() as Array<{ geoId: string; geoName: string; geoCode?: string; geoCodeAlpha2?: string }>);
+    : (getStates(geos.value) as Array<{ geoId: string; geoName: string; geoCode?: string; geoCodeAlpha2?: string }>);
   const normalizedStateProvince = stateProvince.toLowerCase();
   const match = candidates.find((state: any) =>
     state.geoId === stateProvince

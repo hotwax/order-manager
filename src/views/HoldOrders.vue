@@ -126,7 +126,8 @@ import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useUserStore } from '@/store/user';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { getEnumsByType, getShipmentMethodOptions } from '@/db/seedLookups';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
@@ -136,17 +137,18 @@ import Actions from "@/authorization/actions";
 
 const orderTaskStore = useOrderTaskStore();
 const userStore = useUserStore();
-const seedStore = useSeedData();
+const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
+const { records: enums } = useSeedTable('enums');
 
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'hold');
 const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
-const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
-const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions());
+const channelOptions = computed<TaskFilterOption[]>(() => getEnumsByType(enums.value, 'ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
+const shipmentMethodOptions = computed<TaskFilterOption[]>(() => getShipmentMethodOptions(shipmentMethodTypes.value));
 const sortOptions = taskSortOptions('hold');
 // Only purposes without a dedicated queue page are offered — picking Bad Address,
 // Swap or Fraud here would show tasks that belong on those pages.
-const purposeOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType(HOLD_TASK_PURPOSE_ENUM_TYPE_ID)
+const purposeOptions = computed<TaskFilterOption[]>(() => getEnumsByType(enums.value, HOLD_TASK_PURPOSE_ENUM_TYPE_ID)
   .filter((purpose: any) => !isDedicatedQueuePurpose(purpose.enumId))
   .map((purpose: any) => ({ id: purpose.enumId, label: purpose.description || purpose.enumName || purpose.enumId })));
 const canCreateHoldTasks = computed(() => userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE));

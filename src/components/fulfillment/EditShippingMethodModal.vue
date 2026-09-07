@@ -39,7 +39,7 @@
             :key="method.shipmentMethodTypeId"
             :value="method.shipmentMethodTypeId"
           >
-            {{ seed.shipmentMethodDescription(method.shipmentMethodTypeId) }}
+            {{ shipmentMethodDescription(shipmentMethodTypes.value, method.shipmentMethodTypeId) }}
           </ion-select-option>
         </ion-select>
       </ion-item>
@@ -74,10 +74,12 @@ import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, ref } from 'vue';
 import { translate } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { shipmentMethodDescription } from '@/db/seedLookups';
 
 const orderDetailStore = useOrderDetailStore();
-const seed = useSeedData();
+const { records: carriers } = useSeedTable('carriers');
+const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
 
 const selectedCarrierId = ref('');
 const selectedMethodId = ref('');
@@ -85,7 +87,7 @@ const selectedMethodId = ref('');
 const availableCarriers = computed(() => {
   const list = orderDetailStore.carrierParties.length
     ? orderDetailStore.carrierParties
-    : seed.carriers();
+    : carriers.value;
   return [...list].sort((a, b) => {
     const nameA = [a.firstName, a.lastName].filter(Boolean).join(' ') || a.groupName || a.partyId;
     const nameB = [b.firstName, b.lastName].filter(Boolean).join(' ') || b.groupName || b.partyId;

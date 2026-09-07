@@ -42,9 +42,11 @@ import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, Ion
 import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import { onMounted, ref } from 'vue';
 import { translate } from '@common';
-import { useSeedData } from '@/db/useSeedData';
+import { seedRows, useSeedTable } from '@/db/omDb';
+import { getEnumsByParentType } from '@/db/seedLookups';
 
-const seed = useSeedData();
+const { records: enums } = useSeedTable('enums');
+const { records: enumTypes } = useSeedTable('enumTypes');
 
 const isLoading = ref(false);
 const rejectionReasons = ref<any[]>([]);
@@ -61,8 +63,8 @@ function confirm() {
 
 async function loadRejectionReasons() {
   const cachedReasons = [
-    ...seed.getEnumsByParentType('REPORT_AN_ISSUE'),
-    ...seed.getEnumsByParentType('RPRT_NO_VAR_LOG'),
+    ...getEnumsByParentType(enums.value, enumTypes.value, 'REPORT_AN_ISSUE'),
+    ...getEnumsByParentType(enums.value, enumTypes.value, 'RPRT_NO_VAR_LOG'),
   ];
   if (cachedReasons.length) {
     const seen = new Set<string>();
@@ -76,10 +78,15 @@ async function loadRejectionReasons() {
   }
   try {
     if (!cachedReasons.length) {
-      await seed.ensureLoaded(['enums', 'enumTypes']);
+      // Cached into `rejectionReasons` for the modal's lifetime, so read the rows rather
+      // than depending on the reactive slice having emitted.
+      const [enumRows, enumTypeRows] = await Promise.all([
+        seedRows('enums'),
+        seedRows('enumTypes'),
+      ]);
       const reasons = [
-        ...seed.getEnumsByParentType('REPORT_AN_ISSUE'),
-        ...seed.getEnumsByParentType('RPRT_NO_VAR_LOG'),
+        ...getEnumsByParentType(enumRows, enumTypeRows, 'REPORT_AN_ISSUE'),
+        ...getEnumsByParentType(enumRows, enumTypeRows, 'RPRT_NO_VAR_LOG'),
       ];
       const seen = new Set<string>();
       rejectionReasons.value = reasons.filter((r) => {

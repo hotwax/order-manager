@@ -17,11 +17,7 @@ vi.mock('@common', async (importOriginal) => {
   };
 });
 
-vi.mock('@/db/useSeedData', () => ({
-  ensureLoaded: vi.fn(async () => {}),
-  productStore: vi.fn(() => undefined),
-  shipmentMethod: vi.fn(() => undefined),
-}));
+vi.mock('@/db/omDb', () => ({ seedRows: vi.fn(async () => []) }));
 
 vi.mock('@/services/order', () => ({
   searchOrders: vi.fn(),

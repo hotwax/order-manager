@@ -64,7 +64,8 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { translate } from "@common";
-import { useSeedData } from '@/db/useSeedData';
+import { useSeedTable } from '@/db/omDb';
+import { getCountries, getStatesForCountry } from '@/db/seedLookups';
 
 const address = ref({
   address1: "",
@@ -77,9 +78,10 @@ const address = ref({
 })
 
 const props = defineProps(["customerAddress"])
-const seed = useSeedData();
-const countries = computed(() => seed.getCountries())
-const states = computed(() => seed.getStatesForCountry(address.value.country))
+const { records: geos } = useSeedTable('geos');
+const { records: geoAssocs } = useSeedTable('geoAssocs');
+const countries = computed(() => getCountries(geos.value))
+const states = computed(() => getStatesForCountry(geos.value, geoAssocs.value, address.value.country))
 
 onMounted(() => {
   prepareAddress();

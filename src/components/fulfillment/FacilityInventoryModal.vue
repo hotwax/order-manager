@@ -191,7 +191,8 @@ import { IonAccordion, IonAccordionGroup, IonAvatar, IonButton, IonButtons, IonC
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api, DxpShopifyImg, logger, translate } from '@common';
-import { useSeedData } from '@/db/useSeedData';
+import { seedRows } from '@/db/omDb';
+import { facilityName, productStoreFacilities } from '@/db/seedLookups';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
 import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
 
@@ -211,7 +212,6 @@ const props = defineProps<{
 
 const MAX_SHORT_NAMES = 2;
 
-const seedStore = useSeedData();
 const isLoading = ref(false);
 const hasFailed = ref(false);
 const allFacilities = ref<FacilityCoverageRow[]>([]);
@@ -364,10 +364,14 @@ async function fetchFacilityInventory() {
   isLoading.value = true;
   hasFailed.value = false;
   try {
-    // facilityIds drive the inventory request below, so the slices must be populated first.
-    await seedStore.ensureLoaded(['facilities', 'productStoreFacilities']);
+    // facilityIds drive the inventory request below, so read the rows rather than waiting
+    // on a reactive subscription to emit.
+    const [facilityRows, storeFacilityRows] = await Promise.all([
+      seedRows('facilities'),
+      seedRows('productStoreFacilities'),
+    ]);
 
-    const facilities = seedStore.facilities().filter(isPhysicalFacility);
+    const facilities = facilityRows.filter(isPhysicalFacility);
     const facilityIds = facilities.map((facility: any) => facility.facilityId);
     const joinedProductIds = productIds.value.join(',');
 
@@ -403,9 +407,9 @@ async function fetchFacilityInventory() {
       inventoryItems: inventoryResp,
       facilityOrderCounts: orderCountResp,
       productStoreFacilities: props.productStoreId
-        ? seedStore.productStoreFacilities(props.productStoreId)
+        ? productStoreFacilities(storeFacilityRows, props.productStoreId)
         : [],
-      facilityName: (facilityId) => seedStore.facilityName(facilityId)
+      facilityName: (facilityId) => facilityName(facilityRows, facilityId)
     }));
     filterFacilities();
   } catch (error) {

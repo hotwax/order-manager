@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon';
 import { defineStore } from 'pinia';
-import { ensureLoaded, statusAge } from '@/db/useSeedData';
+import { seedRows } from '@/db/omDb';
+import { statusAge } from '@/db/seedLookups';
 import {
   createPartyEmail,
   createPartyPostalAddress,
@@ -323,8 +324,6 @@ export const useCustomerStore = defineStore('customerDetail', {
     // Prefetch on detail route mount. Profile failure fails the page; section
     // failures (orders/tasks) are isolated to their own source bucket.
     async loadCustomerDashboard(partyId: string, force = false) {
-      // statusAge is stamped into card progress values, so load the slice before reading it.
-      await ensureLoaded(['statuses']);
       await Promise.allSettled([
         this.loadCustomerProfile(partyId, force),
         this.loadCustomerOrders(partyId, force),
@@ -371,15 +370,16 @@ export const useCustomerStore = defineStore('customerDetail', {
 
         // Real progress for the rendered cards: hydrate each via the official get-order API
         // (not Solr) and compute from order-item (+ shipment-item) status ages.
-        await ensureLoaded(['statuses']);
+        // statusAge is stamped into each card's progress value, so read the rows up front.
+        const statusRows = await seedRows('statuses');
         const displayCount = 12;
         await Promise.all(result.orders.slice(0, displayCount).map(async (order) => {
           try {
             const statusIds = await getOrderProgressStatuses(order.orderId);
             if (statusIds.length) {
-              order.progressValue = computeProgress(statusIds, (statusId) => statusAge(statusId));
+              order.progressValue = computeProgress(statusIds, (statusId) => statusAge(statusRows, statusId));
               order.progressLabel = `${Math.round(order.progressValue * 100)}% complete`;
-              order.progressColor = progressStatusColor(statusIds, (statusId) => statusAge(statusId));
+              order.progressColor = progressStatusColor(statusIds, (statusId) => statusAge(statusRows, statusId));
             }
           } catch {
             // keep the Solr status fallback on a per-order failure

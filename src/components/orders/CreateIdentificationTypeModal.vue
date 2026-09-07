@@ -53,7 +53,6 @@ import { commonUtil, translate } from '@common';
 import { createOrderIdentificationType } from '@/services/orderIdentification';
 import { showToast } from '@/utils';
 
-const seedStore = useSeedData();
 const saving = ref(false);
 
 const formData = ref({ enumId: '', enumName: '', description: '' });
