@@ -29,8 +29,3 @@ export const ORDER_MANAGER_CACHE_CATALOG: CacheDomainCatalogItem[] = [
   { name: "geoAssoc", table: "geoAssocs", label: "Geo Associations", syncClass: "B" },
 ];
 
-export const appSyncConfig = {
-  dbName: "OrderManagerCacheDB",
-  baseTickMs: 0, // Reference domains only need 1 sync per login; 0 = no periodic polling
-};
-

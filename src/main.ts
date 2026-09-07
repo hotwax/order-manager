@@ -33,10 +33,10 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import localeMessages from './locales';
 import { createDxpI18n, imagePreview, initialiseConfig, logger } from '@common';
 import { registerCommonSeedDomains } from '@common/cache';
-import { orderManagerDb } from './cache/appCacheDb';
+import { getOrderManagerDb } from './cache/appCacheDb';
 import { useUserStore } from './store/user';
 
-registerCommonSeedDomains(() => orderManagerDb);
+registerCommonSeedDomains((omsInstance) => getOrderManagerDb(omsInstance));
 
 const pinia = createPinia().use(piniaPluginPersistedstate);
 const i18n = createDxpI18n(localeMessages)

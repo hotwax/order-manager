@@ -13,7 +13,7 @@ import { commonUtil, cookieHelper } from "@common";
 import { startCacheBootstrap, type SyncHarness } from "@common/cache";
 import { WorkerFactory } from "@common/core/workerFactory";
 import { useAuth } from "@common/composables/useAuth";
-import { orderManagerDb } from "@/cache/appCacheDb";
+import { getOrderManagerDb } from "@/cache/appCacheDb";
 import { ORDER_MANAGER_CACHE_CATALOG } from "@/config/appSyncConfig";
 // `?worker&url` lets Vite bundle the worker as its own chunk and hand back its URL,
 // so the factory resolves the same asset in dev and in a production build.
@@ -32,11 +32,15 @@ export function getCacheSyncToken(): string {
  * first pass lands. Never rejects — a sync failure must not break boot or login.
  */
 export function startAppCacheSync(token: string, onSynced?: () => void): Promise<void> {
+  // Resolved here on the main thread and handed to the worker, which has no cookies to read it from.
+  const omsInstance = commonUtil.getOMSInstanceName();
+
   return startCacheBootstrap({
     workerFactory: () => WorkerFactory.createWorker<SyncHarness>(new URL(appSyncWorkerUrl, import.meta.url)).worker,
     token,
     maargUrl: commonUtil.getMaargURL(),
-    db: orderManagerDb,
+    omsInstance,
+    db: getOrderManagerDb(omsInstance),
     domains: ORDER_MANAGER_CACHE_CATALOG.map((domain) => domain.name),
   }).then(() => {
     onSynced?.();

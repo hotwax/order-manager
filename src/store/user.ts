@@ -4,7 +4,7 @@ import { api, commonUtil, cookieHelper, logger, translate } from "@common";
 import { clearAllCaches } from "@common/cache";
 import { useAuth } from "@common/composables/useAuth";
 import { showToast } from "@/utils";
-import { orderManagerDb } from "@/cache/appCacheDb";
+import { getOrderManagerDb } from "@/cache/appCacheDb";
 import { useSeedStore } from "./seed";
 import { useOrderDetailStore } from "./orderDetail";
 import { useProductCacheStore } from "./productCache";
@@ -191,7 +191,7 @@ export const useUserStore = defineStore("user", {
       }
     },
     async postLogout() {
-      await clearAllCaches(orderManagerDb);
+      await clearAllCaches(getOrderManagerDb(commonUtil.getOMSInstanceName()));
       useSeedStore().resetSeedData();
       useOrderDetailStore().reset();
       useProductCacheStore().reset();

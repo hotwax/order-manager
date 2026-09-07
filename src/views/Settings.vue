@@ -229,7 +229,7 @@ import { useCacheStatus } from '@common/cache';
 import { useAuth } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
-import { orderManagerDb } from '@/cache/appCacheDb';
+import { getOrderManagerDb } from '@/cache/appCacheDb';
 import { ORDER_MANAGER_CACHE_CATALOG } from '@/config/appSyncConfig';
 import DxpProductIdentifier from "@/components/settings/DxpProductIdentifier.vue";
 import DxpAppVersionInfo from "@/components/settings/DxpAppVersionInfo.vue";
@@ -364,7 +364,7 @@ function clearSearch() {
 // Live IndexedDB cache status
 const {
   domains, refreshing, totalRows, oldestSyncedAt, lastSyncedAt, refreshDomain, refreshAll,
-} = useCacheStatus(orderManagerDb, ORDER_MANAGER_CACHE_CATALOG);
+} = useCacheStatus(getOrderManagerDb(commonUtil.getOMSInstanceName()), ORDER_MANAGER_CACHE_CATALOG);
 
 const formatSyncTime = (millis: number) =>
   DateTime.fromMillis(millis).toLocaleString(DateTime.DATETIME_MED);
