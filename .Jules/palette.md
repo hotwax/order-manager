@@ -32,3 +32,6 @@
 ## 2024-08-30 - Localizing UI Text
 **Learning:** Found multiple instances of hardcoded UI strings (e.g., 'View history', 'Merged Contacts', 'Merge') in template files that missed the localization pass. This leads to inconsistent user experience for international users who expect all interface elements to be translated.
 **Action:** Always wrap plain text strings in Vue templates with the application's `translate()` function (e.g., `{{ translate('Text') }}`) to ensure full localization coverage.
+## 2024-09-07 - [Added Spinner in Fab Button]
+**Learning:** Added spinner inside ion-fab-button correctly applies visual cue to users but does not require slot="icon-only" unlike regular ion-button elements
+**Action:** When adding spinners to async submit ion-fab-buttons, standard styling applies.
