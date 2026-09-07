@@ -27,5 +27,7 @@ export const ORDER_MANAGER_SYNC_CATALOG: SyncDomainCatalogItem[] = [
   { name: "communicationEventType", table: "communicationEventTypes", label: "Communication Types", syncClass: "B" },
   { name: "geo", table: "geos", label: "Geographic Regions", syncClass: "B" },
   { name: "geoAssoc", table: "geoAssocs", label: "Geo Associations", syncClass: "B" },
+  { name: "shopifyShop", table: "shopifyShops", label: "Shopify Shops", syncClass: "B" },
+  { name: "shopifyShopLocation", table: "shopifyShopLocations", label: "Shopify Locations", syncClass: "B" },
 ];
 
