@@ -235,8 +235,16 @@ export const getPaymentMethodDescriptions = (ids: readonly string[]) =>
   labels("paymentMethodTypes", "paymentMethodTypeId", ids);
 
 export const getReturnReasonDescription = (id: string) => label("returnReasons", "returnReasonId", id);
+export const getReturnReasonDescriptions = (ids: readonly string[]) =>
+  labels("returnReasons", "returnReasonId", ids);
+
 export const getReturnTypeDescription = (id: string) => label("returnTypes", "returnTypeId", id);
+export const getReturnTypeDescriptions = (ids: readonly string[]) =>
+  labels("returnTypes", "returnTypeId", ids);
+
 export const getReturnItemTypeDescription = (id: string) => label("returnItemTypes", "returnItemTypeId", id);
+export const getReturnItemTypeDescriptions = (ids: readonly string[]) =>
+  labels("returnItemTypes", "returnItemTypeId", ids);
 export const getRoleTypeDescription = (id: string) => label("roleTypes", "roleTypeId", id);
 
 export const getOrderAdjustmentTypeDescription = (id: string) =>
@@ -273,6 +281,8 @@ export const getShopifyShopLocations = () => rows("shopifyShopLocations");
 // ── Geography ─────────────────────────────────────────────────────────────────────────
 
 const byGeoName = (left: Row, right: Row) => (left.geoName || "").localeCompare(right.geoName || "");
+
+export const getGeos = () => rows("geos");
 
 export const getGeoName = (geoId: string) => label("geos", "geoId", geoId, ["geoName"]);
 

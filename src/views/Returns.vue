@@ -188,24 +188,42 @@ import {
 } from "@ionic/vue";
 import { DateTime } from "luxon";
 import { storeToRefs } from "pinia";
-import { computed, nextTick } from "vue";
+import { computed, nextTick, onMounted, ref, watch } from "vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import SearchFilterCard from "@/components/common/SearchFilterCard.vue";
 import UniformFilterLayout from "@/components/common/UniformFilterLayout.vue";
 import router from "@/router";
 import { useReturnsStore } from "@/store/returns";
-import { useSeedTable } from '@/db/orderManagerDb';
-import { enumDescription, facilityName, getEnumsByType, getStatusItemsByType, statusDescription } from '@/db/seedLookups';
+import { getEnumDescriptions, getEnumsByType, getFacilityNames, getStatusDescriptions, getStatusItemsByType } from '@/db/useSeedData';
 
 const returnsStore = useReturnsStore();
-const { records: statuses } = useSeedTable('statuses');
-const { records: enums } = useSeedTable('enums');
-const { records: facilities } = useSeedTable('facilities');
 const { returns, total, query, loading, error, hasMore } = storeToRefs(returnsStore);
 
-const returnStatuses = computed(() => getStatusItemsByType(statuses.value, "ORDER_RETURN_STTS"));
-const returnChannels = computed(() => getEnumsByType(enums.value, "RETURN_CHANNEL"));
+// Seed data comes from the local database, so these resolve after mount.
+const returnStatuses = ref<any[]>([]);
+const returnChannels = ref<any[]>([]);
+
+// Per-row labels for the rendered page, resolved in one read per table.
+const statusLabels = ref<Record<string, string>>({});
+const channelLabels = ref<Record<string, string>>({});
+const facilityLabels = ref<Record<string, string>>({});
+
+watch(returns, async (rows) => {
+  const list = rows || [];
+  [statusLabels.value, channelLabels.value, facilityLabels.value] = await Promise.all([
+    getStatusDescriptions(list.map((r: any) => r.statusId)),
+    getEnumDescriptions(list.map((r: any) => r.returnChannelEnumId)),
+    getFacilityNames(list.map((r: any) => r.destinationFacilityId)),
+  ]);
+}, { immediate: true, deep: true });
+
+onMounted(async () => {
+  [returnStatuses.value, returnChannels.value] = await Promise.all([
+    getStatusItemsByType("ORDER_RETURN_STTS"),
+    getEnumsByType("RETURN_CHANNEL"),
+  ]);
+});
 const searchPlaceholder = computed(() => ({
   RETURN_ID: translate("Exact return ID"),
   ORDER_ID: translate("Exact internal order ID"),
@@ -248,7 +266,7 @@ function openReturn(returnId: string) {
 }
 
 function statusLabel(statusId: string) {
-  return statusDescription(statuses.value, statusId) || statusId || translate("Not specified");
+  return statusLabels.value[statusId] || statusId || translate("Not specified");
 }
 
 function returnCustomerLabel(returnRecord: any) {
@@ -267,11 +285,11 @@ function returnTypeLabel(returnHeaderTypeId?: string) {
 }
 
 function channelLabel(returnChannelEnumId?: string) {
-  return returnChannelEnumId ? enumDescription(enums.value, returnChannelEnumId) || returnChannelEnumId : translate("No channel");
+  return returnChannelEnumId ? channelLabels.value[returnChannelEnumId] || returnChannelEnumId : translate("No channel");
 }
 
 function facilityLabel(destinationFacilityId?: string) {
-  return destinationFacilityId ? facilityName(facilities.value, destinationFacilityId) || destinationFacilityId : translate("No destination facility");
+  return destinationFacilityId ? facilityLabels.value[destinationFacilityId] || destinationFacilityId : translate("No destination facility");
 }
 
 function formatDate(value?: string | number) {

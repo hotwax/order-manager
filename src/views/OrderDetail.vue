@@ -735,7 +735,7 @@
                       <ion-select-option
                         v-for="method in methodsForCarrier(getSelection(shipGroup.id, shipGroup).carrierId)"
                         :key="method.shipmentMethodTypeId" :value="method.shipmentMethodTypeId">
-                        {{ shipmentMethodDescription(shipmentMethodTypes, method.shipmentMethodTypeId) }}
+                        {{ methodLabels[method.shipmentMethodTypeId] ?? method.shipmentMethodTypeId }}
                       </ion-select-option>
                     </ion-select>
                   </ion-item>
@@ -803,7 +803,7 @@
                           <ion-select :label="translate('Country')" label-placement="stacked" interface="popover"
                             :placeholder="translate('Select Country')" v-model="shippingAddressForm.countryGeoId"
                             @ionChange="shippingAddressForm.stateProvinceGeoId = ''">
-                            <ion-select-option v-for="country in getCountries(geos)" :key="country.geoId"
+                            <ion-select-option v-for="country in countries" :key="country.geoId"
                               :value="country.geoId">
                               {{ country.geoName }}
                             </ion-select-option>
@@ -959,7 +959,7 @@
       <div v-if="selectedSegment === 'holds'">
         <template v-if="hasOrderHoldTasks">
           <BadAddressTaskCard v-for="task in orderAddressValidationTasks" :key="task.workEffortId" :task="task"
-            :countries="getCountries(geos)"
+            :countries="countries"
             @completed="reloadHoldTasks" />
           <SwapTaskCard v-for="task in orderSwapTasks" :key="task.workEffortId" :task="task"
             @completed="reloadHoldTasks" />
@@ -1075,8 +1075,7 @@ import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, Io
 import { DateTime } from 'luxon';
 import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, chevronDown, chevronUp, closeCircleOutline, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pauseCircleOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, storefrontOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { useSeedTable } from '@/db/orderManagerDb';
-import { allowedTransitions as allowedTransitionsFor, enumDescription, facility, facilityName, facilityType, geoName, getCountries, getStates, orderAdjustmentTypeDescription, orderIdentificationTypeDescription, paymentMethodDescription, productStoreName, shipmentMethodDescription, shopifyShop, statusDescription } from '@/db/seedLookups';
+import { getAllowedTransitions, getCountries, getEnumDescriptions, getFacilities, getFacilityParentTypeIds, getGeoNames, getOrderAdjustmentTypeDescriptions, getPaymentMethodDescriptions, getProductStoreNames, getShipmentMethodDescriptions, getShipmentMethodTypes, getShopifyShops, getStates, getStatusDescriptions } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import router from '@/router';
@@ -1120,17 +1119,104 @@ const props = defineProps<{
 }>();
 
 const orderDetailStore = useOrderDetailStore();
-const { records: statuses } = useSeedTable('statuses');
-const { records: enums } = useSeedTable('enums');
-const { records: facilities } = useSeedTable('facilities');
-const { records: facilityTypes } = useSeedTable('facilityTypes');
-const { records: productStores } = useSeedTable('productStores');
-const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
-const { records: paymentMethodTypes } = useSeedTable('paymentMethodTypes');
-const { records: orderAdjustmentTypes } = useSeedTable('orderAdjustmentTypes');
-const { records: geos } = useSeedTable('geos');
-const { records: shopifyShops } = useSeedTable('shopifyShops');
-const { records: statusFlowTransitions } = useSeedTable('statusFlowTransitions');
+// Seed data comes from the local database. Labels are resolved into maps and collections
+// into arrays by loadSeedData() below, so the computeds and mappers here stay synchronous.
+const statusLabels = ref<Record<string, string>>({});
+const enumLabels = ref<Record<string, string>>({});
+const facilityLabels = ref<Record<string, string>>({});
+const facilityTypeByFacility = ref<Record<string, string>>({});
+const parentTypeByFacilityType = ref<Record<string, string>>({});
+const productStoreLabels = ref<Record<string, string>>({});
+const methodLabels = ref<Record<string, string>>({});
+const paymentLabels = ref<Record<string, string>>({});
+const adjustmentLabels = ref<Record<string, string>>({});
+const geoLabels = ref<Record<string, string>>({});
+const countries = ref<any[]>([]);
+const states = ref<any[]>([]);
+const shopifyShops = ref<any[]>([]);
+const transitionsByStatus = ref<Record<string, any[]>>({});
+
+const geoLabel = (geoId: string) => geoLabels.value[geoId] ?? geoId ?? '';
+
+/**
+ * Resolve every seed label this page renders. One read per table, re-run whenever the order
+ * changes, so the synchronous computeds above always have their labels in hand.
+ */
+async function loadSeedData() {
+  const raw: any = order.value ?? {};
+  const shipGroups = raw.shipGroups || [];
+  const items = raw.items || [];
+  const payments = raw.payments || [];
+  const statusIds = [
+    raw.statusId,
+    ...(raw.statuses || []).map((entry: any) => entry.statusId),
+    ...payments.map((payment: any) => payment.statusId),
+    ...items.map((item: any) => item.statusId),
+  ].filter(Boolean);
+  const facilityIds = [
+    raw.originFacilityId,
+    ...shipGroups.map((group: any) => group.facilityId),
+    ...items.map((item: any) => item.facilityId),
+  ].filter(Boolean);
+  const geoIds = [raw.shippingAddress, raw.billingAddress]
+    .filter(Boolean)
+    .flatMap((address: any) => [address.stateProvinceGeoId, address.countryGeoId])
+    .filter(Boolean);
+
+  const [
+    statusMap, enumMap, facilityRows, storeMap, methodRows,
+    paymentMap, adjustmentMap, geoMap, countryRows, stateRows, shopRows, transitions,
+  ] = await Promise.all([
+    getStatusDescriptions(statusIds),
+    getEnumDescriptions([
+      raw.salesChannelEnumId,
+      ...(raw.identifications || []).map((id: any) => id.orderIdentificationTypeId),
+      ...(raw.statuses || []).map((entry: any) => entry.changeReason),
+      ...(raw.events || []).map((event: any) => event.changeReason || event.changeReasonEnumId),
+      raw.riskRecommendationEnumId,
+      raw.riskLevelEnumId,
+    ].filter(Boolean)),
+    getFacilities(),
+    getProductStoreNames([raw.productStoreId].filter(Boolean)),
+    getShipmentMethodTypes(),
+    getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
+    getOrderAdjustmentTypeDescriptions((raw.adjustments || []).map((adj: any) => adj.orderAdjustmentTypeId)),
+    getGeoNames(geoIds),
+    getCountries(),
+    getStates(),
+    getShopifyShops(),
+    raw.statusId ? getAllowedTransitions(raw.statusId) : Promise.resolve([]),
+  ]);
+
+  statusLabels.value = statusMap;
+  enumLabels.value = enumMap;
+  productStoreLabels.value = storeMap;
+  paymentLabels.value = paymentMap;
+  adjustmentLabels.value = adjustmentMap;
+  geoLabels.value = geoMap;
+  countries.value = countryRows;
+  states.value = stateRows;
+  shopifyShops.value = shopRows;
+  transitionsByStatus.value = raw.statusId ? { [raw.statusId]: transitions } : {};
+
+  const wantedFacilities = new Set(facilityIds);
+  facilityLabels.value = Object.fromEntries(
+    facilityRows
+      .filter((row: any) => wantedFacilities.has(row.facilityId))
+      .map((row: any) => [row.facilityId, row.facilityName || row.facilityId]),
+  );
+  facilityTypeByFacility.value = Object.fromEntries(
+    facilityRows.map((row: any) => [row.facilityId, row.facilityTypeId]),
+  );
+  parentTypeByFacilityType.value = await getFacilityParentTypeIds(
+    facilityRows.map((row: any) => row.facilityTypeId),
+  );
+  methodLabels.value = Object.fromEntries(
+    methodRows.map((row: any) => [row.shipmentMethodTypeId, row.description || row.shipmentMethodTypeId]),
+  );
+}
+
+watch(order, () => { void loadSeedData(); }, { immediate: true, deep: true });
 const productCache = useProductCacheStore();
 const customerStore = useCustomerStore();
 const userStore = useUserStore();
@@ -1179,7 +1265,7 @@ const shopifyAdminUrl = computed(() => {
   if (!shopifyOrderId.value) return '';
   const shopId = shopifyOrderShopId.value || fallbackShopIdByProductStore.value;
   if (!shopId) return '';
-  const shop: any = shopifyShop(shopifyShops.value, shopId);
+  const shop: any = shopifyShops.value.find((entry: any) => entry.shopId === shopId);
   return shop ? shopifyAdminOrderUrl(shop.myshopifyDomain || shop.domain, shopifyOrderId.value) : '';
 });
 
@@ -1224,11 +1310,11 @@ const order = computed(() => {
     orderName: raw.orderName,
     id: raw.orderId,
     externalId: raw.externalId,
-    status: statusDescription(statuses.value, raw.statusId),
+    status: statusLabels.value[raw.statusId] ?? raw.statusId,
     statusId: raw.statusId,
-    channel: enumDescription(enums.value, raw.salesChannelEnumId),
+    channel: enumLabels.value[raw.salesChannelEnumId] ?? raw.salesChannelEnumId,
     salesChannelEnumId: raw.salesChannelEnumId,
-    productStoreName: productStoreName(productStores.value, raw.productStoreId),
+    productStoreName: productStoreLabels.value[raw.productStoreId] ?? raw.productStoreId,
     // Origin/placed-at facility from the order header (set by the OMS order import for
     // POS/retail-location orders). Prefer a name from the payload, then the seed facility
     // lookup, falling back to the raw id. The Source card shows this for POS-channel
@@ -1236,7 +1322,7 @@ const order = computed(() => {
     // not something to hide.
     originFacilityId: raw.originFacilityId || '',
     originFacilityName: raw.originFacilityId && raw.originFacilityId !== '_NA_'
-      ? (raw.originFacilityName || facility(facilities.value, raw.originFacilityId)?.facilityName || raw.originFacilityId)
+      ? (raw.originFacilityName || facilityLabels.value[raw.originFacilityId] || raw.originFacilityId)
       : '',
     currency: raw.currencyUom,
     localeString: raw.localeString || raw.locale,
@@ -1245,7 +1331,7 @@ const order = computed(() => {
     customerName: orderDetailStore.customerNameByOrderId(props.orderId),
     history: orderDetailStore.headerStatusesByOrderId(props.orderId).map((entry: any) => ({
       id: entry.orderStatusId,
-      label: statusDescription(statuses.value, entry.statusId),
+      label: statusLabels.value[entry.statusId] ?? entry.statusId,
       detail: entry.statusUserLogin || '',
       changeReason: entry.changeReason || '',
       at: entry.statusDatetime
@@ -1254,7 +1340,7 @@ const order = computed(() => {
       .filter((identification: any) => !identification.thruDate || new Date(identification.thruDate).getTime() > Date.now())
       .map((identification: any) => ({
       orderIdentificationTypeId: identification.orderIdentificationTypeId,
-      typeLabel: orderIdentificationTypeDescription(enums.value, identification.orderIdentificationTypeId),
+      typeLabel: enumLabels.value[identification.orderIdentificationTypeId] ?? identification.orderIdentificationTypeId,
       idValue: identification.idValue,
       fromDate: identification.fromDate,
       // Deep-link into the Shopify Admin order screen; prefer the per-order
@@ -1264,10 +1350,10 @@ const order = computed(() => {
     payments: (raw.paymentPreferences || []).map((payment: any) => ({
       id: payment.orderPaymentPreferenceId,
       paymentMethodTypeId: payment.paymentMethodTypeId,
-      paymentMethodTypeDesc: paymentMethodDescription(paymentMethodTypes.value, payment.paymentMethodTypeId),
+      paymentMethodTypeDesc: paymentLabels.value[payment.paymentMethodTypeId] ?? payment.paymentMethodTypeId,
       amount: payment.maxAmount ?? payment.presentmentAmount,
       statusId: payment.statusId,
-      statusDesc: statusDescription(statuses.value, payment.statusId),
+      statusDesc: statusLabels.value[payment.statusId] ?? payment.statusId,
       createdDate: payment.createdDate || payment.createdStamp,
       // Shopify carry-over lineage: on exchange orders this equals the manualRefNum of the
       // original order's refunded OPP ('MATTR-<txn>' exchange credit, 'EPRA-<txn>' payment).
@@ -1277,9 +1363,9 @@ const order = computed(() => {
     shipGroups: (raw.shipGroups || []).map((shipGroup: any) => ({
       id: shipGroup.shipGroupSeqId,
       facilityId: shipGroup.facilityId,
-      facilityTypeId: facility(facilities.value, shipGroup.facilityId)?.facilityTypeId,
-      facilityParentTypeId: facilityType(facilityTypes.value, facility(facilities.value, shipGroup.facilityId)?.facilityTypeId)?.parentTypeId,
-      facilityName: facilityName(facilities.value, shipGroup.facilityId),
+      facilityTypeId: facilityTypeByFacility.value[shipGroup.facilityId],
+      facilityParentTypeId: parentTypeByFacilityType.value[facilityTypeByFacility.value[shipGroup.facilityId]],
+      facilityName: facilityLabels.value[shipGroup.facilityId] ?? shipGroup.facilityId,
       itemSummary: shipGroupItemSummary(shipGroup),
       isGift: shipGroup.isGift,
       giftMessage: shipGroup.giftMessage,
@@ -1403,7 +1489,7 @@ async function discoverExchangeChildren(orderId: string) {
         orderId: candidateId,
         itemCount,
         facilityName: payload.originFacilityId && payload.originFacilityId !== '_NA_'
-          ? facilityName(facilities.value, payload.originFacilityId)
+          ? facilityLabels.value[payload.originFacilityId]
           : '',
         value: timelineMillis(assoc.createdStamp) || timelineMillis(payload.orderDate) || 0
       });
@@ -1497,7 +1583,7 @@ const orderTimeline = computed(() => {
   });
   Object.entries(returnGroups).forEach(([returnId, group]) => {
     const facilityId = returnHeadersById.value[returnId]?.destinationFacilityId;
-    const facilityLabel = facilityId ? facilityName(facilities.value, facilityId) : '';
+    const facilityLabel = facilityId ? facilityLabels.value[facilityId] ?? facilityId : '';
     const itemWord = group.count === 1 ? translate('item') : translate('items');
     const value = group.value || orderDate;
     timeline.push({
@@ -1583,7 +1669,7 @@ const orderTimeline = computed(() => {
   orderDetailStore.itemStatusEventsByOrderId(props.orderId).forEach((event) => {
     const itemWord = event.itemCount === 1 ? translate('item') : translate('items');
     timeline.push({
-      label: statusDescription(statuses.value, event.statusId),
+      label: statusLabels.value[event.statusId] ?? event.statusId,
       id: `item-status-${event.id}`,
       value: event.value,
       icon: closeCircleOutline,
@@ -1591,7 +1677,7 @@ const orderTimeline = computed(() => {
       timeDiff: findTimeDiff(orderDate, event.value),
       metaData: [
         `${event.itemCount} ${itemWord}`,
-        event.changeReason ? enumDescription(enums.value, event.changeReason) : '',
+        event.changeReason ? enumLabels.value[event.changeReason] ?? event.changeReason : '',
         event.statusUserLogin
       ].filter(Boolean).join(' - ')
     });
@@ -1608,7 +1694,7 @@ const orderTimeline = computed(() => {
     const knownMove = FACILITY_CHANGE_LABELS[event.changeReasonEnumId];
     const isRejection = !knownMove && !!event.changeReasonEnumId;
     const facilityId = isRejection ? event.fromFacilityId : event.facilityId;
-    const facilityLabel = facilityId ? facilityName(facilities.value, facilityId) : '';
+    const facilityLabel = facilityId ? facilityLabels.value[facilityId] ?? facilityId : '';
     const direction = isRejection ? translate('from') : translate('to');
 
     timeline.push({
@@ -1621,7 +1707,7 @@ const orderTimeline = computed(() => {
       metaData: [
         `${event.itemCount} ${itemWord}`,
         facilityLabel ? `${direction} ${facilityLabel}` : '',
-        isRejection ? enumDescription(enums.value, event.changeReasonEnumId) : '',
+        isRejection ? enumLabels.value[event.changeReasonEnumId] ?? event.changeReasonEnumId : '',
         event.changeUserLogin
       ].filter(Boolean).join(' - ')
     });
@@ -1650,13 +1736,13 @@ const orderTimeline = computed(() => {
       if (!value) return;
 
       timeline.push({
-        label: statusDescription(statuses.value, status.statusId),
+        label: statusLabels.value[status.statusId] ?? status.statusId,
         id: status.orderStatusId || `${status.statusId}-${status.statusDatetime}`,
         value,
         icon: pulseOutline,
         valueType: 'date-time-millis',
         timeDiff: findTimeDiff(orderDate, value),
-        metaData: [status.statusUserLogin, status.changeReason ? enumDescription(enums.value, status.changeReason) : ''].filter(Boolean).join(' - ')
+        metaData: [status.statusUserLogin, status.changeReason ? enumLabels.value[status.changeReason] ?? status.changeReason : ''].filter(Boolean).join(' - ')
       });
     });
 
@@ -1890,7 +1976,7 @@ function carrierName(carrierPartyId: string): string {
 }
 
 function shippingMethodLabel(shipmentMethodTypeId: string): string {
-  return shipmentMethodTypeId ? shipmentMethodDescription(shipmentMethodTypes.value, shipmentMethodTypeId) : '';
+  return shipmentMethodTypeId ? methodLabels.value[shipmentMethodTypeId] ?? shipmentMethodTypeId : '';
 }
 
 // ── Holds segment — order-scoped task cards ───────────────────────────────────
@@ -1983,7 +2069,7 @@ const groupedItems = computed(() => {
       const unitPrice = Number(rawItem?.unitPrice || 0);
       const statusId = rawItem?.statusId || '';
       const lineStatus = fulfillmentLineStatus(timelineByShipGroup.value[sg.id]);
-      const status = lineStatus ? translate(lineStatus) : statusDescription(statuses.value, statusId);
+      const status = lineStatus ? translate(lineStatus) : statusLabels.value[statusId] ?? statusId;
       const statusColor = lineStatus
         ? fulfillmentLineStatusColor(lineStatus)
         : commonUtil.getStatusColor(statusId);
@@ -2067,8 +2153,8 @@ const riskSummary = computed(() => {
 
   return {
     hasRiskSignal: Boolean(recommendationEnumId || levelEnumId),
-    recommendation: recommendationEnumId ? enumDescription(enums.value, recommendationEnumId) : translate('No recommendation'),
-    level: levelEnumId ? enumDescription(enums.value, levelEnumId) : translate('No risk level')
+    recommendation: recommendationEnumId ? enumLabels.value[recommendationEnumId] ?? recommendationEnumId : translate('No recommendation'),
+    level: levelEnumId ? enumLabels.value[levelEnumId] ?? levelEnumId : translate('No risk level')
   };
 });
 
@@ -2225,7 +2311,7 @@ function isVirtualFacilityForItem(item: any) {
 }
 
 function itemActionContext(item: any) {
-  const allowedTransitions = allowedTransitionsFor(statusFlowTransitions.value, statuses.value, item.statusId, commonUtil.getStatusColor);
+  const allowedTransitions = transitionsByStatus.value[item.statusId] ?? [];
   return {
     timeline: timelineByShipGroup.value[item.shipGroupSeqId],
     isVirtual: isVirtualFacilityForItem(item),
@@ -2793,7 +2879,7 @@ function shippingAddressView(shipGroup: any): { name: string; street: string; lo
   return {
     name: addr.toName || '',
     street: [addr.address1, addr.address2].filter(Boolean).join(', '),
-    locality: [addr.city, addr.postalCode, geoName(geos.value, addr.stateProvinceGeoId), geoName(geos.value, addr.countryGeoId)].filter(Boolean).join(', ')
+    locality: [addr.city, addr.postalCode, geoLabel(addr.stateProvinceGeoId), geoLabel(addr.countryGeoId)].filter(Boolean).join(', ')
   };
 }
 
@@ -2814,7 +2900,7 @@ const shippingAddressForm = ref({
   countryGeoId: '',
 });
 
-const statesForCountry = computed(() => getStates(geos.value));
+const statesForCountry = computed(() => states.value);
 
 function openEditShippingAddress(shipGroup: any) {
   const mech = shipGroupShippingContactMech(shipGroup);
@@ -2874,8 +2960,8 @@ function addressLines(postalAddress: any): string[] {
     postalAddress.toName,
     postalAddress.address1,
     postalAddress.address2,
-    [postalAddress.city, geoName(geos.value, postalAddress.stateProvinceGeoId), postalAddress.postalCode].filter(Boolean).join(', '),
-    geoName(geos.value, postalAddress.countryGeoId)
+    [postalAddress.city, geoLabel(postalAddress.stateProvinceGeoId), postalAddress.postalCode].filter(Boolean).join(', '),
+    geoLabel(postalAddress.countryGeoId)
   ].filter(Boolean) as string[];
 }
 
@@ -3088,8 +3174,8 @@ function groupSecondaryIdentifier(group: any): string {
 function groupLocationLabel(group: any): string {
   const summary = summarizeBrokeredFacilities(group.items.map((item: any) => ({
     facilityId: item.facilityId,
-    facilityName: facilityName(facilities.value, item.facilityId) || item.facilityName,
-    facilityTypeId: facility(facilities.value, item.facilityId)?.facilityTypeId
+    facilityName: facilityLabels.value[item.facilityId] || item.facilityName,
+    facilityTypeId: facilityTypeByFacility.value[item.facilityId]
   })));
 
   const brokered = Boolean(summary.brokeredFacilityName);
@@ -3129,7 +3215,7 @@ function itemAdjustmentLabel(adj: any): string {
   return adj.comments
     || adj.comment
     || adj.description
-    || orderAdjustmentTypeDescription(orderAdjustmentTypes.value, adj.orderAdjustmentTypeId)
+    || adjustmentLabels.value[adj.orderAdjustmentTypeId]
     || adj.orderAdjustmentTypeId
     || translate('Adjustment');
 }
@@ -3448,7 +3534,8 @@ async function openCloneOrderModal() {
 const DISPATCHABLE_FOOTER_IDS = new Set(['CANCEL_ITEMS', 'ORDER_CANCELLED', 'RETURN']);
 const footerActions = computed(() => {
   if (!order.value) return [];
-  const allowedTransitions = allowedTransitionsFor(statusFlowTransitions.value, statuses.value, order.value.statusId, commonUtil.getStatusColor);
+  // Resolved by loadSeedData when the order changes; a computed cannot await.
+  const allowedTransitions = transitionsByStatus.value[order.value.statusId] ?? [];
   const ctx = {
     allItems: groupedItems.value.flatMap((group: any) => group.items),
     orderAllowedToStatusIds: new Set(allowedTransitions.map((transition: any) => transition.toStatusId))

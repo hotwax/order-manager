@@ -191,8 +191,7 @@ import { IonAccordion, IonAccordionGroup, IonAvatar, IonButton, IonButtons, IonC
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api, DxpShopifyImg, logger, translate } from '@common';
-import { seedRows } from '@/db/orderManagerDb';
-import { facilityName, productStoreFacilities } from '@/db/seedLookups';
+import { getFacilities, getFacilityName, getProductStoreFacilities } from '@/db/useSeedData';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
 import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
 
@@ -367,11 +366,12 @@ async function fetchFacilityInventory() {
     // facilityIds drive the inventory request below, so read the rows rather than waiting
     // on a reactive subscription to emit.
     const [facilityRows, storeFacilityRows] = await Promise.all([
-      seedRows('facilities'),
-      seedRows('productStoreFacilities'),
+      getFacilities(),
+      props.productStoreId ? getProductStoreFacilities(props.productStoreId) : Promise.resolve([]),
     ]);
 
     const facilities = facilityRows.filter(isPhysicalFacility);
+    const facilityNameById = new Map(facilityRows.map((row: any) => [row.facilityId, row.facilityName]));
     const facilityIds = facilities.map((facility: any) => facility.facilityId);
     const joinedProductIds = productIds.value.join(',');
 
@@ -407,9 +407,9 @@ async function fetchFacilityInventory() {
       inventoryItems: inventoryResp,
       facilityOrderCounts: orderCountResp,
       productStoreFacilities: props.productStoreId
-        ? productStoreFacilities(storeFacilityRows, props.productStoreId)
+        ? storeFacilityRows
         : [],
-      facilityName: (facilityId) => facilityName(facilityRows, facilityId)
+      facilityName: (facilityId) => facilityNameById.get(facilityId) ?? facilityId
     }));
     filterFacilities();
   } catch (error) {

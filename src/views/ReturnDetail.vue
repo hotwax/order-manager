@@ -28,7 +28,7 @@
             </p>
           </ion-label>
           <ion-badge v-if="returnRecord.statusId" slot="end" :color="returnStatusColor(returnRecord.statusId)">
-            {{ notSpecified(statusDescription(statuses, returnRecord.statusId)) }}
+            {{ notSpecified(statusLabels[returnRecord.statusId]) }}
           </ion-badge>
         </ion-item>
 
@@ -116,7 +116,7 @@
                 <ion-label>
                   <p>{{ translate('Shopify status') }}</p>
                   <ion-badge :color="shopifyStatusColor(returnRecord.shopifySync.returnStatusId)">
-                    {{ notSpecified(statusDescription(statuses, returnRecord.shopifySync.returnStatusId)) }}
+                    {{ notSpecified(statusLabels[returnRecord.shopifySync.returnStatusId]) }}
                   </ion-badge>
                 </ion-label>
               </ion-item>
@@ -224,10 +224,10 @@
 
                 <ion-label class="tablet return-item-status">
                   <ion-badge v-if="item.statusId" :color="returnStatusColor(item.statusId)">
-                    {{ notSpecified(statusDescription(statuses, item.statusId)) }}
+                    {{ notSpecified(statusLabels[item.statusId]) }}
                   </ion-badge>
                   <p v-if="item.returnTypeId">
-                    {{ notSpecified(returnTypeDescription(returnTypes, item.returnTypeId)) }}
+                    {{ notSpecified(returnTypeLabels[item.returnTypeId]) }}
                   </p>
                 </ion-label>
 
@@ -247,7 +247,7 @@
                     {{ translate('Return reason') }}
                   </p>
                   <p class="return-item-detail-value">
-                    {{ item.returnReasonDescription || notSpecified(returnReasonDescription(returnReasons, item.returnReasonId)) }}
+                    {{ item.returnReasonDescription || notSpecified(returnReasonLabels[item.returnReasonId]) }}
                   </p>
                 </div>
 
@@ -270,7 +270,7 @@
                   </div>
                   <div v-if="item.returnItemTypeId" class="return-item-fact">
                     <dt>{{ translate('Return item type') }}</dt>
-                    <dd>{{ notSpecified(returnItemTypeDescription(returnItemTypes, item.returnItemTypeId)) }}</dd>
+                    <dd>{{ notSpecified(returnItemTypeLabels[item.returnItemTypeId]) }}</dd>
                   </div>
                 </dl>
 
@@ -423,7 +423,7 @@ import {
 } from "ionicons/icons";
 import { DateTime } from "luxon";
 import { storeToRefs } from "pinia";
-import { computed, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import Actions from "@/authorization/actions";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
@@ -431,8 +431,7 @@ import { useProductMaster } from "@/composables/useProductMaster";
 import { useOrderDetailStore } from "@/store/orderDetail";
 import { useProductCacheStore } from "@/store/productCache";
 import { useReturnsStore } from "@/store/returns";
-import { useSeedTable } from '@/db/orderManagerDb';
-import { enumDescription, facilityName, paymentMethodDescription, returnItemTypeDescription, returnReasonDescription, returnTypeDescription, statusDescription } from '@/db/seedLookups';
+import { getEnumDescriptions, getFacilityNames, getPaymentMethodDescriptions, getReturnItemTypeDescriptions, getReturnReasonDescriptions, getReturnTypeDescriptions, getStatusDescriptions } from '@/db/useSeedData';
 import { useUserStore } from "@/store/user";
 import type { ReturnItemDetail, ReturnStatusHistory, ReturnSyncState } from "@/types/returns";
 
@@ -441,18 +440,47 @@ const props = defineProps<{
 }>();
 
 const returnsStore = useReturnsStore();
-const { records: statuses } = useSeedTable('statuses');
-const { records: enums } = useSeedTable('enums');
-const { records: facilities } = useSeedTable('facilities');
-const { records: paymentMethodTypes } = useSeedTable('paymentMethodTypes');
-const { records: returnTypes } = useSeedTable('returnTypes');
-const { records: returnReasons } = useSeedTable('returnReasons');
-const { records: returnItemTypes } = useSeedTable('returnItemTypes');
 const productCache = useProductCacheStore();
 const productMaster = useProductMaster();
 const orderDetailStore = useOrderDetailStore();
 const userStore = useUserStore();
 const { current: returnRecord, detailLoading, detailError } = storeToRefs(returnsStore);
+
+// Every label this page renders, resolved in one read per table when the record loads.
+const statusLabels = ref<Record<string, string>>({});
+const returnTypeLabels = ref<Record<string, string>>({});
+const returnReasonLabels = ref<Record<string, string>>({});
+const returnItemTypeLabels = ref<Record<string, string>>({});
+const paymentMethodLabels = ref<Record<string, string>>({});
+const facilityLabels = ref<Record<string, string>>({});
+const channelLabels = ref<Record<string, string>>({});
+
+watch(returnRecord, async (record: any) => {
+  const items = record?.items || [];
+  const payments = record?.payments || [];
+  [
+    statusLabels.value,
+    returnTypeLabels.value,
+    returnReasonLabels.value,
+    returnItemTypeLabels.value,
+    paymentMethodLabels.value,
+    facilityLabels.value,
+    channelLabels.value,
+  ] = await Promise.all([
+    getStatusDescriptions([
+      record?.statusId,
+      record?.shopifySync?.returnStatusId,
+      ...items.map((item: any) => item.statusId),
+      ...payments.map((payment: any) => payment.statusId),
+    ].filter(Boolean) as string[]),
+    getReturnTypeDescriptions(items.map((item: any) => item.returnTypeId)),
+    getReturnReasonDescriptions(items.map((item: any) => item.returnReasonId)),
+    getReturnItemTypeDescriptions(items.map((item: any) => item.returnItemTypeId)),
+    getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
+    getFacilityNames([record?.destinationFacilityId].filter(Boolean) as string[]),
+    getEnumDescriptions([record?.returnChannelEnumId].filter(Boolean) as string[]),
+  ]);
+}, { immediate: true, deep: true });
 const canViewOrders = computed(() => userStore.hasPermission(Actions.APP_ORDERS_VIEW));
 const canViewCustomers = computed(() => userStore.hasPermission(Actions.APP_CUSTOMERS_VIEW));
 const itemGroups = computed(() => {
@@ -493,10 +521,10 @@ const sourceOrderPayments = computed(() => sourceOrderIds.value.flatMap((orderId
     orderId,
     orderName,
     paymentMethodTypeId: payment.paymentMethodTypeId || "",
-    paymentMethodTypeDescription: paymentMethodDescription(paymentMethodTypes.value, payment.paymentMethodTypeId) || payment.paymentMethodTypeId || translate("Payment preference"),
+    paymentMethodTypeDescription: paymentMethodLabels.value[payment.paymentMethodTypeId] || payment.paymentMethodTypeId || translate("Payment preference"),
     amount: Number(payment.maxAmount ?? payment.presentmentAmount ?? 0),
     statusId: payment.statusId || "UNKNOWN",
-    statusDescription: statusDescription(statuses.value, payment.statusId) || payment.statusId || translate("Unknown status"),
+    statusDescription: statusLabels.value[payment.statusId] || payment.statusId || translate("Unknown status"),
     createdDate: payment.createdDate || payment.createdStamp
   }));
 }));
@@ -562,12 +590,12 @@ const returnTypeLabel = computed(() => {
 const facilityLabel = computed(() => {
   const facilityId = returnRecord.value?.destinationFacilityId;
 
-  return facilityId ? facilityName(facilities.value, facilityId) || facilityId : translate("Not specified");
+  return facilityId ? facilityLabels.value[facilityId] || facilityId : translate("Not specified");
 });
 const channelLabel = computed(() => {
   const channelId = returnRecord.value?.returnChannelEnumId;
 
-  return channelId ? enumDescription(enums.value, channelId) || channelId : translate("Not specified");
+  return channelId ? channelLabels.value[channelId] || channelId : translate("Not specified");
 });
 const syncError = computed(() => {
   const sync = returnRecord.value?.shopifySync;
@@ -699,7 +727,7 @@ function inventoryStatusLabel(statusId: string) {
     INV_NOT_RETURNED: "Do not return to inventory"
   };
 
-  return labels[statusId] ? translate(labels[statusId]) : notSpecified(statusDescription(statuses.value, statusId));
+  return labels[statusId] ? translate(labels[statusId]) : notSpecified(statusLabels.value[statusId]);
 }
 
 function returnStatusColor(statusId: string) {
@@ -769,7 +797,7 @@ function returnTimelineLabel(status: ReturnStatusHistory, isConfirmedRestock: bo
     return statusItem(status) ? translate("Item completed") : translate("Return completed");
   }
 
-  return notSpecified(statusDescription(statuses.value, status.statusId));
+  return notSpecified(statusLabels.value[status.statusId]);
 }
 
 function sameMoment(left?: string | number, right?: string | number) {

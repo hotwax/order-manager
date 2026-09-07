@@ -42,11 +42,8 @@ import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, Ion
 import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import { onMounted, ref } from 'vue';
 import { translate } from '@common';
-import { seedRows, useSeedTable } from '@/db/orderManagerDb';
-import { getEnumsByParentType } from '@/db/seedLookups';
+import { getEnumsByParentType } from '@/db/useSeedData';
 
-const { records: enums } = useSeedTable('enums');
-const { records: enumTypes } = useSeedTable('enumTypes');
 
 const isLoading = ref(false);
 const rejectionReasons = ref<any[]>([]);
@@ -62,39 +59,21 @@ function confirm() {
 }
 
 async function loadRejectionReasons() {
-  const cachedReasons = [
-    ...getEnumsByParentType(enums.value, enumTypes.value, 'REPORT_AN_ISSUE'),
-    ...getEnumsByParentType(enums.value, enumTypes.value, 'RPRT_NO_VAR_LOG'),
-  ];
-  if (cachedReasons.length) {
+  isLoading.value = true;
+  try {
+    // Both buckets come from the local database; there is no cache to check first.
+    const [issues, noVariance] = await Promise.all([
+      getEnumsByParentType('REPORT_AN_ISSUE'),
+      getEnumsByParentType('RPRT_NO_VAR_LOG'),
+    ]);
+
     const seen = new Set<string>();
-    rejectionReasons.value = cachedReasons.filter((r) => {
-      if (seen.has(r.enumId)) return false;
-      seen.add(r.enumId);
+    rejectionReasons.value = [...issues, ...noVariance].filter((reason: any) => {
+      if (seen.has(reason.enumId)) return false;
+      seen.add(reason.enumId);
+
       return true;
     });
-  } else {
-    isLoading.value = true;
-  }
-  try {
-    if (!cachedReasons.length) {
-      // Cached into `rejectionReasons` for the modal's lifetime, so read the rows rather
-      // than depending on the reactive slice having emitted.
-      const [enumRows, enumTypeRows] = await Promise.all([
-        seedRows('enums'),
-        seedRows('enumTypes'),
-      ]);
-      const reasons = [
-        ...getEnumsByParentType(enumRows, enumTypeRows, 'REPORT_AN_ISSUE'),
-        ...getEnumsByParentType(enumRows, enumTypeRows, 'RPRT_NO_VAR_LOG'),
-      ];
-      const seen = new Set<string>();
-      rejectionReasons.value = reasons.filter((r) => {
-        if (seen.has(r.enumId)) return false;
-        seen.add(r.enumId);
-        return true;
-      });
-    }
   } finally {
     isLoading.value = false;
   }

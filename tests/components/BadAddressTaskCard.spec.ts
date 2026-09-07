@@ -41,7 +41,7 @@ describe('bad address task card', () => {
     expect(contextRow).toBeLessThan(addresses);
     expect(cardSource).toContain("translate('Facility') }}: {{ brokeredFacilityName(task)");
     expect(cardSource).toContain("translate('Shipping method') }}: {{ carrierShippingMethodLabel(task)");
-    expect(cardSource).toContain("carrierName(carriers.value, task.carrierPartyId)");
-    expect(cardSource).toContain("shipmentMethodDescription(shipmentMethodTypes.value, methodId)");
+    expect(cardSource).toContain("getCarrierName(task.carrierPartyId)");
+    expect(cardSource).toContain("getShipmentMethodDescription(methodId)");
   });
 });

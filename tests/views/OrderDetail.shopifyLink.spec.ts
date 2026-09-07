@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('order detail Shopify Admin deep-link', () => {
   const view = readFileSync(resolve(process.cwd(), 'src/views/OrderDetail.vue'), 'utf8');
-  const seed = readFileSync(resolve(process.cwd(), 'src/db/seedLookups.ts'), 'utf8');
+  const seed = readFileSync(resolve(process.cwd(), 'src/db/useSeedData.ts'), 'utf8');
 
   it('resolves the shop from the order\'s own shopifyShopOrder record', () => {
     // The authoritative per-order source (same one CloneOrderModal uses) — which

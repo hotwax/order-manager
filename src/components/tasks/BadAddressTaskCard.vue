@@ -109,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import {
   IonIcon,
   IonInput,
@@ -131,8 +131,7 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { seedRows, useSeedTable } from '@/db/orderManagerDb';
-import { carrierName, facilityName, getStatesForCountry, shipmentMethodDescription } from '@/db/seedLookups';
+import { getCarrierName, getFacilityName, getGeos, getShipmentMethodDescription, getStatesForCountry } from '@/db/useSeedData';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import { buildAddressState } from '@/utils/badAddressState';
 import type { AddressState } from '@/types/order';
@@ -156,11 +155,6 @@ const emit = defineEmits<{
 }>();
 
 const orderTaskStore = useOrderTaskStore();
-const { records: carriers } = useSeedTable('carriers');
-const { records: facilities } = useSeedTable('facilities');
-const { records: geos } = useSeedTable('geos');
-const { records: geoAssocs } = useSeedTable('geoAssocs');
-const { records: shipmentMethodTypes } = useSeedTable('shipmentMethodTypes');
 
 const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'save-and-release', label: translate('Save and release hold'), kind: 'primary' },
@@ -173,6 +167,28 @@ const cardActions = computed<TaskCardAction[]>(() => ([
 // skeleton placeholder and keeps the layout stable (no shift on hydrate).
 const addressState = ref<AddressState | null>(null);
 
+// Seed labels come from the local database; each resolves when the task changes.
+const facilityLabel = ref('');
+const carrierLabel = ref('');
+const methodLabel = ref('');
+const statesByCountry = ref<Record<string, any[]>>({});
+
+watch(() => props.task, async (task) => {
+  const methodId = task?.shipmentMethodTypeId || task?.shipGroup?.shipmentMethodTypeId || '';
+  [facilityLabel.value, carrierLabel.value, methodLabel.value] = await Promise.all([
+    getFacilityName(task?.facilityId ?? ''),
+    task?.carrierPartyId ? getCarrierName(task.carrierPartyId) : Promise.resolve(''),
+    methodId ? getShipmentMethodDescription(methodId) : Promise.resolve(''),
+  ]);
+}, { immediate: true, deep: true });
+
+// The state name shown next to each address needs its country's states in hand.
+watch(addressState, async (state) => {
+  const countryIds = [state?.original?.countryGeoId, state?.suggested?.countryGeoId].filter(Boolean) as string[];
+  const resolved = await Promise.all(countryIds.map((id) => getStatesForCountry(id)));
+  statesByCountry.value = Object.fromEntries(countryIds.map((id, i) => [id, resolved[i]]));
+}, { deep: true });
+
 // buildAddressState resolves geo codes to ids and the result is STAMPED into addressState,
 // so a cold slice would leave raw codes there permanently. Already deferred past first
 // paint, so awaiting here costs nothing visible.
@@ -180,7 +196,7 @@ async function hydrate() {
   if (addressState.value) return;
   // buildAddressState resolves geo codes to ids and the result is STAMPED into the ref, so
   // it needs the rows in hand — the reactive slice above may not have emitted yet.
-  addressState.value = buildAddressState(await seedRows('geos'), props.task);
+  addressState.value = buildAddressState(await getGeos(), props.task);
 }
 
 onMounted(() => {
@@ -195,7 +211,7 @@ function countryName(geoId: string): string {
 
 function stateName(address: AddressState['original']): string {
   if (!address.countryGeoId || !address.stateProvinceGeoId) return '';
-  return getStatesForCountry(geos.value, geoAssocs.value, address.countryGeoId).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
+  return (statesByCountry.value[address.countryGeoId] || []).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
 }
 
 function readOnlyAddressValue(value: string): string {
@@ -204,15 +220,15 @@ function readOnlyAddressValue(value: string): string {
 
 function brokeredFacilityName(task: any): string {
   return task.facilityName
-    || facilityName(facilities.value, task.facilityId)
+    || facilityLabel.value
     || task.facilityId
     || '-';
 }
 
 function carrierShippingMethodLabel(task: any): string {
-  const carrier = task.carrierPartyId ? carrierName(carriers.value, task.carrierPartyId) : '';
+  const carrier = carrierLabel.value;
   const methodId = task.shipmentMethodTypeId || task.shippingMethodTypeId;
-  const method = methodId ? shipmentMethodDescription(shipmentMethodTypes.value, methodId) : '';
+  const method = methodLabel.value;
   return [carrier, method].filter(Boolean).join(' - ') || '-';
 }
 
@@ -233,7 +249,7 @@ async function openStatePicker(address: AddressState['original']) {
   if (!address.countryGeoId) return;
   const modal = await modalController.create({
     component: GeoSelectModal,
-    componentProps: { title: translate('Select state'), items: getStatesForCountry(geos.value, geoAssocs.value, address.countryGeoId), selectedGeoId: address.stateProvinceGeoId },
+    componentProps: { title: translate('Select state'), items: await getStatesForCountry(address.countryGeoId), selectedGeoId: address.stateProvinceGeoId },
   });
   await modal.present();
   const { data, role } = await modal.onWillDismiss();
