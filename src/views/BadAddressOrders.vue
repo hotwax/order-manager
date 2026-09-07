@@ -107,7 +107,7 @@ import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
@@ -116,16 +116,16 @@ import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'badAddress');
 const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
 const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
-const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions);
+const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions());
 const sortOptions = taskSortOptions('badAddress');
 // Computed once here and passed as a prop — avoids N per-card reactive subscriptions.
-const countries = computed(() => seedStore.getCountries);
+const countries = computed(() => seedStore.getCountries());
 const companyCarrierUrl = buildAppUrl('company', '/carriers');
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});

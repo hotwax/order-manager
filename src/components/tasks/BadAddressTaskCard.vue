@@ -131,7 +131,7 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { ensureLoaded, useSeedData } from '@/db/useSeedData';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import { buildAddressState } from '@/utils/badAddressState';
 import type { AddressState } from '@/types/order';
@@ -155,7 +155,7 @@ const emit = defineEmits<{
 }>();
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 
 const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'save-and-release', label: translate('Save and release hold'), kind: 'primary' },
@@ -168,18 +168,19 @@ const cardActions = computed<TaskCardAction[]>(() => ([
 // skeleton placeholder and keeps the layout stable (no shift on hydrate).
 const addressState = ref<AddressState | null>(null);
 
-function hydrate() {
+// buildAddressState resolves geo codes to ids and the result is STAMPED into addressState,
+// so a cold slice would leave raw codes there permanently. Already deferred past first
+// paint, so awaiting here costs nothing visible.
+async function hydrate() {
   if (addressState.value) return;
-  const state = buildAddressState(props.task);
-  if (state.original.countryGeoId) seedStore.loadGeoAssocs(state.original.countryGeoId);
-  if (state.suggested.countryGeoId) seedStore.loadGeoAssocs(state.suggested.countryGeoId);
-  addressState.value = state;
+  await ensureLoaded(['geos', 'geoAssocs']);
+  addressState.value = buildAddressState(props.task);
 }
 
 onMounted(() => {
   // Defer past the first paint so opening/returning to a list never blocks on
   // building every card's form synchronously.
-  requestAnimationFrame(hydrate);
+  requestAnimationFrame(() => { void hydrate(); });
 });
 
 function countryName(geoId: string): string {
@@ -219,7 +220,6 @@ async function openCountryPicker(address: AddressState['original']) {
   if (role === 'selected' && data && data !== address.countryGeoId) {
     address.countryGeoId = data;
     address.stateProvinceGeoId = '';
-    seedStore.loadGeoAssocs(data);
   }
 }
 
