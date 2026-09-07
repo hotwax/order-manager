@@ -107,12 +107,14 @@ import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { getCountries, getEnumsByType, getShipmentMethodOptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
 import { countTaskTargets, groupTaskCardsByTarget, runGroupedTaskMutation, shipGroupTaskTarget } from '@/utils/orderTaskBulk';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
+
+const seed = useSeedData();
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
@@ -127,9 +129,9 @@ const countries = ref<any[]>([]);
 
 async function loadSeedData() {
   const [channels, methods, countryRows] = await Promise.all([
-    getEnumsByType('ORDER_SALES_CHANNEL'),
-    getShipmentMethodOptions(),
-    getCountries(),
+    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
+    seed.getShipmentMethodOptions(),
+    seed.getCountries(),
   ]);
   channelOptions.value = channels.map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId }));
   shipmentMethodOptions.value = methods;

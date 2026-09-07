@@ -130,7 +130,9 @@ import { api, DxpShopifyImg, translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
-import { getFacilityName } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
+
+const seed = useSeedData();
 
 const props = defineProps<{
   substituteProducts: any[];
@@ -173,7 +175,7 @@ const isSearchScrollable = computed(() =>
 
 const facilityLabel = ref('');
 watch(() => props.facilityId, async (facilityId) => {
-  facilityLabel.value = await getFacilityName(facilityId ?? '');
+  facilityLabel.value = await seed.getFacilityName(facilityId ?? '');
 }, { immediate: true });
 
 function getProduct(productId: string) {

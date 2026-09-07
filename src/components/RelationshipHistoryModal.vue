@@ -64,7 +64,9 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { translate } from '@common';
 import { DateTime } from 'luxon';
 import { useCustomerStore } from '@/store/customer';
-import { getPartyRelationshipDescriptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
+
+const seed = useSeedData();
 
 const props = defineProps<{
   currentPartyId: string;
@@ -77,7 +79,7 @@ const store = useCustomerStore() as any;
 // One read covers every relationship type label on the list, plus the DUPLICATE marker.
 const relationshipLabels = ref<Record<string, string>>({});
 watch(() => store.personalRelationships(props.currentPartyId), async (personal: any[]) => {
-  relationshipLabels.value = await getPartyRelationshipDescriptions([
+  relationshipLabels.value = await seed.getPartyRelationshipDescriptions([
     'DUPLICATE',
     ...(personal || []).map((rel: any) => rel.partyRelationshipTypeId),
   ]);

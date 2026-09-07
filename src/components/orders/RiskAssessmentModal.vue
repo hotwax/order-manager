@@ -44,8 +44,10 @@ import { closeOutline, shieldOutline } from 'ionicons/icons';
 import { ref, watch } from 'vue';
 import { DateTime } from 'luxon';
 import { translate } from '@common';
-import { getEnumDescriptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { factSentimentColor, factSentimentIcon, riskLevelColor, sortFactsBySentiment } from '@/utils';
+
+const seed = useSeedData();
 
 const props = withDefaults(defineProps<{ risks?: any[] }>(), {
   risks: () => [],
@@ -58,7 +60,7 @@ watch(() => props.risks, async (risks) => {
     risk.riskLevelEnumId,
     ...(risk.facts || []).map((fact: any) => fact.sentimentEnumId),
   ]);
-  enumLabels.value = await getEnumDescriptions(ids);
+  enumLabels.value = await seed.getEnumDescriptions(ids);
 }, { immediate: true, deep: true });
 
 

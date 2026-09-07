@@ -142,13 +142,15 @@ import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductAc
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { getFacilityName } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
 import { isSwapItemUnavailable } from '@/utils/swapItems';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import type { TaskCardAction } from '@/types/taskCard';
+
+const seed = useSeedData();
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean; showViewOrderAction?: boolean }>(), {
   selectable: false,
@@ -169,7 +171,7 @@ const cardActions = computed<TaskCardAction[]>(() => ([
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 const facilityLabel = ref('');
 watch(() => props.task?.facilityId, async (facilityId) => {
-  facilityLabel.value = await getFacilityName(facilityId ?? '');
+  facilityLabel.value = await seed.getFacilityName(facilityId ?? '');
 }, { immediate: true });
 
 function getCustomerName(customer: any): string {

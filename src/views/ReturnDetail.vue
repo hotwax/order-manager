@@ -431,9 +431,11 @@ import { useProductMaster } from "@/composables/useProductMaster";
 import { useOrderDetailStore } from "@/store/orderDetail";
 import { useProductCacheStore } from "@/store/productCache";
 import { useReturnsStore } from "@/store/returns";
-import { getEnumDescriptions, getFacilityNames, getPaymentMethodDescriptions, getReturnItemTypeDescriptions, getReturnReasonDescriptions, getReturnTypeDescriptions, getStatusDescriptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useUserStore } from "@/store/user";
 import type { ReturnItemDetail, ReturnStatusHistory, ReturnSyncState } from "@/types/returns";
+
+const seed = useSeedData();
 
 const props = defineProps<{
   returnId: string;
@@ -467,18 +469,18 @@ watch(returnRecord, async (record: any) => {
     facilityLabels.value,
     channelLabels.value,
   ] = await Promise.all([
-    getStatusDescriptions([
+    seed.getStatusDescriptions([
       record?.statusId,
       record?.shopifySync?.returnStatusId,
       ...items.map((item: any) => item.statusId),
       ...payments.map((payment: any) => payment.statusId),
     ].filter(Boolean) as string[]),
-    getReturnTypeDescriptions(items.map((item: any) => item.returnTypeId)),
-    getReturnReasonDescriptions(items.map((item: any) => item.returnReasonId)),
-    getReturnItemTypeDescriptions(items.map((item: any) => item.returnItemTypeId)),
-    getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
-    getFacilityNames([record?.destinationFacilityId].filter(Boolean) as string[]),
-    getEnumDescriptions([record?.returnChannelEnumId].filter(Boolean) as string[]),
+    seed.getReturnTypeDescriptions(items.map((item: any) => item.returnTypeId)),
+    seed.getReturnReasonDescriptions(items.map((item: any) => item.returnReasonId)),
+    seed.getReturnItemTypeDescriptions(items.map((item: any) => item.returnItemTypeId)),
+    seed.getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
+    seed.getFacilityNames([record?.destinationFacilityId].filter(Boolean) as string[]),
+    seed.getEnumDescriptions([record?.returnChannelEnumId].filter(Boolean) as string[]),
   ]);
 }, { immediate: true, deep: true });
 const canViewOrders = computed(() => userStore.hasPermission(Actions.APP_ORDERS_VIEW));

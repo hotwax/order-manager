@@ -126,12 +126,14 @@ import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useUserStore } from '@/store/user';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { getEnumsByType, getShipmentMethodOptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 import { HOLD_TASK_PURPOSE_ENUM_TYPE_ID, isDedicatedQueuePurpose } from '@/utils/taskQueues';
+
+const seed = useSeedData();
 import Actions from "@/authorization/actions";
 
 const orderTaskStore = useOrderTaskStore();
@@ -147,9 +149,9 @@ const purposeOptionRows = ref<any[]>([]);
 
 async function loadSeedData() {
   const [channels, methods, purposes] = await Promise.all([
-    getEnumsByType('ORDER_SALES_CHANNEL'),
-    getShipmentMethodOptions(),
-    getEnumsByType(HOLD_TASK_PURPOSE_ENUM_TYPE_ID),
+    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
+    seed.getShipmentMethodOptions(),
+    seed.getEnumsByType(HOLD_TASK_PURPOSE_ENUM_TYPE_ID),
   ]);
   channelOptions.value = channels.map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId }));
   shipmentMethodOptions.value = methods;

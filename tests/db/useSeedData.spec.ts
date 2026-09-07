@@ -62,12 +62,12 @@ async function seedDb(): Promise<void> {
   ]);
 }
 
-let seed: typeof import('@/db/useSeedData');
+let seed: ReturnType<typeof import('@/db/useSeedData').useSeedData>;
 
 describe('useSeedData', () => {
   beforeEach(async () => {
     await seedDb();
-    seed = await import('@/db/useSeedData');
+    seed = (await import('@/db/useSeedData')).useSeedData();
   });
   afterEach(() => { oms = ''; });
 

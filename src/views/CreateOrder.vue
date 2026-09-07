@@ -294,7 +294,9 @@ import AddressModal from '@/components/AddressModal.vue';
 import AddCustomerModal from '@/components/AddCustomerModal.vue';
 import AddProductModal from '@/components/AddProductModal.vue';
 import AddCustomLineModal from '@/components/AddCustomLineModal.vue';
-import { getProductStoreFacilities, getShopifyShopLocations } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
+
+const seed = useSeedData();
 
 const currencies = ref([]) as any;
 const shopsList = ref<any[]>([]);
@@ -318,10 +320,10 @@ const storeFacilityRows = ref<any[]>([]);
 const shopLocationRows = ref<any[]>([]);
 
 watch(currentStoreId, async (productStoreId) => {
-  storeFacilityRows.value = productStoreId ? await getProductStoreFacilities(productStoreId) : [];
+  storeFacilityRows.value = productStoreId ? await seed.getProductStoreFacilities(productStoreId) : [];
 }, { immediate: true });
 
-onMounted(async () => { shopLocationRows.value = await getShopifyShopLocations(); });
+onMounted(async () => { shopLocationRows.value = await seed.getShopifyShopLocations(); });
 
 const facilities = computed(() => {
   if (!currentStoreId.value) return [];

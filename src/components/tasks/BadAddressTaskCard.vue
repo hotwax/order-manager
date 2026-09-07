@@ -131,11 +131,13 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { getCarrierName, getFacilityName, getGeos, getShipmentMethodDescription, getStatesForCountry } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import { buildAddressState } from '@/utils/badAddressState';
 import type { AddressState } from '@/types/order';
 import type { TaskCardAction } from '@/types/taskCard';
+
+const seed = useSeedData();
 
 const props = withDefaults(defineProps<{
   task: any;
@@ -176,16 +178,16 @@ const statesByCountry = ref<Record<string, any[]>>({});
 watch(() => props.task, async (task) => {
   const methodId = task?.shipmentMethodTypeId || task?.shipGroup?.shipmentMethodTypeId || '';
   [facilityLabel.value, carrierLabel.value, methodLabel.value] = await Promise.all([
-    getFacilityName(task?.facilityId ?? ''),
-    task?.carrierPartyId ? getCarrierName(task.carrierPartyId) : Promise.resolve(''),
-    methodId ? getShipmentMethodDescription(methodId) : Promise.resolve(''),
+    seed.getFacilityName(task?.facilityId ?? ''),
+    task?.carrierPartyId ? seed.getCarrierName(task.carrierPartyId) : Promise.resolve(''),
+    methodId ? seed.getShipmentMethodDescription(methodId) : Promise.resolve(''),
   ]);
 }, { immediate: true, deep: true });
 
 // The state name shown next to each address needs its country's states in hand.
 watch(addressState, async (state) => {
   const countryIds = [state?.original?.countryGeoId, state?.suggested?.countryGeoId].filter(Boolean) as string[];
-  const resolved = await Promise.all(countryIds.map((id) => getStatesForCountry(id)));
+  const resolved = await Promise.all(countryIds.map((id) => seed.getStatesForCountry(id)));
   statesByCountry.value = Object.fromEntries(countryIds.map((id, i) => [id, resolved[i]]));
 }, { deep: true });
 
@@ -196,7 +198,7 @@ async function hydrate() {
   if (addressState.value) return;
   // buildAddressState resolves geo codes to ids and the result is STAMPED into the ref, so
   // it needs the rows in hand — the reactive slice above may not have emitted yet.
-  addressState.value = buildAddressState(await getGeos(), props.task);
+  addressState.value = buildAddressState(await seed.getGeos(), props.task);
 }
 
 onMounted(() => {
@@ -249,7 +251,7 @@ async function openStatePicker(address: AddressState['original']) {
   if (!address.countryGeoId) return;
   const modal = await modalController.create({
     component: GeoSelectModal,
-    componentProps: { title: translate('Select state'), items: await getStatesForCountry(address.countryGeoId), selectedGeoId: address.stateProvinceGeoId },
+    componentProps: { title: translate('Select state'), items: await seed.getStatesForCountry(address.countryGeoId), selectedGeoId: address.stateProvinceGeoId },
   });
   await modal.present();
   const { data, role } = await modal.onWillDismiss();

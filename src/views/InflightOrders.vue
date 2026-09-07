@@ -120,13 +120,15 @@ import {
 import { computed, onMounted, ref, watch } from 'vue';
 import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
-import { getEnumsByType, getShipmentMethodOptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
 import { WORKFLOW_ORDER_SORT_OPTIONS } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
+
+const seed = useSeedData();
 import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, translate } from '@common';
 import router from '@/router';
@@ -153,8 +155,8 @@ const shipmentMethodOptions = ref<Array<{ id: string; label: string }>>([]);
 
 async function loadSeedData() {
   const [channels, methods] = await Promise.all([
-    getEnumsByType('ORDER_SALES_CHANNEL'),
-    getShipmentMethodOptions(),
+    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
+    seed.getShipmentMethodOptions(),
   ]);
   channelOptions.value = channels.map((enumeration: any) => enumeration.enumId);
   shipmentMethodOptions.value = methods;

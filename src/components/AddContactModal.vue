@@ -194,8 +194,10 @@ import {
 import { closeOutline, saveOutline, trashOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
-import { getCountries, getStates, getStatesForCountry } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import type { CustomerContactMech } from '@/types/customer';
+
+const seed = useSeedData();
 
 const props = defineProps<{
   contactMechTypeId: string;
@@ -242,7 +244,7 @@ const stateOptions = ref<Array<{ geoId: string; geoName: string }>>([]);
 
 // The geo slices fill from the local database; there is no per-country fetch to wait on.
 watch(() => form.countryGeoId, async (countryGeoId) => {
-  stateOptions.value = countryGeoId ? await getStatesForCountry(countryGeoId) as any : [];
+  stateOptions.value = countryGeoId ? await seed.getStatesForCountry(countryGeoId) as any : [];
 }, { immediate: true });
 
 const isLoadingStates = computed(() => !!form.countryGeoId && stateOptions.value.length === 0);
@@ -252,7 +254,7 @@ function onCountryChange() {
 }
 
 onMounted(async () => {
-  [countries.value, allStates.value] = await Promise.all([getCountries(), getStates()]) as any;
+  [countries.value, allStates.value] = await Promise.all([seed.getCountries(), seed.getStates()]) as any;
   if (props.existingContact) {
     const c = props.existingContact;
     if (props.contactMechTypeId === 'EMAIL_ADDRESS') {

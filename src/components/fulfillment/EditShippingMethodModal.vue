@@ -74,7 +74,9 @@ import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, ref, watch } from 'vue';
 import { translate } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { getCarriers, getShipmentMethodDescriptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
+
+const seed = useSeedData();
 
 const orderDetailStore = useOrderDetailStore();
 
@@ -103,7 +105,7 @@ const methodsForCarrier = computed(() =>
 );
 
 watch(methodsForCarrier, async (methods) => {
-  methodLabels.value = await getShipmentMethodDescriptions(
+  methodLabels.value = await seed.getShipmentMethodDescriptions(
     (methods || []).map((method: any) => method.shipmentMethodTypeId),
   );
 }, { immediate: true });
@@ -111,7 +113,7 @@ watch(methodsForCarrier, async (methods) => {
 onMounted(async () => {
   orderDetailStore.fetchCarrierParties();
   orderDetailStore.fetchShippingMethods();
-  carrierRows.value = await getCarriers();
+  carrierRows.value = await seed.getCarriers();
 });
 
 function onCarrierChange(carrierId: string) {

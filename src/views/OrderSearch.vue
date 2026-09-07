@@ -203,7 +203,7 @@ import { useOrderStore, DEFAULT_ORDER_SEARCH_SORT } from '@/store/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
-import { getEnumsByType, getShipmentMethodOptions, getStatusItemsByType } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import router from '@/router';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
@@ -211,6 +211,8 @@ import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+
+const seed = useSeedData();
 import UniformFilterLayout from '@/components/common/UniformFilterLayout.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
@@ -243,9 +245,9 @@ const shipmentMethodOptions = ref<Array<{ id: string; label: string }>>([]);
 
 async function loadSeedData() {
   const [statusRows, channelRows, methods] = await Promise.all([
-    getStatusItemsByType('ORDER_STATUS'),
-    getEnumsByType('ORDER_SALES_CHANNEL'),
-    getShipmentMethodOptions(),
+    seed.getStatusItemsByType('ORDER_STATUS'),
+    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
+    seed.getShipmentMethodOptions(),
   ]);
   orderStatuses.value = statusRows;
   salesChannels.value = channelRows;

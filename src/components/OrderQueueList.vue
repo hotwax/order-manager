@@ -152,13 +152,15 @@ import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderStore } from '@/store/order';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useProductStore } from '@/store/productStore';
-import { getEnumsByType, getFacilities, getFacilityParentTypeIds, getShipmentMethodOptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import type { Order } from '@/types/order';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
 import RoutingGroupModal from '@/components/fulfillment/RoutingGroupModal.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
+
+const seed = useSeedData();
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import UniformFilterLayout from '@/components/common/UniformFilterLayout.vue';
@@ -231,8 +233,8 @@ const shipmentMethodOptions = ref<Array<{ id: string; label: string }>>([]);
 
 async function loadSeedData() {
   const [channels, methods] = await Promise.all([
-    getEnumsByType('ORDER_SALES_CHANNEL'),
-    getShipmentMethodOptions(),
+    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
+    seed.getShipmentMethodOptions(),
   ]);
   salesChannels.value = channels;
   shipmentMethodOptions.value = methods;
@@ -452,9 +454,9 @@ async function brokerSelectedOrderShipGroups(orderIds: string[], routingGroupId:
 
 async function brokerableShipGroupsForOrders(orderIds: string[]) {
   // Read the facility rows once for the whole sweep rather than per ship group.
-  const facilityRows = await getFacilities();
+  const facilityRows = await seed.getFacilities();
   const facilityById = new Map(facilityRows.map((row: any) => [row.facilityId, row]));
-  const parentTypeByFacilityType = await getFacilityParentTypeIds(
+  const parentTypeByFacilityType = await seed.getFacilityParentTypeIds(
     facilityRows.map((row: any) => row.facilityTypeId),
   );
 

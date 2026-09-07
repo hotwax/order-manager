@@ -144,11 +144,13 @@ import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import { computed, onMounted, ref, watch } from 'vue';
 import { api, emitter, logger, translate } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { getGeoName, getShopifyShops } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
 import { createShopifyCustomer, searchShopifyCustomers } from '@/services/customer';
 import { showToast } from '@/utils';
 import { buildClonePayload, cloneCustomerName, cloneEmail, clonePhone, defaultCloneNote, type ClonePriceMode } from '@/utils/cloneOrder';
+
+const seed = useSeedData();
 
 /** PartyIdentification type carrying the numeric Shopify customer id (ShopifySeedData.xml). */
 const SHOPIFY_CUSTOMER_ID_TYPE = 'SHOPIFY_CUST_ID';
@@ -172,7 +174,7 @@ const email = computed(() => cloneEmail(raw.value));
 const shopStatus = ref<'resolving' | 'resolved' | 'manual'>('resolving');
 const shopId = ref('');
 const shops = ref<any[]>([]);
-onMounted(async () => { shops.value = await getShopifyShops(); });
+onMounted(async () => { shops.value = await seed.getShopifyShops(); });
 const shopLabel = computed(() => shops.value.find((s: any) => s.shopId === shopId.value)?.name || shopId.value);
 
 // ── Customer resolution: PartyIdentification → Shopify email search → create at submit.
@@ -330,7 +332,7 @@ async function confirm() {
       note: note.value,
       shopId: shopId.value,
       shopifyCustomerId: customerId,
-      geoName: getGeoName,
+      geoName: seed.getGeoName,
       getProduct: productCache.getProduct,
     });
 

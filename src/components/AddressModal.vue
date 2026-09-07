@@ -64,7 +64,9 @@ import {
 import { onMounted, ref, watch } from 'vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { translate } from "@common";
-import { getCountries, getStatesForCountry } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
+
+const seed = useSeedData();
 
 const address = ref({
   address1: "",
@@ -82,11 +84,11 @@ const countries = ref<any[]>([])
 const states = ref<any[]>([])
 
 watch(() => address.value.country, async (countryGeoId) => {
-  states.value = countryGeoId ? await getStatesForCountry(countryGeoId) : []
+  states.value = countryGeoId ? await seed.getStatesForCountry(countryGeoId) : []
 }, { immediate: true })
 
 onMounted(async () => {
-  countries.value = await getCountries();
+  countries.value = await seed.getCountries();
   prepareAddress();
 })
 

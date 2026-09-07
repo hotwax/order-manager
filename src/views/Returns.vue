@@ -195,7 +195,9 @@ import SearchFilterCard from "@/components/common/SearchFilterCard.vue";
 import UniformFilterLayout from "@/components/common/UniformFilterLayout.vue";
 import router from "@/router";
 import { useReturnsStore } from "@/store/returns";
-import { getEnumDescriptions, getEnumsByType, getFacilityNames, getStatusDescriptions, getStatusItemsByType } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
+
+const seed = useSeedData();
 
 const returnsStore = useReturnsStore();
 const { returns, total, query, loading, error, hasMore } = storeToRefs(returnsStore);
@@ -212,16 +214,16 @@ const facilityLabels = ref<Record<string, string>>({});
 watch(returns, async (rows) => {
   const list = rows || [];
   [statusLabels.value, channelLabels.value, facilityLabels.value] = await Promise.all([
-    getStatusDescriptions(list.map((r: any) => r.statusId)),
-    getEnumDescriptions(list.map((r: any) => r.returnChannelEnumId)),
-    getFacilityNames(list.map((r: any) => r.destinationFacilityId)),
+    seed.getStatusDescriptions(list.map((r: any) => r.statusId)),
+    seed.getEnumDescriptions(list.map((r: any) => r.returnChannelEnumId)),
+    seed.getFacilityNames(list.map((r: any) => r.destinationFacilityId)),
   ]);
 }, { immediate: true, deep: true });
 
 onMounted(async () => {
   [returnStatuses.value, returnChannels.value] = await Promise.all([
-    getStatusItemsByType("ORDER_RETURN_STTS"),
-    getEnumsByType("RETURN_CHANNEL"),
+    seed.getStatusItemsByType("ORDER_RETURN_STTS"),
+    seed.getEnumsByType("RETURN_CHANNEL"),
   ]);
 });
 const searchPlaceholder = computed(() => ({

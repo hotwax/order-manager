@@ -88,19 +88,19 @@ async function labels(
 
 // ── Statuses ──────────────────────────────────────────────────────────────────────────
 
-export const getStatus = (statusId: string) => row("statuses", statusId);
+const getStatus = (statusId: string) => row("statuses", statusId);
 
-export const getStatusDescription = (statusId: string) => label("statuses", "statusId", statusId);
+const getStatusDescription = (statusId: string) => label("statuses", "statusId", statusId);
 
-export const getStatusDescriptions = (statusIds: readonly string[]) =>
+const getStatusDescriptions = (statusIds: readonly string[]) =>
   labels("statuses", "statusId", statusIds);
 
-export async function getStatusAge(statusId: string): Promise<number> {
+async function getStatusAge(statusId: string): Promise<number> {
   return Number((await getStatus(statusId))?.statusAge ?? 0);
 }
 
 /** Ages for many statuses in one table read — used when scoring a page of orders. */
-export async function getStatusAges(statusIds: readonly string[]): Promise<Record<string, number>> {
+async function getStatusAges(statusIds: readonly string[]): Promise<Record<string, number>> {
   const wanted = [...new Set(statusIds.filter(Boolean))];
   if(!wanted.length) {return {};}
 
@@ -110,31 +110,31 @@ export async function getStatusAges(statusIds: readonly string[]): Promise<Recor
   return Object.fromEntries(wanted.map((id) => [id, Number(byKey.get(id)?.statusAge ?? 0)]));
 }
 
-export async function getStatusItemsByType(statusTypeId: string): Promise<Row[]> {
+async function getStatusItemsByType(statusTypeId: string): Promise<Row[]> {
   return (await rows("statuses")).filter((record) => record.statusTypeId === statusTypeId);
 }
 
 // ── Enums ─────────────────────────────────────────────────────────────────────────────
 
-export const getEnumDescription = (enumId: string) => label("enums", "enumId", enumId);
+const getEnumDescription = (enumId: string) => label("enums", "enumId", enumId);
 
-export const getEnumDescriptions = (enumIds: readonly string[]) => labels("enums", "enumId", enumIds);
+const getEnumDescriptions = (enumIds: readonly string[]) => labels("enums", "enumId", enumIds);
 
-export async function getEnumsByType(enumTypeId: string): Promise<Row[]> {
+async function getEnumsByType(enumTypeId: string): Promise<Row[]> {
   return (await rows("enums")).filter((record) => record.enumTypeId === enumTypeId);
 }
 
 /** Enums belonging to any child type of `parentTypeId` — joins enumTypes to enums. */
-export async function getEnumsByParentType(parentTypeId: string): Promise<Row[]> {
+async function getEnumsByParentType(parentTypeId: string): Promise<Row[]> {
   const [enums, enumTypes] = await Promise.all([rows("enums"), rows("enumTypes")]);
   const childTypeIds = new Set(enumTypes.filter((type) => type.parentTypeId === parentTypeId).map((type) => type.enumTypeId),);
 
   return enums.filter((record) => childTypeIds.has(record.enumTypeId));
 }
 
-export const getOrderIdentificationTypeDescription = (enumId: string) => getEnumDescription(enumId);
+const getOrderIdentificationTypeDescription = (enumId: string) => getEnumDescription(enumId);
 
-export async function getOrderIdentificationTypeOptions(): Promise<Array<{ enumId: string; description: string }>> {
+async function getOrderIdentificationTypeOptions(): Promise<Array<{ enumId: string; description: string }>> {
   return (await getEnumsByType("ORDER_IDENTITY")).map((record) => ({
     enumId: record.enumId,
     description: labelOf(record, record.enumId),
@@ -143,15 +143,15 @@ export async function getOrderIdentificationTypeOptions(): Promise<Array<{ enumI
 
 // ── Product stores ────────────────────────────────────────────────────────────────────
 
-export const getProductStore = (productStoreId: string) => row("productStores", productStoreId);
+const getProductStore = (productStoreId: string) => row("productStores", productStoreId);
 
-export const getProductStoreName = (productStoreId: string) =>
+const getProductStoreName = (productStoreId: string) =>
   label("productStores", "productStoreId", productStoreId, ["storeName", "companyName"]);
 
-export const getProductStoreNames = (productStoreIds: readonly string[]) =>
+const getProductStoreNames = (productStoreIds: readonly string[]) =>
   labels("productStores", "productStoreId", productStoreIds, ["storeName", "companyName"]);
 
-export async function getProductStoreFacilities(productStoreId: string): Promise<Row[]> {
+async function getProductStoreFacilities(productStoreId: string): Promise<Row[]> {
   if(!productStoreId) {return [];}
 
   return (await rows("productStoreFacilities")).filter((record) => record.productStoreId === productStoreId);
@@ -159,25 +159,25 @@ export async function getProductStoreFacilities(productStoreId: string): Promise
 
 // ── Facilities ────────────────────────────────────────────────────────────────────────
 
-export const getFacilities = () => rows("facilities");
+const getFacilities = () => rows("facilities");
 
-export const getFacility = (facilityId: string) => row("facilities", facilityId);
+const getFacility = (facilityId: string) => row("facilities", facilityId);
 
-export const getFacilityName = (facilityId: string) =>
+const getFacilityName = (facilityId: string) =>
   label("facilities", "facilityId", facilityId, ["facilityName", "facilityId"]);
 
-export const getFacilityNames = (facilityIds: readonly string[]) =>
+const getFacilityNames = (facilityIds: readonly string[]) =>
   labels("facilities", "facilityId", facilityIds, ["facilityName", "facilityId"]);
 
-export const getFacilityType = (facilityTypeId: string) => row("facilityTypes", facilityTypeId);
+const getFacilityType = (facilityTypeId: string) => row("facilityTypes", facilityTypeId);
 
 /** Parent type of a facility type — the virtual-facility check in the order services. */
-export async function getFacilityParentTypeId(facilityTypeId: string): Promise<string> {
+async function getFacilityParentTypeId(facilityTypeId: string): Promise<string> {
   return (await getFacilityType(facilityTypeId))?.parentTypeId ?? "";
 }
 
 /** facilityTypeId -> parentTypeId for many types in one read. */
-export async function getFacilityParentTypeIds(facilityTypeIds: readonly string[],): Promise<Record<string, string>> {
+async function getFacilityParentTypeIds(facilityTypeIds: readonly string[],): Promise<Record<string, string>> {
   const wanted = [...new Set(facilityTypeIds.filter(Boolean))];
   if(!wanted.length) {return {};}
 
@@ -192,37 +192,37 @@ export async function getFacilityParentTypeIds(facilityTypeIds: readonly string[
 const carrierLabel = (carrier: Row) =>
   [carrier.firstName, carrier.lastName].filter(Boolean).join(" ") || carrier.groupName || carrier.partyId;
 
-export const getCarriers = () => rows("carriers");
+const getCarriers = () => rows("carriers");
 
-export const getCarrier = (partyId: string) => row("carriers", partyId);
+const getCarrier = (partyId: string) => row("carriers", partyId);
 
-export async function getCarrierName(partyId: string): Promise<string> {
+async function getCarrierName(partyId: string): Promise<string> {
   const found = await getCarrier(partyId);
 
   return found ? carrierLabel(found) : partyId;
 }
 
-export const getShipmentMethodTypes = () => rows("shipmentMethodTypes");
+const getShipmentMethodTypes = () => rows("shipmentMethodTypes");
 
-export const getShipmentMethod = (shipmentMethodTypeId: string) =>
+const getShipmentMethod = (shipmentMethodTypeId: string) =>
   row("shipmentMethodTypes", shipmentMethodTypeId);
 
 const SHIPMENT_METHOD_LABEL_FIELDS = ["description", "shipmentMethodTypeId"];
 
-export const getShipmentMethodDescription = (shipmentMethodTypeId: string) =>
+const getShipmentMethodDescription = (shipmentMethodTypeId: string) =>
   label("shipmentMethodTypes", "shipmentMethodTypeId", shipmentMethodTypeId, SHIPMENT_METHOD_LABEL_FIELDS);
 
-export const getShipmentMethodDescriptions = (shipmentMethodTypeIds: readonly string[]) =>
+const getShipmentMethodDescriptions = (shipmentMethodTypeIds: readonly string[]) =>
   labels("shipmentMethodTypes", "shipmentMethodTypeId", shipmentMethodTypeIds, SHIPMENT_METHOD_LABEL_FIELDS);
 
-export async function getShipmentMethodOptions(): Promise<Array<{ id: string; label: string }>> {
+async function getShipmentMethodOptions(): Promise<Array<{ id: string; label: string }>> {
   return (await getShipmentMethodTypes()).map((record) => ({
     id: record.shipmentMethodTypeId,
     label: labelOf(record, record.shipmentMethodTypeId, SHIPMENT_METHOD_LABEL_FIELDS),
   }));
 }
 
-export async function getShippingMethodsByCarrier(carrierPartyId: string): Promise<Row[]> {
+async function getShippingMethodsByCarrier(carrierPartyId: string): Promise<Row[]> {
   if(!carrierPartyId) {return [];}
 
   return (await rows("carrierShipmentMethods")).filter((record) => record.partyId === carrierPartyId);
@@ -230,65 +230,65 @@ export async function getShippingMethodsByCarrier(carrierPartyId: string): Promi
 
 // ── Simple type lookups ───────────────────────────────────────────────────────────────
 
-export const getPaymentMethodDescription = (id: string) => label("paymentMethodTypes", "paymentMethodTypeId", id);
-export const getPaymentMethodDescriptions = (ids: readonly string[]) =>
+const getPaymentMethodDescription = (id: string) => label("paymentMethodTypes", "paymentMethodTypeId", id);
+const getPaymentMethodDescriptions = (ids: readonly string[]) =>
   labels("paymentMethodTypes", "paymentMethodTypeId", ids);
 
-export const getReturnReasonDescription = (id: string) => label("returnReasons", "returnReasonId", id);
-export const getReturnReasonDescriptions = (ids: readonly string[]) =>
+const getReturnReasonDescription = (id: string) => label("returnReasons", "returnReasonId", id);
+const getReturnReasonDescriptions = (ids: readonly string[]) =>
   labels("returnReasons", "returnReasonId", ids);
 
-export const getReturnTypeDescription = (id: string) => label("returnTypes", "returnTypeId", id);
-export const getReturnTypeDescriptions = (ids: readonly string[]) =>
+const getReturnTypeDescription = (id: string) => label("returnTypes", "returnTypeId", id);
+const getReturnTypeDescriptions = (ids: readonly string[]) =>
   labels("returnTypes", "returnTypeId", ids);
 
-export const getReturnItemTypeDescription = (id: string) => label("returnItemTypes", "returnItemTypeId", id);
-export const getReturnItemTypeDescriptions = (ids: readonly string[]) =>
+const getReturnItemTypeDescription = (id: string) => label("returnItemTypes", "returnItemTypeId", id);
+const getReturnItemTypeDescriptions = (ids: readonly string[]) =>
   labels("returnItemTypes", "returnItemTypeId", ids);
-export const getRoleTypeDescription = (id: string) => label("roleTypes", "roleTypeId", id);
+const getRoleTypeDescription = (id: string) => label("roleTypes", "roleTypeId", id);
 
-export const getOrderAdjustmentTypeDescription = (id: string) =>
+const getOrderAdjustmentTypeDescription = (id: string) =>
   label("orderAdjustmentTypes", "orderAdjustmentTypeId", id);
-export const getOrderAdjustmentTypeDescriptions = (ids: readonly string[]) =>
+const getOrderAdjustmentTypeDescriptions = (ids: readonly string[]) =>
   labels("orderAdjustmentTypes", "orderAdjustmentTypeId", ids);
 
-export const getContactPurposeDescription = (id: string) =>
+const getContactPurposeDescription = (id: string) =>
   label("contactMechPurposeTypes", "contactMechPurposeTypeId", id);
-export const getContactPurposeDescriptions = (ids: readonly string[]) =>
+const getContactPurposeDescriptions = (ids: readonly string[]) =>
   labels("contactMechPurposeTypes", "contactMechPurposeTypeId", ids);
 
-export const getCommunicationEventTypeDescription = (id: string) =>
+const getCommunicationEventTypeDescription = (id: string) =>
   label("communicationEventTypes", "communicationEventTypeId", id);
-export const getCommunicationEventTypeDescriptions = (ids: readonly string[]) =>
+const getCommunicationEventTypeDescriptions = (ids: readonly string[]) =>
   labels("communicationEventTypes", "communicationEventTypeId", ids);
 
 const RELATIONSHIP_LABEL_FIELDS = ["description", "partyRelationshipName"];
 
-export const getPartyRelationshipDescription = (id: string) =>
+const getPartyRelationshipDescription = (id: string) =>
   label("partyRelationshipTypes", "partyRelationshipTypeId", id, RELATIONSHIP_LABEL_FIELDS);
-export const getPartyRelationshipDescriptions = (ids: readonly string[]) =>
+const getPartyRelationshipDescriptions = (ids: readonly string[]) =>
   labels("partyRelationshipTypes", "partyRelationshipTypeId", ids, RELATIONSHIP_LABEL_FIELDS);
 
-export const getPartyRelationshipTypes = () => rows("partyRelationshipTypes");
-export const getRoleTypes = () => rows("roleTypes");
+const getPartyRelationshipTypes = () => rows("partyRelationshipTypes");
+const getRoleTypes = () => rows("roleTypes");
 
 // ── Shopify ───────────────────────────────────────────────────────────────────────────
 
-export const getShopifyShops = () => rows("shopifyShops");
-export const getShopifyShop = (shopId: string) => row("shopifyShops", shopId);
-export const getShopifyShopLocations = () => rows("shopifyShopLocations");
+const getShopifyShops = () => rows("shopifyShops");
+const getShopifyShop = (shopId: string) => row("shopifyShops", shopId);
+const getShopifyShopLocations = () => rows("shopifyShopLocations");
 
 // ── Geography ─────────────────────────────────────────────────────────────────────────
 
 const byGeoName = (left: Row, right: Row) => (left.geoName || "").localeCompare(right.geoName || "");
 
-export const getGeos = () => rows("geos");
+const getGeos = () => rows("geos");
 
-export const getGeoName = (geoId: string) => label("geos", "geoId", geoId, ["geoName"]);
+const getGeoName = (geoId: string) => label("geos", "geoId", geoId, ["geoName"]);
 
-export const getGeoNames = (geoIds: readonly string[]) => labels("geos", "geoId", geoIds, ["geoName"]);
+const getGeoNames = (geoIds: readonly string[]) => labels("geos", "geoId", geoIds, ["geoName"]);
 
-export async function getGeoIdByCode(code: string): Promise<string> {
+async function getGeoIdByCode(code: string): Promise<string> {
   if(!code) {return "";}
 
   const all = await rows("geos");
@@ -297,7 +297,7 @@ export async function getGeoIdByCode(code: string): Promise<string> {
 }
 
 /** code -> geoId for many codes in one read. */
-export async function getGeoIdsByCode(codes: readonly string[]): Promise<Record<string, string>> {
+async function getGeoIdsByCode(codes: readonly string[]): Promise<Record<string, string>> {
   const wanted = [...new Set(codes.filter(Boolean))];
   if(!wanted.length) {return {};}
 
@@ -309,18 +309,18 @@ export async function getGeoIdsByCode(codes: readonly string[]): Promise<Record<
   ]),);
 }
 
-export async function getCountries(): Promise<Row[]> {
+async function getCountries(): Promise<Row[]> {
   return (await rows("geos")).filter((geo) => geo.geoTypeEnumId === "GEOT_COUNTRY").sort(byGeoName);
 }
 
-export async function getStates(): Promise<Row[]> {
+async function getStates(): Promise<Row[]> {
   return (await rows("geos"))
     .filter((geo) => geo.geoTypeEnumId === "GEOT_STATE" || geo.geoTypeEnumId === "GEOT_PROVINCE")
     .sort(byGeoName);
 }
 
 /** States of one country — joins geoAssocs to geos. */
-export async function getStatesForCountry(countryGeoId: string): Promise<Row[]> {
+async function getStatesForCountry(countryGeoId: string): Promise<Row[]> {
   if(!countryGeoId) {return [];}
 
   const [geos, geoAssocs] = await Promise.all([rows("geos"), rows("geoAssocs")]);
@@ -340,7 +340,7 @@ export interface AllowedTransition extends Row {
  * Transitions out of `statusId`, each carrying the destination's label and colour.
  * Joins statusFlowTransitions to statuses so callers need neither table.
  */
-export async function getAllowedTransitions(statusId: string): Promise<AllowedTransition[]> {
+async function getAllowedTransitions(statusId: string): Promise<AllowedTransition[]> {
   if(!statusId) {return [];}
 
   const [transitions, statuses] = await Promise.all([rows("statusFlowTransitions"), rows("statuses")]);
@@ -364,4 +364,80 @@ export async function getAllowedTransitions(statusId: string): Promise<AllowedTr
 
       return (left.toStatusId || "").localeCompare(right.toStatusId || "");
     });
+}
+
+/**
+ * The seed lookup API.
+ *
+ * Used as `const seed = useSeedData()` then `seed.getStatusDescription(id)`, the same shape
+ * as inventory-count's `useProductMaster()`. Nothing is held between calls, so it is safe
+ * from views, stores, services and utils alike — a plain factory, not a Vue-scoped
+ * composable.
+ */
+export function useSeedData() {
+  return {
+    getAllowedTransitions,
+    getCarrier,
+    getCarrierName,
+    getCarriers,
+    getCommunicationEventTypeDescription,
+    getCommunicationEventTypeDescriptions,
+    getContactPurposeDescription,
+    getContactPurposeDescriptions,
+    getCountries,
+    getEnumDescription,
+    getEnumDescriptions,
+    getEnumsByParentType,
+    getEnumsByType,
+    getFacilities,
+    getFacility,
+    getFacilityName,
+    getFacilityNames,
+    getFacilityParentTypeId,
+    getFacilityParentTypeIds,
+    getFacilityType,
+    getGeoIdByCode,
+    getGeoIdsByCode,
+    getGeoName,
+    getGeoNames,
+    getGeos,
+    getOrderAdjustmentTypeDescription,
+    getOrderAdjustmentTypeDescriptions,
+    getOrderIdentificationTypeDescription,
+    getOrderIdentificationTypeOptions,
+    getPartyRelationshipDescription,
+    getPartyRelationshipDescriptions,
+    getPartyRelationshipTypes,
+    getPaymentMethodDescription,
+    getPaymentMethodDescriptions,
+    getProductStore,
+    getProductStoreFacilities,
+    getProductStoreName,
+    getProductStoreNames,
+    getReturnItemTypeDescription,
+    getReturnItemTypeDescriptions,
+    getReturnReasonDescription,
+    getReturnReasonDescriptions,
+    getReturnTypeDescription,
+    getReturnTypeDescriptions,
+    getRoleTypeDescription,
+    getRoleTypes,
+    getShipmentMethod,
+    getShipmentMethodDescription,
+    getShipmentMethodDescriptions,
+    getShipmentMethodOptions,
+    getShipmentMethodTypes,
+    getShippingMethodsByCarrier,
+    getShopifyShop,
+    getShopifyShopLocations,
+    getShopifyShops,
+    getStates,
+    getStatesForCountry,
+    getStatus,
+    getStatusAge,
+    getStatusAges,
+    getStatusDescription,
+    getStatusDescriptions,
+    getStatusItemsByType,
+  };
 }

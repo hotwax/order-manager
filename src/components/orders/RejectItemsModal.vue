@@ -42,7 +42,9 @@ import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, Ion
 import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import { onMounted, ref } from 'vue';
 import { translate } from '@common';
-import { getEnumsByParentType } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
+
+const seed = useSeedData();
 
 
 const isLoading = ref(false);
@@ -63,8 +65,8 @@ async function loadRejectionReasons() {
   try {
     // Both buckets come from the local database; there is no cache to check first.
     const [issues, noVariance] = await Promise.all([
-      getEnumsByParentType('REPORT_AN_ISSUE'),
-      getEnumsByParentType('RPRT_NO_VAR_LOG'),
+      seed.getEnumsByParentType('REPORT_AN_ISSUE'),
+      seed.getEnumsByParentType('RPRT_NO_VAR_LOG'),
     ]);
 
     const seen = new Set<string>();

@@ -620,13 +620,15 @@ import { translate, StatCard, Sparkline, commonUtil } from '@common';
 import { UNFILLABLE_FACILITY_ID, useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
-import { getEnumsByType, getFacilityName, getShipmentMethodDescription } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useUserStore } from '@/store/user';
 import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
 import { createLatestRequestScope } from '@/utils/latestRequestScope';
 import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
 import { reconcileSelectedFacilityId } from '@/utils/funnelFacilitySelection';
 import { facilityProgressAccessibleName } from '@/utils/funnelProgress';
+
+const seed = useSeedData();
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
@@ -642,9 +644,9 @@ const sortParamEnums = ref<any[]>([]);
 
 async function loadSeedLabels(facilityIds: string[], shipmentMethodTypeIds: string[]) {
   const [facilityEntries, methodEntries, sortParams] = await Promise.all([
-    Promise.all(facilityIds.map(async (id) => [id, await getFacilityName(id)] as const)),
-    Promise.all(shipmentMethodTypeIds.map(async (id) => [id, await getShipmentMethodDescription(id)] as const)),
-    getEnumsByType('PP_SORT_PARAM_TYPE'),
+    Promise.all(facilityIds.map(async (id) => [id, await seed.getFacilityName(id)] as const)),
+    Promise.all(shipmentMethodTypeIds.map(async (id) => [id, await seed.getShipmentMethodDescription(id)] as const)),
+    seed.getEnumsByType('PP_SORT_PARAM_TYPE'),
   ]);
   facilityLabels.value = Object.fromEntries(facilityEntries);
   methodLabels.value = Object.fromEntries(methodEntries);

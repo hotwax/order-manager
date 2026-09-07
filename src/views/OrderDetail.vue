@@ -1075,7 +1075,7 @@ import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, Io
 import { DateTime } from 'luxon';
 import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, chevronDown, chevronUp, closeCircleOutline, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pauseCircleOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, storefrontOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { getAllowedTransitions, getCountries, getEnumDescriptions, getFacilities, getFacilityParentTypeIds, getGeoNames, getOrderAdjustmentTypeDescriptions, getPaymentMethodDescriptions, getProductStoreNames, getShipmentMethodDescriptions, getShipmentMethodTypes, getShopifyShops, getStates, getStatusDescriptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import router from '@/router';
@@ -1083,6 +1083,8 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import AddContactModal from '@/components/AddContactModal.vue';
 import AddItemToOrderModal from '@/components/orders/AddItemToOrderModal.vue';
+
+const seed = useSeedData();
 import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
 import RejectItemsModal from '@/components/orders/RejectItemsModal.vue';
 import ProductInventoryModal from '@/components/inventory/ProductInventoryModal.vue';
@@ -1346,8 +1348,8 @@ async function loadSeedData() {
     statusMap, enumMap, facilityRows, storeMap, methodRows,
     paymentMap, adjustmentMap, geoMap, countryRows, stateRows, shopRows, transitions,
   ] = await Promise.all([
-    getStatusDescriptions(statusIds),
-    getEnumDescriptions([
+    seed.getStatusDescriptions(statusIds),
+    seed.getEnumDescriptions([
       raw.salesChannelEnumId,
       ...(raw.identifications || []).map((id: any) => id.orderIdentificationTypeId),
       ...(raw.statuses || []).map((entry: any) => entry.changeReason),
@@ -1355,16 +1357,16 @@ async function loadSeedData() {
       raw.riskRecommendationEnumId,
       raw.riskLevelEnumId,
     ].filter(Boolean)),
-    getFacilities(),
-    getProductStoreNames([raw.productStoreId].filter(Boolean)),
-    getShipmentMethodTypes(),
-    getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
-    getOrderAdjustmentTypeDescriptions((raw.adjustments || []).map((adj: any) => adj.orderAdjustmentTypeId)),
-    getGeoNames(geoIds),
-    getCountries(),
-    getStates(),
-    getShopifyShops(),
-    raw.statusId ? getAllowedTransitions(raw.statusId) : Promise.resolve([]),
+    seed.getFacilities(),
+    seed.getProductStoreNames([raw.productStoreId].filter(Boolean)),
+    seed.getShipmentMethodTypes(),
+    seed.getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
+    seed.getOrderAdjustmentTypeDescriptions((raw.adjustments || []).map((adj: any) => adj.orderAdjustmentTypeId)),
+    seed.getGeoNames(geoIds),
+    seed.getCountries(),
+    seed.getStates(),
+    seed.getShopifyShops(),
+    raw.statusId ? seed.getAllowedTransitions(raw.statusId) : Promise.resolve([]),
   ]);
 
   statusLabels.value = statusMap;
@@ -1387,7 +1389,7 @@ async function loadSeedData() {
   facilityTypeByFacility.value = Object.fromEntries(
     facilityRows.map((row: any) => [row.facilityId, row.facilityTypeId]),
   );
-  parentTypeByFacilityType.value = await getFacilityParentTypeIds(
+  parentTypeByFacilityType.value = await seed.getFacilityParentTypeIds(
     facilityRows.map((row: any) => row.facilityTypeId),
   );
   methodLabels.value = Object.fromEntries(

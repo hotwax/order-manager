@@ -92,13 +92,15 @@ import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { showToast, sentimentCounts } from '@/utils';
 import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { getEnumDescription, getPaymentMethodDescriptions, getStatusDescriptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import type { TaskCardAction } from '@/types/taskCard';
+
+const seed = useSeedData();
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean; showViewOrderAction?: boolean }>(), {
   selectable: false,
@@ -131,9 +133,9 @@ const recommendationLabel = ref('');
 watch(() => props.task, async (task) => {
   const payments = task?.payments || [];
   [paymentLabels.value, statusLabels.value, recommendationLabel.value] = await Promise.all([
-    getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
-    getStatusDescriptions(payments.map((payment: any) => payment.statusId)),
-    getEnumDescription(task?.riskRecommendationEnumId ?? ''),
+    seed.getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
+    seed.getStatusDescriptions(payments.map((payment: any) => payment.statusId)),
+    seed.getEnumDescription(task?.riskRecommendationEnumId ?? ''),
   ]);
 }, { immediate: true, deep: true });
 

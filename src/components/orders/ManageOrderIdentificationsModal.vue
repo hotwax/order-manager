@@ -112,13 +112,15 @@ import { addOutline, checkmarkDoneOutline, closeOutline, createOutline, trashOut
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { DateTime } from 'luxon';
 import { api, commonUtil, translate } from '@common';
-import { getEnumDescriptions, getOrderIdentificationTypeOptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useUserStore } from '@/store/user';
 import { showToast } from '@/utils';
 import EmptyState from '@/components/common/EmptyState.vue';
 import IdentificationListItem from '@/components/orders/IdentificationListItem.vue';
 import CreateIdentificationTypeModal from '@/components/orders/CreateIdentificationTypeModal.vue';
 import Actions from "@/authorization/actions";
+
+const seed = useSeedData();
 
 type Identification = {
   orderIdentificationTypeId: string;
@@ -161,13 +163,13 @@ const identificationLabels = ref<Record<string, string>>({});
 const identificationTypeOptions = ref<Array<{ enumId: string; description: string }>>([]);
 
 watch(localIdentifications, async (rows) => {
-  identificationLabels.value = await getEnumDescriptions(
+  identificationLabels.value = await seed.getEnumDescriptions(
     rows.map((identification: any) => identification.orderIdentificationTypeId),
   );
 }, { immediate: true, deep: true });
 
 onMounted(async () => {
-  identificationTypeOptions.value = await getOrderIdentificationTypeOptions();
+  identificationTypeOptions.value = await seed.getOrderIdentificationTypeOptions();
 });
 const typeOptions = computed(() => {
   const existingTypeIds = new Set(localIdentifications.value.map((identification) => identification.orderIdentificationTypeId));

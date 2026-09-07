@@ -109,12 +109,14 @@ import TaskQueueListHeader from '@/components/tasks/TaskQueueListHeader.vue';
 import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { getEnumsByType, getStatusItemsByType } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
 import { countTaskTargets, orderTaskTarget, runGroupedTaskMutation, selectedTaskCardsById } from '@/utils/orderTaskBulk';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
+
+const seed = useSeedData();
 import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
@@ -132,10 +134,10 @@ const asEnumOptions = (rows: any[]): TaskFilterOption[] =>
 
 async function loadSeedData() {
   const [channels, orderStatuses, recommendations, levels] = await Promise.all([
-    getEnumsByType('ORDER_SALES_CHANNEL'),
-    getStatusItemsByType('ORDER_STATUS'),
-    getEnumsByType('ORDER_RISK_RECOMMENDATION'),
-    getEnumsByType('ORDER_RISK_LEVEL'),
+    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
+    seed.getStatusItemsByType('ORDER_STATUS'),
+    seed.getEnumsByType('ORDER_RISK_RECOMMENDATION'),
+    seed.getEnumsByType('ORDER_RISK_LEVEL'),
   ]);
   channelOptions.value = asEnumOptions(channels);
   orderStatusOptions.value = orderStatuses.map((status: any) => ({ id: status.statusId, label: status.description || status.statusId }));

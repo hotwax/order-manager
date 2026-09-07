@@ -137,12 +137,14 @@ import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { getEnumsByType, getShipmentMethodOptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { fetchUnfillableProductCandidates, fetchUnfillableShipGroupsForProduct } from '@/services/order';
 import { fetchActiveSubstitutes } from '@/services/productAssociations';
 import { showToast } from '@/utils';
 import { countTaskTargets, runGroupedTaskMutation, shipGroupTaskTarget } from '@/utils/orderTaskBulk';
 import Actions from "@/authorization/actions";
+
+const seed = useSeedData();
 
 const orderTaskStore = useOrderTaskStore();
 const productStore = useProductStore();
@@ -159,8 +161,8 @@ const shipmentMethodOptions = ref<TaskFilterOption[]>([]);
 
 async function loadSeedData() {
   const [channels, methods] = await Promise.all([
-    getEnumsByType('ORDER_SALES_CHANNEL'),
-    getShipmentMethodOptions(),
+    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
+    seed.getShipmentMethodOptions(),
   ]);
   channelOptions.value = channels.map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId }));
   shipmentMethodOptions.value = methods;

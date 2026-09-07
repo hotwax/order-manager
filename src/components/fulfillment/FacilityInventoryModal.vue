@@ -191,9 +191,11 @@ import { IonAccordion, IonAccordionGroup, IonAvatar, IonButton, IonButtons, IonC
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api, DxpShopifyImg, logger, translate } from '@common';
-import { getFacilities, getFacilityName, getProductStoreFacilities } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
 import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
+
+const seed = useSeedData();
 
 export type FacilityInventoryModalItem = {
   orderItemSeqId: string;
@@ -366,8 +368,8 @@ async function fetchFacilityInventory() {
     // facilityIds drive the inventory request below, so read the rows rather than waiting
     // on a reactive subscription to emit.
     const [facilityRows, storeFacilityRows] = await Promise.all([
-      getFacilities(),
-      props.productStoreId ? getProductStoreFacilities(props.productStoreId) : Promise.resolve([]),
+      seed.getFacilities(),
+      props.productStoreId ? seed.getProductStoreFacilities(props.productStoreId) : Promise.resolve([]),
     ]);
 
     const facilities = facilityRows.filter(isPhysicalFacility);

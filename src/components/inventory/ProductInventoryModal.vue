@@ -40,8 +40,10 @@ import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabe
 import { closeOutline } from 'ionicons/icons';
 import { ref, onMounted } from 'vue';
 import { api, logger, translate } from '@common';
-import { getFacilityNames } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
+
+const seed = useSeedData();
 
 const props = defineProps<{ productId: string }>();
 
@@ -53,7 +55,7 @@ const facilityStock = ref<any[]>([]);
 // One read resolves every facility label on the list.
 const facilityLabels = ref<Record<string, string>>({});
 watch(facilityStock, async (entries) => {
-  facilityLabels.value = await getFacilityNames((entries || []).map((entry: any) => entry.facilityId));
+  facilityLabels.value = await seed.getFacilityNames((entries || []).map((entry: any) => entry.facilityId));
 }, { immediate: true, deep: true });
 
 function closeModal() {

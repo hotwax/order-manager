@@ -63,8 +63,10 @@ vi.mock('@/store/user', () => ({
 }));
 
 vi.mock('@/db/useSeedData', () => ({
-  getEnumsByType: async () => [],
-  getShipmentMethodOptions: async () => [],
+  useSeedData: () => ({
+    getEnumsByType: async () => [],
+    getShipmentMethodOptions: async () => [],
+  }),
 }));
 
 // Stands in for the real composable's route->filters direction: the purpose filter

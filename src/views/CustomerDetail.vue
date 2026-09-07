@@ -493,11 +493,13 @@ import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useCustomerDetail } from '@/composables/useCustomerDetail';
 import router from '@/router';
 import { deleteCustomerDetails, indexCustomer } from '@/services/customer';
-import { getCommunicationEventTypeDescriptions, getContactPurposeDescriptions, getEnumDescriptions, getFacilityNames, getPartyRelationshipDescriptions, getStatusDescriptions } from '@/db/useSeedData';
+import { useSeedData } from '@/db/useSeedData';
 import { useUserStore } from '@/store/user';
 import Actions from '@/authorization/actions';
 import type { CustomerOrderCardData, CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
 import type { ReturnSummary } from '@/types/returns';
+
+const seed = useSeedData();
 
 const props = defineProps<{
   customerId: string;
@@ -620,18 +622,18 @@ watch([customer, customerCommunications, customerReturns, openTasks], async () =
     enumLabels.value,
     facilityLabels.value,
   ] = await Promise.all([
-    getContactPurposeDescriptions(contactMechs.map((mech: any) => mech.contactMechPurposeTypeId)),
-    getPartyRelationshipDescriptions(relationships.map((rel: any) => rel.partyRelationshipTypeId)),
-    getCommunicationEventTypeDescriptions(communications.map((comm: any) => comm.communicationEventTypeId)),
-    getStatusDescriptions([
+    seed.getContactPurposeDescriptions(contactMechs.map((mech: any) => mech.contactMechPurposeTypeId)),
+    seed.getPartyRelationshipDescriptions(relationships.map((rel: any) => rel.partyRelationshipTypeId)),
+    seed.getCommunicationEventTypeDescriptions(communications.map((comm: any) => comm.communicationEventTypeId)),
+    seed.getStatusDescriptions([
       ...communications.map((comm: any) => comm.statusId),
       ...returns.map((record: any) => record.statusId),
     ]),
-    getEnumDescriptions([
+    seed.getEnumDescriptions([
       ...tasks.map((task: any) => task.workEffortPurposeTypeId || task.workEffortTypeId),
       ...returns.map((record: any) => record.returnChannelEnumId),
     ]),
-    getFacilityNames(returns.map((record: any) => record.destinationFacilityId)),
+    seed.getFacilityNames(returns.map((record: any) => record.destinationFacilityId)),
   ]);
 }, { immediate: true, deep: true });
 const dashboardTaskCards = computed(() => customerTaskCards.value.slice(0, 1));
