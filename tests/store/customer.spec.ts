@@ -18,7 +18,9 @@ vi.mock('@/services/customer', () => ({
   expirePartyRelationship: vi.fn()
 }));
 
-vi.mock('@/db/omDb', () => ({ seedRows: vi.fn(async () => []) }));
+vi.mock('@/db/orderManagerDb', () => ({
+  omDb: () => ({ all: async () => [], get: async () => undefined }),
+}));
 
 describe('customer detail store', () => {
   beforeEach(() => {

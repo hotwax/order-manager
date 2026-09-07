@@ -45,7 +45,11 @@ vi.mock('@/store/orderTask', () => ({
   }),
 }));
 
-vi.mock('@/db/omDb', () => ({ useSeedTable: () => ({ records: { value: [] } }) }));
+vi.mock('@/db/useSeedData', () => ({
+  getEnumDescription: async (value: string) => value,
+  getPaymentMethodDescriptions: async () => ({}),
+  getStatusDescriptions: async () => ({}),
+}));
 
 vi.mock('@/store/productCache', () => ({
   useProductCacheStore: () => ({ getProduct: () => ({}) }),

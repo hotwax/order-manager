@@ -48,7 +48,9 @@ vi.mock('@/store/order', () => ({
   })),
 }));
 
-vi.mock('@/db/omDb', () => ({ seedRows: vi.fn(async () => []) }));
+vi.mock('@/db/orderManagerDb', () => ({
+  omDb: () => ({ all: async () => [], get: async () => undefined }),
+}));
 
 vi.mock('@/store/orderDetail', () => ({
   useOrderDetailStore: vi.fn(() => ({})),

@@ -62,7 +62,10 @@ vi.mock('@/store/user', () => ({
   useUserStore: () => ({ hasPermission: () => true }),
 }));
 
-vi.mock('@/db/omDb', () => ({ useSeedTable: () => ({ records: { value: [] } }) }));
+vi.mock('@/db/useSeedData', () => ({
+  getEnumsByType: async () => [],
+  getShipmentMethodOptions: async () => [],
+}));
 
 // Stands in for the real composable's route->filters direction: the purpose filter
 // is seeded from `?purpose=`, which is what this spec asserts reaches the store.

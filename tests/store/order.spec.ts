@@ -17,7 +17,9 @@ vi.mock('@common', async (importOriginal) => {
   };
 });
 
-vi.mock('@/db/omDb', () => ({ seedRows: vi.fn(async () => []) }));
+vi.mock('@/db/orderManagerDb', () => ({
+  omDb: () => ({ all: async () => [], get: async () => undefined }),
+}));
 
 vi.mock('@/services/order', () => ({
   searchOrders: vi.fn(),

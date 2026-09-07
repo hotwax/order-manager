@@ -18,7 +18,9 @@ vi.mock('@/composables/useOrderDetail', async (importOriginal) => {
   return { ...actual, useOrderDetail: vi.fn() };
 });
 
-vi.mock('@/db/omDb', () => ({ seedRows: vi.fn(async () => []) }));
+vi.mock('@/db/orderManagerDb', () => ({
+  omDb: () => ({ all: async () => [], get: async () => undefined }),
+}));
 
 const ORDER_ID = 'M102510';
 
