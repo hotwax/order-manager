@@ -63,7 +63,7 @@
  * ║     (alongside RETURN), and are blocked only on ORDER_CANCELLED.          ║
  * ║ R2. The cancel/pull-back policy arrives as ProductStore settings authored ║
  * ║     in the company app — tracked in hotwax/company#158 (seed store        ║
- * ║     already loads productStoreSettingsByStoreId). settingTypeEnumId names ║
+ * ║     read via productStore.fetchProductStoreSettings).  settingTypeEnumId ║
  * ║     TBD; this engine only consumes the mapped `ctx.policy` expressions.   ║
  * ║ R3. Phase cut-offs are REAL EXPRESSIONS (operator + phase, e.g.          ║
  * ║     `"<PACKED"`, `"<=SHIPPED"`); the operator is explicit so there is no  ║

@@ -131,9 +131,18 @@ function loadAndSubscribe(table: string): Promise<void> {
   const gen = generation;
 
   const promise = (async () => {
-    const db = resolveDb();
+    let db: BaseDB;
+    let keyField: string;
+    try {
+      db = resolveDb();
+      keyField = keyFieldOf(db, table);
+    } catch (error) {
+      // No database available (no OMS instance yet, or a failed open). Leave the slice
+      // empty: lookups fall back to raw ids rather than breaking the caller.
+      console.warn(`[seed] Cannot resolve the database for ${table}:`, error);
+      return;
+    }
     const client = dbClient(db);
-    const keyField = keyFieldOf(db, table);
 
     try {
       applyRows(table, keyField, await client.all(table), gen);
@@ -195,8 +204,13 @@ async function waitForDomainSync(table: string, timeoutMs = SYNC_WAIT_TIMEOUT_MS
   const domain = domainOfTable.get(table);
   if (!domain) return;
 
-  const db = resolveDb();
-  if (await hasSyncedThisLogin(db, domain)) return;
+  let db: BaseDB;
+  try {
+    db = resolveDb();
+    if (await hasSyncedThisLogin(db, domain)) return;
+  } catch {
+    return;   // no database to wait on; the caller proceeds with whatever is present
+  }
 
   await new Promise<void>((resolve) => {
     let done = false;
@@ -230,10 +244,16 @@ async function waitForDomainSync(table: string, timeoutMs = SYNC_WAIT_TIMEOUT_MS
  * permanently.
  */
 export async function ensureLoaded(tables: string[], timeoutMs = SYNC_WAIT_TIMEOUT_MS): Promise<void> {
+  // Never rejects. A seed lookup that cannot resolve must degrade to raw ids, not break
+  // the order fetch, customer dashboard or address form that called it.
   await Promise.all(tables.map(async (table) => {
-    if (!slices.has(table)) slices.set(table, shallowRef(new Map<string, Row>()));
-    await waitForDomainSync(table, timeoutMs);
-    await loadAndSubscribe(table);
+    try {
+      if (!slices.has(table)) slices.set(table, shallowRef(new Map<string, Row>()));
+      await waitForDomainSync(table, timeoutMs);
+      await loadAndSubscribe(table);
+    } catch (error) {
+      console.warn(`[seed] ensureLoaded failed for ${table}:`, error);
+    }
   }));
 }
 

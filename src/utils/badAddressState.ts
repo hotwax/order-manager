@@ -1,5 +1,5 @@
-import { useSeedStore } from '@/store/seed';
 import type { AddressForm, AddressState } from '@/types/order';
+import { getGeoIdByCode } from '@/db/useSeedData';
 
 // Builds the editable address-form state a BadAddressTaskCard renders from.
 // Shared by the /bad-address list and the OrderDetail "Holds" segment so both
@@ -21,7 +21,6 @@ function buildAddressForm(src: any, task: any): AddressForm {
 }
 
 function buildSuggestedForm(task: any): AddressForm {
-  const seedStore = useSeedStore();
   let parsed: any = {};
   try { parsed = task.locationDesc ? JSON.parse(task.locationDesc) : {}; } catch { parsed = {}; }
   return {
@@ -29,8 +28,8 @@ function buildSuggestedForm(task: any): AddressForm {
     address2: parsed.address2 ?? '',
     city: parsed.city ?? '',
     postalCode: parsed.postalCode ?? '',
-    stateProvinceGeoId: seedStore.getGeoIdByCode(parsed.stateOrProvinceCode ?? ''),
-    countryGeoId: seedStore.getGeoIdByCode(parsed.countryCode ?? ''),
+    stateProvinceGeoId: getGeoIdByCode(parsed.stateOrProvinceCode ?? ''),
+    countryGeoId: getGeoIdByCode(parsed.countryCode ?? ''),
     contactMechId: task?.shippingAddress?.contactMechId ?? '',
     contactMechPurposeTypeId: task?.shippingAddress?.contactMechPurposeTypeId || 'SHIPPING_LOCATION',
     partyId: task?.customer?.partyId ?? '',

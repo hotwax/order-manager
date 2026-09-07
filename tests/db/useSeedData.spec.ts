@@ -84,6 +84,13 @@ describe('useSeedData module', () => {
     expect(seed.facilityName('F1')).toBe('F1');
   });
 
+  it('ensureLoaded never rejects, even with no resolvable database', async () => {
+    seed.__setDbResolver(() => { throw new Error('no OMS instance'); });
+
+    await expect(seed.ensureLoaded(['facilities'], 120)).resolves.toBeUndefined();
+    expect(seed.facilityName('F1')).toBe('F1');   // degrades to the raw id
+  });
+
   it('describe falls through statuses, enums then lookup tables', async () => {
     await seed.ensureLoaded(['statuses', 'enums', 'roleTypes']);
     expect(seed.describe('ORDER_APPROVED')).toBe('Approved');

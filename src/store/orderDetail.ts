@@ -1,8 +1,8 @@
 import { defineStore } from "pinia";
+import { orderAdjustmentTypeDescription, shippingMethodsByCarrier as seedShippingMethodsByCarrier } from "@/db/useSeedData";
 import { api, commonUtil, logger} from "@common";
 import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
-import { useSeedStore } from "./seed";
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error" | "notfound";
 
@@ -25,7 +25,7 @@ const adjustmentDisplayLabel = (adj: any) =>
   adj.comments
   || adj.comment
   || adj.description
-  || useSeedStore().orderAdjustmentTypeDescription(adj.orderAdjustmentTypeId)
+  || orderAdjustmentTypeDescription(adj.orderAdjustmentTypeId)
   || adj.orderAdjustmentTypeId
   || "OTHER_ADJUSTMENT";
 
@@ -723,8 +723,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       const fromDetail = state.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId);
       if (fromDetail.length) return fromDetail;
       try {
-        const seedStore = useSeedStore();
-        return seedStore.shippingMethodsByCarrier(carrierPartyId);
+        return seedShippingMethodsByCarrier(carrierPartyId);
       } catch {
         return [];
       }

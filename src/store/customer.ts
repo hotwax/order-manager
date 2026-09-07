@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon';
 import { defineStore } from 'pinia';
+import { ensureLoaded, statusAge } from '@/db/useSeedData';
 import {
   createPartyEmail,
   createPartyPostalAddress,
@@ -22,7 +23,6 @@ import {
   getPartyNames
 } from '@/services/customer';
 import { listReturns } from '@/services/returns';
-import { useSeedStore } from '@/store/seed';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { commonUtil } from '@common';
 import type {
@@ -323,13 +323,13 @@ export const useCustomerStore = defineStore('customerDetail', {
     // Prefetch on detail route mount. Profile failure fails the page; section
     // failures (orders/tasks) are isolated to their own source bucket.
     async loadCustomerDashboard(partyId: string, force = false) {
-      const seed = useSeedStore();
+      // statusAge is stamped into card progress values, so load the slice before reading it.
+      await ensureLoaded(['statuses']);
       await Promise.allSettled([
         this.loadCustomerProfile(partyId, force),
         this.loadCustomerOrders(partyId, force),
         this.loadCustomerTasks(partyId, force),
-        this.loadCustomerRelationships(partyId, force),
-        (seed as any).loadPartyRelationshipTypes()
+        this.loadCustomerRelationships(partyId, force)
       ]);
       await (this as any).loadMergableDuplicates(partyId);
     },
@@ -371,15 +371,15 @@ export const useCustomerStore = defineStore('customerDetail', {
 
         // Real progress for the rendered cards: hydrate each via the official get-order API
         // (not Solr) and compute from order-item (+ shipment-item) status ages.
-        const seed = useSeedStore();
+        await ensureLoaded(['statuses']);
         const displayCount = 12;
         await Promise.all(result.orders.slice(0, displayCount).map(async (order) => {
           try {
             const statusIds = await getOrderProgressStatuses(order.orderId);
             if (statusIds.length) {
-              order.progressValue = computeProgress(statusIds, (statusId) => seed.statusAge(statusId));
+              order.progressValue = computeProgress(statusIds, (statusId) => statusAge(statusId));
               order.progressLabel = `${Math.round(order.progressValue * 100)}% complete`;
-              order.progressColor = progressStatusColor(statusIds, (statusId) => seed.statusAge(statusId));
+              order.progressColor = progressStatusColor(statusIds, (statusId) => statusAge(statusId));
             }
           } catch {
             // keep the Solr status fallback on a per-order failure

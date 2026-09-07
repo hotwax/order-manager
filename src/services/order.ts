@@ -1,6 +1,5 @@
 import { api, commonUtil, useSolrSearch } from '@common';
-import { getActivePinia } from 'pinia';
-import { useSeedStore } from '@/store/seed';
+import { ensureLoaded, facilityType } from '@/db/useSeedData';
 import type { Order } from '@/types/order';
 import type {
   AllocationItemDocument,
@@ -272,6 +271,8 @@ export async function searchOrders(params: OrderSearchParams = {}): Promise<Orde
 
   if (commonUtil.hasError(response)) return Promise.reject(response.data);
 
+  // facilityParentTypeId is stamped onto the normalized rows, so it cannot self-correct.
+  await ensureLoaded(['facilityTypes']);
   const result = normalizeOrderSolrResponse(response.data, params.allocationSummary);
   if (params.allocationSummary?.mode !== 'queue-first' || !result.orders.length) return result;
 
@@ -332,6 +333,7 @@ export async function fetchOrderRowEnrichment(orderIds: readonly string[]): Prom
   if (!uniqueOrderIds.length) return {};
   const response = await useSolrSearch().runSolrQuery(buildOrderRowEnrichmentPayload(uniqueOrderIds));
   if (commonUtil.hasError(response)) return Promise.reject(response.data);
+  await ensureLoaded(['facilityTypes']);
   return normalizeOrderRowEnrichment(response.data);
 }
 
@@ -787,15 +789,15 @@ function isVirtualFacilityDoc(doc: any) {
   const facilityTypeId = toStringValue(doc.facilityTypeId);
   if (facilityTypeId === 'VIRTUAL_FACILITY') return true;
 
-  // The parent-type check needs the seed store; guard it so this service stays callable
-  // outside an active Pinia (e.g. unit tests), falling back to the direct type check.
-  if (!facilityTypeId || !getActivePinia()) return false;
-  const parentTypeId = useSeedStore().facilityType(facilityTypeId)?.parentTypeId;
-  return parentTypeId === 'VIRTUAL_FACILITY';
+  if (!facilityTypeId) return false;
+  return facilityType(facilityTypeId)?.parentTypeId === 'VIRTUAL_FACILITY';
 }
 
+/**
+ * Stamps facilityParentTypeId onto each document, so the facilityTypes slice must already be
+ * loaded — the async callers do that via ensureLoaded before reaching here.
+ */
 function allocationDocuments(docs: readonly any[]): AllocationItemDocument[] {
-  const seedStore = getActivePinia() ? useSeedStore() : undefined;
   return docs.map((doc) => {
     const facilityTypeId = toStringValue(doc.facilityTypeId);
     return {
@@ -804,7 +806,7 @@ function allocationDocuments(docs: readonly any[]): AllocationItemDocument[] {
       facilityId: toStringValue(doc.facilityId),
       facilityName: toStringValue(doc.facilityName),
       facilityTypeId,
-      facilityParentTypeId: seedStore?.facilityType(facilityTypeId)?.parentTypeId
+      facilityParentTypeId: facilityType(facilityTypeId)?.parentTypeId
     };
   });
 }
