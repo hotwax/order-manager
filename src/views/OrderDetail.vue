@@ -1138,85 +1138,6 @@ const transitionsByStatus = ref<Record<string, any[]>>({});
 
 const geoLabel = (geoId: string) => geoLabels.value[geoId] ?? geoId ?? '';
 
-/**
- * Resolve every seed label this page renders. One read per table, re-run whenever the order
- * changes, so the synchronous computeds above always have their labels in hand.
- */
-async function loadSeedData() {
-  const raw: any = order.value ?? {};
-  const shipGroups = raw.shipGroups || [];
-  const items = raw.items || [];
-  const payments = raw.payments || [];
-  const statusIds = [
-    raw.statusId,
-    ...(raw.statuses || []).map((entry: any) => entry.statusId),
-    ...payments.map((payment: any) => payment.statusId),
-    ...items.map((item: any) => item.statusId),
-  ].filter(Boolean);
-  const facilityIds = [
-    raw.originFacilityId,
-    ...shipGroups.map((group: any) => group.facilityId),
-    ...items.map((item: any) => item.facilityId),
-  ].filter(Boolean);
-  const geoIds = [raw.shippingAddress, raw.billingAddress]
-    .filter(Boolean)
-    .flatMap((address: any) => [address.stateProvinceGeoId, address.countryGeoId])
-    .filter(Boolean);
-
-  const [
-    statusMap, enumMap, facilityRows, storeMap, methodRows,
-    paymentMap, adjustmentMap, geoMap, countryRows, stateRows, shopRows, transitions,
-  ] = await Promise.all([
-    getStatusDescriptions(statusIds),
-    getEnumDescriptions([
-      raw.salesChannelEnumId,
-      ...(raw.identifications || []).map((id: any) => id.orderIdentificationTypeId),
-      ...(raw.statuses || []).map((entry: any) => entry.changeReason),
-      ...(raw.events || []).map((event: any) => event.changeReason || event.changeReasonEnumId),
-      raw.riskRecommendationEnumId,
-      raw.riskLevelEnumId,
-    ].filter(Boolean)),
-    getFacilities(),
-    getProductStoreNames([raw.productStoreId].filter(Boolean)),
-    getShipmentMethodTypes(),
-    getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
-    getOrderAdjustmentTypeDescriptions((raw.adjustments || []).map((adj: any) => adj.orderAdjustmentTypeId)),
-    getGeoNames(geoIds),
-    getCountries(),
-    getStates(),
-    getShopifyShops(),
-    raw.statusId ? getAllowedTransitions(raw.statusId) : Promise.resolve([]),
-  ]);
-
-  statusLabels.value = statusMap;
-  enumLabels.value = enumMap;
-  productStoreLabels.value = storeMap;
-  paymentLabels.value = paymentMap;
-  adjustmentLabels.value = adjustmentMap;
-  geoLabels.value = geoMap;
-  countries.value = countryRows;
-  states.value = stateRows;
-  shopifyShops.value = shopRows;
-  transitionsByStatus.value = raw.statusId ? { [raw.statusId]: transitions } : {};
-
-  const wantedFacilities = new Set(facilityIds);
-  facilityLabels.value = Object.fromEntries(
-    facilityRows
-      .filter((row: any) => wantedFacilities.has(row.facilityId))
-      .map((row: any) => [row.facilityId, row.facilityName || row.facilityId]),
-  );
-  facilityTypeByFacility.value = Object.fromEntries(
-    facilityRows.map((row: any) => [row.facilityId, row.facilityTypeId]),
-  );
-  parentTypeByFacilityType.value = await getFacilityParentTypeIds(
-    facilityRows.map((row: any) => row.facilityTypeId),
-  );
-  methodLabels.value = Object.fromEntries(
-    methodRows.map((row: any) => [row.shipmentMethodTypeId, row.description || row.shipmentMethodTypeId]),
-  );
-}
-
-watch(order, () => { void loadSeedData(); }, { immediate: true, deep: true });
 const productCache = useProductCacheStore();
 const customerStore = useCustomerStore();
 const userStore = useUserStore();
@@ -1395,6 +1316,86 @@ const order = computed(() => {
     }))
   };
 });
+
+/**
+ * Resolve every seed label this page renders. One read per table, re-run whenever the order
+ * changes, so the synchronous computeds above always have their labels in hand.
+ */
+async function loadSeedData() {
+  const raw: any = order.value ?? {};
+  const shipGroups = raw.shipGroups || [];
+  const items = raw.items || [];
+  const payments = raw.payments || [];
+  const statusIds = [
+    raw.statusId,
+    ...(raw.statuses || []).map((entry: any) => entry.statusId),
+    ...payments.map((payment: any) => payment.statusId),
+    ...items.map((item: any) => item.statusId),
+  ].filter(Boolean);
+  const facilityIds = [
+    raw.originFacilityId,
+    ...shipGroups.map((group: any) => group.facilityId),
+    ...items.map((item: any) => item.facilityId),
+  ].filter(Boolean);
+  const geoIds = [raw.shippingAddress, raw.billingAddress]
+    .filter(Boolean)
+    .flatMap((address: any) => [address.stateProvinceGeoId, address.countryGeoId])
+    .filter(Boolean);
+
+  const [
+    statusMap, enumMap, facilityRows, storeMap, methodRows,
+    paymentMap, adjustmentMap, geoMap, countryRows, stateRows, shopRows, transitions,
+  ] = await Promise.all([
+    getStatusDescriptions(statusIds),
+    getEnumDescriptions([
+      raw.salesChannelEnumId,
+      ...(raw.identifications || []).map((id: any) => id.orderIdentificationTypeId),
+      ...(raw.statuses || []).map((entry: any) => entry.changeReason),
+      ...(raw.events || []).map((event: any) => event.changeReason || event.changeReasonEnumId),
+      raw.riskRecommendationEnumId,
+      raw.riskLevelEnumId,
+    ].filter(Boolean)),
+    getFacilities(),
+    getProductStoreNames([raw.productStoreId].filter(Boolean)),
+    getShipmentMethodTypes(),
+    getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
+    getOrderAdjustmentTypeDescriptions((raw.adjustments || []).map((adj: any) => adj.orderAdjustmentTypeId)),
+    getGeoNames(geoIds),
+    getCountries(),
+    getStates(),
+    getShopifyShops(),
+    raw.statusId ? getAllowedTransitions(raw.statusId) : Promise.resolve([]),
+  ]);
+
+  statusLabels.value = statusMap;
+  enumLabels.value = enumMap;
+  productStoreLabels.value = storeMap;
+  paymentLabels.value = paymentMap;
+  adjustmentLabels.value = adjustmentMap;
+  geoLabels.value = geoMap;
+  countries.value = countryRows;
+  states.value = stateRows;
+  shopifyShops.value = shopRows;
+  transitionsByStatus.value = raw.statusId ? { [raw.statusId]: transitions } : {};
+
+  const wantedFacilities = new Set(facilityIds);
+  facilityLabels.value = Object.fromEntries(
+    facilityRows
+      .filter((row: any) => wantedFacilities.has(row.facilityId))
+      .map((row: any) => [row.facilityId, row.facilityName || row.facilityId]),
+  );
+  facilityTypeByFacility.value = Object.fromEntries(
+    facilityRows.map((row: any) => [row.facilityId, row.facilityTypeId]),
+  );
+  parentTypeByFacilityType.value = await getFacilityParentTypeIds(
+    facilityRows.map((row: any) => row.facilityTypeId),
+  );
+  methodLabels.value = Object.fromEntries(
+    methodRows.map((row: any) => [row.shipmentMethodTypeId, row.description || row.shipmentMethodTypeId]),
+  );
+}
+
+watch(order, () => { void loadSeedData(); }, { immediate: true, deep: true });
 
 const customerProfile = computed(() => customerPartyId.value ? customerStore.getCustomer(customerPartyId.value) : null);
 
