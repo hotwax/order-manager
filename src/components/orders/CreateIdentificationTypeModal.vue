@@ -50,10 +50,10 @@ import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, Ion
 import { checkmarkDoneOutline, closeOutline } from 'ionicons/icons';
 import { ref } from 'vue';
 import { commonUtil, translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { createOrderIdentificationType } from '@/services/orderIdentification';
 import { showToast } from '@/utils';
 
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 const saving = ref(false);
 
 const formData = ref({ enumId: '', enumName: '', description: '' });
@@ -89,7 +89,7 @@ async function createType() {
 
   saving.value = true;
   try {
-    await seedStore.createOrderIdentificationType({
+    await createOrderIdentificationType({
       enumId: formData.value.enumId,
       description: formData.value.description.trim() || formData.value.enumName.trim()
     });

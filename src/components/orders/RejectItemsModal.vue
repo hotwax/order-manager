@@ -42,9 +42,9 @@ import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, Ion
 import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import { onMounted, ref } from 'vue';
 import { translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 
-const seed = useSeedStore();
+const seed = useSeedData();
 
 const isLoading = ref(false);
 const rejectionReasons = ref<any[]>([]);
@@ -76,10 +76,7 @@ async function loadRejectionReasons() {
   }
   try {
     if (!cachedReasons.length) {
-      await Promise.all([
-        seed.loadEnumsByParentType('REPORT_AN_ISSUE'),
-        seed.loadEnumsByParentType('RPRT_NO_VAR_LOG'),
-      ]);
+      await seed.ensureLoaded(['enums', 'enumTypes']);
       const reasons = [
         ...seed.getEnumsByParentType('REPORT_AN_ISSUE'),
         ...seed.getEnumsByParentType('RPRT_NO_VAR_LOG'),

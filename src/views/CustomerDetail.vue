@@ -493,7 +493,7 @@ import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useCustomerDetail } from '@/composables/useCustomerDetail';
 import router from '@/router';
 import { deleteCustomerDetails, indexCustomer } from '@/services/customer';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { useUserStore } from '@/store/user';
 import Actions from '@/authorization/actions';
 import type { CustomerOrderCardData, CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
@@ -504,7 +504,7 @@ const props = defineProps<{
 }>();
 
 const selectedSegment = ref('dashboard');
-const seed = useSeedStore();
+const seed = useSeedData();
 const userStore = useUserStore();
 const recentOrdersQuery = ref('');
 const allOrdersQuery = ref('');
@@ -784,7 +784,7 @@ watch(() => props.customerId, () => {
 });
 
 function seedDescribe(id?: string): string {
-  return (seed as any).describe(id) || '';
+  return seed.describe(id) || '';
 }
 
 function money(value: number, currency = 'USD') {

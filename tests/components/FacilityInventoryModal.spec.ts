@@ -37,7 +37,8 @@ describe('facility inventory modal', () => {
   });
 
   it('takes the order limit from the cached facility and the consumption live', () => {
-    expect(source).toContain('seedStore.loadFacilities()');
+    // facilityIds drive the inventory request, so the slices must be awaited, not merely read.
+    expect(source).toContain("seedStore.ensureLoaded(['facilities', 'productStoreFacilities'])");
     expect(source).toContain("url: 'admin/facilities/orderCount'");
     expect(source).toContain("facilityId_op: 'in'");
     // The unscoped oms mount returned every facility for every date; the admin mount is the one

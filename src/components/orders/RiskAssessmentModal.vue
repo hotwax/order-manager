@@ -43,14 +43,14 @@ import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabe
 import { closeOutline, shieldOutline } from 'ionicons/icons';
 import { DateTime } from 'luxon';
 import { translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { factSentimentColor, factSentimentIcon, riskLevelColor, sortFactsBySentiment } from '@/utils';
 
 withDefaults(defineProps<{ risks?: any[] }>(), {
   risks: () => [],
 });
 
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 
 function dismiss() {
   modalController.dismiss();

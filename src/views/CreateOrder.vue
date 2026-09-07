@@ -294,7 +294,7 @@ import AddressModal from '@/components/AddressModal.vue';
 import AddCustomerModal from '@/components/AddCustomerModal.vue';
 import AddProductModal from '@/components/AddProductModal.vue';
 import AddCustomLineModal from '@/components/AddCustomLineModal.vue';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 
 const currencies = ref([]) as any;
 const shopsList = ref<any[]>([]);
@@ -315,16 +315,14 @@ const facilities = computed(() => {
   const productStoreId = useProductStore().getCurrentProductStore?.productStoreId;
   if (!productStoreId) return [];
 
-  const storeFacilitiesMap = useSeedStore().productStoreFacilitiesByStoreId[productStoreId]?.byId;
-  if (!storeFacilitiesMap) return [];
-
-  const storeFacilities = Object.values(storeFacilitiesMap);
+  const storeFacilities = useSeedData().productStoreFacilities(productStoreId);
+  if (!storeFacilities.length) return [];
 
   if (!orderForm.value.shopId) {
     return storeFacilities;
   }
 
-  const shopLocations = Object.values(useSeedStore().shopifyShopLocations?.byId || {});
+  const shopLocations = useSeedData().shopifyShopLocations();
   const allowedFacilityIds = shopLocations
     .filter((loc: any) => loc.shopId === orderForm.value.shopId)
     .map((loc: any) => loc.facilityId);

@@ -431,7 +431,7 @@ import { useProductMaster } from "@/composables/useProductMaster";
 import { useOrderDetailStore } from "@/store/orderDetail";
 import { useProductCacheStore } from "@/store/productCache";
 import { useReturnsStore } from "@/store/returns";
-import { useSeedStore } from "@/store/seed";
+import { useSeedData } from '@/db/useSeedData';
 import { useUserStore } from "@/store/user";
 import type { ReturnItemDetail, ReturnStatusHistory, ReturnSyncState } from "@/types/returns";
 
@@ -440,7 +440,7 @@ const props = defineProps<{
 }>();
 
 const returnsStore = useReturnsStore();
-const seed = useSeedStore();
+const seed = useSeedData();
 const productCache = useProductCacheStore();
 const productMaster = useProductMaster();
 const orderDetailStore = useOrderDetailStore();

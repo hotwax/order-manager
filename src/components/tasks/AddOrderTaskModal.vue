@@ -108,7 +108,7 @@ import {
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
 
 const props = defineProps<{
@@ -122,7 +122,7 @@ const props = defineProps<{
   defaultWorkEffortPurposeTypeId?: string;
 }>();
 
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 const WORK_EFFORT_TYPE_ID = 'RESOLVE_ONHOLD_ORDER';
 const OPERATOR_HOLD_PURPOSE_IDS = new Set(['ORD_HOLD_MANUAL', 'ORD_HOLD_CUST_REQ']);
 
@@ -164,10 +164,6 @@ const isValid = computed(() => {
     return detailsValid && selectedShipGroupSeqIds.value.length > 0;
   }
   return detailsValid;
-});
-
-onMounted(() => {
-  seedStore.loadEnumType(WORK_EFFORT_TYPE_ID);
 });
 
 watch(generatedTaskName, (taskName) => {

@@ -130,7 +130,7 @@ import { api, DxpShopifyImg, translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 
 const props = defineProps<{
   substituteProducts: any[];
@@ -166,7 +166,7 @@ const searchResults = ref<any[]>([]);
 const isSearching = ref(false);
 const searchPageIndex = ref(0);
 const searchTotalCount = ref(0);
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 
 const isSearchScrollable = computed(() =>
   searchResults.value.length > 0 && searchResults.value.length < searchTotalCount.value
@@ -290,7 +290,6 @@ function save() {
 onMounted(async () => {
   const productIds = props.substituteProducts.map((p: any) => p.productId).filter(Boolean);
   await Promise.all([
-    seedStore.loadFacilities(),
     productIds.length
       ? (async () => {
           useProductMaster().init();

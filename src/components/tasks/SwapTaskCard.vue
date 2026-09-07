@@ -142,7 +142,7 @@ import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductAc
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
@@ -159,7 +159,7 @@ const props = withDefaults(defineProps<{ task: any; selectable?: boolean; select
 const emit = defineEmits<{ (e: 'update:selected', value: boolean): void; (e: 'completed'): void }>();
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 
 const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'release', label: translate('Release updated order'), kind: 'primary' },

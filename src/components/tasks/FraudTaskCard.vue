@@ -92,7 +92,7 @@ import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { showToast, sentimentCounts } from '@/utils';
 import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
@@ -112,7 +112,7 @@ const emit = defineEmits<{
 }>();
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 
 const cardActions = computed<TaskCardAction[]>(() => ([

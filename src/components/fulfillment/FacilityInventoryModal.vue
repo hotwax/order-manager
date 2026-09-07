@@ -191,7 +191,7 @@ import { IonAccordion, IonAccordionGroup, IonAvatar, IonButton, IonButtons, IonC
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api, DxpShopifyImg, logger, translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
 import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
 
@@ -211,7 +211,7 @@ const props = defineProps<{
 
 const MAX_SHORT_NAMES = 2;
 
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 const isLoading = ref(false);
 const hasFailed = ref(false);
 const allFacilities = ref<FacilityCoverageRow[]>([]);
@@ -308,10 +308,6 @@ function todayIsoDate() {
   return localDate.toISOString().slice(0, 10);
 }
 
-function seedDatasetRecords(dataset: any) {
-  return dataset?.ids?.map((id: string) => dataset.byId[id]) ?? [];
-}
-
 function syncMobileViewport() {
   isMobileViewport.value = Boolean(mobileMediaQuery?.matches);
 }
@@ -368,12 +364,10 @@ async function fetchFacilityInventory() {
   isLoading.value = true;
   hasFailed.value = false;
   try {
-    await Promise.all([
-      seedStore.loadFacilities(),
-      props.productStoreId ? seedStore.loadProductStoreSeedData(props.productStoreId) : Promise.resolve()
-    ]);
+    // facilityIds drive the inventory request below, so the slices must be populated first.
+    await seedStore.ensureLoaded(['facilities', 'productStoreFacilities']);
 
-    const facilities = seedDatasetRecords(seedStore.facilities).filter(isPhysicalFacility);
+    const facilities = seedStore.facilities().filter(isPhysicalFacility);
     const facilityIds = facilities.map((facility: any) => facility.facilityId);
     const joinedProductIds = productIds.value.join(',');
 
@@ -409,7 +403,7 @@ async function fetchFacilityInventory() {
       inventoryItems: inventoryResp,
       facilityOrderCounts: orderCountResp,
       productStoreFacilities: props.productStoreId
-        ? seedDatasetRecords(seedStore.productStoreFacilitiesByStoreId[props.productStoreId])
+        ? seedStore.productStoreFacilities(props.productStoreId)
         : [],
       facilityName: (facilityId) => seedStore.facilityName(facilityId)
     }));

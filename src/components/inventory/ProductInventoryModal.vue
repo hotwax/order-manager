@@ -40,12 +40,12 @@ import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabe
 import { closeOutline } from 'ionicons/icons';
 import { ref, onMounted } from 'vue';
 import { api, logger, translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
 
 const props = defineProps<{ productId: string }>();
 
-const seedStore = useSeedStore();
+const seedStore = useSeedData();
 const product = useProductCacheStore().getProduct(props.productId);
 
 const isLoading = ref(false);

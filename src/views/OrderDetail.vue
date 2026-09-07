@@ -803,7 +803,7 @@
                           <ion-select :label="translate('Country')" label-placement="stacked" interface="popover"
                             :placeholder="translate('Select Country')" v-model="shippingAddressForm.countryGeoId"
                             @ionChange="shippingAddressForm.stateProvinceGeoId = ''">
-                            <ion-select-option v-for="country in seed.getCountries" :key="country.geoId"
+                            <ion-select-option v-for="country in seed.getCountries()" :key="country.geoId"
                               :value="country.geoId">
                               {{ country.geoName }}
                             </ion-select-option>
@@ -959,7 +959,7 @@
       <div v-if="selectedSegment === 'holds'">
         <template v-if="hasOrderHoldTasks">
           <BadAddressTaskCard v-for="task in orderAddressValidationTasks" :key="task.workEffortId" :task="task"
-            :countries="seed.getCountries"
+            :countries="seed.getCountries()"
             @completed="reloadHoldTasks" />
           <SwapTaskCard v-for="task in orderSwapTasks" :key="task.workEffortId" :task="task"
             @completed="reloadHoldTasks" />
@@ -1075,7 +1075,7 @@ import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, Io
 import { DateTime } from 'luxon';
 import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, chevronDown, chevronUp, closeCircleOutline, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pauseCircleOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, storefrontOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@/db/useSeedData';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import router from '@/router';
@@ -1119,7 +1119,7 @@ const props = defineProps<{
 }>();
 
 const orderDetailStore = useOrderDetailStore();
-const seed = useSeedStore();
+const seed = useSeedData();
 const productCache = useProductCacheStore();
 const customerStore = useCustomerStore();
 const userStore = useUserStore();
@@ -1160,7 +1160,7 @@ const fallbackShopIdByProductStore = computed(() => {
   if (shopifyOrderShopId.value) return '';
   const productStoreId = orderDetailStore.orderById(props.orderId)?.productStoreId;
   if (!productStoreId) return '';
-  const shops = seed.shopifyShops.ids.map((id: string) => seed.shopifyShops.byId[id]);
+  const shops = seed.shopifyShops();
   return singleShopIdForProductStore(shops, productStoreId);
 });
 
@@ -1168,7 +1168,7 @@ const shopifyAdminUrl = computed(() => {
   if (!shopifyOrderId.value) return '';
   const shopId = shopifyOrderShopId.value || fallbackShopIdByProductStore.value;
   if (!shopId) return '';
-  const shop: any = seed.shopifyShops.byId[shopId];
+  const shop: any = seed.shopifyShops().find((s: any) => s.shopId === shopId);
   return shop ? shopifyAdminOrderUrl(shop.myshopifyDomain || shop.domain, shopifyOrderId.value) : '';
 });
 
@@ -1184,7 +1184,6 @@ async function resolveShopifyOrderShop(orderId: string) {
   }
   shopifyOrderShopId.value = '';
   if (!shopifyOrderId.value) return;
-  seed.loadShopifyShops();
   try {
     const resp = await api({ url: `oms/orders/${orderId}/shopifyShopOrder`, method: 'GET' });
     const rows: any[] = Array.isArray(resp.data) ? resp.data : (resp.data?.docs ?? []);
@@ -2331,16 +2330,6 @@ function carriedOverReturnIds(payment: any): string[] {
 // just avoids re-listing the child types on every order.
 const REJECTION_REASON_PARENT_TYPES = ['REPORT_AN_ISSUE', 'RPRT_NO_VAR_LOG'];
 
-function loadRejectionReasonEnums() {
-  REJECTION_REASON_PARENT_TYPES
-    .filter((parentTypeId) => !seed.getEnumsByParentType(parentTypeId).length)
-    .forEach((parentTypeId) => {
-      seed.loadEnumsByParentType(parentTypeId).catch((error: any) =>
-        logger.debug(`Rejection reason enums for ${parentTypeId} unavailable`, error)
-      );
-    });
-}
-
 async function loadOrder(orderId: string, force = false) {
   if (force) {
     await orderDetailStore.fetchOrder(orderId, true);
@@ -2350,7 +2339,6 @@ async function loadOrder(orderId: string, force = false) {
   // Timeline event sources (OrderStatus, OrderFacilityChange). Fire-and-forget: the
   // header timeline fills in as they land, and the rest of the page never waits.
   orderDetailStore.fetchOrderEvents(orderId, force);
-  loadRejectionReasonEnums();
   // A counter sale's only remaining question is whether inventory actually left the
   // books, so load the issuance rows for those orders and no others.
   if ((orderDetailStore.orderById(orderId)?.shipGroups || []).some(isPosCompleted)) {
@@ -2815,7 +2803,7 @@ const shippingAddressForm = ref({
   countryGeoId: '',
 });
 
-const statesForCountry = computed(() => seed.getStates);
+const statesForCountry = computed(() => seed.getStates());
 
 function openEditShippingAddress(shipGroup: any) {
   const mech = shipGroupShippingContactMech(shipGroup);
