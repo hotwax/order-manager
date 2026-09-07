@@ -6,6 +6,7 @@ import { useAuth } from "@common/composables/useAuth";
 import { showToast } from "@/utils";
 import { getOrderManagerDb } from "@/db/orderManagerDb";
 import { useSeedStore } from "./seed";
+import { resetSeedData } from "@/db/useSeedData";
 import { useOrderDetailStore } from "./orderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useProductStore } from "@/store/productStore";
@@ -192,6 +193,7 @@ export const useUserStore = defineStore("user", {
     },
     async postLogout() {
       await clearLocalDb(getOrderManagerDb(commonUtil.getOMSInstanceName()));
+      resetSeedData();
       useSeedStore().resetSeedData();
       useOrderDetailStore().reset();
       useProductCacheStore().reset();
