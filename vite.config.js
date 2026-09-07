@@ -49,7 +49,9 @@ export default defineConfig(({ mode }) => {
   test: {
     globals: true,
     environment: 'jsdom',
-    include: ['tests/**/*.spec.ts', 'tests/**/*.test.ts'],
+    // The shared footer component this app renders is specced in accxui; run it here too so
+    // a change to common/ that breaks this app's menu is caught by this app's suite.
+    include: ['tests/**/*.spec.ts', 'tests/**/*.test.ts', '../../common/components/**/*.spec.ts'],
     exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', '.claude']
   }
   }

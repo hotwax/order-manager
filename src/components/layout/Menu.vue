@@ -110,37 +110,18 @@
       </ion-list>
     </ion-content>
 
-    <ion-footer v-if="isAuthenticated">
-      <ion-toolbar>
-        <ion-item lines="none">
-          <ion-label class="ion-text-wrap">
-            <p class="overline">{{ omsInstanceLabel() }}</p>
-          </ion-label>
-          <ion-note v-if="currentTimeZone" slot="end" class="ion-text-end" :color="isTimeZoneMismatched ? 'danger' : ''">
-            {{ currentTimeZone }}
-            <p v-if="isTimeZoneMismatched">{{ selectedZoneTime }}</p>
-          </ion-note>
-        </ion-item>
-        <ion-item v-if="productStores.length > 1" lines="none">
-          <ion-select :label="translate('Select store')" interface="popover" :value="currentProductStore.productStoreId" @ionChange="setCurrentProductStore($event)">
-            <ion-select-option v-for="store in productStores" :key="store.productStoreId" :value="store.productStoreId">
-              {{ store.storeName || store.productStoreId }}
-            </ion-select-option>
-          </ion-select>
-        </ion-item>
-        <ion-item v-else-if="currentProductStore?.productStoreId" lines="none">
-          <ion-label class="ion-text-wrap">
-            <p class="overline">{{ translate("Product Store") }}</p>
-            {{ currentProductStore.storeName || currentProductStore.productStoreId }}
-          </ion-label>
-        </ion-item>
-      </ion-toolbar>
-    </ion-footer>
+    <DxpOmsInstanceFooter
+      v-if="isAuthenticated"
+      :instance-label="omsInstanceLabel()"
+      :product-stores="productStores"
+      :current-product-store-id="currentProductStore?.productStoreId"
+      @update:product-store="setCurrentProductStore"
+    />
   </ion-menu>
 </template>
 
 <script setup lang="ts">
-import { IonBadge, IonContent, IonFooter, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonMenu, IonMenuToggle, IonNote, IonSelect, IonSelectOption, IonTitle, IonToolbar } from '@ionic/vue';
+import { IonBadge, IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonMenu, IonMenuToggle, IonTitle, IonToolbar } from '@ionic/vue';
 import {
   airplaneOutline,
   alertCircleOutline,
@@ -157,13 +138,13 @@ import {
   settingsOutline,
   shieldHalfOutline
 } from 'ionicons/icons';
-import { commonUtil, translate } from '@common';
+import { commonUtil, DxpOmsInstanceFooter, translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 import router from '@/router';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted } from 'vue';
 import Actions from "@/authorization/actions";
 
 const HOTWAX_HOST_SUFFIX = ".hotwax.io";
@@ -188,22 +169,6 @@ function omsInstanceLabel() {
   return host.endsWith(HOTWAX_HOST_SUFFIX) ? host.slice(0, -HOTWAX_HOST_SUFFIX.length) : host;
 }
 
-// Mirrors the Settings page resolution so the footer and Settings never disagree.
-const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-const currentTimeZone = computed(() => userStore.getUserTimeZone || userProfile.value?.userTimeZone || browserTimeZone);
-const isTimeZoneMismatched = computed(() => !!currentTimeZone.value && currentTimeZone.value !== browserTimeZone);
-
-// The menu footer stays mounted for the life of the session, so the clock is driven by a
-// timer instead of being frozen at whatever the last render happened to be.
-const selectedZoneTime = ref("");
-let clockTimer: ReturnType<typeof setInterval> | undefined;
-
-function refreshSelectedZoneTime() {
-  selectedZoneTime.value = commonUtil.getCurrentTime(currentTimeZone.value, "t");
-}
-
-watch(currentTimeZone, refreshSelectedZoneTime);
-
 // Queue rollups shown as menu badges. Each count is published to this shared map as
 // a byproduct of the matching page (or the Funnel) fetching its own data, so the
 // badge reflects the latest count the app has loaded. A missing key = not yet loaded.
@@ -218,21 +183,14 @@ const selectedPage = computed(() => {
 })
 
 onMounted(async () => {
-  refreshSelectedZoneTime();
-  clockTimer = setInterval(refreshSelectedZoneTime, 30000);
-
   if (isAuthenticated.value) {
     await productStore.initializeProductStore();
   }
 })
 
-onUnmounted(() => {
-  clearInterval(clockTimer);
-})
-
-function setCurrentProductStore(event: CustomEvent) {
-  if (currentProductStore.value.productStoreId !== event.detail.value) {
-    const selectedProductStore = productStores.value.find((store: any) => store.productStoreId == event.detail.value)
+function setCurrentProductStore(productStoreId: string) {
+  if (currentProductStore.value.productStoreId !== productStoreId) {
+    const selectedProductStore = productStores.value.find((store: any) => store.productStoreId == productStoreId)
     if (selectedProductStore) {
       productStore.setProductStorePreference(selectedProductStore)
     }
