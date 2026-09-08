@@ -566,8 +566,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
             ? fetchVirtualLocationOrderCounts({
                 productStoreId,
                 facilityIds: [UNFILLABLE_FACILITY_ID],
-                status: BROKERABLE_ORDER_STATUSES,
-                itemStatus: UNFILLABLE_ITEM_STATUSES
+                status: UNFILLABLE_QUEUE_ORDER_STATUSES
               })
             : Promise.resolve([])
         ]);
