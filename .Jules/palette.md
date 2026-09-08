@@ -32,3 +32,6 @@
 ## 2024-08-30 - Localizing UI Text
 **Learning:** Found multiple instances of hardcoded UI strings (e.g., 'View history', 'Merged Contacts', 'Merge') in template files that missed the localization pass. This leads to inconsistent user experience for international users who expect all interface elements to be translated.
 **Action:** Always wrap plain text strings in Vue templates with the application's `translate()` function (e.g., `{{ translate('Text') }}`) to ensure full localization coverage.
+## 2024-05-14 - FAB Button Loading States
+**Learning:** In Ionic applications, `<ion-fab-button>` elements behave differently than standard `<ion-button>` elements when adding loading states. While a standard icon-only `<ion-button>` requires `slot="icon-only"` on its inner `<ion-spinner>` to maintain layout, an `<ion-fab-button>` centers its content by default, and its inner elements do not need the `slot="icon-only"` attribute.
+**Action:** When adding async loading feedback to primary action `<ion-fab-button>` elements, use standard `v-if/v-else` conditional rendering to swap the `<ion-icon>` with an `<ion-spinner>` without worrying about slot overrides, while remembering to bind `:disabled="isSubmitting"` to prevent double submissions.
