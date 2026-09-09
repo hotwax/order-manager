@@ -35,7 +35,8 @@ const adjustmentUniqueKey = (adj: any, fallbackSeqId = "") =>
     adj.shipGroupSeqId || "",
     adj.orderAdjustmentTypeId || "",
     adjustmentDisplayLabel(adj),
-    Number(adj.amount || 0)
+    Number(adj.amount || 0),
+    Number(adj.amountAlreadyIncluded || 0)
   ].join("|");
 
 const NON_CANCELLABLE_ITEM_STATUSES = new Set(["ITEM_CANCELLED", "ITEM_COMPLETED"]);
@@ -411,6 +412,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       });
 
       const adjustments: Record<string, number> = {};
+      const includedAdjustments: Record<string, boolean> = {};
       let adjustmentsTotal = 0;
       const seenAdjustments = new Set<string>();
 
@@ -422,8 +424,16 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         const amount = Number(adj.amount || 0);
         adjustmentsTotal += amount;
 
+        const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
+        const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
+        const displayAmount = isIncluded ? amountAlreadyIncluded : amount;
         const label = adjustmentDisplayLabel(adj);
-        adjustments[label] = (adjustments[label] || 0) + amount;
+
+        if (isIncluded) {
+          includedAdjustments[label] = true;
+        }
+
+        adjustments[label] = (adjustments[label] || 0) + displayAmount;
       };
 
       (current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
@@ -444,7 +454,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
       const total = computedTotal || current.grandTotal || 0;
 
-      return { subtotal, adjustments, total };
+      return { subtotal, adjustments, total, includedAdjustments };
     },
 
     allItemsByOrderId: (state) => (orderId: string) => {
@@ -575,9 +585,16 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         const uniqueKey = `${extId}:${adjustmentUniqueKey(adj, seqId)}`;
         if (seenAdjustments.has(uniqueKey)) return;
         seenAdjustments.add(uniqueKey);
-        const comment = adjustmentDisplayLabel(adj);
+
+        const amount = Number(adj.amount || 0);
+        const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
+        const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
+        const displayAmount = isIncluded ? amountAlreadyIncluded : amount;
+        const baseLabel = adjustmentDisplayLabel(adj);
+        const comment = isIncluded ? `${baseLabel} (included)` : baseLabel;
+
         if (!index[extId]) index[extId] = {};
-        index[extId][comment] = (index[extId][comment] || 0) + Number(adj.amount || 0);
+        index[extId][comment] = (index[extId][comment] || 0) + displayAmount;
       };
 
       // 1. Process top-level adjustments (which carry orderItemSeqId)
@@ -638,8 +655,8 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     },
 
     /** Order totals (subtotal, adjustments grouped by comment/type, total) */
-    totals(): { subtotal: number; adjustments: Record<string, number>; total: number } {
-      if (!this.current) return { subtotal: 0, adjustments: {}, total: 0 };
+    totals(): { subtotal: number; adjustments: Record<string, number>; total: number; includedAdjustments: Record<string, boolean> } {
+      if (!this.current) return { subtotal: 0, adjustments: {}, total: 0, includedAdjustments: {} };
 
       let subtotal = 0;
       (this.current.shipGroups || []).forEach((sg: any) => {
@@ -649,6 +666,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       });
 
       const adjustments: Record<string, number> = {};
+      const includedAdjustments: Record<string, boolean> = {};
       let adjustmentsTotal = 0;
       const seenAdjustments = new Set<string>();
 
@@ -660,8 +678,16 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         const amount = Number(adj.amount || 0);
         adjustmentsTotal += amount;
 
+        const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
+        const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
+        const displayAmount = isIncluded ? amountAlreadyIncluded : amount;
         const label = adjustmentDisplayLabel(adj);
-        adjustments[label] = (adjustments[label] || 0) + amount;
+
+        if (isIncluded) {
+          includedAdjustments[label] = true;
+        }
+
+        adjustments[label] = (adjustments[label] || 0) + displayAmount;
       };
 
       (this.current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
@@ -685,7 +711,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
       const total = computedTotal || this.current.grandTotal || 0;
 
-      return { subtotal, adjustments, total };
+      return { subtotal, adjustments, total, includedAdjustments };
     },
 
     /** Flat list of all items across ship groups, each carrying its ship group context. */

@@ -437,7 +437,10 @@
                   {{ adjustment.label }}
                   <p v-if="adjustment.detail">{{ adjustment.detail }}</p>
                 </ion-label>
-                <ion-label slot="end">{{ money(adjustment.amount, order.currency) }}</ion-label>
+                <ion-label slot="end" class="ion-text-end">
+                  {{ money(adjustment.amount, order.currency) }}
+                  <p v-if="adjustment.isIncluded">{{ translate('Included') }}</p>
+                </ion-label>
               </ion-item>
               <ion-item class="grand-total-row">
                 <ion-label>{{ translate('Grand total') }}</ion-label>
@@ -2137,7 +2140,8 @@ const orderAdjustmentRows = computed(() =>
     .map(([label, amount]) => ({
       label,
       detail: shippingAdjustmentDetail(label),
-      amount: Number(amount)
+      amount: Number(amount),
+      isIncluded: Boolean((orderTotals.value as any).includedAdjustments?.[label])
     }))
     .filter((row) => row.amount !== 0)
 );
@@ -3141,7 +3145,8 @@ function itemAdjustmentKey(adj: any, fallbackSeqId = ""): string {
     adj.shipGroupSeqId || "",
     adj.orderAdjustmentTypeId || "",
     itemAdjustmentLabel(adj),
-    Number(adj.amount || 0)
+    Number(adj.amount || 0),
+    Number(adj.amountAlreadyIncluded || 0)
   ].join("|");
 }
 
@@ -3157,8 +3162,16 @@ function itemAdjustmentSummaries(rawItem: any, orderItemSeqId: string): Array<{ 
     const key = itemAdjustmentKey(adj, orderItemSeqId);
     if (seen.has(key)) return;
     seen.add(key);
-    const comment = itemAdjustmentLabel(adj);
-    totals[comment] = (totals[comment] || 0) + Number(adj.amount || 0);
+
+    const amount = Number(adj.amount || 0);
+    const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
+    const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
+    const value = isIncluded ? amountAlreadyIncluded : amount;
+    if (value === 0) return;
+
+    const baseLabel = itemAdjustmentLabel(adj);
+    const comment = isIncluded ? `${baseLabel} (included)` : baseLabel;
+    totals[comment] = (totals[comment] || 0) + value;
   });
 
   return Object.entries(totals)

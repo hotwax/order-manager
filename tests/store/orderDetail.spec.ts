@@ -82,7 +82,8 @@ describe('order detail store', () => {
         'Salt Lake City City Tax': 0.59,
         'Utah State Tax': 2.86
       },
-      total: 63.98
+      total: 63.98,
+      includedAdjustments: {}
     });
     expect(store.adjustmentsByExternalId['15617773142165']).toEqual({
       'Salt Lake County Tax': 1.53,
@@ -120,7 +121,63 @@ describe('order detail store', () => {
         'Utah State Tax': 3,
         SHIPPING_CHARGES: 5
       },
-      total: 77
+      total: 77,
+      includedAdjustments: {}
+    });
+  });
+
+  it('tracks included tax adjustments without adding them to order total', () => {
+    const store = useOrderDetailStore();
+    store.currentOrderId = 'M100823';
+    store.byOrderId.M100823 = {
+      payload: {
+        orderId: 'M100823',
+        grandTotal: 59,
+        adjustments: [
+          {
+            orderAdjustmentId: 'M100510',
+            orderAdjustmentTypeId: 'SALES_TAX',
+            orderItemSeqId: '01',
+            comments: 'State Tax',
+            amount: 0,
+            amountAlreadyIncluded: 4.5
+          }
+        ],
+        shipGroups: [{
+          items: [{
+            orderItemSeqId: '01',
+            externalId: '15617773142165',
+            unitPrice: 59,
+            quantity: 1,
+            adjustments: [
+              {
+                orderAdjustmentId: 'M100510',
+                orderAdjustmentTypeId: 'SALES_TAX',
+                comments: 'State Tax',
+                amount: 0,
+                amountAlreadyIncluded: 4.5
+              }
+            ]
+          }]
+        }]
+      },
+      status: 'loaded',
+      loadedAt: '',
+      error: ''
+    };
+
+    expect(store.totals).toEqual({
+      subtotal: 59,
+      adjustments: {
+        'State Tax': 4.5
+      },
+      total: 59,
+      includedAdjustments: {
+        'State Tax': true
+      }
+    });
+    expect(store.adjustmentsByExternalId['15617773142165']).toEqual({
+      'State Tax (included)': 4.5
     });
   });
 
