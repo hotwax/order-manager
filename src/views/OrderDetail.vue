@@ -310,6 +310,14 @@
               >
                 <template #actions>
                   <ion-button
+                    v-if="canRequestInventoryTransfer && isInventoryTransferRequestEligible(soleItem)"
+                    fill="clear"
+                    size="small"
+                    @click.stop="requestInventoryTransferForItem(soleItem)"
+                  >
+                    {{ translate('Request transfer') }}
+                  </ion-button>
+                  <ion-button
                     v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(soleItem.statusId)"
                     fill="clear"
                     size="small"
@@ -365,6 +373,14 @@
                       @attributes-click="openItemAttributesModal(item)"
                     >
                       <template #actions>
+                        <ion-button
+                          v-if="canRequestInventoryTransfer && isInventoryTransferRequestEligible(item)"
+                          fill="clear"
+                          size="small"
+                          @click.stop="requestInventoryTransferForItem(item)"
+                        >
+                          {{ translate('Request transfer') }}
+                        </ion-button>
                         <ion-button v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)" fill="clear"
                           size="small" color="danger" @click.stop="cancelSingleItem(item)">
                           {{ translate('Cancel') }}
@@ -846,6 +862,12 @@
               <ion-button v-if="isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)" fill="clear"
                 :disabled="isShipGroupActionDisabled(shipGroup, 'RELEASE')" @click="releaseSelectedItems(shipGroup)">{{
                   translate('Release') }}</ion-button>
+              <ion-button
+                v-if="canRequestInventoryTransfer && !isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)"
+                fill="clear"
+                :disabled="!inventoryTransferItemsForShipGroup(shipGroup).length"
+                @click="requestInventoryTransfersForShipGroup(shipGroup)"
+              >{{ translate('Request transfer') }}</ion-button>
               <ion-button fill="clear" @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
               <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" fill="clear" @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
             </div>
@@ -1093,6 +1115,7 @@ import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import ManageOrderIdentificationsModal from '@/components/orders/ManageOrderIdentificationsModal.vue';
 import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import FacilityInventoryModal from '@/components/fulfillment/FacilityInventoryModal.vue';
+import RequestInventoryTransferModal from '@/components/inventory/RequestInventoryTransferModal.vue';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
@@ -1102,6 +1125,7 @@ import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
 import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
 import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
 import { getReturn } from '@/services/returns';
+import { inventoryTransferOpenQuantity, isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
 import { showToast, isKit, riskLevelColor, sentimentCounts } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { fulfillmentLineStatus, fulfillmentLineStatusColor } from '@/utils/fulfillmentLineStatus';
@@ -1124,6 +1148,7 @@ const productCache = useProductCacheStore();
 const customerStore = useCustomerStore();
 const userStore = useUserStore();
 const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW));
+const canRequestInventoryTransfer = computed(() => userStore.hasPermission(Actions.APP_INVENTORY_TRANSFER_CREATE));
 
 const loading = computed(() => orderDetailStore.loadingById(props.orderId));
 const error = computed(() => orderDetailStore.errorById(props.orderId));
@@ -2212,6 +2237,62 @@ function isShipGroupActionDisabled(shipGroup: any, actionId: any) {
 function isVirtualFacilityForItem(item: any) {
   const shipGroup = shipGroupById(item.shipGroupSeqId);
   return shipGroup ? isVirtualFacility(shipGroup) : !item.facilityId;
+}
+
+function inventoryTransferItem(item: any) {
+  const group = groupedItems.value.find((candidate: any) =>
+    candidate.items.some((groupItem: any) => groupItem.orderItemSeqId === item.orderItemSeqId));
+  return {
+    ...item,
+    productId: group?.productId || '',
+    name: group ? groupPrimaryIdentifier(group) : `${translate('Item')} ${item.orderItemSeqId}`,
+    sku: group?.sku || group?.productId || '',
+    imageUrl: getProduct(group?.productId)?.mainImageUrl,
+  };
+}
+
+function isInventoryTransferRequestEligible(item: any) {
+  return isInventoryTransferEligibleItem(inventoryTransferItem(item), isVirtualFacilityForItem(item));
+}
+
+function inventoryTransferItemsForShipGroup(shipGroup: any) {
+  if (isVirtualFacility(shipGroup)) return [];
+  return actionableItemObjectsForShipGroup(shipGroup)
+    .filter((item: any) => isInventoryTransferRequestEligible(item));
+}
+
+async function openInventoryTransferRequestModal(shipGroup: any, items: any[]) {
+  const modalItems = items.map((item) => {
+    const transferItem = inventoryTransferItem(item);
+    return {
+      ...transferItem,
+      quantity: inventoryTransferOpenQuantity(transferItem),
+    };
+  });
+  const modal = await modalController.create({
+    component: RequestInventoryTransferModal,
+    componentProps: {
+      orderId: order.value!.id,
+      productStoreId: orderDetailStore.orderById(props.orderId)?.productStoreId,
+      destinationFacilityId: shipGroup.facilityId,
+      items: modalItems,
+    },
+  });
+  await modal.present();
+  const { role } = await modal.onWillDismiss();
+  if (role === 'confirm') await showToast(translate('Inventory transfer requested.'));
+}
+
+async function requestInventoryTransferForItem(item: any) {
+  const shipGroup = shipGroupById(item.shipGroupSeqId);
+  if (!shipGroup || !isInventoryTransferRequestEligible(item)) return;
+  await openInventoryTransferRequestModal(shipGroup, [item]);
+}
+
+async function requestInventoryTransfersForShipGroup(shipGroup: any) {
+  const items = inventoryTransferItemsForShipGroup(shipGroup);
+  if (!items.length) return;
+  await openInventoryTransferRequestModal(shipGroup, items);
 }
 
 function itemActionContext(item: any) {

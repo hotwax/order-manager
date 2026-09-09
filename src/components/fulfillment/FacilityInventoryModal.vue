@@ -207,6 +207,7 @@ const props = defineProps<{
   items: FacilityInventoryModalItem[];
   productStoreId?: string;
   title?: string;
+  excludedFacilityIds?: string[];
 }>();
 
 const MAX_SHORT_NAMES = 2;
@@ -373,7 +374,10 @@ async function fetchFacilityInventory() {
       props.productStoreId ? seedStore.loadProductStoreSeedData(props.productStoreId) : Promise.resolve()
     ]);
 
-    const facilities = seedDatasetRecords(seedStore.facilities).filter(isPhysicalFacility);
+    const excludedFacilityIds = new Set(props.excludedFacilityIds || []);
+    const facilities = seedDatasetRecords(seedStore.facilities)
+      .filter(isPhysicalFacility)
+      .filter((facility: any) => !excludedFacilityIds.has(facility.facilityId));
     const facilityIds = facilities.map((facility: any) => facility.facilityId);
     const joinedProductIds = productIds.value.join(',');
 
