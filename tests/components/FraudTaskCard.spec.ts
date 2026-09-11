@@ -10,7 +10,7 @@ describe('fraud task card Figma footer', () => {
     expect(source).toContain('<ion-item lines="full" class="suggested-action">');
     expect(source).toContain('<ion-text :color="suggestedActionColor(task)">');
     expect(source).toContain('suggestedActionLabel(task)');
-    expect(source).toContain('seedStore.enumDescription(task.riskRecommendationEnumId)');
+    expect(source).toContain('getEnumDescription(task?.riskRecommendationEnumId')
     expect(source).toContain('recommendation.includes(\'CANCEL\') ? \'danger\' : undefined');
     expect(source).toContain('function productImageUrl(productId: string): string');
     expect(source).toContain('getProduct(productId)?.mainImageUrl || \'\'');

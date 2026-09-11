@@ -1,8 +1,8 @@
 import { defineStore } from "pinia";
+import { omDb } from "@/db/orderManagerDb";
 import { api, commonUtil, logger} from "@common";
 import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
-import { useSeedStore } from "./seed";
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error" | "notfound";
 
@@ -21,20 +21,20 @@ const newEntry = (): OrderEntry => ({ payload: null, status: "idle", loadedAt: "
 // comment/description — fall back to the seeded enum description so rows show "Sales Tax"
 // rather than the raw "SALES_TAX" id. This also backs the rollup grouping key below, so
 // adjustments only merge under their human-readable label, not the raw type id.
-const adjustmentDisplayLabel = (adj: any) =>
+const adjustmentDisplayLabel = (adj: any, adjustmentTypes: any[]) =>
   adj.comments
   || adj.comment
   || adj.description
-  || useSeedStore().orderAdjustmentTypeDescription(adj.orderAdjustmentTypeId)
+  || adjustmentTypes.find((type: any) => type.orderAdjustmentTypeId === adj.orderAdjustmentTypeId)?.description
   || adj.orderAdjustmentTypeId
   || "OTHER_ADJUSTMENT";
 
-const adjustmentUniqueKey = (adj: any, fallbackSeqId = "") =>
+const adjustmentUniqueKey = (adj: any, adjustmentTypes: any[], fallbackSeqId = "") =>
   adj.orderAdjustmentId || [
     fallbackSeqId || adj.orderItemSeqId || "",
     adj.shipGroupSeqId || "",
     adj.orderAdjustmentTypeId || "",
-    adjustmentDisplayLabel(adj),
+    adjustmentDisplayLabel(adj, adjustmentTypes),
     Number(adj.amount || 0)
   ].join("|");
 
@@ -275,6 +275,9 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     commEvents: [] as any[],
     commEventsByOrderId: {} as Record<string, any[]>,
     shippingMethods: [] as any[],
+    /** Reference rows this store owns, read from the local database on order load. */
+    orderAdjustmentTypes: [] as any[],
+    carrierShipmentMethods: [] as any[],
     carrierParties: [] as any[],
     fulfillmentTimeline: [] as any[],
     fulfillmentTimelineByOrderId: {} as Record<string, any[]>,
@@ -415,14 +418,14 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       const seenAdjustments = new Set<string>();
 
       const recordAdjustment = (adj: any, fallbackSeqId = "") => {
-        const uniqueKey = adjustmentUniqueKey(adj, fallbackSeqId);
+        const uniqueKey = adjustmentUniqueKey(adj, state.orderAdjustmentTypes, fallbackSeqId);
         if (seenAdjustments.has(uniqueKey)) return;
         seenAdjustments.add(uniqueKey);
 
         const amount = Number(adj.amount || 0);
         adjustmentsTotal += amount;
 
-        const label = adjustmentDisplayLabel(adj);
+        const label = adjustmentDisplayLabel(adj, state.orderAdjustmentTypes);
         adjustments[label] = (adjustments[label] || 0) + amount;
       };
 
@@ -572,10 +575,10 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       const recordAdj = (seqId: string, adj: any) => {
         const extId = seqIdToExtId[seqId] || seqId;
         if (!extId) return;
-        const uniqueKey = `${extId}:${adjustmentUniqueKey(adj, seqId)}`;
+        const uniqueKey = `${extId}:${adjustmentUniqueKey(adj, this.orderAdjustmentTypes, seqId)}`;
         if (seenAdjustments.has(uniqueKey)) return;
         seenAdjustments.add(uniqueKey);
-        const comment = adjustmentDisplayLabel(adj);
+        const comment = adjustmentDisplayLabel(adj, this.orderAdjustmentTypes);
         if (!index[extId]) index[extId] = {};
         index[extId][comment] = (index[extId][comment] || 0) + Number(adj.amount || 0);
       };
@@ -653,14 +656,14 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       const seenAdjustments = new Set<string>();
 
       const recordAdjustment = (adj: any, fallbackSeqId = "") => {
-        const uniqueKey = adjustmentUniqueKey(adj, fallbackSeqId);
+        const uniqueKey = adjustmentUniqueKey(adj, this.orderAdjustmentTypes, fallbackSeqId);
         if (seenAdjustments.has(uniqueKey)) return;
         seenAdjustments.add(uniqueKey);
 
         const amount = Number(adj.amount || 0);
         adjustmentsTotal += amount;
 
-        const label = adjustmentDisplayLabel(adj);
+        const label = adjustmentDisplayLabel(adj, this.orderAdjustmentTypes);
         adjustments[label] = (adjustments[label] || 0) + amount;
       };
 
@@ -723,8 +726,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       const fromDetail = state.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId);
       if (fromDetail.length) return fromDetail;
       try {
-        const seedStore = useSeedStore();
-        return seedStore.shippingMethodsByCarrier(carrierPartyId);
+        return state.carrierShipmentMethods.filter((m: any) => m.partyId === carrierPartyId);
       } catch {
         return [];
       }
@@ -899,6 +901,20 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         logger.error("Failed to load order risk assessments", error);
         this.riskAssessmentsStatusByOrderId[orderId] = "error";
         this.riskAssessmentsErrorByOrderId[orderId] = error?.message || "Failed to load order risk assessments";
+      }
+    },
+
+    /** Reference rows the getters above read synchronously. Read from the local database. */
+    async loadReferenceRows() {
+      try {
+        const [adjustmentTypes, carrierMethods] = await Promise.all([
+          omDb().all("orderAdjustmentTypes"),
+          omDb().all("carrierShipmentMethods"),
+        ]);
+        this.orderAdjustmentTypes = adjustmentTypes;
+        this.carrierShipmentMethods = carrierMethods;
+      } catch (error: any) {
+        logger.warn("Failed to read order reference rows from the local database", error);
       }
     },
 

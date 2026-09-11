@@ -2,11 +2,13 @@
  * Order Manager Web Worker Entry.
  */
 
-import { exposeWorkerHarness, registerCommonSeedDomains } from "@common/db";
+// Deep imports, not the barrel: this is a worker entry, and the barrel pulls in `vue`.
+// The pre-existing `from "@common/db"` here was the one place Order Manager violated that.
+import { commonDomains } from "@common/db/domains/commonDomains";
+import { exposeWorkerHarness } from "@common/db/sync/pollingWorkerHarness";
+import { registerDomains } from "@common/db/sync/registerDomains";
 import { getOrderManagerDb } from "@/db/orderManagerDb";
 
-// Register all standard HotWax OMS reference domains
-registerCommonSeedDomains((omsInstance) => getOrderManagerDb(omsInstance));
+registerDomains(Object.values(commonDomains));
 
-// Expose the harness across Comlink to the main thread
 exposeWorkerHarness((omsInstance) => getOrderManagerDb(omsInstance));

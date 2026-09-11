@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   enterCallbacks: [] as Array<() => void>,
   fetchHoldTasks: vi.fn(),
   loadPhysicalFacilities: vi.fn(),
-  loadEnumType: vi.fn(),
 }));
 
 vi.mock('@common', () => ({
@@ -63,11 +62,10 @@ vi.mock('@/store/user', () => ({
   useUserStore: () => ({ hasPermission: () => true }),
 }));
 
-vi.mock('@/store/seed', () => ({
-  useSeedStore: () => ({
-    getEnumsByType: () => [],
-    getShipmentMethodOptions: [],
-    loadEnumType: mocks.loadEnumType,
+vi.mock('@common/db', () => ({
+  useSeedData: () => ({
+    getEnumsByType: async () => [],
+    getShipmentMethodOptions: async () => [],
   }),
 }));
 
@@ -100,7 +98,6 @@ describe('HoldOrders purpose route', () => {
     mocks.enterCallbacks.length = 0;
     mocks.fetchHoldTasks.mockReset().mockResolvedValue(undefined);
     mocks.loadPhysicalFacilities.mockReset();
-    mocks.loadEnumType.mockReset();
   });
 
   async function enterPage() {
