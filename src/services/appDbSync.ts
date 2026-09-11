@@ -1,48 +1,23 @@
 /**
  * Main-thread entry point for the Order Manager background database sync.
  *
- * Both boot paths (a restored session in App.vue and a fresh login in store/user)
- * start the same worker with the same config, so the wiring lives here once.
- *
- * Worker creation goes through the shared `WorkerFactory` rather than a bare
- * `new Worker(...)`, keeping module-worker spawning centralized across the suite —
- * the same pattern as company's `pollingService` and inventory-count.
+ * Configures the generic createAppDbSync helper with Order Manager's database and worker.
  */
 
-import { commonUtil, cookieHelper } from "@common";
-import { startDbBootstrap, type SyncHarness } from "@common/db";
-import { WorkerFactory } from "@common/core/workerFactory";
-import { useAuth } from "@common/composables/useAuth";
-import { getOrderManagerDb } from "@/db/orderManagerDb";
-import { ORDER_MANAGER_SYNC_CATALOG } from "@/config/appSyncConfig";
-// `?worker&url` lets Vite bundle the worker as its own chunk and hand back its URL,
-// so the factory resolves the same asset in dev and in a production build.
+import { createAppDbSync, createSyncService } from "@common/db";
+import { orderManagerDb } from "@/db/orderManagerDb";
 import appSyncWorkerUrl from "../workers/appSync.worker.ts?worker&url";
 
-/** The session token the sync worker should start with, or "" when there is none. */
-export function getSyncToken(): string {
-  return cookieHelper().get("api_key")
-    || cookieHelper().get("token")
-    || (useAuth() as any).token?.value
-    || "";
-}
-
-/**
- * Start the background database sync and repopulate the in-memory seed store once the
- * first pass lands. Never rejects — a sync failure must not break boot or login.
- */
-export function startAppDbSync(token: string, onSynced?: () => void): Promise<void> {
-  // Resolved here on the main thread and handed to the worker, which has no cookies to read it from.
-  const omsInstance = commonUtil.getOMSInstanceName();
-
-  return startDbBootstrap({
-    workerFactory: () => WorkerFactory.createWorker<SyncHarness>(new URL(appSyncWorkerUrl, import.meta.url)).worker,
-    token,
-    maargUrl: commonUtil.getMaargURL(),
-    omsInstance,
-    db: getOrderManagerDb(omsInstance),
-    domains: ORDER_MANAGER_SYNC_CATALOG.map((domain) => domain.name),
-  }).then(() => {
-    onSynced?.();
-  });
-}
+export const {
+  syncService,
+  startAppDbSync,
+  stopAppDbSync,
+  refreshAfterMutation,
+  resyncDomain,
+  resyncReferenceData,
+  bootstrapState,
+} = createAppDbSync({
+  db: orderManagerDb,
+  getWorkerUrl: () => new URL(appSyncWorkerUrl, import.meta.url),
+  createSyncService,
+});

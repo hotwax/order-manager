@@ -120,13 +120,15 @@ import {
 import { computed, onMounted, ref, watch } from 'vue';
 import { useCustomerServiceStore, BULK_ACTIONS } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
 import { WORKFLOW_ORDER_SORT_OPTIONS } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
+
+const seed = useSeedData();
 import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, translate } from '@common';
 import router from '@/router';
@@ -135,7 +137,6 @@ const bucket = 'inflight';
 const VIRTUAL_FACILITY_TYPE_ID = 'VIRTUAL_FACILITY';
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
-const seedStore = useSeedStore();
 const ionRouter = useIonRouter();
 const toastMessage = ref('');
 
@@ -145,21 +146,21 @@ const filters = computed({
 });
 const physicalFacilities = ref<FacilityOption[]>([]);
 
-const channelOptions = computed(() =>
-  (seedStore.enumsByType['ORDER_SALES_CHANNEL']?.ids || []).map((enumId) => {
-    const enumeration: any = seedStore.enumsByType['ORDER_SALES_CHANNEL'].byId[enumId];
-    return enumeration?.enumId || enumId;
-  })
-);
+// Seed labels live in the local database, so they resolve after mount rather than in a computed.
+const channelOptions = ref<string[]>([]);
 
 const facilityOptions = computed(() => physicalFacilities.value);
 
-const shipmentMethodOptions = computed(() =>
-  seedStore.shipmentMethodTypes.ids.map((id) => {
-    const method: any = seedStore.shipmentMethodTypes.byId[id];
-    return { id, label: method?.description || id };
-  })
-);
+const shipmentMethodOptions = ref<Array<{ id: string; label: string }>>([]);
+
+async function loadSeedData() {
+  const [channels, methods] = await Promise.all([
+    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
+    seed.getShipmentMethodOptions(),
+  ]);
+  channelOptions.value = channels.map((enumeration: any) => enumeration.enumId);
+  shipmentMethodOptions.value = methods;
+}
 
 const channelFilterOptions = computed(() => channelOptions.value.map((channel) => ({ id: channel, label: formatChannel(channel) })));
 const facilityFilterOptions = computed(() => facilityOptions.value.map((facility) => ({ id: facility.id, label: facility.name })));
@@ -245,6 +246,7 @@ async function loadMore(event: any) {
 }
 
 onMounted(() => {
+  loadSeedData();
   loadWorkflowOrders();
   loadPhysicalFacilities();
 });

@@ -26,7 +26,7 @@
       </ion-list-header>
       <ion-item v-for="entry in facilityStock" :key="entry.facilityId">
         <ion-label>
-          {{ seedStore.facilityName(entry.facilityId) }}
+          {{ facilityLabels[entry.facilityId] ?? entry.facilityId }}
           <p>{{ entry.facilityId }}</p>
         </ion-label>
         <ion-label slot="end" class="stock-col">{{ entry.lastInventoryCount ?? 0 }}</ion-label>
@@ -40,16 +40,23 @@ import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabe
 import { closeOutline } from 'ionicons/icons';
 import { ref, onMounted } from 'vue';
 import { api, logger, translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { useProductCacheStore } from '@/store/productCache';
+
+const seed = useSeedData();
 
 const props = defineProps<{ productId: string }>();
 
-const seedStore = useSeedStore();
 const product = useProductCacheStore().getProduct(props.productId);
 
 const isLoading = ref(false);
 const facilityStock = ref<any[]>([]);
+
+// One read resolves every facility label on the list.
+const facilityLabels = ref<Record<string, string>>({});
+watch(facilityStock, async (entries) => {
+  facilityLabels.value = await seed.getFacilityNames((entries || []).map((entry: any) => entry.facilityId));
+}, { immediate: true, deep: true });
 
 function closeModal() {
   modalController.dismiss();

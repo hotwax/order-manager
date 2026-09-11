@@ -108,8 +108,10 @@ import {
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
+
+const seed = useSeedData();
 
 const props = defineProps<{
   // Optional modal title (already localized by the caller); defaults to "Add Task".
@@ -122,7 +124,6 @@ const props = defineProps<{
   defaultWorkEffortPurposeTypeId?: string;
 }>();
 
-const seedStore = useSeedStore();
 const WORK_EFFORT_TYPE_ID = 'RESOLVE_ONHOLD_ORDER';
 const OPERATOR_HOLD_PURPOSE_IDS = new Set(['ORD_HOLD_MANUAL', 'ORD_HOLD_CUST_REQ']);
 
@@ -140,7 +141,9 @@ const taskNameEdited = ref(false);
 
 // Address, reservation, and fraud purposes are created by their owning backend flows. In
 // particular, fraud is order-scoped and must never be fanned out through this ship-group modal.
-const taskPurposes = computed(() => seedStore.getEnumsByType(WORK_EFFORT_TYPE_ID)
+const workEffortEnums = ref<any[]>([]);
+onMounted(async () => { workEffortEnums.value = await seed.getEnumsByType(WORK_EFFORT_TYPE_ID); });
+const taskPurposes = computed(() => workEffortEnums.value
   .filter((purpose: any) => OPERATOR_HOLD_PURPOSE_IDS.has(purpose.enumId)));
 
 const selectedPurpose = computed(() => taskPurposes.value.find((option) => option.enumId === form.workEffortPurposeTypeId));
@@ -164,10 +167,6 @@ const isValid = computed(() => {
     return detailsValid && selectedShipGroupSeqIds.value.length > 0;
   }
   return detailsValid;
-});
-
-onMounted(() => {
-  seedStore.loadEnumType(WORK_EFFORT_TYPE_ID);
 });
 
 watch(generatedTaskName, (taskName) => {

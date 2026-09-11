@@ -56,7 +56,7 @@
                   </ion-item>
                   <ion-item v-for="value in section.values" :key="value.contactMechId">
                     <ion-label>{{ value.display }}</ion-label>
-                    <ion-note slot="end">{{ seedDescribe(value.contactMechPurposeTypeId) }}</ion-note>
+                    <ion-note slot="end">{{ contactPurposeLabels[value.contactMechPurposeTypeId] ?? value.contactMechPurposeTypeId }}</ion-note>
                   </ion-item>
                   <ion-item v-if="!section.values.length" lines="none">
                     <ion-label color="medium"><em>{{ translate('None on file') }}</em></ion-label>
@@ -74,7 +74,7 @@
                 <ion-list lines="none">
                   <ion-item v-for="relationship in personalRelationships" :key="relationship.key">
                     <ion-label>
-                      <p class="overline">{{ seedDescribe(relationship.partyRelationshipTypeId) }}</p>
+                      <p class="overline">{{ relationshipLabels[relationship.partyRelationshipTypeId] ?? relationship.partyRelationshipTypeId }}</p>
                       <h3>{{ relationship.relatedPartyName }}</h3>
                       <p>{{ relationship.relatedPartyId }}</p>
                     </ion-label>
@@ -332,10 +332,10 @@
             <ion-item lines="full">
               <ion-label>
                 <h2>{{ comm.subject || '(No subject)' }}</h2>
-                <p>{{ seedDescribe(comm.communicationEventTypeId) || comm.communicationEventTypeId }}</p>
+                <p>{{ communicationTypeLabels[comm.communicationEventTypeId] ?? comm.communicationEventTypeId }}</p>
               </ion-label>
               <ion-chip slot="end" :color="commStatusColor(comm.statusId)" outline>
-                {{ seedDescribe(comm.statusId) || comm.statusId }}
+                {{ statusLabels[comm.statusId] ?? comm.statusId }}
               </ion-chip>
             </ion-item>
 
@@ -493,18 +493,19 @@ import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useCustomerDetail } from '@/composables/useCustomerDetail';
 import router from '@/router';
 import { deleteCustomerDetails, indexCustomer } from '@/services/customer';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { useUserStore } from '@/store/user';
 import Actions from '@/authorization/actions';
 import type { CustomerOrderCardData, CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
 import type { ReturnSummary } from '@/types/returns';
+
+const seed = useSeedData();
 
 const props = defineProps<{
   customerId: string;
 }>();
 
 const selectedSegment = ref('dashboard');
-const seed = useSeedStore();
 const userStore = useUserStore();
 const recentOrdersQuery = ref('');
 const allOrdersQuery = ref('');
@@ -597,6 +598,44 @@ const unfillableOrders = computed(() => recentOrdersSource.value
   .filter((o: CustomerOrderSummary) => o.isUnfillable)
   .map((o: CustomerOrderSummary) => ({ ...mapOrder(o), progressColor: 'warning' })));
 const customerTaskCards = computed(() => openTasks.value.map(mapCustomerTaskCard));
+
+// Seed labels for everything this page renders, one read per table as the data arrives.
+const contactPurposeLabels = ref<Record<string, string>>({});
+const relationshipLabels = ref<Record<string, string>>({});
+const communicationTypeLabels = ref<Record<string, string>>({});
+const statusLabels = ref<Record<string, string>>({});
+const enumLabels = ref<Record<string, string>>({});
+const facilityLabels = ref<Record<string, string>>({});
+
+watch([customer, customerCommunications, customerReturns, openTasks], async () => {
+  const contactMechs = customer.value?.contactMechs || [];
+  const relationships = customer.value?.relationships || [];
+  const communications = customerCommunications.value || [];
+  const returns = customerReturns.value || [];
+  const tasks = openTasks.value || [];
+
+  [
+    contactPurposeLabels.value,
+    relationshipLabels.value,
+    communicationTypeLabels.value,
+    statusLabels.value,
+    enumLabels.value,
+    facilityLabels.value,
+  ] = await Promise.all([
+    seed.getContactPurposeDescriptions(contactMechs.map((mech: any) => mech.contactMechPurposeTypeId)),
+    seed.getPartyRelationshipDescriptions(relationships.map((rel: any) => rel.partyRelationshipTypeId)),
+    seed.getCommunicationEventTypeDescriptions(communications.map((comm: any) => comm.communicationEventTypeId)),
+    seed.getStatusDescriptions([
+      ...communications.map((comm: any) => comm.statusId),
+      ...returns.map((record: any) => record.statusId),
+    ]),
+    seed.getEnumDescriptions([
+      ...tasks.map((task: any) => task.workEffortPurposeTypeId || task.workEffortTypeId),
+      ...returns.map((record: any) => record.returnChannelEnumId),
+    ]),
+    seed.getFacilityNames(returns.map((record: any) => record.destinationFacilityId)),
+  ]);
+}, { immediate: true, deep: true });
 const dashboardTaskCards = computed(() => customerTaskCards.value.slice(0, 1));
 
 function mapCustomerTaskCard(task: CustomerTaskSummary) {
@@ -606,7 +645,7 @@ function mapCustomerTaskCard(task: CustomerTaskSummary) {
   return {
     ...task,
     grandTotal: Number(task.grandTotal || 0),
-    purposeDescription: seedDescribe(task.workEffortPurposeTypeId || task.workEffortTypeId)
+    purposeDescription: enumLabels.value[task.workEffortPurposeTypeId || task.workEffortTypeId]
       || task.workEffortPurposeTypeId
       || task.workEffortTypeId,
     estimatedCompletionDate: task.dueDate ? formatLongDate(task.dueDate) : '',
@@ -783,9 +822,7 @@ watch(() => props.customerId, () => {
   void loadSelectedSegment();
 });
 
-function seedDescribe(id?: string): string {
-  return (seed as any).describe(id) || '';
-}
+
 
 function money(value: number, currency = 'USD') {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(Number(value || 0));
@@ -829,22 +866,23 @@ function openReturn(returnId: string) {
 }
 
 function returnStatusLabel(statusId: string) {
-  return seed.statusDescription(statusId) || statusId || translate('Not specified');
+  return statusLabels.value[statusId] || statusId || translate('Not specified');
 }
 
 function returnTypeLabel(returnHeaderTypeId?: string) {
   if (returnHeaderTypeId === 'CUSTOMER_RETURN') return translate('Customer return');
   if (returnHeaderTypeId === 'APPEASEMENT') return translate('Appeasement');
 
-  return returnHeaderTypeId ? seed.describe(returnHeaderTypeId) || returnHeaderTypeId : translate('Return');
+  // returnHeaderTypeId has no seed table, so the old describe() call always returned the id.
+  return returnHeaderTypeId || translate('Return');
 }
 
 function channelLabel(returnChannelEnumId?: string) {
-  return returnChannelEnumId ? seed.enumDescription(returnChannelEnumId) || returnChannelEnumId : translate('No channel');
+  return returnChannelEnumId ? enumLabels.value[returnChannelEnumId] || returnChannelEnumId : translate('No channel');
 }
 
 function facilityLabel(destinationFacilityId?: string) {
-  return destinationFacilityId ? seed.facilityName(destinationFacilityId) || destinationFacilityId : translate('No destination facility');
+  return destinationFacilityId ? facilityLabels.value[destinationFacilityId] || destinationFacilityId : translate('No destination facility');
 }
 
 function formatDate(value?: string | number) {

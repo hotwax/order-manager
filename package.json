@@ -37,12 +37,13 @@
   },
   "devDependencies": {
     "@capacitor/cli": "catalog:",
-    "@vitejs/plugin-legacy": "catalog:",
     "@types/file-saver": "catalog:",
     "@types/luxon": "catalog:",
     "@types/papaparse": "catalog:",
+    "@vitejs/plugin-legacy": "catalog:",
     "@vitejs/plugin-vue": "catalog:",
     "eslint": "catalog:",
+    "fake-indexeddb": "^6.2.5",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plugin-pwa": "catalog:"

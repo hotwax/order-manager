@@ -229,8 +229,8 @@ import { useDbStatus } from '@common/db';
 import { useAuth } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
-import { getOrderManagerDb } from '@/db/orderManagerDb';
-import { ORDER_MANAGER_SYNC_CATALOG } from '@/config/appSyncConfig';
+import { getOrderManagerDb, orderManagerDb } from '@/db/orderManagerDb';
+import { resyncDomain, resyncReferenceData, syncService } from '@/services/appDbSync';
 import DxpProductIdentifier from "@/components/settings/DxpProductIdentifier.vue";
 import DxpAppVersionInfo from "@/components/settings/DxpAppVersionInfo.vue";
 import Actions from "@/authorization/actions";
@@ -364,7 +364,14 @@ function clearSearch() {
 // Live IndexedDB status
 const {
   domains, refreshing, totalRows, oldestSyncedAt, lastSyncedAt, refreshDomain, refreshAll,
-} = useDbStatus(getOrderManagerDb(commonUtil.getOMSInstanceName()), ORDER_MANAGER_SYNC_CATALOG);
+} = useDbStatus(
+  orderManagerDb.raw(),
+  orderManagerDb.statusCatalog,
+  {
+    resyncDomain,
+    resyncAll: resyncReferenceData,
+  },
+);
 
 const formatSyncTime = (millis: number) =>
   DateTime.fromMillis(millis).toLocaleString(DateTime.DATETIME_MED);

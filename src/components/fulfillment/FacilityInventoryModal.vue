@@ -191,9 +191,11 @@ import { IonAccordion, IonAccordionGroup, IonAvatar, IonButton, IonButtons, IonC
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api, DxpShopifyImg, logger, translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
 import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
+
+const seed = useSeedData();
 
 export type FacilityInventoryModalItem = {
   orderItemSeqId: string;
@@ -212,7 +214,6 @@ const props = defineProps<{
 
 const MAX_SHORT_NAMES = 2;
 
-const seedStore = useSeedStore();
 const isLoading = ref(false);
 const hasFailed = ref(false);
 const allFacilities = ref<FacilityCoverageRow[]>([]);
@@ -309,10 +310,6 @@ function todayIsoDate() {
   return localDate.toISOString().slice(0, 10);
 }
 
-function seedDatasetRecords(dataset: any) {
-  return dataset?.ids?.map((id: string) => dataset.byId[id]) ?? [];
-}
-
 function syncMobileViewport() {
   isMobileViewport.value = Boolean(mobileMediaQuery?.matches);
 }
@@ -369,15 +366,18 @@ async function fetchFacilityInventory() {
   isLoading.value = true;
   hasFailed.value = false;
   try {
-    await Promise.all([
-      seedStore.loadFacilities(),
-      props.productStoreId ? seedStore.loadProductStoreSeedData(props.productStoreId) : Promise.resolve()
+    // facilityIds drive the inventory request below, so read the rows rather than waiting
+    // on a reactive subscription to emit.
+    const [facilityRows, storeFacilityRows] = await Promise.all([
+      seed.getFacilities(),
+      props.productStoreId ? seed.getProductStoreFacilities(props.productStoreId) : Promise.resolve([]),
     ]);
 
     const excludedFacilityIds = new Set(props.excludedFacilityIds || []);
-    const facilities = seedDatasetRecords(seedStore.facilities)
+    const facilities = facilityRows
       .filter(isPhysicalFacility)
       .filter((facility: any) => !excludedFacilityIds.has(facility.facilityId));
+    const facilityNameById = new Map(facilityRows.map((row: any) => [row.facilityId, row.facilityName]));
     const facilityIds = facilities.map((facility: any) => facility.facilityId);
     const joinedProductIds = productIds.value.join(',');
 
@@ -413,9 +413,9 @@ async function fetchFacilityInventory() {
       inventoryItems: inventoryResp,
       facilityOrderCounts: orderCountResp,
       productStoreFacilities: props.productStoreId
-        ? seedDatasetRecords(seedStore.productStoreFacilitiesByStoreId[props.productStoreId])
+        ? storeFacilityRows
         : [],
-      facilityName: (facilityId) => seedStore.facilityName(facilityId)
+      facilityName: (facilityId) => facilityNameById.get(facilityId) ?? facilityId
     }));
     filterFacilities();
   } catch (error) {

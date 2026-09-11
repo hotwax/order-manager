@@ -18,11 +18,8 @@ vi.mock('@/services/customer', () => ({
   expirePartyRelationship: vi.fn()
 }));
 
-vi.mock('@/store/seed', () => ({
-  useSeedStore: () => ({
-    loadPartyRelationshipTypes: vi.fn().mockResolvedValue(undefined),
-    statusAge: vi.fn(() => 0),
-  }),
+vi.mock('@/db/orderManagerDb', () => ({
+  omDb: () => ({ all: async () => [], get: async () => undefined }),
 }));
 
 describe('customer detail store', () => {
