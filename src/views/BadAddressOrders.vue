@@ -334,9 +334,10 @@ async function loadMoreAddressValidationTasks(event: any) {
   }
 }
 
-onIonViewWillEnter(() => {
+onIonViewWillEnter(async () => {
   loadPhysicalFacilities();
-  replaceAddressValidationTasks();
+  await seedStore.loadGeos();
+  await replaceAddressValidationTasks();
 });
 </script>
 

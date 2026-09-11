@@ -72,4 +72,41 @@ describe('seed store', () => {
       toStatusColor: 'medium'
     })]);
   });
+
+  it('allows callers to await an in-flight dataset load', async () => {
+    let resolveGeos!: (value: any) => void;
+    vi.mocked(api).mockImplementation((request: any) => {
+      if (request.url !== 'admin/geos') return Promise.resolve({ data: [] });
+
+      return new Promise((resolve) => {
+        resolveGeos = resolve;
+      });
+    });
+
+    const seedStore = useSeedStore();
+    const firstLoad = seedStore.loadGeos();
+    const secondLoad = seedStore.loadGeos();
+    let secondLoadSettled = false;
+    secondLoad.then(() => {
+      secondLoadSettled = true;
+    });
+
+    await Promise.resolve();
+
+    expect(api).toHaveBeenCalledTimes(1);
+    expect(seedStore.geos.status).toBe('loading');
+    expect(secondLoadSettled).toBe(false);
+
+    resolveGeos({
+      data: [
+        { geoId: 'USA', geoName: 'United States', geoTypeEnumId: 'GEOT_COUNTRY' },
+      ],
+    });
+    await Promise.all([firstLoad, secondLoad]);
+
+    expect(secondLoadSettled).toBe(true);
+    expect(seedStore.getCountries).toEqual([
+      expect.objectContaining({ geoId: 'USA', geoName: 'United States' }),
+    ]);
+  });
 });

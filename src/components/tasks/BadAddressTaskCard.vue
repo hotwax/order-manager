@@ -81,13 +81,15 @@
           </ion-label>
           <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
         </ion-item>
-        <ion-item button :detail="false" @click="openCountryPicker(addressState.suggested)">
-          <ion-label class="geo-picker-field">
-            <span class="geo-picker-label">{{ translate('Country') }}</span>
-            <span :class="{ 'geo-picker-placeholder': !countryName(addressState.suggested.countryGeoId) }">{{ countryName(addressState.suggested.countryGeoId) || translate('Select') }}</span>
-          </ion-label>
-          <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
-        </ion-item>
+        <InlineSearchableSelect
+          :label="translate('Country')"
+          :model-value="addressState.suggested.countryGeoId"
+          :options="countryOptions"
+          :placeholder="translate('Select')"
+          :search-placeholder="translate('Search countries')"
+          :empty-text="translate('No countries found')"
+          @update:model-value="onCountrySelect(addressState.suggested, $event)"
+        />
       </ion-list>
     </ion-radio-group>
 
@@ -129,6 +131,7 @@ import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
+import InlineSearchableSelect from '@/components/common/InlineSearchableSelect.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
@@ -156,6 +159,10 @@ const emit = defineEmits<{
 
 const orderTaskStore = useOrderTaskStore();
 const seedStore = useSeedStore();
+const countryOptions = computed(() => props.countries.map((country: any) => ({
+  value: country.geoId,
+  label: country.geoName,
+})));
 
 const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'save-and-release', label: translate('Save and release hold'), kind: 'primary' },
@@ -209,18 +216,11 @@ function carrierShippingMethodLabel(task: any): string {
   return [carrier, method].filter(Boolean).join(' - ') || '-';
 }
 
-async function openCountryPicker(address: AddressState['original']) {
-  const modal = await modalController.create({
-    component: GeoSelectModal,
-    componentProps: { title: translate('Select country'), items: props.countries, selectedGeoId: address.countryGeoId },
-  });
-  await modal.present();
-  const { data, role } = await modal.onWillDismiss();
-  if (role === 'selected' && data && data !== address.countryGeoId) {
-    address.countryGeoId = data;
-    address.stateProvinceGeoId = '';
-    seedStore.loadGeoAssocs(data);
-  }
+function onCountrySelect(address: AddressState['original'], countryGeoId: string) {
+  if (countryGeoId === address.countryGeoId) return;
+  address.countryGeoId = countryGeoId;
+  address.stateProvinceGeoId = '';
+  if (countryGeoId) seedStore.loadGeoAssocs(countryGeoId);
 }
 
 async function openStatePicker(address: AddressState['original']) {
