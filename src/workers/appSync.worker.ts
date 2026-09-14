@@ -6,7 +6,7 @@
 // The pre-existing `from "@common/db"` here was the one place Order Manager violated that.
 import { commonDomains } from "@common/db/domains/commonDomains";
 import { exposeWorkerHarness } from "@common/db/sync/pollingWorkerHarness";
-import { registerDomains } from "@common/db/sync/registerDomains";
+import { registerDomains } from "@common/db/sync/syncRegistry";
 import { getOrderManagerDb } from "@/db/orderManagerDb";
 
 registerDomains(Object.values(commonDomains));
