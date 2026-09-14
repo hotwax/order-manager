@@ -1,10 +1,10 @@
 /**
  * Main-thread entry point for the Order Manager background database sync.
  *
- * Configures the generic createAppDbSync helper with Order Manager's database and worker.
+ * Configures the generic setupAppDbSync helper with Order Manager's database and worker.
  */
 
-import { createAppDbSync, createSyncService } from "@common/db";
+import { createSyncService, setupAppDbSync } from "@common/db";
 import { orderManagerDb } from "@/db/orderManagerDb";
 import appSyncWorkerUrl from "../workers/appSync.worker.ts?worker&url";
 
@@ -16,7 +16,7 @@ export const {
   resyncDomain,
   resyncReferenceData,
   bootstrapState,
-} = createAppDbSync({
+} = setupAppDbSync({
   db: orderManagerDb,
   getWorkerUrl: () => new URL(appSyncWorkerUrl, import.meta.url),
   createSyncService,
