@@ -79,13 +79,13 @@ import {
   modalController,
 } from "@ionic/vue";
 import { closeOutline, sendOutline } from "ionicons/icons";
-import { computed, reactive, ref } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import FacilityInventoryModal from "@/components/fulfillment/FacilityInventoryModal.vue";
 import {
   inventoryTransferOpenQuantity,
   requestInventoryTransfers,
 } from "@/services/inventoryTransfers";
-import { useSeedStore } from "@/store/seed";
+import { useSeedData } from "@common/db";
 
 export type InventoryTransferModalItem = {
   orderItemSeqId: string;
@@ -105,7 +105,7 @@ const props = defineProps<{
   items: InventoryTransferModalItem[];
 }>();
 
-const seedStore = useSeedStore();
+const seed = useSeedData();
 const sourceFacilityId = ref("");
 const comments = ref("");
 const submitting = ref(false);
@@ -116,8 +116,19 @@ const requestedItems = reactive(props.items.map((item) => {
   return { ...item, openQuantity, requestedQuantity: openQuantity };
 }));
 
-const destinationFacilityName = computed(() => seedStore.facilityName(props.destinationFacilityId));
-const sourceFacilityName = computed(() => sourceFacilityId.value ? seedStore.facilityName(sourceFacilityId.value) : "");
+// Seed lookups read IndexedDB per call, so the labels are resolved into refs rather than computed.
+// Same pattern as CustomSwapModal/SwapTaskCard.
+const destinationFacilityName = ref("");
+const sourceFacilityName = ref("");
+
+watch(() => props.destinationFacilityId, async (facilityId) => {
+  destinationFacilityName.value = await seed.getFacilityName(facilityId ?? "");
+}, { immediate: true });
+
+watch(sourceFacilityId, async (facilityId) => {
+  sourceFacilityName.value = facilityId ? await seed.getFacilityName(facilityId) : "";
+}, { immediate: true });
+
 const invalidQuantity = computed(() => requestedItems.some((item) =>
   item.requestedQuantity < 0 || item.requestedQuantity > item.openQuantity));
 const selectedItems = computed(() => requestedItems.filter((item) => item.requestedQuantity > 0));

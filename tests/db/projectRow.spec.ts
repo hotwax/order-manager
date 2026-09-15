@@ -21,11 +21,11 @@ describe('projectRow', () => {
     unprojectedNoise: { big: 'payload' },
   };
 
-  it('stores raw server payload in row.raw and strips unprojectedNoise from root', () => {
+  it('strips undeclared fields instead of stashing the server payload alongside the row', () => {
     const row = projectRow(raw, entity, 1000) as any;
 
-    expect(row.raw).toEqual(raw);
     expect(row.unprojectedNoise).toBeUndefined();
+    expect(row.raw).toBeUndefined();
   });
 
   it('keeps syncedAt', () => {
