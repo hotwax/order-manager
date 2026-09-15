@@ -50,7 +50,10 @@ describe('order detail ship-group brokered progress', () => {
   });
 
   it('distinguishes a brokered step with no recorded time from one still pending', () => {
-    expect(source).toContain("|| (isShipGroupBrokered(shipGroup) ? translate('No date') : translate('Pending'));");
+    // A settled group counts as "No date" too: its items have stopped, so nothing is pending.
+    expect(source).toContain("isShipGroupBrokered(shipGroup) || shipGroupItemStates(shipGroup).settled");
+    expect(source).toContain("? translate('No date')");
+    expect(source).toContain(": translate('Pending')");
     expect(source).toContain('<ion-note slot="end">{{ brokeredStepNote(shipGroup) }}</ion-note>');
   });
 
