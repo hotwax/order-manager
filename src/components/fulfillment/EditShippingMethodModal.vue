@@ -39,7 +39,7 @@
             :key="method.shipmentMethodTypeId"
             :value="method.shipmentMethodTypeId"
           >
-            {{ seed.shipmentMethodDescription(method.shipmentMethodTypeId) }}
+            {{ methodLabels[method.shipmentMethodTypeId] ?? method.shipmentMethodTypeId }}
           </ion-select-option>
         </ion-select>
       </ion-item>
@@ -71,21 +71,26 @@ import {
   modalController,
 } from '@ionic/vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { translate } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
+
+const seed = useSeedData();
 
 const orderDetailStore = useOrderDetailStore();
-const seed = useSeedStore();
 
 const selectedCarrierId = ref('');
 const selectedMethodId = ref('');
 
+// Seed rows come from the local database, so they resolve after mount.
+const carrierRows = ref<any[]>([]);
+const methodLabels = ref<Record<string, string>>({});
+
 const availableCarriers = computed(() => {
   const list = orderDetailStore.carrierParties.length
     ? orderDetailStore.carrierParties
-    : seed.carriers.ids.map((id) => seed.carriers.byId[id]);
+    : carrierRows.value;
   return [...list].sort((a, b) => {
     const nameA = [a.firstName, a.lastName].filter(Boolean).join(' ') || a.groupName || a.partyId;
     const nameB = [b.firstName, b.lastName].filter(Boolean).join(' ') || b.groupName || b.partyId;
@@ -99,9 +104,16 @@ const methodsForCarrier = computed(() =>
   )
 );
 
-onMounted(() => {
+watch(methodsForCarrier, async (methods) => {
+  methodLabels.value = await seed.getShipmentMethodDescriptions(
+    (methods || []).map((method: any) => method.shipmentMethodTypeId),
+  );
+}, { immediate: true });
+
+onMounted(async () => {
   orderDetailStore.fetchCarrierParties();
   orderDetailStore.fetchShippingMethods();
+  carrierRows.value = await seed.getCarriers();
 });
 
 function onCarrierChange(carrierId: string) {

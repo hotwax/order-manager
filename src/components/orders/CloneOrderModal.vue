@@ -144,17 +144,18 @@ import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import { computed, onMounted, ref, watch } from 'vue';
 import { api, emitter, logger, translate } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { useProductCacheStore } from '@/store/productCache';
 import { createShopifyCustomer, searchShopifyCustomers } from '@/services/customer';
 import { showToast } from '@/utils';
 import { buildClonePayload, cloneCustomerName, cloneEmail, clonePhone, defaultCloneNote, type ClonePriceMode } from '@/utils/cloneOrder';
 
+const seed = useSeedData();
+
 /** PartyIdentification type carrying the numeric Shopify customer id (ShopifySeedData.xml). */
 const SHOPIFY_CUSTOMER_ID_TYPE = 'SHOPIFY_CUST_ID';
 
 const orderDetailStore = useOrderDetailStore();
-const seed = useSeedStore();
 const productCache = useProductCacheStore();
 
 const raw = computed(() => orderDetailStore.current);
@@ -172,8 +173,9 @@ const email = computed(() => cloneEmail(raw.value));
 // ── Shop resolution: ShopifyShopOrder mapping first, manual pick from seed shops as fallback.
 const shopStatus = ref<'resolving' | 'resolved' | 'manual'>('resolving');
 const shopId = ref('');
-const shops = computed(() => seed.shopifyShops.ids.map((id: string) => seed.shopifyShops.byId[id]));
-const shopLabel = computed(() => seed.shopifyShops.byId[shopId.value]?.name || shopId.value);
+const shops = ref<any[]>([]);
+onMounted(async () => { shops.value = await seed.getShopifyShops(); });
+const shopLabel = computed(() => shops.value.find((s: any) => s.shopId === shopId.value)?.name || shopId.value);
 
 // ── Customer resolution: PartyIdentification → Shopify email search → create at submit.
 const customerStatus = ref<'resolving' | 'resolved' | 'error'>('resolving');
@@ -270,7 +272,6 @@ async function resolveCustomer() {
 }
 
 onMounted(async () => {
-  seed.loadShopifyShops();
   await resolveShop();
   await resolveCustomer();
 });
@@ -331,7 +332,7 @@ async function confirm() {
       note: note.value,
       shopId: shopId.value,
       shopifyCustomerId: customerId,
-      geoName: seed.geoName,
+      geoName: seed.getGeoName,
       getProduct: productCache.getProduct,
     });
 

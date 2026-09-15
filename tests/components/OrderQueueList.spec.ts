@@ -38,7 +38,7 @@ describe('OrderQueueList', () => {
     expect(source).toContain('component: RoutingGroupModal');
     expect(source).toContain('brokerableShipGroupsForOrders(orderIds)');
     expect(source).toContain('fetchOrderShipGroups(orderId)');
-    expect(source).toContain('.filter(isVirtualShipGroup)');
+    expect(source).toContain('isVirtualShipGroup(shipGroup, facilityById, parentTypeByFacilityType)');
     expect(source).toContain('orderTaskStore.brokerShipGroup({');
     expect(source).toContain("url: `oms/orders/${orderId}/shipGroups`");
   });

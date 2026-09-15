@@ -109,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import {
   IonIcon,
   IonInput,
@@ -131,11 +131,13 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import { buildAddressState } from '@/utils/badAddressState';
 import type { AddressState } from '@/types/order';
 import type { TaskCardAction } from '@/types/taskCard';
+
+const seed = useSeedData();
 
 const props = withDefaults(defineProps<{
   task: any;
@@ -155,7 +157,6 @@ const emit = defineEmits<{
 }>();
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedStore();
 
 const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'save-and-release', label: translate('Save and release hold'), kind: 'primary' },
@@ -168,18 +169,42 @@ const cardActions = computed<TaskCardAction[]>(() => ([
 // skeleton placeholder and keeps the layout stable (no shift on hydrate).
 const addressState = ref<AddressState | null>(null);
 
-function hydrate() {
+// Seed labels come from the local database; each resolves when the task changes.
+const facilityLabel = ref('');
+const carrierLabel = ref('');
+const methodLabel = ref('');
+const statesByCountry = ref<Record<string, any[]>>({});
+
+watch(() => props.task, async (task) => {
+  const methodId = task?.shipmentMethodTypeId || task?.shipGroup?.shipmentMethodTypeId || '';
+  [facilityLabel.value, carrierLabel.value, methodLabel.value] = await Promise.all([
+    seed.getFacilityName(task?.facilityId ?? ''),
+    task?.carrierPartyId ? seed.getCarrierName(task.carrierPartyId) : Promise.resolve(''),
+    methodId ? seed.getShipmentMethodDescription(methodId) : Promise.resolve(''),
+  ]);
+}, { immediate: true, deep: true });
+
+// The state name shown next to each address needs its country's states in hand.
+watch(addressState, async (state) => {
+  const countryIds = [state?.original?.countryGeoId, state?.suggested?.countryGeoId].filter(Boolean) as string[];
+  const resolved = await Promise.all(countryIds.map((id) => seed.getStatesForCountry(id)));
+  statesByCountry.value = Object.fromEntries(countryIds.map((id, i) => [id, resolved[i]]));
+}, { deep: true });
+
+// buildAddressState resolves geo codes to ids and the result is STAMPED into addressState,
+// so a cold slice would leave raw codes there permanently. Already deferred past first
+// paint, so awaiting here costs nothing visible.
+async function hydrate() {
   if (addressState.value) return;
-  const state = buildAddressState(props.task);
-  if (state.original.countryGeoId) seedStore.loadGeoAssocs(state.original.countryGeoId);
-  if (state.suggested.countryGeoId) seedStore.loadGeoAssocs(state.suggested.countryGeoId);
-  addressState.value = state;
+  // buildAddressState resolves geo codes to ids and the result is STAMPED into the ref, so
+  // it needs the rows in hand — the reactive slice above may not have emitted yet.
+  addressState.value = buildAddressState(await seed.getGeos(), props.task);
 }
 
 onMounted(() => {
   // Defer past the first paint so opening/returning to a list never blocks on
   // building every card's form synchronously.
-  requestAnimationFrame(hydrate);
+  requestAnimationFrame(() => { void hydrate(); });
 });
 
 function countryName(geoId: string): string {
@@ -188,7 +213,7 @@ function countryName(geoId: string): string {
 
 function stateName(address: AddressState['original']): string {
   if (!address.countryGeoId || !address.stateProvinceGeoId) return '';
-  return seedStore.getStatesForCountry(address.countryGeoId).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
+  return (statesByCountry.value[address.countryGeoId] || []).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
 }
 
 function readOnlyAddressValue(value: string): string {
@@ -197,15 +222,15 @@ function readOnlyAddressValue(value: string): string {
 
 function brokeredFacilityName(task: any): string {
   return task.facilityName
-    || seedStore.facilityName(task.facilityId)
+    || facilityLabel.value
     || task.facilityId
     || '-';
 }
 
 function carrierShippingMethodLabel(task: any): string {
-  const carrier = task.carrierPartyId ? seedStore.carrierName(task.carrierPartyId) : '';
+  const carrier = carrierLabel.value;
   const methodId = task.shipmentMethodTypeId || task.shippingMethodTypeId;
-  const method = methodId ? seedStore.shipmentMethodDescription(methodId) : '';
+  const method = methodLabel.value;
   return [carrier, method].filter(Boolean).join(' - ') || '-';
 }
 
@@ -219,7 +244,6 @@ async function openCountryPicker(address: AddressState['original']) {
   if (role === 'selected' && data && data !== address.countryGeoId) {
     address.countryGeoId = data;
     address.stateProvinceGeoId = '';
-    seedStore.loadGeoAssocs(data);
   }
 }
 
@@ -227,7 +251,7 @@ async function openStatePicker(address: AddressState['original']) {
   if (!address.countryGeoId) return;
   const modal = await modalController.create({
     component: GeoSelectModal,
-    componentProps: { title: translate('Select state'), items: seedStore.getStatesForCountry(address.countryGeoId), selectedGeoId: address.stateProvinceGeoId },
+    componentProps: { title: translate('Select state'), items: await seed.getStatesForCountry(address.countryGeoId), selectedGeoId: address.stateProvinceGeoId },
   });
   await modal.present();
   const { data, role } = await modal.onWillDismiss();

@@ -192,10 +192,12 @@ import {
   modalController
 } from '@ionic/vue';
 import { closeOutline, saveOutline, trashOutline } from 'ionicons/icons';
-import { computed, onMounted, reactive } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import type { CustomerContactMech } from '@/types/customer';
+
+const seed = useSeedData();
 
 const props = defineProps<{
   contactMechTypeId: string;
@@ -203,7 +205,6 @@ const props = defineProps<{
   existingContact?: CustomerContactMech;
 }>();
 
-const seed = useSeedStore();
 
 const isEditMode = computed(() => !!props.existingContact);
 
@@ -235,31 +236,25 @@ const form = reactive<Record<string, string>>({
   countryGeoId: ''
 });
 
-const countries = computed(() => (seed as any).getCountries as Array<{ geoId: string; geoName: string }>);
+// Geography comes from the local database, so it resolves after mount.
+const countries = ref<Array<{ geoId: string; geoName: string }>>([]);
+const allStates = ref<Array<{ geoId: string; geoName: string; geoCode?: string; geoCodeAlpha2?: string }>>([]);
+const stateOptions = ref<Array<{ geoId: string; geoName: string }>>([]);
 
-const stateOptions = computed(() => {
-  if (!form.countryGeoId) return [];
-  return ((seed as any).getStatesForCountry(form.countryGeoId) as Array<{ geoId: string; geoName: string }>);
-});
 
-const isLoadingStates = computed(() =>
-  !!form.countryGeoId && ['idle', 'loading'].includes((seed as any).geoAssocStatus?.(form.countryGeoId))
-);
+// The geo slices fill from the local database; there is no per-country fetch to wait on.
+watch(() => form.countryGeoId, async (countryGeoId) => {
+  stateOptions.value = countryGeoId ? await seed.getStatesForCountry(countryGeoId) as any : [];
+}, { immediate: true });
 
-async function onCountryChange() {
+const isLoadingStates = computed(() => !!form.countryGeoId && stateOptions.value.length === 0);
+
+function onCountryChange() {
   form.stateProvinceGeoId = '';
-  if (form.countryGeoId) {
-    await (seed as any).loadGeoAssocs(form.countryGeoId);
-  }
 }
 
 onMounted(async () => {
-  if (props.contactMechTypeId === 'POSTAL_ADDRESS') {
-    if ((seed as any).geos?.status !== 'loaded') {
-      await (seed as any).loadGeos?.();
-    }
-  }
-
+  [countries.value, allStates.value] = await Promise.all([seed.getCountries(), seed.getStates()]) as any;
   if (props.existingContact) {
     const c = props.existingContact;
     if (props.contactMechTypeId === 'EMAIL_ADDRESS') {
@@ -275,9 +270,6 @@ onMounted(async () => {
       form.stateProvinceGeoId = c.postalAddress?.stateProvinceGeoId || '';
       form.postalCode = c.postalAddress?.postalCode || '';
       form.countryGeoId = c.postalAddress?.countryGeoId || '';
-      if (form.countryGeoId) {
-        await (seed as any).loadGeoAssocs(form.countryGeoId);
-      }
     }
   }
 });
@@ -326,7 +318,7 @@ function normalizeStateProvinceGeoId(value: string) {
 
   const candidates = stateOptions.value.length
     ? stateOptions.value
-    : ((seed as any).getStates as Array<{ geoId: string; geoName: string; geoCode?: string; geoCodeAlpha2?: string }>);
+    : allStates.value;
   const normalizedStateProvince = stateProvince.toLowerCase();
   const match = candidates.find((state: any) =>
     state.geoId === stateProvince
