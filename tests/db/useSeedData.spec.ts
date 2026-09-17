@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { BaseDB, commonSchema, dbClient } from '@common/db';
+import { BaseDB, commonSchema, dbClient, ensureDbReady } from '@common/db';
 import { setOmsInstanceResolver } from '@/db/orderManagerDb';
 
 let oms = '';
@@ -16,7 +16,9 @@ async function seedDb(): Promise<void> {
   oms = `useSeedDataTest-${n++}`;
   setOmsInstanceResolver(() => oms);
   const db = new BaseDB(`${oms}-OrderManagerDB`, commonSchema.stores);
-  await db.open();
+  // Record the declared version before seeding, as the app does on first use. A database with no
+  // recorded version is treated as built by another build and is rebuilt on first read.
+  await ensureDbReady(db);
   const c = dbClient(db);
   await c.entity('statuses').bulkPut([
     { statusId: 'ORDER_APPROVED', statusTypeId: 'ORDER_STATUS', description: 'Approved', statusAge: 5, syncedAt: 1 },
