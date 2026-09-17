@@ -7,7 +7,7 @@ describe('authenticated app boot', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/App.vue'), 'utf8');
 
     expect(source).toContain('const { isAuthenticated } = useAuth();');
-    expect(source).toContain('if (isAuthenticated.value)');
-    expect(source).toContain('await userStore.fetchPermissions()');
+    expect(source).toContain('watch(isAuthenticated,');
+    expect(source).toContain('userStore.fetchPermissions()');
   });
 });

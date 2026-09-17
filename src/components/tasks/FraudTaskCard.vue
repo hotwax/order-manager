@@ -85,20 +85,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { IonButton, IonChip, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController, modalController } from '@ionic/vue';
 import { alertCircleOutline, checkmarkCircleOutline, hardwareChipOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { showToast, sentimentCounts } from '@/utils';
 import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import type { TaskCardAction } from '@/types/taskCard';
+
+const seed = useSeedData();
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean; showViewOrderAction?: boolean }>(), {
   selectable: false,
@@ -112,7 +114,6 @@ const emit = defineEmits<{
 }>();
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedStore();
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 
 const cardActions = computed<TaskCardAction[]>(() => ([
@@ -123,6 +124,20 @@ const cardActions = computed<TaskCardAction[]>(() => ([
 const taskFacts = computed<any[]>(() => (props.task.risks || []).flatMap((risk: any) => risk.facts || []));
 const negativeFacts = computed(() => taskFacts.value.filter((fact) => fact.sentimentEnumId === 'SENT_NEGATIVE'));
 const counts = computed(() => sentimentCounts(taskFacts.value));
+
+// Seed labels come from the local database; one read per table when the task changes.
+const paymentLabels = ref<Record<string, string>>({});
+const statusLabels = ref<Record<string, string>>({});
+const recommendationLabel = ref('');
+
+watch(() => props.task, async (task) => {
+  const payments = task?.payments || [];
+  [paymentLabels.value, statusLabels.value, recommendationLabel.value] = await Promise.all([
+    seed.getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
+    seed.getStatusDescriptions(payments.map((payment: any) => payment.statusId)),
+    seed.getEnumDescription(task?.riskRecommendationEnumId ?? ''),
+  ]);
+}, { immediate: true, deep: true });
 
 async function openRiskDetails() {
   const modal = await modalController.create({
@@ -158,13 +173,13 @@ function orderedItemSecondary(item: any): string {
 
 function paymentMethodLabel(payment: any): string {
   return payment.paymentMethodDescription
-    || seedStore.paymentMethodDescription(payment.paymentMethodTypeId)
+    || paymentLabels.value[payment.paymentMethodTypeId]
     || payment.paymentMethodTypeId;
 }
 
 function paymentStatusLabel(payment: any): string {
   return payment.statusDescription
-    || seedStore.statusDescription(payment.statusId)
+    || statusLabels.value[payment.statusId]
     || payment.statusId;
 }
 
@@ -179,8 +194,8 @@ function paymentStatusColor(payment: any): string | undefined {
 
 function suggestedActionLabel(task: any): string {
   return task.suggestedAction
-    || seedStore.enumDescription(task.riskRecommendationEnumId)
-    || seedStore.enumDescription(task.recommendationEnumId)
+    || recommendationLabel.value
+    || enumDescription(enums.value, task.recommendationEnumId)
     || translate('Review');
 }
 

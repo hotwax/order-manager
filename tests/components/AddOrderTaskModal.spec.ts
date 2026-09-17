@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('AddOrderTaskModal canonical hold WorkEffort model (#345)', () => {
   const modal = readFileSync(resolve(process.cwd(), 'src/components/tasks/AddOrderTaskModal.vue'), 'utf8');
-  const seed = readFileSync(resolve(process.cwd(), 'src/store/seed.ts'), 'utf8');
+  const seed = readFileSync(resolve(process.cwd(), '../../common/db/useSeedData.ts'), 'utf8');
 
   it('fixes the task type to RESOLVE_ONHOLD_ORDER', () => {
     // Poorti only excludes open hold tasks from ready-to-pick when the WorkEffort
@@ -22,7 +22,8 @@ describe('AddOrderTaskModal canonical hold WorkEffort model (#345)', () => {
 
   it('scopes the purpose picker to the canonical hold purpose bucket', () => {
     expect(modal).toContain('getEnumsByType(WORK_EFFORT_TYPE_ID)');
-    expect(modal).toContain('loadEnumType(WORK_EFFORT_TYPE_ID)');
+    // Enums are synced by the worker; there is no per-type fetch to trigger.
+    expect(modal).not.toContain('loadEnumType(');
     expect(modal).not.toContain("getEnumsByParentType('WorkEffortPurposeType')");
   });
 
@@ -41,6 +42,8 @@ describe('AddOrderTaskModal canonical hold WorkEffort model (#345)', () => {
   });
 
   it('stops loading the obsolete ORDER_HOLD task seed buckets', () => {
+    // The seed layer no longer enumerates status/enum types at all — the worker syncs
+    // every status and enum — so these buckets cannot leak back in.
     expect(seed).not.toContain('ORDER_HOLD_STATUS');
     expect(seed).not.toContain('ORDER_HOLD_PURPOSE');
   });

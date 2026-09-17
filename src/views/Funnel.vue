@@ -620,22 +620,40 @@ import { translate, StatCard, Sparkline, commonUtil } from '@common';
 import { UNFILLABLE_FACILITY_ID, useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { useUserStore } from '@/store/user';
 import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
 import { createLatestRequestScope } from '@/utils/latestRequestScope';
 import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
 import { reconcileSelectedFacilityId } from '@/utils/funnelFacilitySelection';
 import { facilityProgressAccessibleName } from '@/utils/funnelProgress';
+
+const seed = useSeedData();
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 import { DateTime } from 'luxon';
 
 const store = useCustomerServiceStore();
+
+// Seed labels come from the local database. These maps are resolved by loadSeedLabels()
+// below so the computeds above can stay synchronous.
+const facilityLabels = ref<Record<string, string>>({});
+const methodLabels = ref<Record<string, string>>({});
+const sortParamEnums = ref<any[]>([]);
+
+async function loadSeedLabels(facilityIds: string[], shipmentMethodTypeIds: string[]) {
+  const [facilityEntries, methodEntries, sortParams] = await Promise.all([
+    Promise.all(facilityIds.map(async (id) => [id, await seed.getFacilityName(id)] as const)),
+    Promise.all(shipmentMethodTypeIds.map(async (id) => [id, await seed.getShipmentMethodDescription(id)] as const)),
+    seed.getEnumsByType('PP_SORT_PARAM_TYPE'),
+  ]);
+  facilityLabels.value = Object.fromEntries(facilityEntries);
+  methodLabels.value = Object.fromEntries(methodEntries);
+  sortParamEnums.value = sortParams;
+}
 const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
-const seedStore = useSeedStore();
 const userStore = useUserStore();
 const router = useRouter();
 const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -764,7 +782,6 @@ const queueSegments = computed(() => {
   const topSortField = sortRules[0]?.id || 'deliveryDays';
   let segments: any[] = [];
 
-  const seedStore = useSeedStore() as any;
 
   if (topSortField === 'deliveryDays' || topSortField === 'shipmentMethodTypeId') {
     // Dynamic combinations grouping
@@ -789,8 +806,8 @@ const queueSegments = computed(() => {
 
     let runningMinutes = 0;
     segments = sortedCombinations.map((item, index) => {
-      const shipmentMethod = seedStore.shipmentMethodTypes?.byId?.[item.shipmentMethodTypeId];
-      const label = `${item.deliveryDays}d - ${shipmentMethod?.description || item.shipmentMethodTypeId || 'None'}`;
+      const methodLabel = methodLabels.value[item.shipmentMethodTypeId];
+      const label = `${item.deliveryDays}d - ${methodLabel || item.shipmentMethodTypeId || 'None'}`;
       const segmentMinutes = Math.ceil(item.count / batchSize) * cronIntervalMinutes;
       runningMinutes += segmentMinutes;
       return {
@@ -1089,6 +1106,22 @@ const fulfillmentStageMetrics = computed(() => {
   ];
 });
 
+// Every facility and shipment method the dashboard currently renders. Re-resolved whenever
+// the underlying data changes, so the synchronous computeds above always have their labels.
+watch([facilityOrderVolume, facilityFulfillmentVelocity, facilityRejections, fulfillmentSyncData], async () => {
+  const facilityIds = [
+    selectedFacilityId.value,
+    ...facilityOrderVolume.value.map((item: any) => item.facilityId),
+    ...facilityFulfillmentVelocity.value.map((item: any) => item.facilityId),
+    ...facilityRejections.value.map((item: any) => item.facilityId),
+  ].filter(Boolean);
+  const methodIds = (fulfillmentSyncData.value?.rawOrderCountRecords || [])
+    .map((record: any) => String(record.shipmentMethodTypeId || '').trim())
+    .filter(Boolean);
+
+  await loadSeedLabels([...new Set(facilityIds)], [...new Set(methodIds)]);
+}, { immediate: true, deep: true });
+
 onIonViewWillEnter(async () => {
   await productStore.initializeProductStore();
   refreshDashboardData();
@@ -1119,13 +1152,13 @@ function retrySyncData() {
   if (selectedFacilityId.value) store.fetchFulfillmentSyncData(selectedFacilityId.value);
 }
 
-function getFacilityName(facilityId: string) {
-  return seedStore.facilityName(facilityId);
+function facilityLabelFor(facilityId: string) {
+  return facilityLabels.value[facilityId] ?? facilityId;
 }
 
 const selectedFacilityName = computed(() => {
   const selected = filteredFacilities.value.find(item => item.facilityId === selectedFacilityId.value);
-  return selected ? selected.name : getFacilityName(selectedFacilityId.value);
+  return selected ? selected.name : facilityLabelFor(selectedFacilityId.value);
 });
 
 const filteredFacilities = computed(() => {
@@ -1133,14 +1166,14 @@ const filteredFacilities = computed(() => {
   if (selectedDimension.value === 'volume') {
     list = facilityOrderVolume.value.map(item => ({
       facilityId: item.facilityId,
-      name: item.facilityName || getFacilityName(item.facilityId),
+      name: item.facilityName || facilityLabelFor(item.facilityId),
       value: item.lastOrderCount,
       label: `${item.lastOrderCount} orders`
     }));
   } else if (selectedDimension.value === 'velocity') {
     list = facilityFulfillmentVelocity.value.map(item => ({
       facilityId: item.facilityId,
-      name: item.facilityName || getFacilityName(item.facilityId),
+      name: item.facilityName || facilityLabelFor(item.facilityId),
       value: item.activeFacilityFallback ? item.lastOrderCount : (item.fulfillmentVelocity || 0),
       activeFacilityFallback: item.activeFacilityFallback,
       label: item.activeFacilityFallback
@@ -1150,7 +1183,7 @@ const filteredFacilities = computed(() => {
   } else if (selectedDimension.value === 'rejections') {
     list = facilityRejections.value.map(item => ({
       facilityId: item.facilityId,
-      name: item.facilityName || getFacilityName(item.facilityId),
+      name: item.facilityName || facilityLabelFor(item.facilityId),
       value: item.lastOrderCount || 0,
       label: item.rejectedShipGroupCount
         ? `${item.lastOrderCount || 0} ${translate("active orders")}, ${item.rejectedShipGroupCount} ${translate("rejected orders")}`
@@ -1237,11 +1270,11 @@ const handleReorder = (event: any) => {
 };
 
 
+
 const availableSortOptions = computed(() => {
-  const seedStore = useSeedStore() as any;
-  const allParams = seedStore.getEnumsByType('PP_SORT_PARAM_TYPE') || [];
   const currentIds = sortRules.value.map(r => r.id);
-  return allParams.filter((e: any) => !currentIds.includes(e.enumCode));
+
+  return sortParamEnums.value.filter((e: any) => !currentIds.includes(e.enumCode));
 });
 
 function addSortRule(enumCode: string) {

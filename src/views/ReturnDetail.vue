@@ -28,7 +28,7 @@
             </p>
           </ion-label>
           <ion-badge v-if="returnRecord.statusId" slot="end" :color="returnStatusColor(returnRecord.statusId)">
-            {{ describe(returnRecord.statusId) }}
+            {{ notSpecified(statusLabels[returnRecord.statusId]) }}
           </ion-badge>
         </ion-item>
 
@@ -116,7 +116,7 @@
                 <ion-label>
                   <p>{{ translate('Shopify status') }}</p>
                   <ion-badge :color="shopifyStatusColor(returnRecord.shopifySync.returnStatusId)">
-                    {{ describe(returnRecord.shopifySync.returnStatusId) }}
+                    {{ notSpecified(statusLabels[returnRecord.shopifySync.returnStatusId]) }}
                   </ion-badge>
                 </ion-label>
               </ion-item>
@@ -224,10 +224,10 @@
 
                 <ion-label class="tablet return-item-status">
                   <ion-badge v-if="item.statusId" :color="returnStatusColor(item.statusId)">
-                    {{ describe(item.statusId) }}
+                    {{ notSpecified(statusLabels[item.statusId]) }}
                   </ion-badge>
                   <p v-if="item.returnTypeId">
-                    {{ describe(item.returnTypeId) }}
+                    {{ notSpecified(returnTypeLabels[item.returnTypeId]) }}
                   </p>
                 </ion-label>
 
@@ -247,7 +247,7 @@
                     {{ translate('Return reason') }}
                   </p>
                   <p class="return-item-detail-value">
-                    {{ item.returnReasonDescription || describe(item.returnReasonId) }}
+                    {{ item.returnReasonDescription || notSpecified(returnReasonLabels[item.returnReasonId]) }}
                   </p>
                 </div>
 
@@ -270,7 +270,7 @@
                   </div>
                   <div v-if="item.returnItemTypeId" class="return-item-fact">
                     <dt>{{ translate('Return item type') }}</dt>
-                    <dd>{{ describe(item.returnItemTypeId) }}</dd>
+                    <dd>{{ notSpecified(returnItemTypeLabels[item.returnItemTypeId]) }}</dd>
                   </div>
                 </dl>
 
@@ -423,7 +423,7 @@ import {
 } from "ionicons/icons";
 import { DateTime } from "luxon";
 import { storeToRefs } from "pinia";
-import { computed, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import Actions from "@/authorization/actions";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
@@ -431,21 +431,58 @@ import { useProductMaster } from "@/composables/useProductMaster";
 import { useOrderDetailStore } from "@/store/orderDetail";
 import { useProductCacheStore } from "@/store/productCache";
 import { useReturnsStore } from "@/store/returns";
-import { useSeedStore } from "@/store/seed";
+import { useSeedData } from '@common/db';
 import { useUserStore } from "@/store/user";
 import type { ReturnItemDetail, ReturnStatusHistory, ReturnSyncState } from "@/types/returns";
+
+const seed = useSeedData();
 
 const props = defineProps<{
   returnId: string;
 }>();
 
 const returnsStore = useReturnsStore();
-const seed = useSeedStore();
 const productCache = useProductCacheStore();
 const productMaster = useProductMaster();
 const orderDetailStore = useOrderDetailStore();
 const userStore = useUserStore();
 const { current: returnRecord, detailLoading, detailError } = storeToRefs(returnsStore);
+
+// Every label this page renders, resolved in one read per table when the record loads.
+const statusLabels = ref<Record<string, string>>({});
+const returnTypeLabels = ref<Record<string, string>>({});
+const returnReasonLabels = ref<Record<string, string>>({});
+const returnItemTypeLabels = ref<Record<string, string>>({});
+const paymentMethodLabels = ref<Record<string, string>>({});
+const facilityLabels = ref<Record<string, string>>({});
+const channelLabels = ref<Record<string, string>>({});
+
+watch(returnRecord, async (record: any) => {
+  const items = record?.items || [];
+  const payments = record?.payments || [];
+  [
+    statusLabels.value,
+    returnTypeLabels.value,
+    returnReasonLabels.value,
+    returnItemTypeLabels.value,
+    paymentMethodLabels.value,
+    facilityLabels.value,
+    channelLabels.value,
+  ] = await Promise.all([
+    seed.getStatusDescriptions([
+      record?.statusId,
+      record?.shopifySync?.returnStatusId,
+      ...items.map((item: any) => item.statusId),
+      ...payments.map((payment: any) => payment.statusId),
+    ].filter(Boolean) as string[]),
+    seed.getReturnTypeDescriptions(items.map((item: any) => item.returnTypeId)),
+    seed.getReturnReasonDescriptions(items.map((item: any) => item.returnReasonId)),
+    seed.getReturnItemTypeDescriptions(items.map((item: any) => item.returnItemTypeId)),
+    seed.getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
+    seed.getFacilityNames([record?.destinationFacilityId].filter(Boolean) as string[]),
+    seed.getEnumDescriptions([record?.returnChannelEnumId].filter(Boolean) as string[]),
+  ]);
+}, { immediate: true, deep: true });
 const canViewOrders = computed(() => userStore.hasPermission(Actions.APP_ORDERS_VIEW));
 const canViewCustomers = computed(() => userStore.hasPermission(Actions.APP_CUSTOMERS_VIEW));
 const itemGroups = computed(() => {
@@ -486,10 +523,10 @@ const sourceOrderPayments = computed(() => sourceOrderIds.value.flatMap((orderId
     orderId,
     orderName,
     paymentMethodTypeId: payment.paymentMethodTypeId || "",
-    paymentMethodTypeDescription: seed.paymentMethodDescription(payment.paymentMethodTypeId) || payment.paymentMethodTypeId || translate("Payment preference"),
+    paymentMethodTypeDescription: paymentMethodLabels.value[payment.paymentMethodTypeId] || payment.paymentMethodTypeId || translate("Payment preference"),
     amount: Number(payment.maxAmount ?? payment.presentmentAmount ?? 0),
     statusId: payment.statusId || "UNKNOWN",
-    statusDescription: seed.statusDescription(payment.statusId) || payment.statusId || translate("Unknown status"),
+    statusDescription: statusLabels.value[payment.statusId] || payment.statusId || translate("Unknown status"),
     createdDate: payment.createdDate || payment.createdStamp
   }));
 }));
@@ -549,17 +586,18 @@ const returnTypeLabel = computed(() => {
   if(returnRecord.value?.returnHeaderTypeId === "CUSTOMER_RETURN") {return translate("Customer return");}
   if(returnRecord.value?.returnHeaderTypeId === "APPEASEMENT") {return translate("Appeasement");}
 
-  return describe(returnRecord.value?.returnHeaderTypeId);
+  // returnHeaderTypeId has no seed table, so describe() always returned the raw id here.
+  return notSpecified(returnRecord.value?.returnHeaderTypeId);
 });
 const facilityLabel = computed(() => {
   const facilityId = returnRecord.value?.destinationFacilityId;
 
-  return facilityId ? seed.facilityName(facilityId) || facilityId : translate("Not specified");
+  return facilityId ? facilityLabels.value[facilityId] || facilityId : translate("Not specified");
 });
 const channelLabel = computed(() => {
   const channelId = returnRecord.value?.returnChannelEnumId;
 
-  return channelId ? seed.enumDescription(channelId) || channelId : translate("Not specified");
+  return channelId ? channelLabels.value[channelId] || channelId : translate("Not specified");
 });
 const syncError = computed(() => {
   const sync = returnRecord.value?.shopifySync;
@@ -656,9 +694,7 @@ async function loadReturn() {
   await Promise.all(exchangeOriginalOrderIds.value.map((orderId) => orderDetailStore.fetchOrder(orderId)));
 }
 
-function describe(value?: string) {
-  return value ? seed.describe(value) || value : translate("Not specified");
-}
+const notSpecified = (value?: string) => value || translate("Not specified");
 
 function money(value: number, currency = "USD") {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "USD" }).format(value);
@@ -693,7 +729,7 @@ function inventoryStatusLabel(statusId: string) {
     INV_NOT_RETURNED: "Do not return to inventory"
   };
 
-  return labels[statusId] ? translate(labels[statusId]) : describe(statusId);
+  return labels[statusId] ? translate(labels[statusId]) : notSpecified(statusLabels.value[statusId]);
 }
 
 function returnStatusColor(statusId: string) {
@@ -763,7 +799,7 @@ function returnTimelineLabel(status: ReturnStatusHistory, isConfirmedRestock: bo
     return statusItem(status) ? translate("Item completed") : translate("Return completed");
   }
 
-  return describe(status.statusId);
+  return notSpecified(statusLabels.value[status.statusId]);
 }
 
 function sameMoment(left?: string | number, right?: string | number) {

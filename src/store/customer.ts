@@ -1,5 +1,6 @@
 import { DateTime } from 'luxon';
 import { defineStore } from 'pinia';
+import { omDb } from '@/db/orderManagerDb';
 import {
   createPartyEmail,
   createPartyPostalAddress,
@@ -22,7 +23,6 @@ import {
   getPartyNames
 } from '@/services/customer';
 import { listReturns } from '@/services/returns';
-import { useSeedStore } from '@/store/seed';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { commonUtil } from '@common';
 import type {
@@ -147,6 +147,17 @@ function allRelationships(profile: CustomerProfile | null, loadedRelationships: 
 
 function triggerCustomerIndex(partyId: string): void {
   indexCustomer(partyId).catch((e) => console.error(`[customer index] failed for ${partyId}:`, e));
+}
+
+/** statusId -> statusAge, read straight from IndexedDB. */
+async function readStatusAges(): Promise<Map<string, number>> {
+  try {
+    const statuses = await omDb().all('statuses');
+
+    return new Map(statuses.map((row: any) => [row.statusId, Number(row.statusAge ?? 0)]));
+  } catch {
+    return new Map();
+  }
 }
 
 export const useCustomerStore = defineStore('customerDetail', {
@@ -323,13 +334,11 @@ export const useCustomerStore = defineStore('customerDetail', {
     // Prefetch on detail route mount. Profile failure fails the page; section
     // failures (orders/tasks) are isolated to their own source bucket.
     async loadCustomerDashboard(partyId: string, force = false) {
-      const seed = useSeedStore();
       await Promise.allSettled([
         this.loadCustomerProfile(partyId, force),
         this.loadCustomerOrders(partyId, force),
         this.loadCustomerTasks(partyId, force),
-        this.loadCustomerRelationships(partyId, force),
-        (seed as any).loadPartyRelationshipTypes()
+        this.loadCustomerRelationships(partyId, force)
       ]);
       await (this as any).loadMergableDuplicates(partyId);
     },
@@ -371,15 +380,16 @@ export const useCustomerStore = defineStore('customerDetail', {
 
         // Real progress for the rendered cards: hydrate each via the official get-order API
         // (not Solr) and compute from order-item (+ shipment-item) status ages.
-        const seed = useSeedStore();
+        // statusAge is stamped into each card's progress value, so read the rows up front.
+        const ageByStatusId = await readStatusAges();
         const displayCount = 12;
         await Promise.all(result.orders.slice(0, displayCount).map(async (order) => {
           try {
             const statusIds = await getOrderProgressStatuses(order.orderId);
             if (statusIds.length) {
-              order.progressValue = computeProgress(statusIds, (statusId) => seed.statusAge(statusId));
+              order.progressValue = computeProgress(statusIds, (statusId) => ageByStatusId.get(statusId) ?? 0);
               order.progressLabel = `${Math.round(order.progressValue * 100)}% complete`;
-              order.progressColor = progressStatusColor(statusIds, (statusId) => seed.statusAge(statusId));
+              order.progressColor = progressStatusColor(statusIds, (statusId) => ageByStatusId.get(statusId) ?? 0);
             }
           } catch {
             // keep the Solr status fallback on a per-order failure

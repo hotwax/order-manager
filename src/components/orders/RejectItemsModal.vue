@@ -42,9 +42,10 @@ import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, Ion
 import { checkmarkOutline, closeOutline } from 'ionicons/icons';
 import { onMounted, ref } from 'vue';
 import { translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 
-const seed = useSeedStore();
+const seed = useSeedData();
+
 
 const isLoading = ref(false);
 const rejectionReasons = ref<any[]>([]);
@@ -60,37 +61,21 @@ function confirm() {
 }
 
 async function loadRejectionReasons() {
-  const cachedReasons = [
-    ...seed.getEnumsByParentType('REPORT_AN_ISSUE'),
-    ...seed.getEnumsByParentType('RPRT_NO_VAR_LOG'),
-  ];
-  if (cachedReasons.length) {
+  isLoading.value = true;
+  try {
+    // Both buckets come from the local database; there is no cache to check first.
+    const [issues, noVariance] = await Promise.all([
+      seed.getEnumsByParentType('REPORT_AN_ISSUE'),
+      seed.getEnumsByParentType('RPRT_NO_VAR_LOG'),
+    ]);
+
     const seen = new Set<string>();
-    rejectionReasons.value = cachedReasons.filter((r) => {
-      if (seen.has(r.enumId)) return false;
-      seen.add(r.enumId);
+    rejectionReasons.value = [...issues, ...noVariance].filter((reason: any) => {
+      if (seen.has(reason.enumId)) return false;
+      seen.add(reason.enumId);
+
       return true;
     });
-  } else {
-    isLoading.value = true;
-  }
-  try {
-    if (!cachedReasons.length) {
-      await Promise.all([
-        seed.loadEnumsByParentType('REPORT_AN_ISSUE'),
-        seed.loadEnumsByParentType('RPRT_NO_VAR_LOG'),
-      ]);
-      const reasons = [
-        ...seed.getEnumsByParentType('REPORT_AN_ISSUE'),
-        ...seed.getEnumsByParentType('RPRT_NO_VAR_LOG'),
-      ];
-      const seen = new Set<string>();
-      rejectionReasons.value = reasons.filter((r) => {
-        if (seen.has(r.enumId)) return false;
-        seen.add(r.enumId);
-        return true;
-      });
-    }
   } finally {
     isLoading.value = false;
   }

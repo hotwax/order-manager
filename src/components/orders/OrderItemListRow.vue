@@ -80,7 +80,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonBadge, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonThumbnail } from '@ionic/vue';
+import { IonBadge, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonNote, IonThumbnail } from '@ionic/vue';
 import { businessOutline, listOutline } from 'ionicons/icons';
 import { DxpShopifyImg, translate } from '@common';
 

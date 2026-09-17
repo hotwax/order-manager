@@ -53,7 +53,7 @@
       <IdentificationListItem
         v-for="identification in localIdentifications"
         :key="`${identification.orderIdentificationTypeId}::${identification.fromDate}`"
-        :label="seed.orderIdentificationTypeDescription(identification.orderIdentificationTypeId)"
+        :label="identificationLabels[identification.orderIdentificationTypeId] ?? identification.orderIdentificationTypeId"
         :value="identification.idValue"
         :hide-value="editingKey === rowKey(identification)"
         :is-updatable="isRowUpdatable(identification)"
@@ -109,16 +109,18 @@ import {
   modalController
 } from '@ionic/vue';
 import { addOutline, checkmarkDoneOutline, closeOutline, createOutline, trashOutline } from 'ionicons/icons';
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { DateTime } from 'luxon';
 import { api, commonUtil, translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { useUserStore } from '@/store/user';
 import { showToast } from '@/utils';
 import EmptyState from '@/components/common/EmptyState.vue';
 import IdentificationListItem from '@/components/orders/IdentificationListItem.vue';
 import CreateIdentificationTypeModal from '@/components/orders/CreateIdentificationTypeModal.vue';
 import Actions from "@/authorization/actions";
+
+const seed = useSeedData();
 
 type Identification = {
   orderIdentificationTypeId: string;
@@ -144,7 +146,6 @@ function isSystemSourced(identification: Identification) {
   return SYSTEM_SOURCED_TYPE_IDS.has(identification.orderIdentificationTypeId);
 }
 
-const seed = useSeedStore();
 const userStore = useUserStore();
 // A user with Actions.APP_ORDER_IDENTIFICATION_UPDATE (ORDERMGR_ADMIN) can edit/remove any
 // identification, including system/imported ones; everyone else can only edit/remove the
@@ -156,9 +157,23 @@ function isRowUpdatable(identification: Identification) {
 }
 
 const localIdentifications = ref<Identification[]>([...props.identifications]);
+
+// One read per list change resolves every identification type label.
+const identificationLabels = ref<Record<string, string>>({});
+const identificationTypeOptions = ref<Array<{ enumId: string; description: string }>>([]);
+
+watch(localIdentifications, async (rows) => {
+  identificationLabels.value = await seed.getEnumDescriptions(
+    rows.map((identification: any) => identification.orderIdentificationTypeId),
+  );
+}, { immediate: true, deep: true });
+
+onMounted(async () => {
+  identificationTypeOptions.value = await seed.getOrderIdentificationTypeOptions();
+});
 const typeOptions = computed(() => {
   const existingTypeIds = new Set(localIdentifications.value.map((identification) => identification.orderIdentificationTypeId));
-  return seed.orderIdentificationTypeOptions.filter((type) => {
+  return identificationTypeOptions.value.filter((type) => {
     if (existingTypeIds.has(type.enumId)) return false;
     // Without the permission, a user can't add a system-sourced type either — otherwise they
     // could delete one (allowed) and immediately recreate it with an arbitrary value.
