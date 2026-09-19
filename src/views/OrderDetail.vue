@@ -3251,7 +3251,7 @@ function itemAdjustmentSummaries(rawItem: any, orderItemSeqId: string): Array<{ 
     if (value === 0) return;
 
     const baseLabel = itemAdjustmentLabel(adj);
-    const comment = isIncluded ? `${baseLabel} (included)` : baseLabel;
+    const comment = isIncluded ? `${baseLabel} (${translate('included')})` : baseLabel;
     totals[comment] = (totals[comment] || 0) + value;
   });
 
