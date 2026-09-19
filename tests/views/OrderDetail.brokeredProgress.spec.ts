@@ -12,6 +12,16 @@ import { describe, expect, it } from 'vitest';
 describe('order detail ship-group brokered progress', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/views/OrderDetail.vue'), 'utf8');
 
+  /** The body of one top-level function in the SFC, so assertions stay scoped to it. */
+  const fnBody = (name: string) => {
+    const start = source.indexOf(`function ${name}(`);
+    expect(start, `${name} not found`).toBeGreaterThan(-1);
+    const end = source.indexOf('\n}', start);
+    return source.slice(start, end);
+  };
+  const statusLabelFn = fnBody('shipGroupStatusLabel');
+  const brokeredStepNoteFn = fnBody('brokeredStepNote');
+
   it('counts the brokered quarter from the facility, not from a timeline date', () => {
     expect(source).toContain('function isShipGroupBrokered(shipGroup: any): boolean {');
     expect(source).toContain('return !isVirtualFacility(shipGroup) || !!shipGroupBrokeredDate(shipGroup);');
@@ -50,14 +60,32 @@ describe('order detail ship-group brokered progress', () => {
   });
 
   it('distinguishes a brokered step with no recorded time from one still pending', () => {
-    expect(source).toContain("|| (isShipGroupBrokered(shipGroup) ? translate('No date') : translate('Pending'));");
+    // A settled group counts as "No date" too: its items have stopped, so nothing is pending.
+    // Asserted as a property of the function rather than its exact wording, so that renaming
+    // a local does not fail a behaviourally identical refactor.
+    expect(brokeredStepNoteFn).toMatch(/settled/);
+    expect(brokeredStepNoteFn).toContain("translate('No date')");
+    expect(brokeredStepNoteFn).toContain("translate('Pending')");
     expect(source).toContain('<ion-note slot="end">{{ brokeredStepNote(shipGroup) }}</ion-note>');
   });
 
   it('drops the zero-progress label that collided with the Brokered step name', () => {
     expect(source).toContain("return `${Math.round(shipGroupProgress(shipGroup) * 100)}% ${translate('Complete')}`;");
     expect(source).not.toContain("progress > 0 ? `${progress}% ${translate('Complete')}` : translate('Brokered')");
-    // A virtual facility still reads as not brokered at all.
-    expect(source).toContain("if (isVirtualFacility(shipGroup)) return translate('Not Brokered');");
+  });
+
+  it('reports a stopped group by its items before it reports where they are parked', () => {
+    // Cancelled items are routinely moved to a virtual facility, so returning "Not Brokered"
+    // first would hide the terminal state behind the brokering label. The ordering is the
+    // thing that matters here, not how the condition happens to be written.
+    const cancelledAt = statusLabelFn.indexOf("translate('Cancelled')");
+    const partialAt = statusLabelFn.indexOf("translate('Partially complete')");
+    const notBrokeredAt = statusLabelFn.indexOf("translate('Not Brokered')");
+
+    expect(cancelledAt).toBeGreaterThan(-1);
+    expect(partialAt).toBeGreaterThan(-1);
+    expect(notBrokeredAt).toBeGreaterThan(-1);
+    expect(cancelledAt).toBeLessThan(notBrokeredAt);
+    expect(partialAt).toBeLessThan(notBrokeredAt);
   });
 });

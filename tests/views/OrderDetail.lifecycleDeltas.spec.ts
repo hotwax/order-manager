@@ -28,7 +28,10 @@ describe('order detail ship-group lifecycle step deltas (#350)', () => {
   });
 
   it('keeps the absolute clock time in the end note and Pending for incomplete steps', () => {
-    expect(source).toContain("formatTime(lifecycleByShipGroup[shipGroup.id]?.shippedDate)");
+    // The step notes now go through lifecycleStepNote, which still formats the date when there
+    // is one — it only changes what it says when there is not, and only for a settled group.
+    expect(source).toContain("lifecycleStepNote(shipGroup, lifecycleByShipGroup[shipGroup.id]?.shippedDate)");
+    expect(source).toContain("return formatTime(date)");
     expect(source).toContain("translate('Pending')");
   });
 });

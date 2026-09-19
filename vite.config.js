@@ -49,9 +49,15 @@ export default defineConfig(({ mode }) => {
   test: {
     globals: true,
     environment: 'jsdom',
-    // common/core specs guard the shared code this app depends on (the logger's redaction
-    // hook lives there), so they run here too — that code has no suite of its own.
-    include: ['tests/**/*.spec.ts', 'tests/**/*.test.ts', '../../common/core/**/*.spec.ts'],
+    // The shared code this app depends on has no suite of its own, so its specs run here:
+    // the footer component this app's menu renders, and common/core (the logger's redaction
+    // hook). A change to common/ that breaks this app is caught by this app's suite.
+    include: [
+      'tests/**/*.spec.ts',
+      'tests/**/*.test.ts',
+      '../../common/components/**/*.spec.ts',
+      '../../common/core/**/*.spec.ts'
+    ],
     exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', '.claude']
   }
   }

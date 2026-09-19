@@ -110,7 +110,8 @@
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
       <ion-fab-button :disabled="!isValid" @click="confirm()" :aria-label="translate('Clone')">
-        <ion-icon :icon="checkmarkOutline" />
+        <ion-spinner v-if="isSubmitting" name="crescent" />
+        <ion-icon v-else :icon="checkmarkOutline" />
       </ion-fab-button>
     </ion-fab>
   </ion-content>
