@@ -85,11 +85,11 @@ describe('order detail store', () => {
       total: 63.98,
       includedAdjustments: {}
     });
-    expect(store.adjustmentsByExternalId['15617773142165']).toEqual({
-      'Salt Lake County Tax': 1.53,
-      'Salt Lake City City Tax': 0.59,
-      'Utah State Tax': 2.86
-    });
+    expect(store.adjustmentsByExternalId['15617773142165']).toEqual([
+      { label: 'Salt Lake County Tax', amount: 1.53, isIncluded: false },
+      { label: 'Salt Lake City City Tax', amount: 0.59, isIncluded: false },
+      { label: 'Utah State Tax', amount: 2.86, isIncluded: false }
+    ]);
   });
 
   it('falls back to adjustment type labels and sums repeated comments', () => {
@@ -168,17 +168,76 @@ describe('order detail store', () => {
 
     expect(store.totals).toEqual({
       subtotal: 59,
-      adjustments: {
-        'State Tax': 4.5
-      },
+      adjustments: {},
       total: 59,
       includedAdjustments: {
-        'State Tax': true
+        'State Tax': 4.5
       }
     });
-    expect(store.adjustmentsByExternalId['15617773142165']).toEqual({
-      'State Tax (included)': 4.5
+    expect(store.adjustmentsByExternalId['15617773142165']).toEqual([
+      { label: 'State Tax', amount: 4.5, isIncluded: true }
+    ]);
+  });
+
+  it('keeps an included and an ordinary adjustment sharing a label in separate rows', () => {
+    const store = useOrderDetailStore();
+    store.currentOrderId = 'M100824';
+    store.byOrderId.M100824 = {
+      payload: {
+        orderId: 'M100824',
+        grandTotal: 121,
+        adjustments: [],
+        shipGroups: [{
+          items: [
+            {
+              orderItemSeqId: '01',
+              externalId: 'EXT_INCLUDED',
+              unitPrice: 59,
+              quantity: 1,
+              adjustments: [{
+                orderAdjustmentId: 'M100510',
+                orderAdjustmentTypeId: 'SALES_TAX',
+                comments: 'State Tax',
+                amount: 0,
+                amountAlreadyIncluded: 4.5
+              }]
+            },
+            {
+              orderItemSeqId: '02',
+              externalId: 'EXT_ORDINARY',
+              unitPrice: 59,
+              quantity: 1,
+              adjustments: [{
+                orderAdjustmentId: 'M100511',
+                orderAdjustmentTypeId: 'SALES_TAX',
+                comments: 'State Tax',
+                amount: 3,
+                amountAlreadyIncluded: 0
+              }]
+            }
+          ]
+        }]
+      },
+      status: 'loaded',
+      loadedAt: '',
+      error: ''
+    };
+
+    // The ordinary $3 must stay out of the included bucket: it genuinely adds to the
+    // grand total, so labelling it "included" would misstate what the customer paid.
+    expect(store.totals).toEqual({
+      subtotal: 118,
+      adjustments: { 'State Tax': 3 },
+      total: 121,
+      includedAdjustments: { 'State Tax': 4.5 }
     });
+
+    expect(store.adjustmentsByExternalId.EXT_INCLUDED).toEqual([
+      { label: 'State Tax', amount: 4.5, isIncluded: true }
+    ]);
+    expect(store.adjustmentsByExternalId.EXT_ORDINARY).toEqual([
+      { label: 'State Tax', amount: 3, isIncluded: false }
+    ]);
   });
 
   it('bulk cancels open items through each order item-cancel endpoint', async () => {

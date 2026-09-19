@@ -412,7 +412,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       });
 
       const adjustments: Record<string, number> = {};
-      const includedAdjustments: Record<string, boolean> = {};
+      const includedAdjustments: Record<string, number> = {};
       let adjustmentsTotal = 0;
       const seenAdjustments = new Set<string>();
 
@@ -426,14 +426,16 @@ export const useOrderDetailStore = defineStore("orderDetail", {
 
         const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
         const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
-        const displayAmount = isIncluded ? amountAlreadyIncluded : amount;
         const label = adjustmentDisplayLabel(adj);
 
+        // Included and excluded amounts stay in separate buckets: a label can carry both
+        // (an included tax on one item, an ordinary one on another), and merging them would
+        // label the ordinary amount "included" while it still adds to the grand total.
         if (isIncluded) {
-          includedAdjustments[label] = true;
+          includedAdjustments[label] = (includedAdjustments[label] || 0) + amountAlreadyIncluded;
+        } else {
+          adjustments[label] = (adjustments[label] || 0) + amount;
         }
-
-        adjustments[label] = (adjustments[label] || 0) + displayAmount;
       };
 
       (current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
@@ -448,6 +450,11 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       Object.keys(adjustments).forEach((key) => {
         if (adjustments[key] === 0) {
           delete adjustments[key];
+        }
+      });
+      Object.keys(includedAdjustments).forEach((key) => {
+        if (includedAdjustments[key] === 0) {
+          delete includedAdjustments[key];
         }
       });
 
@@ -573,9 +580,13 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       return map;
     },
 
-    /** Adjustments grouped by orderItemExternalId and comment, summing their amounts. */
-    adjustmentsByExternalId(): Record<string, Record<string, number>> {
-      const index: Record<string, Record<string, number>> = {};
+    /**
+     * Adjustments grouped by orderItemExternalId, summing their amounts. Inclusion is carried
+     * as metadata rather than baked into the label so the view can translate it at render time,
+     * and so an included and an ordinary adjustment sharing a label stay separate rows.
+     */
+    adjustmentsByExternalId(): Record<string, Array<{ label: string; amount: number; isIncluded: boolean }>> {
+      const index: Record<string, Record<string, { label: string; amount: number; isIncluded: boolean }>> = {};
       const seqIdToExtId = this.itemExternalIdBySeqId;
       const seenAdjustments = new Set<string>();
 
@@ -590,11 +601,12 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
         const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
         const displayAmount = isIncluded ? amountAlreadyIncluded : amount;
-        const baseLabel = adjustmentDisplayLabel(adj);
-        const comment = isIncluded ? `${baseLabel} (included)` : baseLabel;
+        const label = adjustmentDisplayLabel(adj);
+        const bucketKey = isIncluded ? `${label}\u0000included` : label;
 
         if (!index[extId]) index[extId] = {};
-        index[extId][comment] = (index[extId][comment] || 0) + displayAmount;
+        const bucket = index[extId][bucketKey] || (index[extId][bucketKey] = { label, amount: 0, isIncluded });
+        bucket.amount += displayAmount;
       };
 
       // 1. Process top-level adjustments (which carry orderItemSeqId)
@@ -615,7 +627,9 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         });
       });
 
-      return index;
+      return Object.fromEntries(
+        Object.entries(index).map(([extId, buckets]) => [extId, Object.values(buckets)])
+      );
     },
 
     /** Rolled up item price totals (sum of unitPrice * quantity) grouped by orderItemExternalId */
@@ -655,7 +669,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     },
 
     /** Order totals (subtotal, adjustments grouped by comment/type, total) */
-    totals(): { subtotal: number; adjustments: Record<string, number>; total: number; includedAdjustments: Record<string, boolean> } {
+    totals(): { subtotal: number; adjustments: Record<string, number>; total: number; includedAdjustments: Record<string, number> } {
       if (!this.current) return { subtotal: 0, adjustments: {}, total: 0, includedAdjustments: {} };
 
       let subtotal = 0;
@@ -666,7 +680,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       });
 
       const adjustments: Record<string, number> = {};
-      const includedAdjustments: Record<string, boolean> = {};
+      const includedAdjustments: Record<string, number> = {};
       let adjustmentsTotal = 0;
       const seenAdjustments = new Set<string>();
 
@@ -680,14 +694,16 @@ export const useOrderDetailStore = defineStore("orderDetail", {
 
         const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
         const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
-        const displayAmount = isIncluded ? amountAlreadyIncluded : amount;
         const label = adjustmentDisplayLabel(adj);
 
+        // Included and excluded amounts stay in separate buckets: a label can carry both
+        // (an included tax on one item, an ordinary one on another), and merging them would
+        // label the ordinary amount "included" while it still adds to the grand total.
         if (isIncluded) {
-          includedAdjustments[label] = true;
+          includedAdjustments[label] = (includedAdjustments[label] || 0) + amountAlreadyIncluded;
+        } else {
+          adjustments[label] = (adjustments[label] || 0) + amount;
         }
-
-        adjustments[label] = (adjustments[label] || 0) + displayAmount;
       };
 
       (this.current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
@@ -702,6 +718,11 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       Object.keys(adjustments).forEach((key) => {
         if (adjustments[key] === 0) {
           delete adjustments[key];
+        }
+      });
+      Object.keys(includedAdjustments).forEach((key) => {
+        if (includedAdjustments[key] === 0) {
+          delete includedAdjustments[key];
         }
       });
 

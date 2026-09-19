@@ -2161,14 +2161,20 @@ const paymentNetColor = computed(() => {
 const orderAdjustmentRows = computed(() =>
   // orderTotals.adjustments is already keyed by the resolved comment/description
   // (see adjustmentDisplayLabel in the orderDetail store) — no further lookup needed here.
-  Object.entries(orderTotals.value.adjustments)
-    .map(([label, amount]) => ({
+  [
+    ...Object.entries(orderTotals.value.adjustments).map(([label, amount]) => ({
       label,
       detail: shippingAdjustmentDetail(label),
       amount: Number(amount),
-      isIncluded: Boolean((orderTotals.value as any).includedAdjustments?.[label])
+      isIncluded: false
+    })),
+    ...Object.entries((orderTotals.value as any).includedAdjustments || {}).map(([label, amount]) => ({
+      label,
+      detail: shippingAdjustmentDetail(label),
+      amount: Number(amount),
+      isIncluded: true
     }))
-    .filter((row) => row.amount !== 0)
+  ].filter((row) => row.amount !== 0)
 );
 
 const selectedSegment = ref('items');
@@ -3150,9 +3156,9 @@ function formatTime(value: string | number | undefined) {
 }
 
 function getGroupAdjustments(group: any) {
-  const adjs = orderDetailStore.adjustmentsByExternalId[group.externalId] || {};
-  return Object.entries(adjs)
-    .map(([comment, amount]) => ({ comment, amount: Number(amount) }))
+  const adjs = orderDetailStore.adjustmentsByExternalId[group.externalId] || [];
+  return adjs
+    .map((adj) => ({ comment: adj.label, amount: Number(adj.amount), isIncluded: adj.isIncluded }))
     .filter(adj => adj.amount !== 0);
 }
 
@@ -3187,7 +3193,7 @@ function groupLocationLabel(group: any): string {
 
 function getGroupAdjustmentRows(group: any): Array<{ label: string; amount: string }> {
   return getGroupAdjustments(group).map((adjustment) => ({
-    label: adjustment.comment,
+    label: adjustment.isIncluded ? `${adjustment.comment} (${translate('included')})` : adjustment.comment,
     amount: money(adjustment.amount, order.value?.currency || 'USD')
   }));
 }
