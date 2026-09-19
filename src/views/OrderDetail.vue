@@ -1894,12 +1894,16 @@ function shipGroupHeaderTitle(shipGroup: any): string {
 
 function shipGroupStatusLabel(shipGroup: any): string {
   if (isPosCompleted(shipGroup)) return translate('Sold in store');
-  if (isVirtualFacility(shipGroup)) return translate('Not Brokered');
 
-  // A stopped group is not a point on the way to shipping, so a percentage misreads it.
+  // A stopped group is not a point on the way to shipping, so a percentage misreads it —
+  // and neither does where its items are parked. Cancelled items are routinely moved to a
+  // virtual facility such as REJECTED_ITM_PARKING, so the brokering label has to come after
+  // these checks or the card reads "Not Brokered" over a terminal-aware progress bar.
   const states = shipGroupItemStates(shipGroup);
   if (states.allCancelled) return translate('Cancelled');
   if (states.partiallyFulfilled) return translate('Partially complete');
+
+  if (!states.settled && isVirtualFacility(shipGroup)) return translate('Not Brokered');
 
   // A physical facility is always at least brokered, so there is no 0% case left to
   // label — the old fallback here read "Brokered", which collided with the step name.

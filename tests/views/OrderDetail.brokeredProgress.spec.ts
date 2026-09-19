@@ -60,7 +60,9 @@ describe('order detail ship-group brokered progress', () => {
   it('drops the zero-progress label that collided with the Brokered step name', () => {
     expect(source).toContain("return `${Math.round(shipGroupProgress(shipGroup) * 100)}% ${translate('Complete')}`;");
     expect(source).not.toContain("progress > 0 ? `${progress}% ${translate('Complete')}` : translate('Brokered')");
-    // A virtual facility still reads as not brokered at all.
-    expect(source).toContain("if (isVirtualFacility(shipGroup)) return translate('Not Brokered');");
+    // A virtual facility still reads as not brokered — but only while the group is still
+    // moving. Cancelled items get parked in a virtual facility, so a stopped group must
+    // report its terminal state instead of where it happens to be sitting.
+    expect(source).toContain("if (!states.settled && isVirtualFacility(shipGroup)) return translate('Not Brokered');");
   });
 });
