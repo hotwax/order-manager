@@ -30,8 +30,9 @@ export interface ShipGroupItemStates {
 export function shipGroupItemStates(items: any[] | undefined | null): ShipGroupItemStates {
   const known = (items || []).filter((item: any) => item?.statusId);
   const fulfilled = known.filter((item: any) => OrderActionValidator.isItemFulfilled(item)).length;
-  const terminal = known.filter((item: any) => OrderActionValidator.isItemTerminal(item)).length;
-  const settled = known.length > 0 && terminal === known.length;
+  // Single definition of "this group has stopped" — the action gating reads the same one,
+  // so the card's label and its controls can never disagree about it.
+  const settled = OrderActionValidator.isShipGroupSettled({ items: known });
 
   return {
     total: known.length,

@@ -538,12 +538,13 @@
               <div v-if="hasSelectedShipGroupOptions(shipGroup)"
                 class="ship-group-selected-options">
                 <ion-item v-if="shipGroup.giftMessage" button detail="false" lines="none"
-                  @click="openGiftModal(shipGroup)">
+                  :disabled="isShipGroupReadOnly(shipGroup)" @click="openGiftModal(shipGroup)">
                   <ion-label>
                     <p>{{ translate('Gift message') }}</p>
                     {{ shipGroup.giftMessage }}
                   </ion-label>
                   <ion-button
+                    v-if="!isShipGroupReadOnly(shipGroup)"
                     slot="end"
                     fill="clear"
                     color="medium"
@@ -554,7 +555,7 @@
                   </ion-button>
                 </ion-item>
                 <ion-item v-if="shipGroup.shipAfterDate || shipGroup.shipByDate" button detail="false" lines="none"
-                  @click="openShippingDatesModal(shipGroup)">
+                  :disabled="isShipGroupReadOnly(shipGroup)" @click="openShippingDatesModal(shipGroup)">
                   <ion-label>
                     <p class="outline">{{ translate('Ship after') }}</p>
                     {{ formatDate(shipGroup.shipAfterDate) }}
@@ -565,7 +566,7 @@
                   </ion-label>
                 </ion-item>
                 <ion-item v-if="shipGroup.estimatedShipDate || shipGroup.estimatedDeliveryDate" button detail="false"
-                  lines="none" @click="openDeliveryDatesModal(shipGroup)">
+                  lines="none" :disabled="isShipGroupReadOnly(shipGroup)" @click="openDeliveryDatesModal(shipGroup)">
                   <ion-label>
                     <p class="outline">{{ translate('Estimated ship date') }}</p>
                     {{ formatDate(shipGroup.estimatedShipDate) }}
@@ -576,7 +577,7 @@
                   </ion-label>
                 </ion-item>
                 <ion-item v-if="shipGroup.shippingInstructions" button detail="false" lines="none"
-                  @click="openInstructionModal(shipGroup)">
+                  :disabled="isShipGroupReadOnly(shipGroup)" @click="openInstructionModal(shipGroup)">
                   <ion-label>
                     <p class="outline">{{ translate('Instructions') }}</p>
                     {{ shipGroup.shippingInstructions }}
@@ -729,6 +730,7 @@
                   <ion-item lines="full">
                     <ion-select :label="translate('Carrier')" interface="popover"
                       :placeholder="translate('Select Carrier')"
+                      :disabled="isShipGroupActionDisabled(shipGroup, 'EDIT_CARRIER_METHOD')"
                       :value="getSelection(shipGroup.id, shipGroup).carrierId"
                       @ionChange="onCarrierChange(shipGroup.id, $event.detail.value)">
                       <ion-select-option v-for="carrier in availableCarriers" :key="carrier.partyId"
@@ -743,6 +745,7 @@
                   <ion-item lines="full">
                     <ion-select :label="translate('Shipping method')" interface="popover"
                       :placeholder="translate('Select Shipping Method')"
+                      :disabled="isShipGroupActionDisabled(shipGroup, 'EDIT_CARRIER_METHOD')"
                       :value="getSelection(shipGroup.id, shipGroup).methodId || undefined"
                       @ionChange="onMethodChange(shipGroup.id, $event.detail.value)">
                       <ion-select-option
@@ -764,7 +767,9 @@
                     <p slot="end" v-if="!isVirtualFacility(shipGroup) && shipGroupDistances[shipGroup.id]">
                       {{ shipGroupDistances[shipGroup.id] }} {{ translate('miles') }}
                     </p>
-                    <ion-button slot="end" fill="clear" color="medium" :id="'shipping-opt-trigger-' + shipGroup.id" :aria-label="translate('Shipping options')">
+                    <ion-button v-if="!isShipGroupActionDisabled(shipGroup, 'EDIT_ADDRESS')" slot="end" fill="clear"
+                      color="medium" :id="'shipping-opt-trigger-' + shipGroup.id"
+                      :aria-label="translate('Shipping options')">
                       <ion-icon slot="icon-only" :icon="ellipsisVertical" />
                     </ion-button>
                     <ion-popover :trigger="'shipping-opt-trigger-' + shipGroup.id" dismiss-on-select
@@ -772,7 +777,9 @@
                       <ion-content>
                         <ion-list>
                           <ion-list-header>{{ translate("Shipping address") }}</ion-list-header>
-                          <ion-item button detail="false" @click="openEditShippingAddress(shipGroup)">
+                          <ion-item button detail="false"
+                            :disabled="isShipGroupActionDisabled(shipGroup, 'EDIT_ADDRESS')"
+                            @click="openEditShippingAddress(shipGroup)">
                             <ion-icon :icon="createOutline" slot="end" />
                             {{ translate('Edit') }}
                           </ion-item>
@@ -865,8 +872,11 @@
                 :disabled="!inventoryTransferItemsForShipGroup(shipGroup).length"
                 @click="requestInventoryTransfersForShipGroup(shipGroup)"
               >{{ translate('Request transfer') }}</ion-button>
-              <ion-button fill="clear" @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
-              <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" fill="clear" @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
+              <ion-button fill="clear" :disabled="isShipGroupActionDisabled(shipGroup, 'ADD_TASK')"
+                @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
+              <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" fill="clear"
+                :disabled="isShipGroupActionDisabled(shipGroup, 'ADD_ITEMS')"
+                @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
             </div>
           <!-- Gift message modal -->
           <ion-modal :is-open="giftModalShipGroupId === shipGroup.id" @didDismiss="giftModalShipGroupId = null">
@@ -1801,6 +1811,15 @@ function shipGroupItemStates(shipGroup: any) {
   return itemStatesFor(shipGroup?.items);
 }
 
+/**
+ * A stopped group is read-only: its carrier, method, dates, gift message and instructions
+ * all describe a shipment that is no longer going to change. Reads the same `settled` the
+ * card's label uses, so the two cannot disagree.
+ */
+function isShipGroupReadOnly(shipGroup: any): boolean {
+  return shipGroupItemStates(shipGroup).settled;
+}
+
 function shipGroupProgress(shipGroup: any): number {
   // A counter sale is finished the moment it is recorded; there is no lifecycle to
   // measure and no timeline row to measure it from.
@@ -1911,6 +1930,7 @@ function shipGroupStatusLabel(shipGroup: any): string {
 }
 
 function hasSelectableShipGroupOptions(shipGroup: any): boolean {
+  if (isShipGroupReadOnly(shipGroup)) return false;
   return !shipGroup.giftMessage
     || (!shipGroup.shipAfterDate && !shipGroup.shipByDate)
     || (!shipGroup.estimatedShipDate && !shipGroup.estimatedDeliveryDate)
