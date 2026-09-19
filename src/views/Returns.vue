@@ -285,7 +285,7 @@ function formatDate(value?: string | number) {
 <style scoped>
 .search-contract-note {
   display: block;
-  margin: calc(-1 * var(--spacer-xs)) var(--spacer-md) var(--spacer-sm);
+  margin: calc(-1 * var(--spacer-xs)) var(--spacer-base) var(--spacer-sm);
 }
 
 .return-result-row {
