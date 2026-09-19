@@ -15,7 +15,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Settings } from 'luxon';
 import { emitter, FastTravel, translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
-import { getCacheSyncToken, startAppCacheSync } from '@/services/appCacheSync';
+import { getSyncToken, startAppDbSync } from '@/services/appDbSync';
 import Menu from '@/components/layout/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';
@@ -60,19 +60,19 @@ onMounted(async () => {
   const timeZone = userProfile.value?.timeZone || userProfile.value?.userTimeZone;
   if (timeZone) Settings.defaultZone = timeZone;
 
-  // Initialize in-memory seed cache from IndexedDB on startup/reload. Awaited so the cached
+  // Initialize the in-memory seed store from IndexedDB on startup/reload. Awaited so the stored
   // datasets are in place before the API fallback below decides what still needs fetching.
-  await useSeedStore().initSeedCache();
+  await useSeedStore().initSeedDb();
 
-  // On authenticated boot, start background Web Worker cache bootstrap to ensure sync
+  // On authenticated boot, start the background Web Worker database bootstrap to ensure sync
   if (isAuthenticated.value) {
     await userStore.fetchPermissions().catch(() => undefined);
 
-    const token = getCacheSyncToken();
+    const token = getSyncToken();
     if (token) {
-      startAppCacheSync(token, () => useSeedStore().populateFromCache())
+      startAppDbSync(token, () => useSeedStore().populateFromDb())
         .catch((err) => {
-          console.warn("Background cache bootstrap notice:", err);
+          console.warn("Background database bootstrap notice:", err);
         });
     }
   }

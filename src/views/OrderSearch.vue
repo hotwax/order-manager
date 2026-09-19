@@ -191,7 +191,6 @@ import {
   IonSelect,
   IonSelectOption,
   IonTitle,
-  IonToggle,
   IonToolbar,
   alertController,
   modalController,

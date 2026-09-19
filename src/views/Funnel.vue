@@ -623,7 +623,9 @@ import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
+import { createLatestRequestScope } from '@/utils/latestRequestScope';
 import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
+import { reconcileSelectedFacilityId } from '@/utils/funnelFacilitySelection';
 import { facilityProgressAccessibleName } from '@/utils/funnelProgress';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
@@ -669,6 +671,7 @@ const fulfillmentProgress = computed(() => store.getFulfillmentProgress);
 const brokeredWorkload = ref<WorkflowOrderTotals>({ open: 0, inflight: 0, packed: 0 });
 const brokeredWorkloadLoading = ref(false);
 const brokeredWorkloadError = ref(false);
+const brokeredWorkloadRequestScope = createLatestRequestScope();
 const brokeredWorkloadTotal = computed(() =>
   brokeredWorkload.value.open + brokeredWorkload.value.inflight + brokeredWorkload.value.packed
 );
@@ -898,6 +901,7 @@ const facilityMetricKey = computed<DashboardStatusKey>(() => {
 });
 const facilityMetricsLoading = computed(() => store.isDashboardGroupLoading(facilityMetricKey.value));
 const facilityMetricsError = computed(() => store.isDashboardGroupError(facilityMetricKey.value));
+const facilityMetricStatus = computed(() => store.getDashboardStatus(facilityMetricKey.value));
 
 const totalUnfillable = computed(() => store.getUnfillable.totalCount || 0);
 // Match the side-menu "Brokering queue" badge and the /brokering page exactly: one
@@ -941,32 +945,48 @@ function fetchStoreDashboardData(productStoreId: string) {
 }
 
 async function fetchBrokeredWorkload(productStoreId: string) {
-  brokeredWorkloadLoading.value = true;
-  brokeredWorkloadError.value = false;
-  try {
-    brokeredWorkload.value = await fetchWorkflowOrderTotals(productStoreId);
-    // Share the brokered totals with the side-menu rollup badges (first-come preload).
-    orderStore.setNavCount('open', brokeredWorkload.value.open);
-    orderStore.setNavCount('inflight', brokeredWorkload.value.inflight);
-    orderStore.setNavCount('packed', brokeredWorkload.value.packed);
-  } catch (error) {
-    console.error('Failed to fetch brokered workload totals', error);
-    brokeredWorkloadError.value = true;
-  } finally {
-    brokeredWorkloadLoading.value = false;
-  }
+  await brokeredWorkloadRequestScope.run(
+    () => fetchWorkflowOrderTotals(productStoreId),
+    {
+      onStart: () => {
+        brokeredWorkloadLoading.value = true;
+        brokeredWorkloadError.value = false;
+      },
+      onSuccess: (nextBrokeredWorkload) => {
+        brokeredWorkload.value = nextBrokeredWorkload;
+        // Share the brokered totals with the side-menu rollup badges (first-come preload).
+        orderStore.setNavCount('open', brokeredWorkload.value.open);
+        orderStore.setNavCount('inflight', brokeredWorkload.value.inflight);
+        orderStore.setNavCount('packed', brokeredWorkload.value.packed);
+      },
+      onError: (error) => {
+        console.error('Failed to fetch brokered workload totals', error);
+        brokeredWorkloadError.value = true;
+      },
+      onSettled: () => {
+        brokeredWorkloadLoading.value = false;
+      }
+    }
+  );
 }
 
 function fetchSelectedFacilityDashboardData(productStoreId: string) {
   if (selectedFacilityId.value) {
     store.fetchFacilityFulfillmentProgress(selectedFacilityId.value, productStoreId);
-    store.fetchFulfillmentSyncData(selectedFacilityId.value, productStoreId);
+    store.fetchFulfillmentSyncData(selectedFacilityId.value);
   }
 }
 
 function refreshDashboardData() {
   const productStoreId = selectedProductStoreId.value;
-  if (!productStoreId) return;
+  if (!productStoreId) {
+    brokeredWorkloadRequestScope.invalidate();
+    brokeredWorkload.value = { open: 0, inflight: 0, packed: 0 };
+    brokeredWorkloadLoading.value = false;
+    brokeredWorkloadError.value = false;
+    store.clearFunnelDashboardScope();
+    return;
+  }
 
   fetchStoreDashboardData(productStoreId);
   fetchSelectedFacilityDashboardData(productStoreId);
@@ -975,6 +995,7 @@ function refreshDashboardData() {
 watch(selectedProductStoreId, (productStoreId, previousProductStoreId) => {
   if (productStoreId !== previousProductStoreId) {
     selectedFacilityId.value = '';
+    store.clearSelectedFacilityDashboardScope();
   }
   if (!productStore.isProductStoreInitialized) return;
   refreshDashboardData();
@@ -983,7 +1004,9 @@ watch(selectedProductStoreId, (productStoreId, previousProductStoreId) => {
 watch(selectedFacilityId, (newFacilityId) => {
   if (newFacilityId && selectedProductStoreId.value) {
     store.fetchFacilityFulfillmentProgress(newFacilityId, selectedProductStoreId.value);
-    store.fetchFulfillmentSyncData(newFacilityId, selectedProductStoreId.value);
+    store.fetchFulfillmentSyncData(newFacilityId);
+  } else {
+    store.clearSelectedFacilityDashboardScope();
   }
 });
 
@@ -1093,7 +1116,7 @@ function retryFacilityProgress() {
   if (selectedFacilityId.value) store.fetchFacilityFulfillmentProgress(selectedFacilityId.value, selectedProductStoreId.value);
 }
 function retrySyncData() {
-  if (selectedFacilityId.value) store.fetchFulfillmentSyncData(selectedFacilityId.value, selectedProductStoreId.value);
+  if (selectedFacilityId.value) store.fetchFulfillmentSyncData(selectedFacilityId.value);
 }
 
 function getFacilityName(facilityId: string) {
@@ -1158,15 +1181,12 @@ const maxMetricValue = computed(() => {
   return filteredFacilities.value[0].value || 1;
 });
 
-watch(filteredFacilities, (newList) => {
-  if (newList.length > 0) {
-    const exists = newList.some(item => item.facilityId === selectedFacilityId.value);
-    if (!exists) {
-      selectedFacilityId.value = newList[0].facilityId;
-    }
-  } else {
-    selectedFacilityId.value = '';
-  }
+watch([filteredFacilities, facilityMetricStatus], ([newList, status]) => {
+  selectedFacilityId.value = reconcileSelectedFacilityId(
+    selectedFacilityId.value,
+    newList,
+    status
+  );
 });
 
 const workflowRouteQuery = computed(() => ({
@@ -1257,7 +1277,7 @@ const nextRunTime = computed(() => {
   if (!cronExpressionInput.value) return '-';
   try {
     return commonUtil.getNextExecutionTime(cronExpressionInput.value);
-  } catch (error) {
+  } catch {
     return translate('Invalid expression');
   }
 });
@@ -1298,8 +1318,7 @@ async function saveSchedule() {
     settings.jobName,
     cronExpressionInput.value,
     isJobActive.value ? 'N' : 'Y',
-    selectedFacilityId.value,
-    selectedProductStoreId.value
+    selectedFacilityId.value
   );
   
   closeScheduleModal();

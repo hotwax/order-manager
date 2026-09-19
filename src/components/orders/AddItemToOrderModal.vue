@@ -60,7 +60,7 @@
 
 <script setup lang="ts">
 import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonSearchbar, IonSpinner, IonThumbnail, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { checkmarkCircle, closeOutline, imageOutline } from 'ionicons/icons';
+import { checkmarkCircle, closeOutline } from 'ionicons/icons';
 import { ref, computed } from 'vue';
 import { api, commonUtil, DxpShopifyImg, translate } from '@common';
 import { useSolrSearch } from '@common/composables/useSolrSearch';

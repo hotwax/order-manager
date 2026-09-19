@@ -2,16 +2,13 @@ import { api } from '@common';
 import { useSolrSearch } from '@common/composables/useSolrSearch';
 import {
   allDocs,
-  buildRelatedDataDocumentPayload,
   defaultDataDocuments,
   normalizeCustomerDoc,
-  normalizeOrderCollectionResponse,
   normalizeOrderDoc,
   orderLookupFields,
-  toStringValue,
-  uniqueStrings
+  toStringValue
 } from './OrderService';
-import type { ContactMech, Customer, Order } from '@/types/order';
+import type { Customer, Order } from '@/types/order';
 import type { CustomerContactMech, CustomerOrderSummary, CustomerProfile, CustomerRelationship, CustomerTaskSummary } from '@/types/customer';
 
 export interface CustomerSearchParams {
@@ -29,18 +26,6 @@ export interface CustomerSearchResult {
   total: number;
 }
 
-export const partyTypes: Record<string, string> = {
-  PERSON: 'Person',
-  PARTY_GROUP: 'Company'
-};
-
-export interface CustomerContactMechResult {
-  contactMechs: ContactMech[];
-  emails: ContactMech[];
-  phones: ContactMech[];
-  postalAddresses: ContactMech[];
-}
-
 export interface CustomerOrderResult {
   orders: Order[];
   total: number;
@@ -49,77 +34,6 @@ export interface CustomerOrderResult {
 export interface CustomerOrderParams {
   pageSize?: number;
   pageIndex?: number;
-}
-
-export function buildCustomerSearchRequests(params: CustomerSearchParams = {}) {
-  const baseParams: Record<string, string | number> = {
-    dependentLevels: 1,
-    pageSize: Number(params.pageSize ?? 50),
-    pageIndex: Number(params.pageIndex ?? 0)
-  };
-  const searchTerm = params.queryString?.trim();
-
-  if (params.status && params.status !== 'All') baseParams.statusId = params.status;
-
-  if (!searchTerm) {
-    if (params.partyTypeId && params.partyTypeId !== 'All') baseParams.partyTypeId = params.partyTypeId;
-    else if (!params.partyTypeId) baseParams.partyTypeId = 'PERSON';
-    return [baseParams];
-  }
-
-  if (isPartyIdSearch(searchTerm)) {
-    return [{
-      partyId: searchTerm,
-      ...baseParams
-    }];
-  }
-
-  const requestedPartyType = params.partyTypeId && params.partyTypeId !== 'All' ? params.partyTypeId : '';
-  const tokens = searchTerm.split(/\s+/).filter(Boolean);
-
-  if (tokens.length > 1) {
-    return [{
-      partyTypeId: requestedPartyType || 'PERSON',
-      firstName_op: 'contains',
-      firstName: tokens[0],
-      lastName_op: 'contains',
-      lastName: tokens[tokens.length - 1],
-      ...baseParams
-    }];
-  }
-
-  if (requestedPartyType === 'PARTY_GROUP') {
-    return [{
-      partyTypeId: 'PARTY_GROUP',
-      groupName_op: 'contains',
-      groupName: searchTerm,
-      ...baseParams
-    }];
-  }
-
-  if (requestedPartyType === 'PERSON') {
-    return [{
-      partyTypeId: 'PERSON',
-      lastName_op: 'contains',
-      lastName: searchTerm,
-      ...baseParams
-    }];
-  }
-
-  return [
-    {
-      partyTypeId: 'PERSON',
-      lastName_op: 'contains',
-      lastName: searchTerm,
-      ...baseParams
-    },
-    {
-      partyTypeId: 'PARTY_GROUP',
-      groupName_op: 'contains',
-      groupName: searchTerm,
-      ...baseParams
-    }
-  ];
 }
 
 export async function searchCustomers(params: CustomerSearchParams = {}): Promise<CustomerSearchResult> {
@@ -200,21 +114,6 @@ export async function getCustomer(partyId: string): Promise<Customer> {
   return normalizeCustomerDoc(doc, partyId);
 }
 
-export async function getCustomerContactMechs(partyId: string): Promise<CustomerContactMechResult> {
-  const response = await api({
-    url: 'oms/dataDocumentView',
-    method: 'post',
-    data: buildRelatedDataDocumentPayload(
-      defaultDataDocuments.customerContactLookup,
-      'partyid',
-      partyId
-    )
-  });
-  const contactMechs = allDocs(response.data).map(normalizeContactMech);
-
-  return groupContactMechs(contactMechs);
-}
-
 export async function getCustomerOrders(partyId: string, params: CustomerOrderParams = {}): Promise<CustomerOrderResult> {
   const roleResponse = await api({
     url: 'oms/dataDocumentView',
@@ -275,138 +174,6 @@ export async function getCustomerOrders(partyId: string, params: CustomerOrderPa
   };
 }
 
-export function groupContactMechs(contactMechs: ContactMech[]): CustomerContactMechResult {
-  return {
-    contactMechs,
-    emails: contactMechs.filter((contactMech) => contactMech.contactMechTypeId === 'EMAIL_ADDRESS'),
-    phones: contactMechs.filter((contactMech) => contactMech.contactMechTypeId === 'TELECOM_NUMBER'),
-    postalAddresses: contactMechs.filter((contactMech) => contactMech.contactMechTypeId === 'POSTAL_ADDRESS')
-  };
-}
-
-function normalizeContactMech(doc: any): ContactMech {
-  const contactMechTypeId = readContactField(doc, 'contactMechTypeId');
-
-  return {
-    contactMechId: readContactField(doc, 'contactMechId'),
-    contactMechTypeId,
-    contactMechPurposeTypeId: readContactField(doc, 'contactMechPurposeTypeId'),
-    infoString: contactMechTypeId === 'TELECOM_NUMBER' ? formatPhone(doc) : readContactField(doc, 'infoString'),
-    postalAddress: contactMechTypeId === 'POSTAL_ADDRESS' ? {
-      address1: readContactField(doc, 'address1'),
-      address2: readContactField(doc, 'address2'),
-      city: readContactField(doc, 'city'),
-      stateProvinceGeoId: readContactField(doc, 'stateProvinceGeoId'),
-      postalCode: readContactField(doc, 'postalCode'),
-      countryGeoId: readContactField(doc, 'countryGeoId')
-    } : undefined,
-    expireDate: readContactField(doc, 'expireDate')
-  };
-}
-
-function formatPhone(doc: any) {
-  const countryCode = readContactField(doc, 'countryCode');
-  const areaCode = readContactField(doc, 'areaCode');
-  const contactNumber = readContactField(doc, 'contactNumber');
-  const phone = [countryCode ? `+${countryCode}` : '', areaCode, contactNumber].filter(Boolean).join(' ');
-
-  return phone || readContactField(doc, 'infoString');
-}
-
-function readContactField(doc: any, fieldName: string) {
-  return toStringValue(doc[fieldName] ?? doc[fieldName.toLowerCase()]);
-}
-
-async function searchCustomersByContact(searchTerm: string, params: CustomerSearchParams): Promise<CustomerSearchResult> {
-  const contactField = searchTerm.includes('@') ? 'infoString' : 'contactNumber';
-  const response = await api({
-    url: 'oms/dataDocumentView',
-    method: 'post',
-    data: {
-      dataDocumentId: defaultDataDocuments.customerContactLookup,
-      format: 'json',
-      customParametersMap: {
-        [contactField]: searchTerm
-      },
-      pageSize: Number(params.pageSize ?? 50),
-      pageIndex: Number(params.pageIndex ?? 0)
-    }
-  });
-  const contactDocs = allDocs(response.data);
-  const partyIds = uniqueStrings(contactDocs.map((doc: any) => readContactField(doc, 'partyId')));
-
-  if (!partyIds.length) {
-    return { customers: [], total: 0 };
-  }
-
-  const customers = await Promise.all(partyIds.map(getCustomer));
-  const filteredCustomers = customers.filter((customer) => {
-    if (params.status && params.status !== 'All' && customer.statusId !== params.status) return false;
-    if (params.partyTypeId && params.partyTypeId !== 'All' && customer.partyTypeId !== params.partyTypeId) return false;
-    return true;
-  });
-
-  return {
-    customers: filteredCustomers,
-    total: filteredCustomers.length
-  };
-}
-
-function responseList(data: any) {
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.items)) return data.items;
-  if (Array.isArray(data?.results)) return data.results;
-  if (Array.isArray(data?.list)) return data.list;
-  return allDocs(data);
-}
-
-function responseTotal(data: any, fallback: number) {
-  return Number(data?.count ?? data?.total ?? data?.documentDataCount ?? data?.response?.numFound ?? fallback);
-}
-
-function isPartyIdSearch(value: string) {
-  return /^10\d+$/.test(value);
-}
-
-function isPhoneSearch(value: string) {
-  return /^\d{7,}$/.test(value.replace(/[^\d]/g, ''));
-}
-
-/**
- * Customer 360 profile read. Calls GET /oms/customers/{partyId} (the Party
- * `customerDetail` entity master) and flattens the nested master into the
- * CustomerProfile shape the detail store/getters consume. Bounded profile only -
- * orders, tasks, returns, and communications are separate paginated calls.
- */
-export interface PartySearchResult {
-  partyId: string;
-  name: string;
-  partyTypeId: string;
-}
-
-export async function findParties(params: {
-  partyTypeId: 'PERSON' | 'PARTY_GROUP';
-  firstName?: string;
-  lastName?: string;
-  groupName?: string;
-  pageSize?: number;
-}): Promise<PartySearchResult[]> {
-  const query: Record<string, any> = {
-    partyTypeId: params.partyTypeId,
-    statusId: 'PARTY_ENABLED',
-    pageSize: params.pageSize ?? 20
-  };
-  if (params.firstName?.trim()) { query.firstName_op = 'contains'; query.firstName = params.firstName.trim(); }
-  if (params.lastName?.trim()) { query.lastName_op = 'contains'; query.lastName = params.lastName.trim(); }
-  if (params.groupName?.trim()) { query.groupName_op = 'contains'; query.groupName = params.groupName.trim(); }
-  const response = await api({ url: 'oms/parties', method: 'get', params: query });
-  return asList(response.data).map((doc: any) => ({
-    partyId: toStringValue(doc.partyId),
-    name: toStringValue(doc.groupName) || [doc.firstName, doc.lastName].filter(Boolean).join(' ').trim() || toStringValue(doc.partyId),
-    partyTypeId: toStringValue(doc.partyTypeId)
-  }));
-}
-
 export async function getPartyNames(partyIds: string[]): Promise<Array<{ partyId: string; name: string; partyTypeId: string }>> {
   if (!partyIds.length) return [];
   const response = await api({
@@ -421,6 +188,12 @@ export async function getPartyNames(partyIds: string[]): Promise<Array<{ partyId
   }));
 }
 
+/**
+ * Customer 360 profile read. Calls GET /oms/customers/{partyId} (the Party
+ * `customerDetail` entity master) and flattens the nested master into the
+ * CustomerProfile shape the detail store/getters consume. Bounded profile only -
+ * orders, tasks, returns, and communications are separate paginated calls.
+ */
 export async function getCustomerProfile(partyId: string): Promise<CustomerProfile> {
   const response = await api({
     url: `oms/customers/${partyId}`,

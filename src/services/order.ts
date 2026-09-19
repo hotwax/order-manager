@@ -762,8 +762,6 @@ function normalizeActivePhysicalFacilityOrderVolume(data: any): ActiveFacilityOr
     .sort((a: ActiveFacilityOrderVolume, b: ActiveFacilityOrderVolume) => b.lastOrderCount - a.lastOrderCount || a.facilityName.localeCompare(b.facilityName));
 }
 
-type FacilityItemCount = { name: string; count: number };
-
 // Derives the location summary purely from the per-item ORDER docs the grouped
 // search already returns (no per-row detail fetch). Physical facilities drive
 // the brokered numerator/chip. When none are brokered, virtual/parking facilities

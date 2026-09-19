@@ -455,7 +455,7 @@ async function releaseUpdatedOrder(task: any) {
   }
 }
 
-async function cancelOrder(task: any) {
+async function cancelOrder() {
   const alert = await alertController.create({
     header: translate('Cancel order'),
     message: translate('Are you sure you want to cancel this order? This action cannot be undone.'),
@@ -478,7 +478,7 @@ async function cancelOrder(task: any) {
   await alert.present();
 }
 
-async function parkOrder(task: any) {
+async function parkOrder() {
   const confirmed = await confirmParkOrder();
   if (!confirmed) return;
 
@@ -532,8 +532,8 @@ async function submitPark(facilityId: string) {
 
 function handleAction(actionId: string) {
   if (actionId === 'release') return releaseUpdatedOrder(props.task);
-  if (actionId === 'park') return parkOrder(props.task);
-  if (actionId === 'cancel') return cancelOrder(props.task);
+  if (actionId === 'park') return parkOrder();
+  if (actionId === 'cancel') return cancelOrder();
 }
 
 defineExpose({

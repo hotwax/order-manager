@@ -531,10 +531,6 @@ function orderDetailLink(order: Order) {
   return `/orders/${order.id}`;
 }
 
-function statusDescription(statusId: string) {
-  return seedStore.statusDescription(statusId);
-}
-
 </script>
 
 <style scoped>

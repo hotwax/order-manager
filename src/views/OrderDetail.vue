@@ -310,6 +310,14 @@
               >
                 <template #actions>
                   <ion-button
+                    v-if="canRequestInventoryTransfer && isInventoryTransferRequestEligible(soleItem)"
+                    fill="clear"
+                    size="small"
+                    @click.stop="requestInventoryTransferForItem(soleItem)"
+                  >
+                    {{ translate('Request transfer') }}
+                  </ion-button>
+                  <ion-button
                     v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(soleItem.statusId)"
                     fill="clear"
                     size="small"
@@ -365,6 +373,14 @@
                       @attributes-click="openItemAttributesModal(item)"
                     >
                       <template #actions>
+                        <ion-button
+                          v-if="canRequestInventoryTransfer && isInventoryTransferRequestEligible(item)"
+                          fill="clear"
+                          size="small"
+                          @click.stop="requestInventoryTransferForItem(item)"
+                        >
+                          {{ translate('Request transfer') }}
+                        </ion-button>
                         <ion-button v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)" fill="clear"
                           size="small" color="danger" @click.stop="cancelSingleItem(item)">
                           {{ translate('Cancel') }}
@@ -437,7 +453,10 @@
                   {{ adjustment.label }}
                   <p v-if="adjustment.detail">{{ adjustment.detail }}</p>
                 </ion-label>
-                <ion-label slot="end">{{ money(adjustment.amount, order.currency) }}</ion-label>
+                <ion-label slot="end" class="ion-text-end">
+                  {{ money(adjustment.amount, order.currency) }}
+                  <p v-if="adjustment.isIncluded">{{ translate('Included') }}</p>
+                </ion-label>
               </ion-item>
               <ion-item class="grand-total-row">
                 <ion-label>{{ translate('Grand total') }}</ion-label>
@@ -840,6 +859,12 @@
               <ion-button v-if="isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)" fill="clear"
                 :disabled="isShipGroupActionDisabled(shipGroup, 'RELEASE')" @click="releaseSelectedItems(shipGroup)">{{
                   translate('Release') }}</ion-button>
+              <ion-button
+                v-if="canRequestInventoryTransfer && !isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)"
+                fill="clear"
+                :disabled="!inventoryTransferItemsForShipGroup(shipGroup).length"
+                @click="requestInventoryTransfersForShipGroup(shipGroup)"
+              >{{ translate('Request transfer') }}</ion-button>
               <ion-button fill="clear" @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
               <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" fill="clear" @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
             </div>
@@ -1064,9 +1089,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
-import { storeToRefs } from 'pinia';
 import { DateTime } from 'luxon';
 import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, chevronDown, chevronUp, closeCircleOutline, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pauseCircleOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, storefrontOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -1088,6 +1112,7 @@ import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import ManageOrderIdentificationsModal from '@/components/orders/ManageOrderIdentificationsModal.vue';
 import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import FacilityInventoryModal from '@/components/fulfillment/FacilityInventoryModal.vue';
+import RequestInventoryTransferModal from '@/components/inventory/RequestInventoryTransferModal.vue';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
@@ -1097,6 +1122,7 @@ import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
 import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
 import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
 import { getReturn } from '@/services/returns';
+import { inventoryTransferOpenQuantity, isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
 import { showToast, isKit, riskLevelColor, sentimentCounts } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { fulfillmentLineStatus, fulfillmentLineStatusColor } from '@/utils/fulfillmentLineStatus';
@@ -1120,6 +1146,7 @@ const productCache = useProductCacheStore();
 const customerStore = useCustomerStore();
 const userStore = useUserStore();
 const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW));
+const canRequestInventoryTransfer = computed(() => userStore.hasPermission(Actions.APP_INVENTORY_TRANSFER_CREATE));
 
 const loading = computed(() => orderDetailStore.loadingById(props.orderId));
 const error = computed(() => orderDetailStore.errorById(props.orderId));
@@ -2158,13 +2185,20 @@ const paymentNetColor = computed(() => {
 const orderAdjustmentRows = computed(() =>
   // orderTotals.adjustments is already keyed by the resolved comment/description
   // (see adjustmentDisplayLabel in the orderDetail store) — no further lookup needed here.
-  Object.entries(orderTotals.value.adjustments)
-    .map(([label, amount]) => ({
+  [
+    ...Object.entries(orderTotals.value.adjustments).map(([label, amount]) => ({
       label,
       detail: shippingAdjustmentDetail(label),
-      amount: Number(amount)
+      amount: Number(amount),
+      isIncluded: false
+    })),
+    ...Object.entries((orderTotals.value as any).includedAdjustments || {}).map(([label, amount]) => ({
+      label,
+      detail: shippingAdjustmentDetail(label),
+      amount: Number(amount),
+      isIncluded: true
     }))
-    .filter((row) => row.amount !== 0)
+  ].filter((row) => row.amount !== 0)
 );
 
 const selectedSegment = ref('items');
@@ -2237,6 +2271,62 @@ function isShipGroupActionDisabled(shipGroup: any, actionId: any) {
 function isVirtualFacilityForItem(item: any) {
   const shipGroup = shipGroupById(item.shipGroupSeqId);
   return shipGroup ? isVirtualFacility(shipGroup) : !item.facilityId;
+}
+
+function inventoryTransferItem(item: any) {
+  const group = groupedItems.value.find((candidate: any) =>
+    candidate.items.some((groupItem: any) => groupItem.orderItemSeqId === item.orderItemSeqId));
+  return {
+    ...item,
+    productId: group?.productId || '',
+    name: group ? groupPrimaryIdentifier(group) : `${translate('Item')} ${item.orderItemSeqId}`,
+    sku: group?.sku || group?.productId || '',
+    imageUrl: getProduct(group?.productId)?.mainImageUrl,
+  };
+}
+
+function isInventoryTransferRequestEligible(item: any) {
+  return isInventoryTransferEligibleItem(inventoryTransferItem(item), isVirtualFacilityForItem(item));
+}
+
+function inventoryTransferItemsForShipGroup(shipGroup: any) {
+  if (isVirtualFacility(shipGroup)) return [];
+  return actionableItemObjectsForShipGroup(shipGroup)
+    .filter((item: any) => isInventoryTransferRequestEligible(item));
+}
+
+async function openInventoryTransferRequestModal(shipGroup: any, items: any[]) {
+  const modalItems = items.map((item) => {
+    const transferItem = inventoryTransferItem(item);
+    return {
+      ...transferItem,
+      quantity: inventoryTransferOpenQuantity(transferItem),
+    };
+  });
+  const modal = await modalController.create({
+    component: RequestInventoryTransferModal,
+    componentProps: {
+      orderId: order.value!.id,
+      productStoreId: orderDetailStore.orderById(props.orderId)?.productStoreId,
+      destinationFacilityId: shipGroup.facilityId,
+      items: modalItems,
+    },
+  });
+  await modal.present();
+  const { role } = await modal.onWillDismiss();
+  if (role === 'confirm') await showToast(translate('Inventory transfer requested.'));
+}
+
+async function requestInventoryTransferForItem(item: any) {
+  const shipGroup = shipGroupById(item.shipGroupSeqId);
+  if (!shipGroup || !isInventoryTransferRequestEligible(item)) return;
+  await openInventoryTransferRequestModal(shipGroup, [item]);
+}
+
+async function requestInventoryTransfersForShipGroup(shipGroup: any) {
+  const items = inventoryTransferItemsForShipGroup(shipGroup);
+  if (!items.length) return;
+  await openInventoryTransferRequestModal(shipGroup, items);
 }
 
 function itemActionContext(item: any) {
@@ -2545,12 +2635,13 @@ async function lookupPostalCoordinates(zips: string[]): Promise<Record<string, {
   const coords: Record<string, { lat: number; lon: number }> = {};
   if (!zips.length) return coords;
   try {
-    const { runSolrQuery } = useSolrSearch();
-    const resp = await runSolrQuery({
-      coreName: 'postalCode',
-      json: {
-        query: `postcode:(${zips.map((zip) => `"${zip}"`).join(' OR ')})`,
-        params: { rows: zips.length, fl: 'postcode,latitude,longitude' }
+    const resp = await api({
+      url: 'api/geocode',
+      method: 'POST',
+      data: {
+        json: {
+          query: `postcode:(${zips.map((zip) => `"${zip}"`).join(' OR ')})`
+        }
       }
     });
     (resp?.data?.response?.docs ?? []).forEach((doc: any) => {
@@ -2560,7 +2651,7 @@ async function lookupPostalCoordinates(zips: string[]): Promise<Record<string, {
       if (zip && lat !== undefined && lon !== undefined) coords[zip] = { lat, lon };
     });
   } catch (error) {
-    console.error('Failed to look up postal-code coordinates from Solr:', error);
+    console.error('Failed to look up postal-code coordinates:', error);
   }
   return coords;
 }
@@ -3089,9 +3180,9 @@ function formatTime(value: string | number | undefined) {
 }
 
 function getGroupAdjustments(group: any) {
-  const adjs = orderDetailStore.adjustmentsByExternalId[group.externalId] || {};
-  return Object.entries(adjs)
-    .map(([comment, amount]) => ({ comment, amount: Number(amount) }))
+  const adjs = orderDetailStore.adjustmentsByExternalId[group.externalId] || [];
+  return adjs
+    .map((adj) => ({ comment: adj.label, amount: Number(adj.amount), isIncluded: adj.isIncluded }))
     .filter(adj => adj.amount !== 0);
 }
 
@@ -3126,7 +3217,7 @@ function groupLocationLabel(group: any): string {
 
 function getGroupAdjustmentRows(group: any): Array<{ label: string; amount: string }> {
   return getGroupAdjustments(group).map((adjustment) => ({
-    label: adjustment.comment,
+    label: adjustment.isIncluded ? `${adjustment.comment} (${translate('included')})` : adjustment.comment,
     amount: money(adjustment.amount, order.value?.currency || 'USD')
   }));
 }
@@ -3165,7 +3256,8 @@ function itemAdjustmentKey(adj: any, fallbackSeqId = ""): string {
     adj.shipGroupSeqId || "",
     adj.orderAdjustmentTypeId || "",
     itemAdjustmentLabel(adj),
-    Number(adj.amount || 0)
+    Number(adj.amount || 0),
+    Number(adj.amountAlreadyIncluded || 0)
   ].join("|");
 }
 
@@ -3181,8 +3273,16 @@ function itemAdjustmentSummaries(rawItem: any, orderItemSeqId: string): Array<{ 
     const key = itemAdjustmentKey(adj, orderItemSeqId);
     if (seen.has(key)) return;
     seen.add(key);
-    const comment = itemAdjustmentLabel(adj);
-    totals[comment] = (totals[comment] || 0) + Number(adj.amount || 0);
+
+    const amount = Number(adj.amount || 0);
+    const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
+    const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
+    const value = isIncluded ? amountAlreadyIncluded : amount;
+    if (value === 0) return;
+
+    const baseLabel = itemAdjustmentLabel(adj);
+    const comment = isIncluded ? `${baseLabel} (${translate('included')})` : baseLabel;
+    totals[comment] = (totals[comment] || 0) + value;
   });
 
   return Object.entries(totals)
@@ -3330,18 +3430,6 @@ async function brokerShipGroup(shipGroupSeqId: string) {
   }
 }
 
-async function parkShipGroup(shipGroupSeqId: string) {
-  const facilityId = await openFacilityModal();
-  if (!facilityId) return;
-  try {
-    await orderTaskStore.parkOrder(order.value!.id, shipGroupSeqId, facilityId);
-    await showToast(translate('Ship group successfully moved to parking.'));
-    await loadOrder(order.value!.id, true);
-  } catch {
-    await showToast(translate('Failed to park the ship group. Please try again.'));
-  }
-}
-
 async function cancelOrderItems() {
   const raw = orderDetailStore.orderById(props.orderId);
   if (!raw || !selectedItems.value.length) return;
@@ -3455,18 +3543,6 @@ async function cancelSingleItem(item: any) {
     ]
   });
   await alert.present();
-}
-
-async function parkFullOrder() {
-  const facilityId = await openFacilityModal();
-  if (!facilityId) return;
-  try {
-    await orderTaskStore.parkOrderFull(order.value!.id, facilityId);
-    await showToast(translate('Order successfully moved to parking.'));
-    await loadOrder(order.value!.id, true);
-  } catch {
-    await showToast(translate('Failed to park the order. Please try again.'));
-  }
 }
 
 async function viewInventory(productId: string) {

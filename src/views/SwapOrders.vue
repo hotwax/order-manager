@@ -330,7 +330,7 @@ async function loadSetupCandidates() {
       }
     });
     configuredProductIds.value = configuredIds;
-  } catch (cause) {
+  } catch {
     setupCandidates.value = [];
     setupError.value = translate('Failed to load unfillable products. Please try again.');
   } finally {
@@ -381,7 +381,7 @@ async function rebrokerProductOrders(candidate: SwapSetupCandidate) {
     if (successes) await showToast(translate('{count} ship group(s) submitted for rebrokering.', { count: successes }));
     if (failures) await showToast(translate('{count} ship group(s) could not be rebrokered.', { count: failures }));
     await fetchSwapTasks();
-  } catch (cause) {
+  } catch {
     setupError.value = translate('Failed to rebroker orders for this product. Please try again.');
   } finally {
     setupLoading.value = false;

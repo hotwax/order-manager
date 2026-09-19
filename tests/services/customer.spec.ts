@@ -1,13 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { api } from '@common';
 import {
-  buildCustomerSearchRequests,
   getCustomer,
-  getCustomerContactMechs,
   getCustomerOrders,
   getCustomerTasks,
   searchCustomers
 } from '@/services/customer';
+
+const { runSolrQuery } = vi.hoisted(() => ({
+  runSolrQuery: vi.fn(),
+}));
+
+vi.mock('@common/composables/useSolrSearch', () => ({
+  useSolrSearch: () => ({ runSolrQuery }),
+}));
 
 vi.mock('@common/core/remoteApi', () => {
   const fn = vi.fn();
@@ -27,12 +33,12 @@ vi.mock('@common', async (importOriginal) => {
   };
 });
 
-import { cookieHelper } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 
 describe('customer service', () => {
   beforeEach(() => {
     vi.mocked(api).mockReset();
+    runSolrQuery.mockReset();
     useAuth().updateToken("test-token");
   });
 
@@ -116,98 +122,6 @@ describe('customer service', () => {
   });
 
 
-  it('fetches and groups customer contact mechs from the contact DataDocument', async () => {
-    vi.mocked(api).mockResolvedValue({
-      data: {
-        entityValueList: [
-          {
-            contactMechId: 'EMAIL1',
-            contactMechTypeId: 'EMAIL_ADDRESS',
-            contactMechPurposeTypeId: 'PRIMARY_EMAIL',
-            infoString: 'swati@example.com',
-          },
-          {
-            contactMechId: 'PHONE1',
-            contactMechTypeId: 'TELECOM_NUMBER',
-            contactMechPurposeTypeId: 'PHONE_MOBILE',
-            countryCode: '1',
-            areaCode: '415',
-            contactNumber: '5550100',
-          },
-          {
-            contactMechId: 'ADDR1',
-            contactMechTypeId: 'POSTAL_ADDRESS',
-            contactMechPurposeTypeId: 'SHIPPING_LOCATION',
-            address1: '100 Market St',
-            city: 'San Francisco',
-            stateProvinceGeoId: 'CA',
-            postalCode: '94105',
-            countryGeoId: 'USA',
-          },
-        ],
-      },
-    });
-
-    const result = await getCustomerContactMechs('CUST_1');
-
-    expect(api).toHaveBeenCalledWith({
-      url: 'oms/dataDocumentView',
-      method: 'post',
-        data: expect.objectContaining({
-          dataDocumentId: 'OrderManagerCustomerContactLookup',
-        customParametersMap: { partyid: 'CUST_1' },
-      }),
-    });
-    expect(vi.mocked(api).mock.calls[0][0].data.fieldsToSelect).toBeUndefined();
-    expect(result.emails[0]).toMatchObject({ infoString: 'swati@example.com' });
-    expect(result.phones[0]).toMatchObject({ infoString: '+1 415 5550100' });
-    expect(result.postalAddresses[0].postalAddress).toMatchObject({
-      address1: '100 Market St',
-      city: 'San Francisco',
-    });
-  });
-
-  it('normalizes lowercase customer contact aliases returned by Moqui DataDocuments', async () => {
-    vi.mocked(api).mockResolvedValue({
-      data: {
-        entityValueList: [
-          {
-            contactmechid: 'PHONE1',
-            contactmechtypeid: 'TELECOM_NUMBER',
-            contactmechpurposetypeid: 'PRIMARY_PHONE',
-            countrycode: '1',
-            areacode: '415',
-            contactnumber: '5550100',
-          },
-          {
-            contactmechid: 'ADDR1',
-            contactmechtypeid: 'POSTAL_ADDRESS',
-            contactmechpurposetypeid: 'SHIPPING_LOCATION',
-            address1: '100 Market St',
-            city: 'San Francisco',
-            stateprovincegeoid: 'CA',
-            postalcode: '94105',
-            countrygeoid: 'USA',
-          },
-        ],
-      },
-    });
-
-    const result = await getCustomerContactMechs('CUST_1');
-
-    expect(result.phones[0]).toMatchObject({
-      contactMechId: 'PHONE1',
-      contactMechPurposeTypeId: 'PRIMARY_PHONE',
-      infoString: '+1 415 5550100',
-    });
-    expect(result.postalAddresses[0].postalAddress).toMatchObject({
-      address1: '100 Market St',
-      stateProvinceGeoId: 'CA',
-      postalCode: '94105',
-      countryGeoId: 'USA',
-    });
-  });
-
   it('fetches recent customer orders using OrderManagerOrderRoleLookup and OrderManagerOrderLookup', async () => {
     vi.mocked(api)
       .mockResolvedValueOnce({
@@ -271,53 +185,8 @@ describe('customer service', () => {
     });
   });
 
-  it('routes party id customer searches to an exact oms parties lookup', () => {
-    expect(buildCustomerSearchRequests({ queryString: '10001', status: 'PARTY_ENABLED' })).toEqual([{
-      partyId: '10001',
-      statusId: 'PARTY_ENABLED',
-      dependentLevels: 1,
-      pageSize: 50,
-      pageIndex: 0,
-    }]);
-  });
-
-  it('routes single-token customer searches across person and group names', () => {
-    expect(buildCustomerSearchRequests({ queryString: 'Smith', partyTypeId: 'All', pageSize: 25, pageIndex: 2 })).toEqual([
-      {
-        partyTypeId: 'PERSON',
-        lastName_op: 'contains',
-        lastName: 'Smith',
-        dependentLevels: 1,
-        pageSize: 25,
-        pageIndex: 2,
-      },
-      {
-        partyTypeId: 'PARTY_GROUP',
-        groupName_op: 'contains',
-        groupName: 'Smith',
-        dependentLevels: 1,
-        pageSize: 25,
-        pageIndex: 2,
-      },
-    ]);
-  });
-
-  it('routes two-token customer searches to first and last name contains filters', () => {
-    expect(buildCustomerSearchRequests({ queryString: 'Swati Pandey', status: 'PARTY_ENABLED' })).toEqual([{
-      partyTypeId: 'PERSON',
-      firstName_op: 'contains',
-      firstName: 'Swati',
-      lastName_op: 'contains',
-      lastName: 'Pandey',
-      statusId: 'PARTY_ENABLED',
-      dependentLevels: 1,
-      pageSize: 50,
-      pageIndex: 0,
-    }]);
-  });
-
   it('searches customers through Solr and normalizes totals', async () => {
-    vi.mocked(api).mockResolvedValue({
+    runSolrQuery.mockResolvedValue({
       data: {
         response: {
           numFound: 1,
@@ -333,9 +202,8 @@ describe('customer service', () => {
 
     const result = await searchCustomers({ queryString: 'Swati Pandey' });
 
-    expect(api).toHaveBeenCalledWith(expect.objectContaining({
-      url: 'admin/search/query',
-      method: 'post',
+    expect(runSolrQuery).toHaveBeenCalledWith(expect.objectContaining({
+      json: expect.objectContaining({ query: '*Swati Pandey* OR "Swati Pandey"^100' }),
     }));
     expect(result).toMatchObject({
       total: 1,
@@ -344,7 +212,7 @@ describe('customer service', () => {
   });
 
   it('resolves email searches through Solr search', async () => {
-    vi.mocked(api).mockResolvedValue({
+    runSolrQuery.mockResolvedValue({
       data: {
         response: {
           numFound: 1,
@@ -360,20 +228,19 @@ describe('customer service', () => {
 
     const result = await searchCustomers({ queryString: 'swati@example.com' });
 
-    expect(api).toHaveBeenCalledWith(expect.objectContaining({
-      url: 'admin/search/query',
-      method: 'post',
+    expect(runSolrQuery).toHaveBeenCalledWith(expect.objectContaining({
+      json: expect.objectContaining({ query: '*swati@example.com* OR "swati@example.com"^100' }),
     }));
     expect(result.customers[0]).toMatchObject({ partyId: 'CUST_1' });
   });
 
   it('passes an explicit customer sort to Solr', async () => {
-    vi.mocked(api).mockResolvedValue({ data: { response: { numFound: 0, docs: [] } } });
+    runSolrQuery.mockResolvedValue({ data: { response: { numFound: 0, docs: [] } } });
 
     await searchCustomers({ queryString: 'Swati', sort: 'fullName asc' });
 
-    expect(api).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({
+    expect(runSolrQuery).toHaveBeenCalledWith(expect.objectContaining({
+      json: expect.objectContaining({
         params: expect.objectContaining({ sort: 'fullName asc' }),
       }),
     }));
@@ -382,12 +249,12 @@ describe('customer service', () => {
   // Without a sort clause Solr ranks by edismax relevance, which is what a keyword search
   // should return; sending an empty sort would instead be a Solr error.
   it('omits the sort clause entirely when no customer sort is selected', async () => {
-    vi.mocked(api).mockResolvedValue({ data: { response: { numFound: 0, docs: [] } } });
+    runSolrQuery.mockResolvedValue({ data: { response: { numFound: 0, docs: [] } } });
 
     await searchCustomers({ queryString: 'Swati', sort: '' });
 
-    const payload = vi.mocked(api).mock.calls.at(-1)?.[0] as any;
-    expect(payload.data.params).not.toHaveProperty('sort');
+    const payload = runSolrQuery.mock.calls.at(-1)?.[0] as any;
+    expect(payload.json.params).not.toHaveProperty('sort');
   });
 
   it('fetches customer tasks via workEffortPartyAssignments with roleTypeId CUSTOMER', async () => {

@@ -25,6 +25,25 @@ describe('order task filter controls', () => {
     expect(filterSource).not.toContain('<ion-grid');
   });
 
+  it('uses shared outlined Ionic selects across task queues', () => {
+    const fraudOrders = readFileSync(resolve(process.cwd(), 'src/views/FraudOrders.vue'), 'utf8');
+    const holdOrders = readFileSync(resolve(process.cwd(), 'src/views/HoldOrders.vue'), 'utf8');
+    const badAddressOrders = readFileSync(resolve(process.cwd(), 'src/views/BadAddressOrders.vue'), 'utf8');
+    const swapOrders = readFileSync(resolve(process.cwd(), 'src/views/SwapOrders.vue'), 'utf8');
+
+    // 7 = purpose, sales channel, facility, shipping method, order status, risk
+    // recommendation, risk level. The date filters use DateFilterSelect instead.
+    expect(filterSource.match(/<ion-select(?:\s|>)/g)?.length).toBe(7);
+    expect(filterSource.match(/fill="outline"/g)?.length).toBe(7);
+    expect(filterSource.match(/<DateFilterSelect/g)?.length).toBe(4);
+    expect(filterSource.match(/ outlined/g)?.length).toBe(4);
+    expect(fraudOrders).toContain('show-fraud-filters');
+    expect(holdOrders).toContain('show-ship-group-filters');
+    expect(badAddressOrders).toContain('show-ship-group-filters');
+    expect(swapOrders).toContain('show-ship-group-filters');
+    expect(`${filterSource}\n${fraudOrders}\n${holdOrders}\n${badAddressOrders}\n${swapOrders}`).not.toContain('ion-grid');
+  });
+
   it('shows total, sort, and selection in one Ionic list header', () => {
     expect(headerSource).toContain('<ion-list-header>');
     expectInOrder(headerSource, ['<ion-checkbox', '<ion-label>', '<OrderSortPopover', '<ion-button']);

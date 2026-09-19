@@ -124,7 +124,7 @@ import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   grandTotal?: number;
   newTotal?: number;
   refundAmount?: number;

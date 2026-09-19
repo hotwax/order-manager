@@ -36,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
+import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { closeOutline } from 'ionicons/icons';
 import { ref, onMounted } from 'vue';
 import { api, logger, translate } from '@common';

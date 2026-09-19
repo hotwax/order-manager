@@ -149,8 +149,6 @@ const selectedPurposeLabel = computed(() =>
     ? (selectedPurpose.value.description || selectedPurpose.value.enumName || selectedPurpose.value.enumId)
     : translate('Select Task Purpose')
 );
-const selectedPurposeIcon = computed(() => getTaskPurposeIcon(form.workEffortPurposeTypeId));
-
 const generatedTaskName = computed(() => {
   if (!props.autoGenerateTaskName) return '';
 

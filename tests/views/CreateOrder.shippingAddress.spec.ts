@@ -2,7 +2,9 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 
-describe('create order shipping address modal', () => {
+// The Create Order prototype is intentionally retained for future work from PR #464,
+// even though it is not currently routed into the shipped application.
+describe('dormant Create Order shipping address modal', () => {
   it('passes the address prop expected by the modal and stores the confirmed result', () => {
     const source = readFileSync(resolve(process.cwd(), 'src/views/CreateOrder.vue'), 'utf8');
     const modalStart = source.indexOf('async function openShippingAddressModal');

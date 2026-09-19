@@ -157,7 +157,8 @@ export const useOrderStore = defineStore('orders', {
     },
     // Shared queue totals surfaced as menu rollup badges. Written as a byproduct
     // of each queue page fetching its own list; the menu reads them reactively.
-    navCounts: {} as Record<string, number | undefined>
+    navCounts: {} as Record<string, number | undefined>,
+    navCountRequestGeneration: 0
   }),
   getters: {
     filteredOrders: (state) => state.searchResults,
@@ -188,16 +189,25 @@ export const useOrderStore = defineStore('orders', {
      * brokered-workload fetch. Each count uses the same query its queue page uses.
      */
     async primeNavCounts(productStoreId?: string) {
+      const requestId = ++this.navCountRequestGeneration;
       const storeId = productStoreId && productStoreId !== 'All' ? productStoreId : undefined;
-      await Promise.all(
+      const results = await Promise.all(
         Object.entries(queueCountFetchers).map(async ([key, fetchCount]) => {
           try {
-            this.setNavCount(key, await fetchCount(storeId));
+            return { key, total: await fetchCount(storeId) };
           } catch (error: any) {
-            logger.error(`Failed to prime the ${key} nav count`, error);
+            return { key, error };
           }
         })
       );
+      if (requestId !== this.navCountRequestGeneration) return;
+      results.forEach((result) => {
+        if ('error' in result) {
+          logger.error(`Failed to prime the ${result.key} nav count`, result.error);
+        } else {
+          this.setNavCount(result.key, result.total);
+        }
+      });
     },
     async runSearch() {
       this.pageIndex = 0;
@@ -347,7 +357,8 @@ export const useOrderStore = defineStore('orders', {
       'workflowOrdersLoading',
       'workflowOrdersTotal',
       'workflowOrdersPageIndex',
-      'workflowOrderEnrichment'
+      'workflowOrderEnrichment',
+      'navCountRequestGeneration'
     ]
   },
 });
