@@ -700,6 +700,11 @@
                         <ion-badge class="kit-badge" color="dark" v-if="isKit(item)">{{ translate("Kit") }}</ion-badge>
                       </div>
                       <p>{{ shipGroupProductIdentification(productIdentificationPref.secondaryId, item) }}</p>
+                      <!-- The collapsed summary above carries the same line, but a counter sale
+                           has no collapsed state and an expanded group hides it, so the variant
+                           has to be named here too. -->
+                      <p v-if="productFeatureLabel(item.productId)" class="ship-group-item-features"
+                        :title="productFeatureLabel(item.productId)">{{ productFeatureLabel(item.productId) }}</p>
                     </ion-label>
 
                     <!-- Inventory lookup answers "can we still fulfil this?"; the goods have

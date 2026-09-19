@@ -42,4 +42,22 @@ describe('order detail ship group actions', () => {
     expect(source).toContain('<p v-if="productFeatureLabel(item.productId)" class="ship-group-item-features"');
     expect(source).toContain('.ship-group-item-features {');
   });
+
+  // The card shows its items twice and a group is only ever in one of the two: the summary is
+  // hidden once a group is expanded, and a counter sale has no collapsed state at all. A
+  // variant named in only one of them disappears exactly where an operator went to compare.
+  it('names the variant in both the collapsed summary and the expanded item list', () => {
+    const featureLine = '<p v-if="productFeatureLabel(item.productId)" class="ship-group-item-features"';
+    const summary = source.slice(
+      source.indexOf('class="ship-group-summary-container"'),
+      source.indexOf('class="ship-group-card-details"')
+    );
+    const expanded = source.slice(
+      source.indexOf('class="ship-group-card-details"'),
+      source.indexOf('<div class="ship-group-actions">')
+    );
+
+    expect(summary).toContain(featureLine);
+    expect(expanded).toContain(featureLine);
+  });
 });
