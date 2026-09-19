@@ -4,75 +4,49 @@ import { shipGroupItemStates } from '@/utils/shipGroupItemStates';
 const completed = { statusId: 'ITEM_COMPLETED' };
 const cancelled = { statusId: 'ITEM_CANCELLED' };
 const approved = { statusId: 'ITEM_APPROVED' };
+const unloaded = { orderItemSeqId: '01' };
 
 describe('shipGroupItemStates', () => {
-  it('calls a group finished when every item completed', () => {
-    const states = shipGroupItemStates([completed, completed]);
-
-    expect(states.allFulfilled).toBe(true);
-    expect(states.settled).toBe(true);
-    expect(states.allCancelled).toBe(false);
-    expect(states.partiallyFulfilled).toBe(false);
+  it('counts only items that carry a status', () => {
+    expect(shipGroupItemStates([completed, unloaded, cancelled])).toEqual({
+      total: 2, fulfilled: 1, settled: true
+    });
   });
 
-  it('calls a group cancelled when every item stopped without finishing', () => {
-    const states = shipGroupItemStates([cancelled, cancelled]);
-
-    expect(states.allCancelled).toBe(true);
-    expect(states.settled).toBe(true);
-    expect(states.allFulfilled).toBe(false);
-    expect(states.partiallyFulfilled).toBe(false);
+  it('calls a group settled once every item has stopped', () => {
+    expect(shipGroupItemStates([completed, completed]).settled).toBe(true);
+    expect(shipGroupItemStates([cancelled, cancelled]).settled).toBe(true);
+    expect(shipGroupItemStates([completed, cancelled]).settled).toBe(true);
   });
 
-  it('calls a stopped group partially complete when some finished and some did not', () => {
-    // The case that reads as "Partially complete" on the card.
-    const states = shipGroupItemStates([completed, cancelled]);
-
-    expect(states.partiallyFulfilled).toBe(true);
-    expect(states.settled).toBe(true);
-    expect(states.allFulfilled).toBe(false);
-    expect(states.allCancelled).toBe(false);
-    expect(states.fulfilled).toBe(1);
-    expect(states.total).toBe(2);
+  it('leaves a group with any open item unsettled', () => {
+    expect(shipGroupItemStates([completed, approved]).settled).toBe(false);
+    expect(shipGroupItemStates([approved]).settled).toBe(false);
   });
 
-  it('reports the fulfilled fraction so the bar can show how much of the group landed', () => {
-    const states = shipGroupItemStates([completed, cancelled, cancelled, completed]);
-
-    expect(states.fulfilled / states.total).toBe(0.5);
+  it('does not call an empty or still-loading group settled', () => {
+    // A group mid-load must read as in progress, not as freshly cancelled.
+    expect(shipGroupItemStates([])).toEqual({ total: 0, fulfilled: 0, settled: false });
+    expect(shipGroupItemStates([unloaded, unloaded])).toEqual({ total: 0, fulfilled: 0, settled: false });
+    expect(shipGroupItemStates(undefined)).toEqual({ total: 0, fulfilled: 0, settled: false });
+    expect(shipGroupItemStates(null)).toEqual({ total: 0, fulfilled: 0, settled: false });
   });
 
-  it('leaves a still-moving group unsettled, so the timeline keeps describing it', () => {
-    const states = shipGroupItemStates([completed, approved]);
+  it('reports the fulfilled fraction the progress bar is drawn from', () => {
+    // `fulfilled / total` is what the card uses for a settled group, so it has to answer
+    // all three terminal cases on its own: everything landed, nothing did, and in between.
+    const all = shipGroupItemStates([completed, completed]);
+    expect(all.fulfilled / all.total).toBe(1);
 
-    expect(states.settled).toBe(false);
-    expect(states.allFulfilled).toBe(false);
-    expect(states.partiallyFulfilled).toBe(false);
-    expect(states.allCancelled).toBe(false);
+    const none = shipGroupItemStates([cancelled, cancelled]);
+    expect(none.fulfilled / none.total).toBe(0);
+
+    const mixed = shipGroupItemStates([completed, cancelled, cancelled, completed]);
+    expect(mixed).toEqual({ total: 4, fulfilled: 2, settled: true });
+    expect(mixed.fulfilled / mixed.total).toBe(0.5);
   });
 
-  it('treats an empty group as nothing to conclude, not as finished', () => {
-    // An empty ship group (a parked one, say) must not claim to be complete or cancelled.
-    const states = shipGroupItemStates([]);
-
-    expect(states.settled).toBe(false);
-    expect(states.allFulfilled).toBe(false);
-    expect(states.allCancelled).toBe(false);
-    expect(states.total).toBe(0);
-  });
-
-  it('ignores items whose status has not loaded rather than counting them as unfinished', () => {
-    // Mid-load a group would otherwise flip to "in progress" and then back, or worse, to
-    // "cancelled" because an unknown status is not ITEM_COMPLETED.
-    const states = shipGroupItemStates([completed, { statusId: undefined }, {}]);
-
-    expect(states.total).toBe(1);
-    expect(states.allFulfilled).toBe(true);
-    expect(states.settled).toBe(true);
-  });
-
-  it('survives a missing item list', () => {
-    expect(shipGroupItemStates(undefined).settled).toBe(false);
-    expect(shipGroupItemStates(null).total).toBe(0);
+  it('counts only completed items as fulfilled', () => {
+    expect(shipGroupItemStates([cancelled, approved]).fulfilled).toBe(0);
   });
 });

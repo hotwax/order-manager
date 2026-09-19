@@ -1825,11 +1825,11 @@ function shipGroupProgress(shipGroup: any): number {
   // measure and no timeline row to measure it from.
   if (isPosCompleted(shipGroup)) return 1;
 
-  const states = shipGroupItemStates(shipGroup);
   // Item status wins for a stopped group; the timeline only describes one still in motion.
-  if (states.allFulfilled) return 1;
-  if (states.allCancelled) return 0;
-  if (states.partiallyFulfilled) return states.fulfilled / states.total;
+  // One expression covers all three terminal cases: 1 when every item landed, 0 when none
+  // did, and the fraction in between.
+  const { total, fulfilled, settled } = shipGroupItemStates(shipGroup);
+  if (settled) return fulfilled / total;
 
   const tl = timelineByShipGroup.value[shipGroup.id];
   let progress = 0;
@@ -1918,11 +1918,11 @@ function shipGroupStatusLabel(shipGroup: any): string {
   // and neither does where its items are parked. Cancelled items are routinely moved to a
   // virtual facility such as REJECTED_ITM_PARKING, so the brokering label has to come after
   // these checks or the card reads "Not Brokered" over a terminal-aware progress bar.
-  const states = shipGroupItemStates(shipGroup);
-  if (states.allCancelled) return translate('Cancelled');
-  if (states.partiallyFulfilled) return translate('Partially complete');
+  const { total, fulfilled, settled } = shipGroupItemStates(shipGroup);
+  if (settled && fulfilled === 0) return translate('Cancelled');
+  if (settled && fulfilled < total) return translate('Partially complete');
 
-  if (!states.settled && isVirtualFacility(shipGroup)) return translate('Not Brokered');
+  if (!settled && isVirtualFacility(shipGroup)) return translate('Not Brokered');
 
   // A physical facility is always at least brokered, so there is no 0% case left to
   // label — the old fallback here read "Brokered", which collided with the step name.

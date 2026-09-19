@@ -2,37 +2,21 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 
-describe('order detail ship group reflects item status', () => {
+/**
+ * The rules themselves are covered for real in tests/utils/shipGroupItemStates.spec.ts and
+ * tests/utils/OrderActionValidator.spec.ts, which call the code and assert on its answers.
+ *
+ * What is left here is the one thing those cannot reach: the ship group view model is built
+ * inside the SFC, so nothing but the source proves it still carries item status through. That
+ * single line is the whole reason the card can see status at all, and dropping it again would
+ * be silent — every rule below it would keep passing against items that no longer have a
+ * statusId. Assertions that merely restated the logic used to live here; they only locked the
+ * implementation's wording in place and broke on correct refactors, so they are gone.
+ */
+describe('order detail ship group view model', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/views/OrderDetail.vue'), 'utf8');
 
   it('carries each item status into the ship group view model', () => {
-    // Without this the card literally cannot see item status — the mapping used to drop it,
-    // which is why a finished group read "25% Complete" forever.
     expect(source).toContain('statusId: item.statusId');
-  });
-
-  it('lets item status override the timeline for a group that has stopped', () => {
-    expect(source).toContain('if (states.allFulfilled) return 1;');
-    expect(source).toContain('if (states.allCancelled) return 0;');
-    expect(source).toContain('if (states.partiallyFulfilled) return states.fulfilled / states.total;');
-  });
-
-  it('still measures a moving group from the fulfillment timeline', () => {
-    expect(source).toContain("if (tl?.picklistDate) progress += 0.25;");
-    expect(source).toContain("if (tl?.packedDate) progress += 0.25;");
-    expect(source).toContain("if (tl?.shippedDate) progress += 0.25;");
-  });
-
-  it('labels a stopped group instead of quoting it a percentage', () => {
-    expect(source).toContain("if (states.allCancelled) return translate('Cancelled');");
-    expect(source).toContain("if (states.partiallyFulfilled) return translate('Partially complete');");
-  });
-
-  it('stops claiming later steps are Pending once the group has stopped', () => {
-    expect(source).toContain('function lifecycleStepNote(shipGroup: any, date: any): string {');
-    expect(source).toContain("shipGroupItemStates(shipGroup).settled ? translate('No date') : translate('Pending')");
-    ['picklistDate', 'packedDate', 'shippedDate'].forEach((field) => {
-      expect(source).toContain(`lifecycleStepNote(shipGroup, lifecycleByShipGroup[shipGroup.id]?.${field})`);
-    });
   });
 });
