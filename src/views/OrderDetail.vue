@@ -318,7 +318,7 @@
                     {{ translate('Request transfer') }}
                   </ion-button>
                   <ion-button
-                    v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(soleItem.statusId)"
+                    v-if="isItemCancelAllowed(soleItem)"
                     fill="clear"
                     size="small"
                     color="danger"
@@ -380,7 +380,7 @@
                         >
                           {{ translate('Request transfer') }}
                         </ion-button>
-                        <ion-button v-if="!['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)" fill="clear"
+                        <ion-button v-if="isItemCancelAllowed(item)" fill="clear"
                           size="small" color="danger" @click.stop="cancelSingleItem(item)">
                           {{ translate('Cancel') }}
                         </ion-button>
@@ -2389,6 +2389,22 @@ function isItemFacilityActionDisabled(item: any) {
   return !itemFacilityActionValidation(item).allowed;
 }
 
+/**
+ * Whether this row may offer Cancel. A non-terminal item is not enough: the validator also
+ * refuses once the ORDER is terminal, when the store's cancelAllowedWhen policy rules out the
+ * ship group's phase, and when the seed transition table has no ITEM_CANCELLED edge from the
+ * item's current status. Reading the same validator the action itself runs is what keeps the
+ * button from offering a cancellation the backend will reject.
+ */
+function itemCancelValidation(item: any) {
+  if (!order.value) return { allowed: false, reason: 'Order is not loaded.' };
+  return OrderActionValidator.validateItemAction(order.value, item, 'CANCEL_ITEM', itemActionContext(item));
+}
+
+function isItemCancelAllowed(item: any) {
+  return itemCancelValidation(item).allowed;
+}
+
 async function showUnavailableAction(validation: any) {
   await showToast(validation?.reason || 'Action is not available.');
 }
@@ -3551,6 +3567,14 @@ async function rejectAndReleaseItem(item: any) {
 async function cancelSingleItem(item: any) {
   const raw = orderDetailStore.orderById(props.orderId);
   if (!raw) return;
+
+  // The row can have been rendered before a refresh moved the item or the order on, so the
+  // handler asks the validator again rather than trusting the button that called it.
+  const validation = itemCancelValidation(item);
+  if (!validation.allowed) {
+    await showUnavailableAction(validation);
+    return;
+  }
   const alert = await alertController.create({
     header: translate('Cancel Item'),
     message: translate('Are you sure you want to cancel this item? This action cannot be undone.'),

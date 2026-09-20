@@ -297,3 +297,72 @@ describe('ship-group fulfillment approval gate', () => {
     ).allowed).toBe(true);
   });
 });
+
+/**
+ * The per-row Cancel button reads this, so what it refuses is what the row must not offer.
+ * A row that only checked the item's own status would offer every case below.
+ */
+describe('validateItemAction CANCEL_ITEM', () => {
+  const approvedItem = { orderItemSeqId: '01', statusId: 'ITEM_APPROVED' };
+  const cancellable = new Set(['ITEM_CANCELLED', 'ITEM_COMPLETED']);
+
+  it('allows cancelling a live item on a live order the table lets reach ITEM_CANCELLED', () => {
+    const result = OrderActionValidator.validateItemAction(
+      { statusId: 'ORDER_APPROVED' },
+      approvedItem,
+      'CANCEL_ITEM',
+      { itemAllowedToStatusIds: cancellable, allItems: [approvedItem] }
+    );
+    expect(result.allowed).toBe(true);
+  });
+
+  it('refuses a live item once the ORDER is terminal', () => {
+    ['ORDER_COMPLETED', 'ORDER_CANCELLED'].forEach((statusId) => {
+      const result = OrderActionValidator.validateItemAction(
+        { statusId },
+        approvedItem,
+        'CANCEL_ITEM',
+        { itemAllowedToStatusIds: cancellable, allItems: [approvedItem] }
+      );
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toMatch(/Order is already/);
+    });
+  });
+
+  it('refuses when the status flow has no ITEM_CANCELLED edge from the current item status', () => {
+    const result = OrderActionValidator.validateItemAction(
+      { statusId: 'ORDER_APPROVED' },
+      approvedItem,
+      'CANCEL_ITEM',
+      { itemAllowedToStatusIds: new Set(['ITEM_COMPLETED']), allItems: [approvedItem] }
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/status flow/);
+  });
+
+  it('refuses when store policy restricts cancellation to another ship group phase', () => {
+    const result = OrderActionValidator.validateItemAction(
+      { statusId: 'ORDER_APPROVED' },
+      approvedItem,
+      'CANCEL_ITEM',
+      {
+        itemAllowedToStatusIds: cancellable,
+        allItems: [approvedItem],
+        policy: { cancelAllowedWhen: 'unbrokered' },
+        timeline: { firstBrokeredDate: 1_700_000_000_000 }
+      }
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/policy/i);
+  });
+
+  it('still refuses an item that is itself terminal', () => {
+    const result = OrderActionValidator.validateItemAction(
+      { statusId: 'ORDER_APPROVED' },
+      { orderItemSeqId: '01', statusId: 'ITEM_COMPLETED' },
+      'CANCEL_ITEM',
+      { itemAllowedToStatusIds: cancellable, allItems: [] }
+    );
+    expect(result.allowed).toBe(false);
+  });
+});
