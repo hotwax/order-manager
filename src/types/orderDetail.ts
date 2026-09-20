@@ -12,6 +12,13 @@ export interface ShipGroupActionCapabilities {
   canEditShippingMethod: boolean;
 }
 
+export interface IssuanceBadge {
+  label: string;
+  tone: string;
+  qohBefore: number;
+  qohAfter: number;
+}
+
 export interface EnrichedOrderItem {
   orderItemSeqId: string;
   id: string; // alias for orderItemSeqId
@@ -34,6 +41,7 @@ export interface EnrichedOrderItem {
   attributeCount: number;
   adjustments: Array<{ comment: string; amount: number }>;
   actions: ItemActionCapabilities;
+  issuanceBadge?: IssuanceBadge;
 }
 
 export interface EnrichedShipGroup {
@@ -51,6 +59,12 @@ export interface EnrichedShipGroup {
   statusLabel: string;
   headerTitle: string;
   itemSummary: string;
+  firstBrokeredDate?: string | number;
+  lifecycle?: Record<string, any>;
+  shippingAddress?: {
+    lines: string[];
+    view: { name: string; street: string; locality: string } | null;
+  };
   carrierPartyId?: string;
   carrierName?: string;
   shipmentMethodTypeId?: string;
@@ -68,11 +82,19 @@ export interface EnrichedShipGroup {
   actions: ShipGroupActionCapabilities;
 }
 
+export interface EnrichedOrderAdjustmentRow {
+  label: string;
+  detail: string;
+  amount: number;
+  isIncluded: boolean;
+}
+
 export interface EnrichedOrderTotals {
   subtotal: number;
   adjustments: Record<string, number>;
   includedAdjustments: Record<string, number>;
   total: number;
+  adjustmentRows?: EnrichedOrderAdjustmentRow[];
 }
 
 export interface EnrichedPaymentPreference {

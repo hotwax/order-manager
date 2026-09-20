@@ -19,12 +19,14 @@ import { sentimentCounts } from './index';
 import { isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
 import type {
   EnrichedOrder,
+  EnrichedOrderAdjustmentRow,
   EnrichedOrderItem,
   EnrichedOrderPayments,
   EnrichedOrderRisk,
   EnrichedOrderTimelineEvent,
   EnrichedOrderTotals,
   EnrichedShipGroup,
+  IssuanceBadge,
   ItemActionCapabilities,
   ShipGroupActionCapabilities,
 } from '@/types/orderDetail';
@@ -515,6 +517,18 @@ export function enrichOrder(
       const status = seedStore.statusDescription(item.statusId);
       const statusColor = commonUtil.getStatusColor ? commonUtil.getStatusColor(item.statusId) : 'medium';
 
+      let issuanceBadge: IssuanceBadge | undefined = undefined;
+      if (isPosCompleted && auxiliaryData.issuanceByItem) {
+        const summary = auxiliaryData.issuanceByItem[item.orderItemSeqId];
+        const ordered = Number(item.quantity || 0);
+        const issued = summary?.issued || 0;
+        const stock = { qohBefore: summary?.qohBefore ?? 0, qohAfter: summary?.qohAfter ?? 0 };
+
+        if (issued <= 0) issuanceBadge = { label: translate('Inventory not issued'), tone: 'warning', ...stock };
+        else if (ordered && issued < ordered) issuanceBadge = { label: translate('Inventory partly issued'), tone: 'warning', ...stock };
+        else issuanceBadge = { label: translate('Inventory issued'), tone: 'success', ...stock };
+      }
+
       const isTransferEligible = isInventoryTransferEligibleItem(
         { productId: item.productId, statusId: item.statusId, quantity: item.quantity },
         isVirtual
@@ -565,6 +579,7 @@ export function enrichOrder(
           amount: Number(adj.amount || 0),
         })),
         actions,
+        issuanceBadge,
       };
     });
 
@@ -584,6 +599,38 @@ export function enrichOrder(
     const units = (sg.items || []).reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
     const itemSummary = `${(sg.items || []).length} ${(sg.items || []).length === 1 ? 'item' : 'items'} · ${units} ${units === 1 ? 'unit' : 'units'}`;
 
+    const brokeredFromTimeline = timelineEntry?.firstBrokeredDate || timelineEntry?.firstReleasedDate;
+    const earliestFacilityChange = !isVirtual
+      ? (auxiliaryData.facilityChanges || [])
+          .filter((c: any) => c.shipGroupSeqId === sg.shipGroupSeqId && c.value)
+          .sort((a: any, b: any) => a.value - b.value)[0]?.value
+      : undefined;
+    const firstBrokeredDate = brokeredFromTimeline || earliestFacilityChange;
+
+    const lifecycle = {
+      ...(timelineEntry || {}),
+      firstBrokeredDate,
+    };
+
+    const shippingMech = sg.contactMechId
+      ? contactMechs.find((m: any) => m.contactMechId === sg.contactMechId)
+      : contactMechs.find((m: any) => m.contactMechPurposeTypeId === 'SHIPPING_LOCATION');
+    const addr = shippingMech?.postalAddress;
+    const shippingAddress = addr ? {
+      lines: [
+        addr.toName,
+        addr.address1,
+        addr.address2,
+        [addr.city, seedStore.geoName?.(addr.stateProvinceGeoId), addr.postalCode].filter(Boolean).join(', '),
+        seedStore.geoName?.(addr.countryGeoId)
+      ].filter(Boolean) as string[],
+      view: {
+        name: addr.toName || '',
+        street: [addr.address1, addr.address2].filter(Boolean).join(', '),
+        locality: [addr.city, addr.postalCode, seedStore.geoName?.(addr.stateProvinceGeoId), seedStore.geoName?.(addr.countryGeoId)].filter(Boolean).join(', ')
+      }
+    } : undefined;
+
     return {
       id: sg.shipGroupSeqId,
       shipGroupSeqId: sg.shipGroupSeqId,
@@ -599,6 +646,9 @@ export function enrichOrder(
       statusLabel,
       headerTitle,
       itemSummary,
+      firstBrokeredDate,
+      lifecycle,
+      shippingAddress,
       carrierPartyId: sg.carrierPartyId,
       carrierName: sg.carrierPartyId ? seedStore.carrierParties?.find((c: any) => c.partyId === sg.carrierPartyId)?.groupName || sg.carrierPartyId : '',
       shipmentMethodTypeId: sg.shipmentMethodTypeId,
@@ -691,11 +741,28 @@ export function enrichOrder(
   });
 
   const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
+  const shippingMethodsList = Array.from(new Set(shipGroups.map((sg: any) => sg.shippingMethodLabel).filter(Boolean))).join(', ');
+  const adjustmentRows: EnrichedOrderAdjustmentRow[] = [
+    ...Object.entries(adjustments).map(([label, amount]) => ({
+      label,
+      detail: /shipping/i.test(label) ? shippingMethodsList : '',
+      amount: Number(amount),
+      isIncluded: false,
+    })),
+    ...Object.entries(includedAdjustments).map(([label, amount]) => ({
+      label,
+      detail: /shipping/i.test(label) ? shippingMethodsList : '',
+      amount: Number(amount),
+      isIncluded: true,
+    })),
+  ].filter((row) => row.amount !== 0);
+
   const totals: EnrichedOrderTotals = {
     subtotal,
     adjustments,
     includedAdjustments,
     total: computedTotal || rawOrder.grandTotal || 0,
+    adjustmentRows,
   };
 
   const payments = calculatePaymentSummary(rawOrder, returnedQtyBySeqId, seedStore);

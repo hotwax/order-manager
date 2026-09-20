@@ -21,6 +21,10 @@ const num = (value: any): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+// Module-level caches: facility locations and postal codes are immutable during a session.
+const postalCoordinatesCache = new Map<string, { lat: number; lon: number }>();
+const facilityOriginsCache = new Map<string, { lat?: number; lon?: number; zip?: string }>();
+
 /**
  * Fallback geocoder: resolve postal codes to coordinates via the Solr `postalCode`
  * core (fields: postcode / latitude / longitude), returning a { zip: {lat, lon} }
@@ -32,13 +36,26 @@ const num = (value: any): number | undefined => {
 export async function lookupPostalCoordinates(zips: string[]): Promise<Record<string, { lat: number; lon: number }>> {
   const coords: Record<string, { lat: number; lon: number }> = {};
   if (!zips.length) return coords;
+
+  const missingZips: string[] = [];
+  zips.forEach((zip) => {
+    const cached = postalCoordinatesCache.get(zip);
+    if (cached) {
+      coords[zip] = cached;
+    } else {
+      missingZips.push(zip);
+    }
+  });
+
+  if (!missingZips.length) return coords;
+
   try {
     const resp = await api({
       url: 'api/geocode',
       method: 'POST',
       data: {
         json: {
-          query: `postcode:(${zips.map((zip) => `"${zip}"`).join(' OR ')})`
+          query: `postcode:(${missingZips.map((zip) => `"${zip}"`).join(' OR ')})`
         }
       }
     });
@@ -46,7 +63,11 @@ export async function lookupPostalCoordinates(zips: string[]): Promise<Record<st
       const zip = String(doc.postcode ?? '').trim();
       const lat = num(doc.latitude);
       const lon = num(doc.longitude);
-      if (zip && lat !== undefined && lon !== undefined) coords[zip] = { lat, lon };
+      if (zip && lat !== undefined && lon !== undefined) {
+        const entry = { lat, lon };
+        coords[zip] = entry;
+        postalCoordinatesCache.set(zip, entry);
+      }
     });
   } catch (error) {
     console.error('Failed to look up postal-code coordinates:', error);
@@ -59,13 +80,30 @@ export async function lookupPostalCoordinates(zips: string[]): Promise<Record<st
  *  Solr lookup when the address isn't geocoded. Deduped per facilityId. */
 export async function fetchFacilityOrigins(facilityIds: string[]): Promise<Record<string, { lat?: number; lon?: number; zip?: string }>> {
   const origins: Record<string, { lat?: number; lon?: number; zip?: string }> = {};
-  await Promise.all(facilityIds.map(async (facilityId) => {
+  const missingIds: string[] = [];
+
+  facilityIds.forEach((id) => {
+    const cached = facilityOriginsCache.get(id);
+    if (cached) {
+      origins[id] = cached;
+    } else {
+      missingIds.push(id);
+    }
+  });
+
+  if (!missingIds.length) return origins;
+
+  await Promise.all(missingIds.map(async (facilityId) => {
     try {
       const resp = await api({ url: 'oms/facilityContactMechs', method: 'GET', params: { facilityId } });
       const mechs: any[] = resp?.data?.facilityContactMechs ?? [];
       const postal = mechs.find((m) => m.contactMechTypeId === 'POSTAL_ADDRESS' && m.contactMechPurposeTypeId === 'SHIP_ORIG_LOCATION')
         || mechs.find((m) => m.contactMechTypeId === 'POSTAL_ADDRESS');
-      if (postal) origins[facilityId] = { lat: num(postal.latitude), lon: num(postal.longitude), zip: postal.postalCode?.trim() };
+      if (postal) {
+        const entry = { lat: num(postal.latitude), lon: num(postal.longitude), zip: postal.postalCode?.trim() };
+        origins[facilityId] = entry;
+        facilityOriginsCache.set(facilityId, entry);
+      }
     } catch (error) {
       console.error(`Failed to load origin address for facility ${facilityId}:`, error);
     }

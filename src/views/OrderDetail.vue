@@ -447,15 +447,15 @@
                 <ion-label>{{ translate('Subtotal') }}</ion-label>
                 <ion-label slot="end">{{ money(orderTotals.subtotal, order.currency) }}</ion-label>
               </ion-item>
-              <ion-item v-for="adjustment in orderAdjustmentRows" :key="adjustment.label">
+              <ion-item v-for="adjustment in (orderTotals.adjustmentRows || [])" :key="adjustment.label">
                 <ion-label>
                   {{ adjustment.label }}
                   <p v-if="adjustment.detail">{{ adjustment.detail }}</p>
                 </ion-label>
-                <ion-label slot="end" class="ion-text-end">
+                <ion-note slot="end" :color="adjustment.isIncluded ? 'medium' : undefined">
                   {{ money(adjustment.amount, order.currency) }}
-                  <p v-if="adjustment.isIncluded">{{ translate('Included') }}</p>
-                </ion-label>
+                  <template v-if="adjustment.isIncluded"> ({{ translate('included') }})</template>
+                </ion-note>
               </ion-item>
               <ion-item class="grand-total-row">
                 <ion-label>{{ translate('Grand total') }}</ion-label>
@@ -591,8 +591,8 @@
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="compassOutline" />
                 <ion-label>
-                  <p class="overline" v-if="lifecycleByShipGroup[shipGroup.id]?.firstBrokeredDate">{{
-                    lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], 'brokered') }}</p>
+                  <p class="overline" v-if="shipGroup.lifecycle?.firstBrokeredDate">{{
+                    lifecycleStepLabel(shipGroup.lifecycle, 'brokered') }}</p>
                   {{ translate('Brokered') }}
                 </ion-label>
                 <ion-note slot="end">{{ brokeredStepNote(shipGroup) }}</ion-note>
@@ -600,71 +600,61 @@
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="mailOutline" />
                 <ion-label>
-                  <p class="overline" v-if="lifecycleByShipGroup[shipGroup.id]?.picklistDate">{{
-                    lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], 'pick') }}</p>
+                  <p class="overline" v-if="shipGroup.lifecycle?.picklistDate">{{
+                    lifecycleStepLabel(shipGroup.lifecycle, 'pick') }}</p>
                   {{ translate('Pick') }}
                 </ion-label>
-                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, lifecycleByShipGroup[shipGroup.id]?.picklistDate) }}</ion-note>
+                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, shipGroup.lifecycle?.picklistDate) }}</ion-note>
               </ion-item>
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="cubeOutline" />
                 <ion-label>
-                  <p class="overline" v-if="lifecycleByShipGroup[shipGroup.id]?.packedDate">{{
-                    lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], 'pack') }}</p>
+                  <p class="overline" v-if="shipGroup.lifecycle?.packedDate">{{
+                    lifecycleStepLabel(shipGroup.lifecycle, 'pack') }}</p>
                   {{ translate('Pack') }}
                 </ion-label>
-                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, lifecycleByShipGroup[shipGroup.id]?.packedDate) }}</ion-note>
+                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, shipGroup.lifecycle?.packedDate) }}</ion-note>
               </ion-item>
               <ion-item lines="none">
                 <ion-icon slot="start" :icon="sendOutline" />
                 <ion-label>
-                  <p class="overline" v-if="lifecycleByShipGroup[shipGroup.id]?.shippedDate">{{
-                    lifecycleStepLabel(lifecycleByShipGroup[shipGroup.id], 'ship') }}</p>
+                  <p class="overline" v-if="shipGroup.lifecycle?.shippedDate">{{
+                    lifecycleStepLabel(shipGroup.lifecycle, 'ship') }}</p>
                   {{ translate('Ship') }}
                 </ion-label>
-                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, lifecycleByShipGroup[shipGroup.id]?.shippedDate) }}</ion-note>
+                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, shipGroup.lifecycle?.shippedDate) }}</ion-note>
               </ion-item>
             </div>
 
             <!-- shows when collapsed; a counter sale has no collapsed state -->
             <div v-if="!isPosCompleted(shipGroup)" v-collapsible class="ship-group-summary-container"
-              :class="{ 'ship-group-summary-collapsed': isShipGroupExpanded(shipGroup.id) }"
-              :aria-hidden="isShipGroupExpanded(shipGroup.id)"
-              :inert="isShipGroupExpanded(shipGroup.id) ? '' : undefined">
-              <div class="ship-group-summary-content">
-                <ion-list lines="none" :aria-label="translate('Items')">
-                  <ion-item v-for="item in shipGroupPreviewItems(shipGroup)" :key="item.id">
-                    <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)"
-                      :key="getProduct(item.productId)?.mainImageUrl">
-                      <DxpShopifyImg :src="item?.imageUrl" :key="getProduct(item.productId)?.mainImageUrl" size="small" />
+              :class="{ 'ship-group-summary-container-expanded': isShipGroupExpanded(shipGroup.id) }">
+              <div class="ship-group-summary">
+                <ion-list lines="none">
+                  <ion-item>
+                    <ion-thumbnail slot="start" v-for="item in shipGroupPreviewItems(shipGroup)" :key="item.id"
+                      v-image-preview="getProduct(item.productId)">
+                      <DxpShopifyImg :src="item?.imageUrl" :key="getProduct(item.productId)?.mainImageUrl"
+                        size="small" />
                     </ion-thumbnail>
                     <ion-label>
-                      <p class="overline">{{ shipGroupProductIdentification(productIdentificationPref.secondaryId, item)
-                        }}</p>
-                      <div>
-                        {{ shipGroupProductIdentification(productIdentificationPref.primaryId, item) || item.productId }}
-                        <ion-badge class="kit-badge" color="dark" v-if="isKit(item)">{{ translate("Kit") }}</ion-badge>
-                      </div>
-                      <p v-if="productFeatureLabel(item.productId)" class="ship-group-item-features"
-                        :title="productFeatureLabel(item.productId)">{{ productFeatureLabel(item.productId) }}</p>
+                      <p>{{ shipGroup.itemSummary }}</p>
                     </ion-label>
-                    <ion-note slot="end">{{ item.quantity }} {{ translate('units') }}</ion-note>
                   </ion-item>
-                </ion-list>
-
-                <ion-list lines="none" :aria-label="translate('Fulfillment')">
-                  <ion-item lines="full">
+                  <ion-item>
+                    <ion-icon :icon="cubeOutline" slot="start" />
                     <ion-label>
-                      {{ carrierName(getSelection(shipGroup.id, shipGroup).carrierId) || translate('Carrier name') }} {{
-                        shippingMethodLabel(getSelection(shipGroup.id, shipGroup).methodId) || translate('Shipping Method Name') }}
+                      {{ carrierName(shipGroup.carrierPartyId || shipGroup.carrier) }}
+                      <p v-if="shipGroup.shipmentMethodTypeId">{{ shippingMethodLabel(shipGroup.shipmentMethodTypeId) }}
+                      </p>
                     </ion-label>
                   </ion-item>
                   <ion-item>
                     <ion-icon :icon="sendOutline" slot="start" />
-                    <ion-label v-if="shippingAddressView(shipGroup)">
-                      {{ shippingAddressView(shipGroup)?.name }}
-                      <p v-if="shippingAddressView(shipGroup)?.street">{{ shippingAddressView(shipGroup)?.street }}</p>
-                      <p v-if="shippingAddressView(shipGroup)?.locality">{{ shippingAddressView(shipGroup)?.locality }}</p>
+                    <ion-label v-if="shipGroup.shippingAddress?.view">
+                      {{ shipGroup.shippingAddress.view.name }}
+                      <p v-if="shipGroup.shippingAddress.view.street">{{ shipGroup.shippingAddress.view.street }}</p>
+                      <p v-if="shipGroup.shippingAddress.view.locality">{{ shipGroup.shippingAddress.view.locality }}</p>
                     </ion-label>
                     <ion-label v-else>{{ translate('Shipping address not available') }}</ion-label>
                   </ion-item>
@@ -713,14 +703,14 @@
                     <ion-button v-if="!isPosCompleted(shipGroup)" slot="end" fill="clear" color="medium" @click.stop="viewInventory(item.productId)" :aria-label="translate('View inventory')">
                       <ion-icon slot="icon-only" :icon="cubeOutline" />
                     </ion-button>
-                    <div v-else-if="itemIssuanceBadges[item.id]" slot="end" class="ship-group-item-issuance">
-                      <ion-badge :color="itemIssuanceBadges[item.id].tone">
-                        {{ translate(itemIssuanceBadges[item.id].label) }}
+                    <div v-else-if="item.issuanceBadge" slot="end" class="ship-group-item-issuance">
+                      <ion-badge :color="item.issuanceBadge.tone">
+                        {{ translate(item.issuanceBadge.label) }}
                       </ion-badge>
                       <!-- Stock at the store as the sale was recorded, not stock now: later
                            movements against the same inventory item are not reflected here. -->
-                      <ion-note v-if="itemIssuanceBadges[item.id].label === 'Inventory issued'">
-                        {{ translate('On hand at sale') }} {{ itemIssuanceBadges[item.id].qohBefore }} → {{ itemIssuanceBadges[item.id].qohAfter }}
+                      <ion-note v-if="item.issuanceBadge.label === 'Inventory issued'">
+                        {{ translate('On hand at sale') }} {{ item.issuanceBadge.qohBefore }} → {{ item.issuanceBadge.qohAfter }}
                       </ion-note>
                     </div>
                   </ion-item>
@@ -765,8 +755,8 @@
                   <ion-item>
                     <ion-icon :icon="sendOutline" slot="start" />
                     <ion-label>
-                      <template v-if="shippingAddressLines(shipGroup).length">
-                        <div v-for="(line, idx) in shippingAddressLines(shipGroup)" :key="idx">{{ line }}</div>
+                      <template v-if="shipGroup.shippingAddress?.lines?.length">
+                        <div v-for="(line, idx) in shipGroup.shippingAddress.lines" :key="idx">{{ line }}</div>
                       </template>
                       <div v-else>{{ translate('Shipping address not available') }}</div>
                     </ion-label>
@@ -1131,9 +1121,8 @@ import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useOrderActions } from '@/composables/useOrderActions';
-import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
-import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
-import { getReturn } from '@/services/returns';
+import { api, commonUtil, DxpShopifyImg, logger, translate } from '@common';
+import { summarizeBrokeredFacilities } from '@/services/order';
 import { isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
 import { showToast, isKit, riskLevelColor, sentimentCounts } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
@@ -1241,91 +1230,10 @@ async function resolveShopifyOrderShop(orderId: string) {
  */
 const order = computed(() => orderDetailStore.enrichedOrderByOrderId(props.orderId));
 
-const customerProfile = computed(() => customerPartyId.value ? customerStore.getCustomer(customerPartyId.value) : null);
 
 const customer = computed(() => order.value?.customer);
 
 const billingAddress = computed(() => order.value?.customer?.billingAddress);
-
-// Return headers hydrate lazily per returnId to name the facility a return was processed
-// at (ReturnHeader.destinationFacilityId — the embedded ReturnItem rows don't carry it).
-// null = header unavailable (endpoint down or return not found); timeline wording degrades
-// to the facility-less variant.
-const returnHeadersById = ref<Record<string, any | null>>({});
-
-watch([() => {
-  const raw = orderDetailStore.orderById(props.orderId);
-  return [...new Set((raw?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[];
-}, canViewReturns], ([returnIds, canView]) => {
-  if (!canView) return;
-  returnIds.forEach(async (returnId) => {
-    if (returnId in returnHeadersById.value) return;
-    returnHeadersById.value = { ...returnHeadersById.value, [returnId]: null };
-    try {
-      const header = await getReturn(returnId);
-      if (header) returnHeadersById.value = { ...returnHeadersById.value, [returnId]: header };
-    } catch (error) {
-      logger.debug(`Return header ${returnId} unavailable for timeline facility context`, error);
-    }
-  });
-}, { immediate: true });
-
-// Reverse exchange lineage: OrderItemAssoc EXCHANGE rows live only on the exchange order,
-// so an original order finds its exchanges by the EXC-<orderName>-N naming convention in
-// Solr, confirmed against each candidate's own itemAssocs before it may appear.
-const exchangeChildrenByOrderId = ref<Record<string, Array<{
-  orderId: string;
-  itemCount: number;
-  facilityName: string;
-  value: number;
-}>>>({});
-
-watch(() => orderDetailStore.orderById(props.orderId)?.orderName, () => discoverExchangeChildren(props.orderId), { immediate: true });
-
-async function discoverExchangeChildren(orderId: string) {
-  const raw = orderDetailStore.orderById(orderId);
-  if (!raw?.orderName || orderId in exchangeChildrenByOrderId.value) return;
-  exchangeChildrenByOrderId.value = { ...exchangeChildrenByOrderId.value, [orderId]: [] };
-
-  try {
-    const response = await useSolrSearch().runSolrQuery({
-      json: {
-        params: { rows: 50, q: '*:*' },
-        filter: ['docType: ORDER', `orderName: ${escapeSolrValue(`EXC-${raw.orderName}-`)}*`]
-      }
-    });
-    const candidateIds = [...new Set(
-      (response.data?.response?.docs || [])
-        .map((doc: any) => String(doc.orderId || ''))
-        .filter((candidateId: string) => candidateId && candidateId !== orderId)
-    )] as string[];
-
-    const children: Array<{ orderId: string; itemCount: number; facilityName: string; value: number }> = [];
-    await Promise.all(candidateIds.map(async (candidateId) => {
-      await orderDetailStore.fetchOrder(candidateId);
-      const payload = orderDetailStore.byOrderId[candidateId]?.payload;
-      const assoc = (payload?.itemAssocs || []).find(
-        (row: any) => row.orderItemAssocTypeId === 'EXCHANGE' && row.toOrderId === orderId
-      );
-      if (!assoc) return;
-
-      const itemCount = (payload.shipGroups || [])
-        .flatMap((shipGroup: any) => shipGroup.items || [])
-        .reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
-      children.push({
-        orderId: candidateId,
-        itemCount,
-        facilityName: payload.originFacilityId && payload.originFacilityId !== '_NA_'
-          ? seed.facilityName(payload.originFacilityId)
-          : '',
-        value: timelineMillis(assoc.createdStamp) || timelineMillis(payload.orderDate) || 0
-      });
-    }));
-    exchangeChildrenByOrderId.value = { ...exchangeChildrenByOrderId.value, [orderId]: children };
-  } catch (error) {
-    logger.error('Failed to discover exchange orders for timeline', error);
-  }
-}
 
 // OrderFacilityChange reasons that describe where items went. Every other reason —
 // the REPORT_VAR/REPORT_NO_VAR rejection reasons, damaged, inventory-not-found — is a
@@ -1347,40 +1255,6 @@ const FACILITY_CHANGE_ICONS: Record<string, string> = {
 const orderTimeline = computed(() => order.value?.timeline || []);
 
 const timelineByShipGroup = computed(() => orderDetailStore.timelineByShipGroupByOrderId(props.orderId));
-
-/**
- * Earliest OrderFacilityChange per ship group, from the rows the events feed already
- * loads. `get#OrderFulfillmentTimeline` dates brokering off rows carrying a BROKERED
- * or RELEASED changeReasonEnumId, and only the routing engine writes those — the row
- * OMS writes when an order is first allocated carries no reason at all, so a group that
- * was never re-brokered has no date in the timeline endpoint. That row is the date.
- */
-const facilityChangeDateByShipGroup = computed<Record<string, number>>(() => {
-  const earliest: Record<string, number> = {};
-  (orderDetailStore.facilityChangesByOrderId[props.orderId] || []).forEach((change: any) => {
-    const millis = timelineMillis(change?.changeDatetime);
-    if (!change?.shipGroupSeqId || millis == undefined) return;
-    const current = earliest[change.shipGroupSeqId];
-    if (current == undefined || millis < current) earliest[change.shipGroupSeqId] = millis;
-  });
-  return earliest;
-});
-
-/**
- * What the lifecycle strip and the progress bar read: the timeline endpoint's dates with
- * the brokered date resolved as above. Kept separate from `timelineByShipGroup` so the
- * action engine keeps reading the endpoint's contract verbatim.
- */
-const lifecycleByShipGroup = computed<Record<string, any>>(() => {
-  const index: Record<string, any> = {};
-  (order.value?.shipGroups || []).forEach((shipGroup: any) => {
-    index[shipGroup.id] = {
-      ...(timelineByShipGroup.value[shipGroup.id] || {}),
-      firstBrokeredDate: shipGroupBrokeredDate(shipGroup)
-    };
-  });
-  return index;
-});
 
 const expandedShipGroupIds = ref<Set<string>>(new Set());
 const collapsibleObservers = new WeakMap<HTMLElement, ResizeObserver>();
@@ -1440,13 +1314,7 @@ function isPosCompleted(shipGroup: any): boolean {
 
 /** When the ship group reached its facility, or undefined if nothing recorded it. */
 function shipGroupBrokeredDate(shipGroup: any): string | number | undefined {
-  const tl = timelineByShipGroup.value[shipGroup.id];
-  const brokered = tl?.firstBrokeredDate || tl?.firstReleasedDate;
-  if (brokered) return brokered;
-  // The fallback row only dates brokering for a group that reached a physical facility.
-  // On a virtual one the same rows record parking, rejections and cancellations, none of
-  // which are a brokering — so a parked group must not inherit a date from them.
-  return isVirtualFacility(shipGroup) ? undefined : facilityChangeDateByShipGroup.value[shipGroup.id];
+  return shipGroup.firstBrokeredDate;
 }
 
 /**
@@ -1455,7 +1323,7 @@ function shipGroupBrokeredDate(shipGroup: any): string | number | undefined {
  * has to apply it too, because a group can be brokered with no date to show.
  */
 function isShipGroupBrokered(shipGroup: any): boolean {
-  return !isVirtualFacility(shipGroup) || !!shipGroupBrokeredDate(shipGroup);
+  return shipGroup.isBrokered ?? (!isVirtualFacility(shipGroup) || !!shipGroup.firstBrokeredDate);
 }
 
 /** Item-derived state for this group; see utils/shipGroupItemStates for why it is the authority. */
@@ -1499,39 +1367,6 @@ function isShipGroupDetailsOpen(shipGroup: any): boolean {
   return isPosCompleted(shipGroup) || isShipGroupExpanded(shipGroup.id);
 }
 
-/** `tone` is the Ionic semantic colour name handed to the badge, not a CSS colour. */
-interface IssuanceBadge { label: string; tone: string; qohBefore: number; qohAfter: number }
-
-/**
- * Whether inventory was issued for a counter-sale line, and how completely.
- *
- * Completion and issuance are separate steps — issue#PosOrderInventory skips an order
- * whose facility is not a physical store — so an item can be ITEM_COMPLETED with no
- * inventory ever issued. That gap is the reason to show this at all, and it is why the
- * badge reads the issuance rows rather than the item status. Returns null while the
- * rows are still loading or if they failed, so an unknown never reads as "not issued".
- */
-const itemIssuanceBadges = computed<Record<string, IssuanceBadge>>(() => {
-  const issuanceByItem = orderDetailStore.issuanceByItemSeqIdByOrderId(props.orderId);
-  if (!issuanceByItem) return {};
-
-  const badges: Record<string, IssuanceBadge> = {};
-  (order.value?.shipGroups || [])
-    .filter(isPosCompleted)
-    .forEach((shipGroup: any) => {
-      (shipGroup.items || []).forEach((item: any) => {
-        const ordered = Number(item.quantity) || 0;
-        const summary = issuanceByItem[item.id];
-        const issued = summary?.issued || 0;
-        const stock = { qohBefore: summary?.qohBefore ?? 0, qohAfter: summary?.qohAfter ?? 0 };
-
-        if (issued <= 0) badges[item.id] = { label: 'Inventory not issued', tone: 'warning', ...stock };
-        else if (ordered && issued < ordered) badges[item.id] = { label: 'Inventory partly issued', tone: 'warning', ...stock };
-        else badges[item.id] = { label: 'Inventory issued', tone: 'success', ...stock };
-      });
-    });
-  return badges;
-});
 
 function toggleShipGroup(shipGroupId: string) {
   const next = new Set(expandedShipGroupIds.value);
@@ -1695,24 +1530,6 @@ const allItemsReturned = computed(() => order.value?.payments?.allItemsReturned 
 // money still held for goods that all came back — likely a refund owed.
 const paymentNetColor = computed(() => order.value?.payments?.netColor);
 
-const orderAdjustmentRows = computed(() =>
-  // orderTotals.adjustments is already keyed by the resolved comment/description
-  // (see adjustmentDisplayLabel in the orderDetail store) — no further lookup needed here.
-  [
-    ...Object.entries(orderTotals.value.adjustments).map(([label, amount]) => ({
-      label,
-      detail: shippingAdjustmentDetail(label),
-      amount: Number(amount),
-      isIncluded: false
-    })),
-    ...Object.entries((orderTotals.value as any).includedAdjustments || {}).map(([label, amount]) => ({
-      label,
-      detail: shippingAdjustmentDetail(label),
-      amount: Number(amount),
-      isIncluded: true
-    }))
-  ].filter((row) => row.amount !== 0)
-);
 
 const selectedSegment = ref('items');
 
@@ -1955,9 +1772,6 @@ async function loadOrder(orderId: string, force = false) {
   await orderDetailStore.loadOrderAggregate(orderId, { force });
   loadRejectionReasonEnums();
   resolveShopifyOrderShop(orderId);
-  if (customerPartyId.value) {
-    await customerStore.loadCustomerProfile(customerPartyId.value, force);
-  }
 }
 
 async function openCustomerContactModal(contactMechTypeId: string, contactMechPurposeTypeId: string) {
@@ -2263,25 +2077,6 @@ function toDateInputValue(value: any): string {
 
 // ── Shipping address display & edit ──────────────────────────────────────────
 
-function shippingAddressLines(shipGroup: any): string[] {
-  const mech = shipGroupShippingContactMech(shipGroup);
-  return addressLines(mech?.postalAddress);
-}
-
-/**
- * Compact 3-line address for the ship-group card: name / street (address line 1
- * & 2) / locality (city, zip, state, country). Returns null when no address.
- */
-function shippingAddressView(shipGroup: any): { name: string; street: string; locality: string } | null {
-  const mech = shipGroupShippingContactMech(shipGroup);
-  const addr = mech?.postalAddress;
-  if (!addr) return null;
-  return {
-    name: addr.toName || '',
-    street: [addr.address1, addr.address2].filter(Boolean).join(', '),
-    locality: [addr.city, addr.postalCode, seed.geoName(addr.stateProvinceGeoId), seed.geoName(addr.countryGeoId)].filter(Boolean).join(', ')
-  };
-}
 
 function shipGroupShippingContactMech(shipGroup: any) {
   return shipGroup.contactMechId
@@ -2542,15 +2337,6 @@ function itemAdjustmentKey(adj: any, fallbackSeqId = ""): string {
   ].join("|");
 }
 
-function shippingAdjustmentDetail(typeId: string): string {
-  if (!typeId || !/shipping/i.test(typeId)) return '';
-  const methods = new Set(
-    (order.value?.shipGroups || [])
-      .map((shipGroup: any) => shippingMethodLabel(shipGroup.shipmentMethodTypeId))
-      .filter(Boolean)
-  );
-  return Array.from(methods).join(', ');
-}
 
 const orderTaskStore = useOrderTaskStore();
 

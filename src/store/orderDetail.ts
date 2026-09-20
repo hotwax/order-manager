@@ -1064,7 +1064,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         this.fetchOrderEvents(orderId, options?.force),
         this.fetchInventoryIssuance(orderId, options?.force),
         this.fetchRiskAssessments(orderId, options?.force),
-        this.fetchCommEvents(orderId),
       ]);
     },
     async setCurrentOrder(orderId: string) {
