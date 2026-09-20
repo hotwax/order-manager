@@ -49,7 +49,7 @@
         </ion-thumbnail>
         <ion-label>
           {{ productLabel(product) }}
-          <p>{{ product.sku || product.productId }}</p>
+          <p>{{ productMaster.secondaryId(product, [product.sku, product.productId]) }}</p>
         </ion-label>
         <ion-checkbox slot="end" :checked="selectedIds.has(product.productId)" />
       </ion-item>
@@ -147,7 +147,12 @@ const dirty = computed(() => {
 });
 
 function productLabel(product: SelectableProduct) {
-  return product.productName || product.parentProductName || product.internalName || product.productId;
+  return productMaster.primaryId(product, [
+    product.productName,
+    product.parentProductName,
+    product.internalName,
+    product.productId
+  ]);
 }
 
 function normalizeProduct(product: any): SelectableProduct {

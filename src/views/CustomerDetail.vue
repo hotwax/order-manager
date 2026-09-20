@@ -493,6 +493,8 @@ import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import { useCustomerDetail } from '@/composables/useCustomerDetail';
 import router from '@/router';
 import { deleteCustomerDetails, indexCustomer } from '@/services/customer';
+import { useProductMaster } from '@/composables/useProductMaster';
+import { useProductCacheStore } from '@/store/productCache';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import Actions from '@/authorization/actions';
@@ -506,6 +508,8 @@ const props = defineProps<{
 const selectedSegment = ref('dashboard');
 const seed = useSeedStore();
 const userStore = useUserStore();
+const productMaster = useProductMaster();
+const productCache = useProductCacheStore();
 const recentOrdersQuery = ref('');
 const allOrdersQuery = ref('');
 const deleting = ref(false);
@@ -569,8 +573,8 @@ function mapOrder(order: CustomerOrderSummary): CustomerOrderCardData {
     isUnfillable: order.isUnfillable,
     items: (order.items || []).map((item) => ({
       productId: item.productId || '',
-      name: item.name || item.sku || 'Item',
-      secondary: item.sku || '',
+      name: productMaster.primaryId(productCache.getProduct(item.productId) || item, [item.name, item.sku, translate('Item')]),
+      secondary: productMaster.secondaryId(productCache.getProduct(item.productId) || item, [item.sku]),
       imageUrl: item.imageUrl || ''
     }))
   };
