@@ -7,7 +7,7 @@
  * ── How a SALES order's lifecycle is modeled here ───────────────────────────
  * Unlike the transfers app, a sales order has NO `statusFlowId` on its payload
  * (statusFlowId exists only on seed `StatusFlowTransition` rows, never on the
- * order). So decisions here key on THREE distinct layers:
+ * order). So decisions here key on TWO layers:
  *
  *   1. STATUS LAYER (transition-table driven). Header status
  *      (ORDER_CREATED/APPROVED/HOLD/COMPLETED/CANCELLED) and item status
@@ -19,27 +19,17 @@
  *      See `canTransitionTo()` and ctx.orderAllowedToStatusIds /
  *      ctx.itemAllowedToStatusIds.
  *
- *   2. FULFILLMENT-PHASE LAYER (derived here — the transition table CANNOT
- *      express it). Brokered / picked / packed / shipped are NOT order or item
- *      statuses. The current phase is derived from:
- *        - virtual-vs-physical facility on the ship group (brokering/parking),
- *        - the per-ship-group `timelineByShipGroup` entry
- *          (firstBrokeredDate / picklistDate / packedDate / shippedDate).
- *      IMPORTANT (product decision 2026-06-11): the engine does NOT hardcode
- *      "you can't cancel/pull back after stage X". Every business is
- *      different, so the cut-off is BUSINESS CONFIG — a per-store policy
- *      authored in the company app and passed in via `ctx.policy`
- *      (`cancelAllowedWhen` / `pullBackAllowedWhen`). These are REAL phase
- *      EXPRESSIONS — an operator + phase token like `"<PACKED"`, `"<=SHIPPED"`,
- *      `"=<PICKED"` — so there is no inclusive/exclusive guessing; the operator
- *      says exactly what it means. When no policy is set, cancel/pull-back are
- *      allowed at ANY phase and only terminal statuses gate them (today's
- *      behavior). See `phaseExprAllows()`.
- *
- *   3. SIDE-CONDITION LAYER. Hold tasks are INFORMATIONAL ONLY — product
+ *   2. SIDE-CONDITION LAYER. Hold tasks are INFORMATIONAL ONLY — product
  *      decision 2026-06-11: an open hold NEVER prevents a ship group from
  *      being brokered or items from being released. No action in this engine
  *      gates on holds.
+ *
+ * Fulfillment phase (brokered / picked / packed / shipped) is NOT a gate here.
+ * Cancel and pull-back are gated by terminal status and the transition table
+ * only. A per-store phase cut-off was drafted against company-app config
+ * (hotwax/company#158) that no caller ever supplied, so every phase check was
+ * unreachable; it was removed rather than left in place looking live. If that
+ * config lands, reintroduce it together with the caller that populates it.
  *
  * ── Remediation & lifecycle-restart actions (product decisions 2026-06-11) ──
  *   - RETURN becomes available as soon as the order has ≥1 item in
@@ -61,18 +51,9 @@
  * ╠══════════════════════════════════════════════════════════════════════════╣
  * ║ R1. APPEASEMENT/RESHIP stay available AFTER the first item completes too  ║
  * ║     (alongside RETURN), and are blocked only on ORDER_CANCELLED.          ║
- * ║ R2. The cancel/pull-back policy arrives as ProductStore settings authored ║
- * ║     in the company app — tracked in hotwax/company#158 (seed store        ║
- * ║     already loads productStoreSettingsByStoreId). settingTypeEnumId names ║
- * ║     TBD; this engine only consumes the mapped `ctx.policy` expressions.   ║
- * ║ R3. Phase cut-offs are REAL EXPRESSIONS (operator + phase, e.g.          ║
- * ║     `"<PACKED"`, `"<=SHIPPED"`); the operator is explicit so there is no  ║
- * ║     inclusive/exclusive ambiguity. A malformed expression FAILS CLOSED    ║
- * ║     (action disabled) so a config typo surfaces rather than silently      ║
- * ║     permitting the gated action.                                          ║
- * ║ R4. Reject quantity is hardcoded '1' in the current UI; this engine is    ║
- * ║     status/phase-only and does NOT compute partial-qty eligibility.       ║
- * ║ R5. allowedTransitions has no statusFlowId scoping; sales orders run the  ║
+ * ║ R2. Reject quantity is hardcoded '1' in the current UI; this engine is    ║
+ * ║     status-only and does NOT compute partial-qty eligibility.             ║
+ * ║ R3. allowedTransitions has no statusFlowId scoping; sales orders run the  ║
  * ║     implicit Default flow, so we pass the set in as-is.                   ║
  * ╚══════════════════════════════════════════════════════════════════════════╝
  */
@@ -154,55 +135,6 @@ export interface FooterActionView {
   toStatusId?: string;
 }
 
-/* ── Fulfillment phase model ──────────────────────────────────────────────── */
-
-/**
- * The ordered fulfillment phases of a ship group, derived (not stored).
- * Used as the vocabulary for per-store cancel/pull-back policy.
- */
-export type FulfillmentPhase = 'UNBROKERED' | 'BROKERED' | 'PICKED' | 'PACKED' | 'SHIPPED';
-
-const PHASE_RANK: Record<FulfillmentPhase, number> = {
-  UNBROKERED: 0,
-  BROKERED: 1,
-  PICKED: 2,
-  PACKED: 3,
-  SHIPPED: 4
-};
-
-/**
- * A phase comparison expression: a comparison operator followed by a
- * FulfillmentPhase token, e.g. `"<PACKED"`, `"<=SHIPPED"`, `"=<PICKED"`,
- * `">=BROKERED"`, `"=PACKED"`. Evaluated against the ship group's current
- * phase by `phaseExprAllows`. Supported operators: `<  <=  =<  >  >=  =>  =  ==`
- * (`=<`/`=>` are accepted as aliases for `<=`/`>=`). Using an explicit operator
- * — rather than a bare phase + an implied "till" — removes any
- * inclusive/exclusive guesswork.
- */
-export type PhaseExpression = string;
-
-/**
- * Per-store lifecycle policy, authored in the company app (R2) and mapped by
- * the caller into this shape. Each field is a phase EXPRESSION naming WHEN the
- * action is still allowed (evaluated against the ship group's current phase).
- * Unset field = no phase restriction — the action is gated by terminal
- * statuses only, which is today's behavior.
- */
-export interface OrderLifecyclePolicy {
-  /** When cancel is allowed, e.g. `"<PACKED"` (block once packed). */
-  cancelAllowedWhen?: PhaseExpression;
-  /** When pull-back / reject is allowed, e.g. `"<=PICKED"`. */
-  pullBackAllowedWhen?: PhaseExpression;
-}
-
-export interface ShipGroupTimeline {
-  firstBrokeredDate?: string | number | null;
-  firstReleasedDate?: string | number | null;
-  picklistDate?: string | number | null;
-  packedDate?: string | number | null;
-  shippedDate?: string | number | null;
-}
-
 /**
  * Lifecycle context — the signals the raw `current` payload does NOT natively
  * carry, supplied by the caller (OrderDetail.vue) from the stores it already
@@ -210,13 +142,6 @@ export interface ShipGroupTimeline {
  * today's terminal-status-only behavior).
  */
 export interface OrderLifecycleContext {
-  /**
-   * Per-ship-group timeline entry: { firstBrokeredDate?, picklistDate?,
-   * packedDate?, shippedDate? }. Keyed by shipGroupSeqId in the store; pass the
-   * entry for the relevant group (orderDetailStore.timelineByShipGroup[id]).
-   * For item-level calls, pass the timeline of the ITEM's ship group.
-   */
-  timeline?: ShipGroupTimeline;
   /**
    * Seed transition table results, split by status level — a single FROM
    * status only ever yields ORDER_* or ITEM_* targets, never both, so one
@@ -247,8 +172,6 @@ export interface OrderLifecycleContext {
    * an ORDER_COMPLETED header keeps RETURN available.
    */
   allItems?: any[];
-  /** Per-store cancel/pull-back phase policy (company app config, R2). */
-  policy?: OrderLifecyclePolicy;
 }
 
 /* ── Lifecycle constants (kept local; mirror seed/ground-truth) ───────────── */
@@ -300,66 +223,6 @@ export const OrderActionValidator = {
       shipGroup.facilityParentTypeId === 'VIRTUAL_FACILITY' ||
       shipGroup.facilityTypeId === 'VIRTUAL_FACILITY'
     );
-  },
-
-  /** Brokered == assigned to a real (physical) facility OR timeline shows a brokered date. */
-  isShipGroupBrokered(shipGroup: any, ctx?: OrderLifecycleContext): boolean {
-    if (ctx?.timeline?.firstBrokeredDate || ctx?.timeline?.firstReleasedDate) return true;
-    return !this.isVirtualFacility(shipGroup, ctx);
-  },
-
-  isShipGroupPicked(ctx?: OrderLifecycleContext): boolean {
-    return !!ctx?.timeline?.picklistDate;
-  },
-
-  isShipGroupPacked(ctx?: OrderLifecycleContext): boolean {
-    return !!ctx?.timeline?.packedDate;
-  },
-
-  isShipGroupShipped(ctx?: OrderLifecycleContext): boolean {
-    return !!ctx?.timeline?.shippedDate;
-  },
-
-  /**
-   * The highest fulfillment phase the ship group has reached, derived from the
-   * timeline dates + facility virtuality. For item-level calls pass `null` as
-   * shipGroup and supply ctx.isVirtual/ctx.timeline for the item's group —
-   * with neither present this degrades to UNBROKERED (permissive).
-   */
-  getShipGroupPhase(shipGroup: any, ctx?: OrderLifecycleContext): FulfillmentPhase {
-    if (this.isShipGroupShipped(ctx)) return 'SHIPPED';
-    if (this.isShipGroupPacked(ctx)) return 'PACKED';
-    if (this.isShipGroupPicked(ctx)) return 'PICKED';
-    if (this.isShipGroupBrokered(shipGroup, ctx)) return 'BROKERED';
-    return 'UNBROKERED';
-  },
-
-  /**
-   * BUSINESS-CONFIG GATE (product decision 2026-06-11). Evaluate a phase
-   * EXPRESSION (operator + phase, e.g. `"<PACKED"`) against a current phase.
-   * - empty / undefined expression → true (no restriction; today's behavior).
-   * - malformed expression or unknown phase → false (FAILS CLOSED so a config
-   *   typo surfaces as a disabled action rather than silently permitting it).
-   * Returned separately from the call sites so the reason string can quote
-   * both the configured expression and the current phase.
-   */
-  phaseExprAllows(expr: PhaseExpression | undefined, currentPhase: FulfillmentPhase): boolean {
-    if (!expr || !expr.trim()) return true;
-    const match = expr.trim().match(/^(<=|=<|>=|=>|==|=|<|>)\s*([A-Za-z_]+)$/);
-    if (!match) return false;
-    const op = match[1];
-    const target = match[2].toUpperCase();
-    if (!(target in PHASE_RANK)) return false;
-    const cur = PHASE_RANK[currentPhase];
-    const tgt = PHASE_RANK[target as FulfillmentPhase];
-    switch (op) {
-      case '<': return cur < tgt;
-      case '<=': case '=<': return cur <= tgt;
-      case '>': return cur > tgt;
-      case '>=': case '=>': return cur >= tgt;
-      case '=': case '==': return cur === tgt;
-      default: return false;
-    }
   },
 
   /** Item is in a terminal status (cancelled/completed). Matches OrderDetail.vue:215,228. */
@@ -555,11 +418,7 @@ export const OrderActionValidator = {
     switch (actionId) {
       /**
        * CANCEL_ITEMS — footer "Cancel" (OrderDetail.vue:727).
-       * Terminal statuses always gate; the PHASE cut-off comes from store
-       * policy (ctx.policy.cancelAllowedWhen) — see validateItemAction.
-       * NOTE: items may span ship groups in different phases; for precise
-       * phase gating the caller should evaluate per item with that item's
-       * group timeline in ctx.
+       * Gated by terminal statuses only.
        */
       case 'CANCEL_ITEMS': {
         if (this.isOrderTerminal(order)) {
@@ -691,19 +550,12 @@ export const OrderActionValidator = {
       /**
        * PULL_BACK — the "Pull back" face of the dual button (OrderDetail.vue:605,
        * shown when PHYSICAL). Rejects items back from a physical facility.
-       * Phase cut-off is BUSINESS CONFIG (ctx.policy.pullBackAllowedWhen, a
-       * phase expression); unset = allowed at any phase, terminal statuses only.
+       * Gated by terminal statuses only.
        */
       case 'PULL_BACK': {
         if (virtual) return { allowed: false, reason: 'Pull back only applies to items at a physical facility.' };
         if (this.isOrderTerminal(order)) return { allowed: false, reason: 'Order is already cancelled or completed.' };
         if (!hasSelection) return { allowed: false, reason: 'This ship group has no items to pull back.' };
-        if (ctx?.policy?.pullBackAllowedWhen) {
-          const phase = this.getShipGroupPhase(shipGroup, ctx);
-          if (!this.phaseExprAllows(ctx.policy.pullBackAllowedWhen, phase)) {
-            return { allowed: false, reason: `Store policy restricts pull back to phase ${ctx.policy.pullBackAllowedWhen}; this ship group is currently ${phase}.` };
-          }
-        }
         const anyPullable = selectedItems.some((it) => !this.isItemTerminal(it));
         if (!anyPullable) return { allowed: false, reason: 'The items to pull back are already cancelled or completed.' };
         return { allowed: true };
@@ -772,9 +624,7 @@ export const OrderActionValidator = {
     switch (actionId) {
       /**
        * CANCEL_ITEM — per-row "Cancel" (OrderDetail.vue:228).
-       * Terminal statuses always gate. The phase cut-off is BUSINESS CONFIG
-       * (ctx.policy.cancelAllowedWhen, a phase expression); unset = cancellable
-       * at any phase before terminal, which is today's behavior.
+       * Gated by terminal statuses and the seed transition table.
        */
       case 'CANCEL_ITEM': {
         if (this.isItemTerminal(item)) {
@@ -782,12 +632,6 @@ export const OrderActionValidator = {
         }
         if (this.isOrderTerminal(order)) {
           return { allowed: false, reason: 'Order is already cancelled or completed.' };
-        }
-        if (ctx?.policy?.cancelAllowedWhen) {
-          const phase = this.getShipGroupPhase(null, ctx);
-          if (!this.phaseExprAllows(ctx.policy.cancelAllowedWhen, phase)) {
-            return { allowed: false, reason: `Store policy restricts cancellation to phase ${ctx.policy.cancelAllowedWhen}; this item's ship group is currently ${phase}.` };
-          }
         }
         const tableSays = this.canTransitionTo('ITEM_CANCELLED', ctx?.itemAllowedToStatusIds);
         if (tableSays === false) {
@@ -817,12 +661,6 @@ export const OrderActionValidator = {
         }
         if (ctx?.isVirtual === true) {
           return { allowed: false, reason: 'Reject only applies to items at a physical facility — release the item instead.' };
-        }
-        if (ctx?.policy?.pullBackAllowedWhen) {
-          const phase = this.getShipGroupPhase(null, ctx);
-          if (!this.phaseExprAllows(ctx.policy.pullBackAllowedWhen, phase)) {
-            return { allowed: false, reason: `Store policy restricts rejection to phase ${ctx.policy.pullBackAllowedWhen}; this item's ship group is currently ${phase}.` };
-          }
         }
         return { allowed: true };
       }

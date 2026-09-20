@@ -340,22 +340,6 @@ describe('validateItemAction CANCEL_ITEM', () => {
     expect(result.reason).toMatch(/status flow/);
   });
 
-  it('refuses when store policy restricts cancellation to another ship group phase', () => {
-    const result = OrderActionValidator.validateItemAction(
-      { statusId: 'ORDER_APPROVED' },
-      approvedItem,
-      'CANCEL_ITEM',
-      {
-        itemAllowedToStatusIds: cancellable,
-        allItems: [approvedItem],
-        policy: { cancelAllowedWhen: 'unbrokered' },
-        timeline: { firstBrokeredDate: 1_700_000_000_000 }
-      }
-    );
-    expect(result.allowed).toBe(false);
-    expect(result.reason).toMatch(/policy/i);
-  });
-
   it('still refuses an item that is itself terminal', () => {
     const result = OrderActionValidator.validateItemAction(
       { statusId: 'ORDER_APPROVED' },
