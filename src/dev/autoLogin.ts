@@ -34,17 +34,13 @@ export async function tryDevAutoLogin(): Promise<void> {
 
   const auth = useAuth();
   const userStore = useUserStore();
-  const activeOms = cookieHelper().get('oms');
-  // If the browser already has a valid session for the requested OMS, do not replace it with the dev default.
-  if (auth.isAuthenticated.value && commonUtil.getMaargURL() && (!activeOms || activeOms === oms)) {
+  // If the browser already has a valid session, do not replace it with the dev default.
+  if (auth.isAuthenticated.value && commonUtil.getMaargURL()) {
     redirectFromLogin();
     return;
   }
 
   try {
-    if (activeOms && activeOms !== oms) {
-      auth.clearAuth();
-    }
     // Seed the OMS cookie so commonUtil.getOmsURL() resolves correctly before login.
     userStore.oms = oms;
     accxuiConfig.value.oms = oms;
