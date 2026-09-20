@@ -42,6 +42,21 @@ describe('product identity surfaces honour the preference', () => {
     expect(source).not.toContain('return item.productName || item.description || item.sku || item.productId || translate("Return item");');
   });
 
+  it('caches every field the preference can point at, and heals records that predate them', () => {
+    const master = read('src/composables/useProductMaster.ts');
+    ['groupId', 'groupName', 'primaryProductCategoryName', 'title', 'goodIdentifications'].forEach((field) => {
+      expect(master).toContain(field);
+    });
+    expect(master).toContain('CACHED_IDENTITY_KEYS.every((key) => key in product)');
+    expect(read('src/services/productDb.ts')).toContain('primaryProductCategoryName: string;');
+  });
+
+  it('substitute picker keeps identity data through normalization', () => {
+    const source = read('src/components/swaps/SubstituteRelationshipModal.vue');
+    expect(source).toContain('goodIdentifications: product.goodIdentifications,');
+    expect(source).toContain('title: product.title,');
+  });
+
   // Without the caller-supplied fallbacks a custom line item, which has no catalog product,
   // would render an empty name once the preferred field came back blank.
   it('every call site passes its own fallbacks', () => {

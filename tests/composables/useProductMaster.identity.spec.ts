@@ -12,6 +12,12 @@ vi.mock('@common', () => ({
   commonUtil: {
     getProductIdentificationValue: (idKey: string, product: any) => {
       if (product === undefined || product === null) throw new TypeError('Cannot convert undefined to object');
+      // mirrors commonUtil: a goodIdentifications entry for the key wins over the static field
+      const identification = product.goodIdentifications?.find((entry: any) =>
+        typeof entry === 'string' ? entry.startsWith(idKey + '/') : entry?.type === idKey);
+      if (identification) {
+        return typeof identification === 'string' ? identification.split('/')[1] : identification.value;
+      }
       return product[idKey] || '';
     }
   }
@@ -39,10 +45,33 @@ describe('product identity honours the operator preference', () => {
   });
 
   it('follows the store when the store changes its mind', () => {
-    setPref('productName', 'productId');
-    const product = { productId: '123', productName: 'Giovanna Top', internalName: 'GIO-TOP-BLK' };
+    setPref('parentProductName', 'productId');
+    const product = { productId: '123', parentProductName: 'Giovanna Top', internalName: 'GIO-TOP-BLK' };
     expect(primaryId(product)).toBe('Giovanna Top');
     expect(secondaryId(product)).toBe('123');
+  });
+
+  // Settings offers more than internalName/SKU: the other static options, and the fetched
+  // good-identification types. A product shape missing any of them reads as "no value" and
+  // silently falls through to the call site's fallback.
+  it('resolves every static option the operator can pick', () => {
+    const product = {
+      productId: '123',
+      groupId: 'GRP-9',
+      groupName: 'Giovanna',
+      primaryProductCategoryName: 'Tops',
+      title: 'Giovanna Top - Black'
+    };
+    (['groupId', 'groupName', 'primaryProductCategoryName', 'title'] as const).forEach((option) => {
+      setPref(option, 'productId');
+      expect(primaryId(product, ['fallback'])).toBe((product as any)[option]);
+    });
+  });
+
+  it('resolves a fetched good-identification type such as UPC', () => {
+    setPref('UPCA', 'productId');
+    const product = { productId: '123', goodIdentifications: ['UPCA/012345678905'] };
+    expect(primaryId(product, ['fallback'])).toBe('012345678905');
   });
 
   // A row can reach these helpers before the product cache has warmed, and a custom line item

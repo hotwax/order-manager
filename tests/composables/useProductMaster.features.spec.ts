@@ -15,7 +15,9 @@ describe('product master selectable features', () => {
   it('refetches a product cached before the field existed, instead of stranding it', () => {
     // The cache never refetches a hit, so a record persisted without the key would never
     // gain features. A missing key is a miss; an empty array is a real answer.
-    expect(source).toContain('return !!product && "productFeatures" in product;');
+    // the check now spans every cached identity field, productFeatures included
+    expect(source).toContain('CACHED_IDENTITY_KEYS.every((key) => key in product)');
+    expect(source).toContain('"productFeatures",');
     expect(source).toContain('.filter((id) => !isFullyCached(cache.getProduct(id)));');
     expect(source).toContain('if (isFullyCached(existing) && !opts?.refresh)');
   });

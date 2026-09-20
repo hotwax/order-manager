@@ -12,7 +12,11 @@ import { useProductStore } from "@/store/productStore";
  * docs/ProductData.md and docs/Compromises.md). Consumers never touch the store directly.
  */
 
-const PRODUCT_FIELDS = "productId productName parentProductName internalName goodIdentifications mainImageUrl productFeatures";
+// Every field Settings > Product identifier can point at: the static options from
+// productStore.prepareProductIdentifierOptions plus goodIdentifications, which carries the
+// fetched types (UPC and friends). A field missing here silently resolves to a call site's
+// fallback, so the operator's choice would be honoured for some options and not others.
+const PRODUCT_FIELDS = "productId productName parentProductName internalName groupId groupName primaryProductCategoryName title goodIdentifications mainImageUrl productFeatures";
 const BATCH_SIZE = 200;
 
 const cacheReady = ref(false);
@@ -51,6 +55,10 @@ function mapDocToProduct(doc: any): CachedProduct {
     internalName: doc.internalName || "",
     mainImageUrl: doc.mainImageUrl || "",
     productFeatures: Array.isArray(doc.productFeatures) ? doc.productFeatures : [],
+    groupId: doc.groupId || "",
+    groupName: doc.groupName || "",
+    primaryProductCategoryName: doc.primaryProductCategoryName || "",
+    title: doc.title || "",
     goodIdentifications,
     updatedAt: Date.now()
   };
@@ -97,11 +105,19 @@ async function getByIds(productIds: string[]): Promise<CachedProduct[]> {
 /**
  * A product persisted before a field joined PRODUCT_FIELDS has no such key at all, and the
  * never-refetch rule would strand it incomplete forever. Treat a missing key as a miss so it
- * heals exactly once; an empty array is a real answer and stays cached. Add a key here
+ * heals exactly once; an empty value is a real answer and stays cached. Add a key here
  * whenever PRODUCT_FIELDS grows.
  */
+const CACHED_IDENTITY_KEYS = [
+  "productFeatures",
+  "groupId",
+  "groupName",
+  "primaryProductCategoryName",
+  "title"
+] as const;
+
 function isFullyCached(product?: CachedProduct): boolean {
-  return !!product && "productFeatures" in product;
+  return !!product && CACHED_IDENTITY_KEYS.every((key) => key in product);
 }
 
 /** Fetch only the productIds not already cached, then store them. The never-refetch path. */

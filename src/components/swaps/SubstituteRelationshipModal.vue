@@ -120,6 +120,14 @@ interface SelectableProduct {
   internalName?: string;
   sku?: string;
   mainImageUrl?: string;
+  // The operator's identifier can be any static option or a fetched good-identification type
+  // (UPC and friends). Solr returns them on the search doc, so they are carried through rather
+  // than normalized away — otherwise this picker alone would ignore the configured choice.
+  groupId?: string;
+  groupName?: string;
+  primaryProductCategoryName?: string;
+  title?: string;
+  goodIdentifications?: any[];
 }
 
 const props = defineProps<{
@@ -163,6 +171,11 @@ function normalizeProduct(product: any): SelectableProduct {
     internalName: product.internalName,
     sku: product.sku,
     mainImageUrl: product.mainImageUrl,
+    groupId: product.groupId,
+    groupName: product.groupName,
+    primaryProductCategoryName: product.primaryProductCategoryName,
+    title: product.title,
+    goodIdentifications: product.goodIdentifications,
   };
 }
 
