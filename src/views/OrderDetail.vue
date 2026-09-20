@@ -12,250 +12,27 @@
     </ion-header>
 
     <ion-content v-if="order">
-      <div class="order-detail-header">
-        <!-- direct child matching .order-detail-header>ion-item -->
-        <ion-item lines="none">
-          <ion-icon slot="start" :icon="ticketOutline" />
-          <ion-label>
-            <h1>{{ order.orderName ? order.orderName : order.id }}</h1>
-            <p>{{ order.id }}</p>
-          </ion-label>
-          <ion-badge v-if="order.status" slot="end" :color="commonUtil.getStatusColor(order.statusId)">
-            {{ order.status }}
-          </ion-badge>
-        </ion-item>
-
-        <!-- timeline: child matching .order-detail-timeline -->
-        <div class="timeline order-detail-timeline">
-          <ion-item lines="none">
-            <ion-icon slot="start" :icon="timeOutline" />
-            <h2>{{ translate('Timeline') }}</h2>
-          </ion-item>
-
-          <ion-list>
-            <ion-item v-for="event in orderTimeline" :key="event.id" :router-link="event.route" :button="!!event.route" :detail="false">
-              <ion-icon :icon="event.icon" slot="start" />
-              <ion-label>
-                <p v-if="event.timeDiff">{{ event.timeDiff }}</p>
-                {{ translate(event.label) }}
-                <p v-if="event.metaData">{{ event.metaData }}</p>
-              </ion-label>
-              <ion-note slot="end" v-if="event.value && event.valueType === 'date-time-millis'">
-                {{ formatDateTime(event.value) }}
-              </ion-note>
-            </ion-item>
-
-            <template v-if="!orderTimeline.length">
-              <ion-item>
-                <ion-icon :icon="pulseOutline" slot="start" />
-                <ion-label>
-                  {{ translate('Order status') }}
-                  <p>{{ translate('Initial status details') }}</p>
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-icon :icon="compassOutline" slot="start" />
-                <ion-label>
-                  {{ translate('Order facility change') }}
-                  <p>{{ translate('Facility details') }}</p>
-                </ion-label>
-              </ion-item>
-            </template>
-          </ion-list>
-        </div>
-
-        <!-- details wrapper: child matching .order-detail-header-details -->
-        <div class="order-detail-header-details">
-          <ion-card class="customer-summary-card">
-            <ion-card-header>
-              <ion-item lines="none">
-                <ion-label>
-                  <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
-                </ion-label>
-                <ion-button v-if="customerPartyId" slot="end" fill="clear" size="small"
-                  :router-link="'/customers/' + customerPartyId">
-                  {{ translate('View details') }}
-                </ion-button>
-              </ion-item>
-            </ion-card-header>
-            <ion-list lines="none">
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Email') }}</p>
-                  {{ customer?.email || translate('Email not available') }}
-                </ion-label>
-                <ion-button v-if="!customer?.email && customerPartyId" slot="end" fill="clear" size="small"
-                  @click="openCustomerContactModal('EMAIL_ADDRESS', 'ORDER_EMAIL')">
-                  {{ translate('Add') }}
-                </ion-button>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Phone') }}</p>
-                  {{ customer?.phone || translate('Phone not available') }}
-                </ion-label>
-                <ion-button v-if="!customer?.phone && customerPartyId" slot="end" fill="clear" size="small"
-                  @click="openCustomerContactModal('TELECOM_NUMBER', 'PHONE_BILLING')">
-                  {{ translate('Add') }}
-                </ion-button>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Locale') }}</p>
-                  {{ order.localeString || translate('Locale not available') }}
-                </ion-label>
-                <ion-button v-if="!order.localeString" slot="end" fill="clear" size="small" @click="openLocalePrompt">
-                  {{ translate('Add') }}
-                </ion-button>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Billing address') }}</p>
-                  <template v-if="billingAddress?.lines?.length">
-                    <div v-for="(line, idx) in billingAddress.lines" :key="idx">{{ line }}</div>
-                  </template>
-                  <div v-else>{{ translate('Billing address not available') }}</div>
-                </ion-label>
-                <ion-button v-if="!billingAddress?.lines?.length && customerPartyId" slot="end" fill="clear" size="small"
-                  @click="openCustomerContactModal('POSTAL_ADDRESS', 'BILLING_LOCATION')">
-                  {{ translate('Add') }}
-                </ion-button>
-              </ion-item>
-            </ion-list>
-          </ion-card>
-
-          <ion-card>
-            <ion-card-header>
-              <ion-card-title>{{ translate('Source') }}</ion-card-title>
-            </ion-card-header>
-            <ion-list lines="none">
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Brand') }}</p>
-                  {{ order.productStoreName }}
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Channel') }}</p>
-                  {{ order.channel || translate('Channel') }}
-                </ion-label>
-              </ion-item>
-              <ion-item v-if="order.salesChannelEnumId === 'POS_SALES_CHANNEL'">
-                <ion-label>
-                  <p>{{ translate('Placed at') }}</p>
-                  {{ order.originFacilityName || translate('Facility not available') }}
-                  <p>{{ order.originFacilityId }}</p>
-                </ion-label>
-              </ion-item>
-              <template v-for="source in exchangeSources" :key="source.orderId">
-                <ion-item button :detail="true" :router-link="`/orders/${source.orderId}`">
-                  <ion-label>
-                    <p>{{ translate('Exchange of') }}</p>
-                    <ion-skeleton-text v-if="source.loading" animated style="width: 60%" />
-                    <template v-else>{{ source.orderName }}</template>
-                  </ion-label>
-                </ion-item>
-                <ion-item v-for="returnId in canViewReturns ? source.returnIds : []" :key="returnId" button :detail="true" :router-link="`/returns/${returnId}`">
-                  <ion-label>
-                    <p>{{ translate('Processed with return') }}</p>
-                    {{ returnId }}
-                  </ion-label>
-                </ion-item>
-              </template>
-            </ion-list>
-          </ion-card>
-
-          <ion-card>
-            <ion-card-header>
-              <ion-card-title>{{ translate('Order identifications') }}</ion-card-title>
-              <ion-button fill="clear" size="small" @click="openManageIdentificationsModal()">
-                {{ translate('Manage') }}
-              </ion-button>
-            </ion-card-header>
-            <ion-list lines="none">
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Order Number') }}</p>
-                  {{ order.externalId || translate('Order Number') }}
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Order ID') }}</p>
-                  {{ order.id }}
-                </ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-label>
-                  <p>{{ translate('Order Name') }}</p>
-                  {{ order.orderName || translate('Order Name') }}
-                </ion-label>
-              </ion-item>
-              <ion-item v-for="id in order.identifications" :key="id.orderIdentificationTypeId">
-                <ion-label>
-                  <p>{{ id.typeLabel }}</p>
-                  {{ id.idValue }}
-                </ion-label>
-                <a
-                  v-if="id.shopifyAdminUrl"
-                  slot="end"
-                  :href="id.shopifyAdminUrl"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  :aria-label="translate('View in Shopify')"
-                  :title="translate('View in Shopify')"
-                >
-                  <ion-icon :icon="openOutline" />
-                </a>
-              </ion-item>
-            </ion-list>
-          </ion-card>
-
-          <ion-card>
-            <ion-card-header>
-              <ion-card-title>{{ translate('Attributes') }}</ion-card-title>
-            </ion-card-header>
-            <ion-list lines="none">
-              <AttributeListItem
-                v-for="attribute in order.attributes"
-                :key="attribute.id"
-                :name="attribute.name"
-                :value="attribute.value"
-                :description="attribute.description"
-              />
-              <ion-item v-if="!order.attributes.length">
-                <ion-label>{{ translate('No order attributes') }}</ion-label>
-              </ion-item>
-            </ion-list>
-          </ion-card>
-
-          <ion-card v-if="riskSummary.hasRiskSignal">
-            <ion-card-header>
-              <ion-card-title>{{ translate('Fraud risk') }}</ion-card-title>
-            </ion-card-header>
-            <ion-list lines="none">
-              <ion-item lines="none">
-                <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(order.riskLevelEnumId)" />
-                <ion-label>
-                  <p>{{ translate('Recommendation') }}</p>
-                  {{ riskSummary.recommendation }}
-                </ion-label>
-                <ion-badge slot="end" :color="riskLevelColor(order.riskLevelEnumId)">
-                  {{ riskSummary.level }}
-                </ion-badge>
-              </ion-item>
-              <ion-item v-if="riskFactCount" button detail lines="none" @click="openRiskDetails">
-                <div class="sentiment-chips">
-                  <ion-chip color="danger" outline>{{ riskCounts.negative }} {{ translate('negative') }}</ion-chip>
-                  <ion-chip color="medium" outline>{{ riskCounts.neutral }} {{ translate('neutral') }}</ion-chip>
-                  <ion-chip color="success" outline>{{ riskCounts.positive }} {{ translate('positive') }}</ion-chip>
-                </div>
-              </ion-item>
-            </ion-list>
-          </ion-card>
-        </div>
-      </div>
+      <OrderSummaryHeader
+        :order="order"
+        :customer="customer"
+        :customer-party-id="customerPartyId"
+        :billing-address="billingAddress"
+        :order-timeline="orderTimeline"
+        :exchange-sources="exchangeSources"
+        :can-view-returns="canViewReturns"
+        :shopify-admin-url="shopifyAdminUrl"
+        :risk-summary="riskSummary"
+        :risk-fact-count="riskFactCount"
+        :risk-counts="riskCounts"
+        :get-status-color="commonUtil.getStatusColor"
+        :risk-level-color="riskLevelColor"
+        :format-date-time="formatDateTime"
+        :translate="translate"
+        @open-customer-contact="openCustomerContactModal"
+        @open-locale-prompt="openLocalePrompt"
+        @open-manage-identifications="openManageIdentificationsModal"
+        @open-risk-details="openRiskDetails"
+      />
 
       <ion-segment v-model="selectedSegment">
         <ion-segment-button value="items">
@@ -272,779 +49,103 @@
         </ion-segment-button>
       </ion-segment>
 
-      <div v-if="selectedSegment === 'items'" class="order-items">
+      <OrderItemsSegment
+        v-if="selectedSegment === 'items'"
+        :order="order"
+        :are-all-selected="areAllSelected"
+        :item-groups="itemGroups"
+        :order-totals="orderTotals"
+        :payment-received-total="paymentReceivedTotal"
+        :payment-sections="paymentSections"
+        :payment-net-amount="paymentNetAmount"
+        :payment-net-color="paymentNetColor"
+        :can-view-returns="canViewReturns"
+        :can-request-inventory-transfer="canRequestInventoryTransfer"
+        :is-kit="isKit"
+        :get-product="getProduct"
+        :product-feature-label="productFeatureLabel"
+        :group-primary-identifier="groupPrimaryIdentifier"
+        :group-secondary-identifier="groupSecondaryIdentifier"
+        :group-location-label="groupLocationLabel"
+        :attribute-chip-label="attributeChipLabel"
+        :is-item-facility-action-disabled="isItemFacilityActionDisabled"
+        :item-status-detail="itemStatusDetail"
+        :item-line-total="itemLineTotal"
+        :get-item-adjustment-rows="getItemAdjustmentRows"
+        :get-group-adjustment-rows="getGroupAdjustmentRows"
+        :is-inventory-transfer-request-eligible="isInventoryTransferRequestEligible"
+        :is-item-cancel-allowed="isItemCancelAllowed"
+        :carried-over-return-ids="carriedOverReturnIds"
+        :money="money"
+        :format-date-time="formatDateTime"
+        :translate="translate"
+        @toggle-select-all="toggleSelectAll"
+        @open-add-item="openAddItemFromItemsSegment"
+        @reject-and-release="rejectAndReleaseItem"
+        @open-item-attributes="openItemAttributesModal"
+        @request-inventory-transfer="requestInventoryTransferForItem"
+        @cancel-single-item="cancelSingleItem"
+      />
 
-        <ion-list lines="none" class="order-items-list">
-          <ion-item lines="full" class="order-items-toolbar">
-            <ion-checkbox :checked="areAllSelected" justify="start" label-placement="end"
-              @ionChange="toggleSelectAll($event.detail.checked)">{{ translate('Select all') }}</ion-checkbox>
-            <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" slot="end" fill="outline" color="medium" @click="openAddItemFromItemsSegment">
-              {{ translate('Add items') }}
-            </ion-button>
-          </ion-item>
-          <ion-accordion-group>
-            <template v-for="{ group, soleItem } in itemGroups" :key="group.externalId">
-              <!-- Nothing to roll up when the group is a single order item, so the item row is
-                   rendered directly with the product identity the rolled up header would carry. -->
-              <OrderItemListRow
-                v-if="soleItem"
-                :primary="groupPrimaryIdentifier(group)"
-                :secondary="groupSecondaryIdentifier(group)"
-                :badge-label="isKit(group) ? translate('Kit') : ''"
-                :features="productFeatureLabel(group.productId)"
-                :image-url="getProduct(group.productId)?.mainImageUrl"
-                :preview-product="getProduct(group.productId)"
-                :selected="soleItem.selected"
-                :quantity="soleItem.quantity"
-                :quantity-label="translate('qty')"
-                :facility-label="soleItem.facilityName"
-                :facility-disabled="isItemFacilityActionDisabled(soleItem)"
-                :attributes-label="attributeChipLabel(soleItem.attributeCount)"
-                :statuses="soleItem.statuses"
-                :status-detail="itemStatusDetail(soleItem)"
-                :amount="money(itemLineTotal(soleItem), order.currency)"
-                :adjustments="getItemAdjustmentRows(soleItem)"
-                @update:selected="soleItem.selected = $event"
-                @facility-click="rejectAndReleaseItem(soleItem)"
-                @attributes-click="openItemAttributesModal(soleItem)"
-              >
-                <template #actions>
-                  <ion-button
-                    v-if="canRequestInventoryTransfer && isInventoryTransferRequestEligible(soleItem)"
-                    fill="clear"
-                    size="small"
-                    @click.stop="requestInventoryTransferForItem(soleItem)"
-                  >
-                    {{ translate('Request transfer') }}
-                  </ion-button>
-                  <ion-button
-                    v-if="isItemCancelAllowed(soleItem)"
-                    fill="clear"
-                    size="small"
-                    color="danger"
-                    @click.stop="cancelSingleItem(soleItem)"
-                  >
-                    {{ translate('Cancel') }}
-                  </ion-button>
-                </template>
-              </OrderItemListRow>
-              <ion-accordion v-else :value="group.externalId">
-                <OrderItemListRow
-                  slot="header"
-                  :select-on-row-click="false"
-                  :primary="groupPrimaryIdentifier(group)"
-                  :secondary="groupSecondaryIdentifier(group)"
-                  :badge-label="isKit(group) ? translate('Kit') : ''"
-                  :features="productFeatureLabel(group.productId)"
-                  :image-url="getProduct(group.productId)?.mainImageUrl"
-                  :preview-product="getProduct(group.productId)"
-                  :selected="group.selected"
-                  :quantity="group.totalQty"
-                  :quantity-label="translate('qty')"
-                  :facility-label="groupLocationLabel(group)"
-                  :facility-disabled="true"
-                  :statuses="group.statuses"
-                  :amount="money(group.totalPrice, order.currency)"
-                  :adjustments="getGroupAdjustmentRows(group)"
-                  @update:selected="group.selected = $event"
-                />
-                <div slot="content">
-                  <ion-list lines="none">
-                    <OrderItemListRow
-                      v-for="item in group.items"
-                      :key="item.orderItemSeqId"
-                      class="order-item-detail-entry"
-                      :primary="`${translate('Item')} ${item.orderItemSeqId}`"
-                      :secondary="item.externalId && item.externalId !== 'null' ? `${translate('External ID')}: ${item.externalId}` : ''"
-                      :selected="item.selected"
-                      :quantity="item.quantity"
-                      :quantity-label="translate('qty')"
-                      :show-quantity="false"
-                      :facility-label="item.facilityName"
-                      :facility-disabled="isItemFacilityActionDisabled(item)"
-                      :attributes-label="attributeChipLabel(item.attributeCount)"
-                      :statuses="item.statuses"
-                      :status-detail="itemStatusDetail(item)"
-                      :amount="money(itemLineTotal(item), order.currency)"
-                      :adjustments="getItemAdjustmentRows(item)"
-                      @update:selected="item.selected = $event"
-                      @facility-click="rejectAndReleaseItem(item)"
-                      @attributes-click="openItemAttributesModal(item)"
-                    >
-                      <template #actions>
-                        <ion-button
-                          v-if="canRequestInventoryTransfer && isInventoryTransferRequestEligible(item)"
-                          fill="clear"
-                          size="small"
-                          @click.stop="requestInventoryTransferForItem(item)"
-                        >
-                          {{ translate('Request transfer') }}
-                        </ion-button>
-                        <ion-button v-if="isItemCancelAllowed(item)" fill="clear"
-                          size="small" color="danger" @click.stop="cancelSingleItem(item)">
-                          {{ translate('Cancel') }}
-                        </ion-button>
-                      </template>
-                    </OrderItemListRow>
-                  </ion-list>
-                </div>
-              </ion-accordion>
-            </template>
-          </ion-accordion-group>
-        </ion-list>
-
-        <!-- Totals Card -->
-
-        <div class="order-summary">
-          <ion-card class="payment-card">
-            <ion-card-header>
-              <ion-card-title>{{ translate('Payment') }}</ion-card-title>
-              <ion-card-subtitle v-if="order.payments.length" :color="paymentNetColor">
-                {{ translate('Net') }} {{ money(paymentNetAmount, order.currency) }}
-              </ion-card-subtitle>
-            </ion-card-header>
-            <ion-list lines="none">
-              <template v-for="section in paymentSections" :key="section.statusId">
-                <ion-item-divider color="light">
-                  <ion-label>{{ section.label }}</ion-label>
-                  <ion-label slot="end">{{ money(section.total, order.currency) }}</ion-label>
-                </ion-item-divider>
-                <ion-item v-for="(payment, index) in section.payments" :key="payment.id || `${payment.paymentMethodTypeId}-${index}`">
-                  <ion-label>
-                    <p class="overline">{{ payment.paymentMethodTypeId || payment.method }}</p>
-                    {{ payment.paymentMethodTypeDesc || payment.method }}
-                    <p>{{ payment.statusDesc || payment.status || payment.statusId }}</p>
-                    <p v-if="payment.createdDate">{{ formatDateTime(payment.createdDate) }}</p>
-                    <template v-if="canViewReturns">
-                      <ion-button
-                        v-for="returnId in carriedOverReturnIds(payment)"
-                        :key="returnId"
-                        fill="clear"
-                        size="small"
-                        class="payment-return-link"
-                        :router-link="`/returns/${returnId}`"
-                        @click.stop
-                      >
-                        <ion-icon slot="start" :icon="openOutline" />
-                        {{ translate('Return') }} {{ returnId }}
-                      </ion-button>
-                    </template>
-                  </ion-label>
-                  <ion-label slot="end">{{ money(payment.amount, order.currency) }}</ion-label>
-                </ion-item>
-              </template>
-              <ion-item v-if="!order.payments.length">
-                <ion-label>{{ translate('No payment preference records') }}</ion-label>
-              </ion-item>
-            </ion-list>
-          </ion-card>
-          <ion-card class="totals">
-            <ion-card-header>
-              <ion-card-title>{{ translate('Total') }}</ion-card-title>
-            </ion-card-header>
-            <ion-list lines="full">
-              <ion-item>
-                <ion-label>{{ translate('Subtotal') }}</ion-label>
-                <ion-label slot="end">{{ money(orderTotals.subtotal, order.currency) }}</ion-label>
-              </ion-item>
-              <ion-item v-for="adjustment in (orderTotals.adjustmentRows || [])" :key="adjustment.label">
-                <ion-label>
-                  {{ adjustment.label }}
-                  <p v-if="adjustment.detail">{{ adjustment.detail }}</p>
-                </ion-label>
-                <ion-note slot="end" :color="adjustment.isIncluded ? 'medium' : undefined">
-                  {{ money(adjustment.amount, order.currency) }}
-                  <template v-if="adjustment.isIncluded"> ({{ translate('included') }})</template>
-                </ion-note>
-              </ion-item>
-              <ion-item class="grand-total-row">
-                <ion-label>{{ translate('Grand total') }}</ion-label>
-                <ion-label slot="end" color="dark">{{ money(orderTotals.total, order.currency) }}</ion-label>
-              </ion-item>
-              <ion-item>
-                <ion-label>{{ translate('Payment received') }}</ion-label>
-                <ion-label slot="end">{{ money(paymentReceivedTotal, order.currency) }}</ion-label>
-              </ion-item>
-            </ion-list>
-          </ion-card>
-        </div>
-      </div>
       <div v-if="selectedSegment === 'ship-groups'" class="ion-padding">
-        <!-- Loop through ship groups or show mock card if empty -->
         <template v-if="order.shipGroups && order.shipGroups.length">
-          <ion-card v-for="shipGroup in order.shipGroups.filter((sg: any) => sg.items?.length)" :key="shipGroup.id"
-            class="ship-group-card">
-            <div class="ship-group-header-wrapper">
-              <ion-card-header>
-                <ion-card-title>
-                  {{ shipGroup.id }} {{ shipGroup.facilityName || translate('Facility Name') }}
-                </ion-card-title>
-                <ion-card-subtitle>
-                  {{ shipGroup.itemSummary }}
-                </ion-card-subtitle>
-              </ion-card-header>
-
-              <div class="ship-group-status-toggle">
-                <p>{{ shipGroupStatusLabel(shipGroup) }}</p>
-                <!-- A counter sale has one state, so there is nothing to expand into. -->
-                <ion-button v-if="!isPosCompleted(shipGroup)" fill="clear" color="medium" @click="toggleShipGroup(shipGroup.id)" :aria-label="translate('Toggle ship group')">
-                  <ion-icon slot="icon-only" :icon="isShipGroupExpanded(shipGroup.id) ? chevronUp : chevronDown" />
-                </ion-button>
-              </div>
-            </div>
-
-            <ion-progress-bar :value="shipGroupProgress(shipGroup)"
-              :color="shipGroupProgress(shipGroup) === 1 ? 'success' : 'primary'" />
-
-            <ion-item v-if="shipGroupHoldTaskCount(shipGroup)" color="warning" lines="none">
-              <ion-icon slot="start" :icon="warningOutline" />
-              <ion-label>{{ shipGroupHoldTaskLabel(shipGroup) }}</ion-label>
-              <ion-button slot="end" fill="solid" color="dark" size="small" @click="showShipGroupHoldTask">
-                {{ translate('View details') }}
-              </ion-button>
-            </ion-item>
-
-            <!-- Gift, shipping date, delivery date and instruction options all describe a
-                 shipment that will happen; a counter sale has already happened. -->
-            <div v-if="!isPosCompleted(shipGroup)" class="ship-group-options-wrapper">
-              <!-- shows when expanded -->
-              <div v-collapsible class="ship-group-expanded-options"
-                :class="{ 'ship-group-expanded-options-open': hasSelectableShipGroupOptions(shipGroup) && isShipGroupExpanded(shipGroup.id) }"
-                :aria-hidden="!(hasSelectableShipGroupOptions(shipGroup) && isShipGroupExpanded(shipGroup.id))"
-                :inert="hasSelectableShipGroupOptions(shipGroup) && isShipGroupExpanded(shipGroup.id) ? undefined : ''">
-                <div class="ship-group-options">
-                  <ion-chip v-if="!shipGroup.giftMessage" outline @click="openGiftModal(shipGroup)">
-                    <ion-icon :icon="giftOutline" />
-                    <ion-label>{{ translate('Gift options') }}</ion-label>
-                  </ion-chip>
-                  <ion-chip v-if="!shipGroup.shipAfterDate && !shipGroup.shipByDate" outline
-                    @click="openShippingDatesModal(shipGroup)">
-                    <ion-icon :icon="calendarOutline" />
-                    <ion-label>{{ translate('Shipping dates') }}</ion-label>
-                  </ion-chip>
-                  <ion-chip v-if="!shipGroup.estimatedShipDate && !shipGroup.estimatedDeliveryDate" outline
-                    @click="openDeliveryDatesModal(shipGroup)">
-                    <ion-icon :icon="calendarOutline" />
-                    <ion-label>{{ translate('Delivery dates') }}</ion-label>
-                  </ion-chip>
-                  <ion-chip v-if="!shipGroup.shippingInstructions" outline @click="openInstructionModal(shipGroup)">
-                    <ion-icon :icon="documentTextOutline" />
-                    <ion-label>{{ translate('Instruction') }}</ion-label>
-                  </ion-chip>
-                </div>
-              </div>
-              <!-- shows all the time -->
-              <div v-if="hasSelectedShipGroupOptions(shipGroup)"
-                class="ship-group-selected-options">
-                <ion-item v-if="shipGroup.giftMessage" button detail="false" lines="none"
-                  :disabled="isShipGroupReadOnly(shipGroup)" @click="openGiftModal(shipGroup)">
-                  <ion-label>
-                    <p>{{ translate('Gift message') }}</p>
-                    {{ shipGroup.giftMessage }}
-                  </ion-label>
-                  <ion-button
-                    v-if="!isShipGroupReadOnly(shipGroup)"
-                    slot="end"
-                    fill="clear"
-                    color="medium"
-                    :aria-label="translate('Clear gift message')"
-                    @click.stop="clearGiftMessage(shipGroup)"
-                  >
-                    <ion-icon slot="icon-only" :icon="trashOutline" />
-                  </ion-button>
-                </ion-item>
-                <ion-item v-if="shipGroup.shipAfterDate || shipGroup.shipByDate" button detail="false" lines="none"
-                  :disabled="isShipGroupReadOnly(shipGroup)" @click="openShippingDatesModal(shipGroup)">
-                  <ion-label>
-                    <p class="outline">{{ translate('Ship after') }}</p>
-                    {{ formatDate(shipGroup.shipAfterDate) }}
-                  </ion-label>
-                  <ion-label>
-                    <p class="outline">{{ translate('Ship by') }}</p>
-                    {{ formatDate(shipGroup.shipByDate) }}
-                  </ion-label>
-                </ion-item>
-                <ion-item v-if="shipGroup.estimatedShipDate || shipGroup.estimatedDeliveryDate" button detail="false"
-                  lines="none" :disabled="isShipGroupReadOnly(shipGroup)" @click="openDeliveryDatesModal(shipGroup)">
-                  <ion-label>
-                    <p class="outline">{{ translate('Estimated ship date') }}</p>
-                    {{ formatDate(shipGroup.estimatedShipDate) }}
-                  </ion-label>
-                  <ion-label>
-                    <p class="outline">{{ translate('Estimated delivery date') }}</p>
-                    {{ formatDate(shipGroup.estimatedDeliveryDate) }}
-                  </ion-label>
-                </ion-item>
-                <ion-item v-if="shipGroup.shippingInstructions" button detail="false" lines="none"
-                  :disabled="isShipGroupReadOnly(shipGroup)" @click="openInstructionModal(shipGroup)">
-                  <ion-label>
-                    <p class="outline">{{ translate('Instructions') }}</p>
-                    {{ shipGroup.shippingInstructions }}
-                  </ion-label>
-                </ion-item>
-              </div>
-            </div>
-
-            <!-- shows all the time, except on a counter sale that never brokers, picks,
-                 packs or ships — every step there would read "Pending" forever -->
-            <div v-if="!isPosCompleted(shipGroup)" class="ship-group-timeline">
-              <ion-item lines="none">
-                <ion-icon slot="start" :icon="compassOutline" />
-                <ion-label>
-                  <p class="overline" v-if="shipGroup.lifecycle?.firstBrokeredDate">{{
-                    lifecycleStepLabel(shipGroup.lifecycle, 'brokered') }}</p>
-                  {{ translate('Brokered') }}
-                </ion-label>
-                <ion-note slot="end">{{ brokeredStepNote(shipGroup) }}</ion-note>
-              </ion-item>
-              <ion-item lines="none">
-                <ion-icon slot="start" :icon="mailOutline" />
-                <ion-label>
-                  <p class="overline" v-if="shipGroup.lifecycle?.picklistDate">{{
-                    lifecycleStepLabel(shipGroup.lifecycle, 'pick') }}</p>
-                  {{ translate('Pick') }}
-                </ion-label>
-                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, shipGroup.lifecycle?.picklistDate) }}</ion-note>
-              </ion-item>
-              <ion-item lines="none">
-                <ion-icon slot="start" :icon="cubeOutline" />
-                <ion-label>
-                  <p class="overline" v-if="shipGroup.lifecycle?.packedDate">{{
-                    lifecycleStepLabel(shipGroup.lifecycle, 'pack') }}</p>
-                  {{ translate('Pack') }}
-                </ion-label>
-                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, shipGroup.lifecycle?.packedDate) }}</ion-note>
-              </ion-item>
-              <ion-item lines="none">
-                <ion-icon slot="start" :icon="sendOutline" />
-                <ion-label>
-                  <p class="overline" v-if="shipGroup.lifecycle?.shippedDate">{{
-                    lifecycleStepLabel(shipGroup.lifecycle, 'ship') }}</p>
-                  {{ translate('Ship') }}
-                </ion-label>
-                <ion-note slot="end">{{ lifecycleStepNote(shipGroup, shipGroup.lifecycle?.shippedDate) }}</ion-note>
-              </ion-item>
-            </div>
-
-            <!-- shows when collapsed; a counter sale has no collapsed state -->
-            <div v-if="!isPosCompleted(shipGroup)" v-collapsible class="ship-group-summary-container"
-              :class="{ 'ship-group-summary-container-expanded': isShipGroupExpanded(shipGroup.id) }">
-              <div class="ship-group-summary">
-                <ion-list lines="none">
-                  <ion-item>
-                    <ion-thumbnail slot="start" v-for="item in shipGroupPreviewItems(shipGroup)" :key="item.id"
-                      v-image-preview="getProduct(item.productId)">
-                      <DxpShopifyImg :src="item?.imageUrl" :key="getProduct(item.productId)?.mainImageUrl"
-                        size="small" />
-                    </ion-thumbnail>
-                    <ion-label>
-                      <p>{{ shipGroup.itemSummary }}</p>
-                    </ion-label>
-                  </ion-item>
-                  <ion-item>
-                    <ion-icon :icon="cubeOutline" slot="start" />
-                    <ion-label>
-                      {{ carrierName(shipGroup.carrierPartyId || shipGroup.carrier) }}
-                      <p v-if="shipGroup.shipmentMethodTypeId">{{ shippingMethodLabel(shipGroup.shipmentMethodTypeId) }}
-                      </p>
-                    </ion-label>
-                  </ion-item>
-                  <ion-item>
-                    <ion-icon :icon="sendOutline" slot="start" />
-                    <ion-label v-if="shipGroup.shippingAddress?.view">
-                      {{ shipGroup.shippingAddress.view.name }}
-                      <p v-if="shipGroup.shippingAddress.view.street">{{ shipGroup.shippingAddress.view.street }}</p>
-                      <p v-if="shipGroup.shippingAddress.view.locality">{{ shipGroup.shippingAddress.view.locality }}</p>
-                    </ion-label>
-                    <ion-label v-else>{{ translate('Shipping address not available') }}</ion-label>
-                  </ion-item>
-                </ion-list>
-              </div>
-            </div>
-
-            <!-- shows when expanded; a counter sale has no other state, so it stays open -->
-            <div v-collapsible class="ship-group-card-details"
-              :class="{ 'ship-group-card-details-expanded': isShipGroupDetailsOpen(shipGroup) }"
-              :aria-hidden="!isShipGroupDetailsOpen(shipGroup)"
-              :inert="isShipGroupDetailsOpen(shipGroup) ? undefined : ''">
-              <div class="ship-group-card-details-inner">
-                <div class="ship-group-detail-columns">
-                  <ion-list class="ship-group-items" lines="none">
-                  <ion-list-header>
-                    <ion-label>{{ translate('Items') }}</ion-label>
-                  </ion-list-header>
-                  <ion-item v-for="item in shipGroup.items" :key="item.id">
-                    <!-- Selection only feeds the pull back / release actions, which a counter
-                         sale does not have. -->
-                    <ion-checkbox v-if="!isPosCompleted(shipGroup)" slot="start" :checked="isItemSelected(shipGroup.id, item.id)"
-                      @ionChange="toggleItemSelection(shipGroup.id, item.id, $event.detail.checked)" />
-                    <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)"
-                      :key="getProduct(item.productId)?.mainImageUrl">
-                      <DxpShopifyImg :src="item?.imageUrl" :key="getProduct(item.productId)?.mainImageUrl"
-                        size="small" />
-                    </ion-thumbnail>
-                    <ion-label>
-                      <div>
-                        {{ shipGroupProductIdentification(productIdentificationPref.primaryId, item) || item.productId
-                        }}
-                        <ion-badge class="kit-badge" color="dark" v-if="isKit(item)">{{ translate("Kit") }}</ion-badge>
-                      </div>
-                      <p>{{ shipGroupProductIdentification(productIdentificationPref.secondaryId, item) }}</p>
-                      <!-- The collapsed summary above carries the same line, but a counter sale
-                           has no collapsed state and an expanded group hides it, so the variant
-                           has to be named here too. -->
-                      <p v-if="productFeatureLabel(item.productId)" class="ship-group-item-features"
-                        :title="productFeatureLabel(item.productId)">{{ productFeatureLabel(item.productId) }}</p>
-                    </ion-label>
-
-                    <!-- Inventory lookup answers "can we still fulfil this?"; the goods have
-                         already left the store. What matters instead is whether the stock
-                         they left with came off the books. -->
-                    <ion-button v-if="!isPosCompleted(shipGroup)" slot="end" fill="clear" color="medium" @click.stop="viewInventory(item.productId)" :aria-label="translate('View inventory')">
-                      <ion-icon slot="icon-only" :icon="cubeOutline" />
-                    </ion-button>
-                    <div v-else-if="item.issuanceBadge" slot="end" class="ship-group-item-issuance">
-                      <ion-badge :color="item.issuanceBadge.tone">
-                        {{ translate(item.issuanceBadge.label) }}
-                      </ion-badge>
-                      <!-- Stock at the store as the sale was recorded, not stock now: later
-                           movements against the same inventory item are not reflected here. -->
-                      <ion-note v-if="item.issuanceBadge.label === 'Inventory issued'">
-                        {{ translate('On hand at sale') }} {{ item.issuanceBadge.qohBefore }} → {{ item.issuanceBadge.qohAfter }}
-                      </ion-note>
-                    </div>
-                  </ion-item>
-                  </ion-list>
-
-                  <!-- Nothing here applies to a counter sale: the carrier is _NA_, the method
-                       cannot be changed once the goods have left with the customer, and there
-                       is no ship-to address to show or edit. -->
-                  <ion-list v-if="!isPosCompleted(shipGroup)" class="ship-group-fulfillment" lines="none">
-                  <ion-list-header>
-                    <ion-label>{{ translate('Fulfillment') }}</ion-label>
-                  </ion-list-header>
-                  <ion-item lines="full">
-                    <ion-select :label="translate('Carrier')" interface="popover"
-                      :placeholder="translate('Select Carrier')"
-                      :disabled="isShipGroupActionDisabled(shipGroup, 'EDIT_CARRIER_METHOD')"
-                      :value="getSelection(shipGroup.id, shipGroup).carrierId"
-                      @ionChange="onCarrierChange(shipGroup.id, $event.detail.value)">
-                      <ion-select-option v-for="carrier in availableCarriers" :key="carrier.partyId"
-                        :value="carrier.partyId">
-                        {{ [carrier.firstName, carrier.lastName].filter(Boolean).join(' ') || carrier.groupName ||
-                        carrier.partyId
-                        }}
-                      </ion-select-option>
-                    </ion-select>
-                  </ion-item>
-
-                  <ion-item lines="full">
-                    <ion-select :label="translate('Shipping method')" interface="popover"
-                      :placeholder="translate('Select Shipping Method')"
-                      :disabled="isShipGroupActionDisabled(shipGroup, 'EDIT_CARRIER_METHOD')"
-                      :value="getSelection(shipGroup.id, shipGroup).methodId || undefined"
-                      @ionChange="onMethodChange(shipGroup.id, $event.detail.value)">
-                      <ion-select-option
-                        v-for="method in methodsForCarrier(getSelection(shipGroup.id, shipGroup).carrierId)"
-                        :key="method.shipmentMethodTypeId" :value="method.shipmentMethodTypeId">
-                        {{ seed.shipmentMethodDescription(method.shipmentMethodTypeId) }}
-                      </ion-select-option>
-                    </ion-select>
-                  </ion-item>
-
-                  <ion-item>
-                    <ion-icon :icon="sendOutline" slot="start" />
-                    <ion-label>
-                      <template v-if="shipGroup.shippingAddress?.lines?.length">
-                        <div v-for="(line, idx) in shipGroup.shippingAddress.lines" :key="idx">{{ line }}</div>
-                      </template>
-                      <div v-else>{{ translate('Shipping address not available') }}</div>
-                    </ion-label>
-                    <p slot="end" v-if="!isVirtualFacility(shipGroup) && shipGroupDistances[shipGroup.id]">
-                      {{ shipGroupDistances[shipGroup.id] }} {{ translate('miles') }}
-                    </p>
-                    <ion-button v-if="!isShipGroupActionDisabled(shipGroup, 'EDIT_ADDRESS')" slot="end" fill="clear"
-                      color="medium" :id="'shipping-opt-trigger-' + shipGroup.id"
-                      :aria-label="translate('Shipping options')">
-                      <ion-icon slot="icon-only" :icon="ellipsisVertical" />
-                    </ion-button>
-                    <ion-popover :trigger="'shipping-opt-trigger-' + shipGroup.id" dismiss-on-select
-                      show-backdrop="false">
-                      <ion-content>
-                        <ion-list>
-                          <ion-list-header>{{ translate("Shipping address") }}</ion-list-header>
-                          <ion-item button detail="false"
-                            :disabled="isShipGroupActionDisabled(shipGroup, 'EDIT_ADDRESS')"
-                            @click="openEditShippingAddress(shipGroup)">
-                            <ion-icon :icon="createOutline" slot="end" />
-                            {{ translate('Edit') }}
-                          </ion-item>
-                        </ion-list>
-                      </ion-content>
-                    </ion-popover>
-                  </ion-item>
-
-                  <!-- Edit shipping address modal -->
-                  <ion-modal :is-open="editingShipGroupId === shipGroup.id" @didDismiss="closeEditShippingAddress">
-                    <ion-header>
-                      <ion-toolbar>
-                        <ion-buttons slot="start">
-                          <ion-button @click="closeEditShippingAddress" :aria-label="translate('Close')"><ion-icon slot="icon-only"
-                              :icon="closeOutline" /></ion-button>
-                        </ion-buttons>
-                        <ion-title>{{ translate('Edit Shipping Address') }}</ion-title>
-                        <ion-buttons slot="end">
-                        </ion-buttons>
-                      </ion-toolbar>
-                    </ion-header>
-                    <ion-content class="ion-padding">
-                      <ion-list>
-                        <ion-item>
-                          <ion-input :label="translate('Address line 1')" label-placement="stacked"
-                            :placeholder="translate('Street address')" v-model="shippingAddressForm.address1" />
-                        </ion-item>
-                        <ion-item>
-                          <ion-input :label="translate('Address line 2')" label-placement="stacked"
-                            :placeholder="translate('Apt, suite, etc.')" v-model="shippingAddressForm.address2" />
-                        </ion-item>
-                        <ion-item>
-                          <ion-input :label="translate('City')" label-placement="stacked"
-                            :placeholder="translate('City')" v-model="shippingAddressForm.city" />
-                        </ion-item>
-                        <ion-item>
-                          <ion-input :label="translate('Postal code')" label-placement="stacked"
-                            :placeholder="translate('Postal code')" v-model="shippingAddressForm.postalCode" />
-                        </ion-item>
-                        <ion-item>
-                          <ion-select :label="translate('Country')" label-placement="stacked" interface="popover"
-                            :placeholder="translate('Select Country')" v-model="shippingAddressForm.countryGeoId"
-                            @ionChange="shippingAddressForm.stateProvinceGeoId = ''">
-                            <ion-select-option v-for="country in seed.getCountries" :key="country.geoId"
-                              :value="country.geoId">
-                              {{ country.geoName }}
-                            </ion-select-option>
-                          </ion-select>
-                        </ion-item>
-                        <ion-item>
-                          <ion-select :label="translate('State / Province')" label-placement="stacked"
-                            interface="popover" :placeholder="translate('Select State / Province')"
-                            :disabled="!shippingAddressForm.countryGeoId"
-                            v-model="shippingAddressForm.stateProvinceGeoId">
-                            <ion-select-option v-for="state in statesForCountry" :key="state.geoId"
-                              :value="state.geoId">
-                              {{ state.geoName }}
-                            </ion-select-option>
-                          </ion-select>
-                        </ion-item>
-                      </ion-list>
-                      <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                        <ion-fab-button :disabled="savingShippingAddress" @click="saveShippingAddress(shipGroup)" :aria-label="translate('Save')">
-                          <ion-icon :icon="saveOutline" />
-                        </ion-fab-button>
-                      </ion-fab>
-                    </ion-content>
-                  </ion-modal>
-                  </ion-list>
-                </div>
-              </div>
-            </div>
-
-            <div class="ship-group-actions">
-              <!-- Broker, release, park and pull back all move a group through fulfillment, in
-                   the order a group travels them. A counter sale has none left, so only the
-                   order-level actions remain. -->
-              <ion-button v-if="isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)" fill="clear"
-                :disabled="isShipGroupActionDisabled(shipGroup, 'BROKER')" @click="brokerShipGroup(shipGroup.id)">{{
-                translate('Broker') }}</ion-button>
-              <ion-button v-if="isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)" fill="clear"
-                :disabled="isShipGroupActionDisabled(shipGroup, 'RELEASE')" @click="releaseSelectedItems(shipGroup)">{{
-                  translate('Release') }}</ion-button>
-              <ion-button v-if="!isPosCompleted(shipGroup)" fill="clear"
-                :disabled="isShipGroupActionDisabled(shipGroup, isVirtualFacility(shipGroup) ? 'PARK_ITEMS' : 'PULL_BACK')"
-                @click="isVirtualFacility(shipGroup) ? parkSelectedItems(shipGroup) : rejectSelectedItems(shipGroup)">{{
-                  isVirtualFacility(shipGroup) ? translate('Park') : translate('Pull back') }}</ion-button>
-              <ion-button
-                v-if="canRequestInventoryTransfer && !isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)"
-                fill="clear"
-                :disabled="!inventoryTransferItemsForShipGroup(shipGroup).length"
-                @click="requestInventoryTransfersForShipGroup(shipGroup)"
-              >{{ translate('Request transfer') }}</ion-button>
-              <ion-button fill="clear" :disabled="isShipGroupActionDisabled(shipGroup, 'ADD_TASK')"
-                @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
-              <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" fill="clear"
-                :disabled="isShipGroupActionDisabled(shipGroup, 'ADD_ITEMS')"
-                @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
-            </div>
-          <!-- Gift message modal -->
-          <ion-modal :is-open="giftModalShipGroupId === shipGroup.id" @didDismiss="giftModalShipGroupId = null">
-            <ion-header>
-              <ion-toolbar>
-                <ion-buttons slot="start"><ion-button @click="giftModalShipGroupId = null" :aria-label="translate('Close')"><ion-icon slot="icon-only"
-                      :icon="closeOutline" /></ion-button></ion-buttons>
-                <ion-title>{{ translate('Gift message') }}</ion-title>
-              </ion-toolbar>
-            </ion-header>
-            <ion-content class="ion-padding">
-              <ion-item>
-                <ion-textarea :label="translate('Gift message')" label-placement="stacked" :rows="4"
-                  :placeholder="translate('Enter gift message')" v-model="giftMessageDraft" />
-              </ion-item>
-              <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button @click="saveGiftMessage(shipGroup)" :aria-label="translate('Save')">
-                  <ion-icon :icon="saveOutline" />
-                </ion-fab-button>
-              </ion-fab>
-            </ion-content>
-          </ion-modal>
-
-          <!-- Shipping dates modal -->
-          <ion-modal :is-open="shippingDatesModalShipGroupId === shipGroup.id"
-            @didDismiss="shippingDatesModalShipGroupId = null">
-            <ion-header>
-              <ion-toolbar>
-                <ion-buttons slot="start"><ion-button @click="shippingDatesModalShipGroupId = null" :aria-label="translate('Close')"><ion-icon
-                      slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
-                <ion-title>{{ translate('Shipping dates') }}</ion-title>
-              </ion-toolbar>
-            </ion-header>
-            <ion-content class="ion-padding">
-              <ion-item>
-                <ion-input :label="translate('Ship after')" label-placement="stacked" type="date"
-                  v-model="shippingDatesDraft.shipAfterDate" />
-              </ion-item>
-              <ion-item>
-                <ion-input :label="translate('Ship by')" label-placement="stacked" type="date"
-                  v-model="shippingDatesDraft.shipByDate" />
-              </ion-item>
-              <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button @click="saveShippingDates(shipGroup)" :aria-label="translate('Save')">
-                  <ion-icon :icon="saveOutline" />
-                </ion-fab-button>
-              </ion-fab>
-            </ion-content>
-          </ion-modal>
-
-          <!-- Delivery dates modal -->
-          <ion-modal :is-open="deliveryDatesModalShipGroupId === shipGroup.id"
-            @didDismiss="deliveryDatesModalShipGroupId = null">
-            <ion-header>
-              <ion-toolbar>
-                <ion-buttons slot="start"><ion-button @click="deliveryDatesModalShipGroupId = null" :aria-label="translate('Close')"><ion-icon
-                      slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
-                <ion-title>{{ translate('Delivery dates') }}</ion-title>
-              </ion-toolbar>
-            </ion-header>
-            <ion-content class="ion-padding">
-              <ion-item>
-                <ion-input :label="translate('Estimated ship date')" label-placement="stacked" type="date"
-                  v-model="deliveryDatesDraft.estimatedShipDate" />
-              </ion-item>
-              <ion-item>
-                <ion-input :label="translate('Estimated delivery date')" label-placement="stacked" type="date"
-                  v-model="deliveryDatesDraft.estimatedDeliveryDate" />
-              </ion-item>
-              <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button @click="saveDeliveryDates(shipGroup)" :aria-label="translate('Save')">
-                  <ion-icon :icon="saveOutline" />
-                </ion-fab-button>
-              </ion-fab>
-            </ion-content>
-          </ion-modal>
-
-          <!-- Instruction modal -->
-          <ion-modal :is-open="instructionModalShipGroupId === shipGroup.id"
-            @didDismiss="instructionModalShipGroupId = null">
-            <ion-header>
-              <ion-toolbar>
-                <ion-buttons slot="start"><ion-button @click="instructionModalShipGroupId = null" :aria-label="translate('Close')"><ion-icon
-                      slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
-                <ion-title>{{ translate('Shipping instructions') }}</ion-title>
-              </ion-toolbar>
-            </ion-header>
-            <ion-content class="ion-padding">
-              <ion-item>
-                <ion-textarea :label="translate('Instructions')" label-placement="stacked" :rows="4"
-                  :placeholder="translate('Enter shipping instructions')" v-model="instructionDraft" />
-              </ion-item>
-              <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button @click="saveInstruction(shipGroup)" :aria-label="translate('Save')">
-                  <ion-icon :icon="saveOutline" />
-                </ion-fab-button>
-              </ion-fab>
-            </ion-content>
-          </ion-modal>
-          </ion-card>
+          <OrderShipGroupCard
+            v-for="shipGroup in order.shipGroups.filter((sg: any) => sg.items?.length)"
+            :key="shipGroup.id"
+            :ship-group="shipGroup"
+            :order="order"
+            :is-ship-group-expanded="isShipGroupExpanded"
+            :toggle-ship-group="toggleShipGroup"
+            :ship-group-hold-task-count="shipGroupHoldTaskCount"
+            :ship-group-hold-task-label="shipGroupHoldTaskLabel"
+            :show-ship-group-hold-task="showShipGroupHoldTask"
+            :is-item-selected="isItemSelected"
+            :toggle-item-selection="toggleItemSelection"
+            :is-ship-group-action-disabled="isShipGroupActionDisabled"
+            :broker-ship-group="brokerShipGroup"
+            :release-selected-items="releaseSelectedItems"
+            :park-selected-items="parkSelectedItems"
+            :reject-selected-items="rejectSelectedItems"
+            :can-request-inventory-transfer="canRequestInventoryTransfer"
+            :inventory-transfer-items-for-ship-group="inventoryTransferItemsForShipGroup"
+            :request-inventory-transfers-for-ship-group="requestInventoryTransfersForShipGroup"
+            :open-add-task-modal="openAddTaskModal"
+            :open-add-item-modal="openAddItemModal"
+            :view-inventory="viewInventory"
+            :available-carriers="availableCarriers"
+            :ship-group-distances="shipGroupDistances"
+            :product-identification-pref="productIdentificationPref"
+            :save-carrier-and-method="saveCarrierAndMethod"
+            :update-ship-group="updateShipGroup"
+            :load-order="loadOrder"
+            :customer-party-id="customerPartyId"
+          />
         </template>
-
         <template v-else>
           <EmptyState :title="translate('No ship groups')"
             :message="translate('There are no ship groups defined for this order.')" />
         </template>
       </div>
 
-      <div v-if="selectedSegment === 'holds'">
-        <template v-if="hasOrderHoldTasks">
-          <BadAddressTaskCard v-for="task in orderAddressValidationTasks" :key="task.workEffortId" :task="task"
-            :countries="seed.getCountries"
-            @completed="reloadHoldTasks" />
-          <SwapTaskCard v-for="task in orderSwapTasks" :key="task.workEffortId" :task="task"
-            @completed="reloadHoldTasks" />
-          <FraudTaskCard v-for="task in orderFraudTasks" :key="task.workEffortId" :task="task"
-            @completed="reloadHoldTasks" />
-          <HoldTaskCard v-for="task in orderHoldTasks" :key="task.workEffortId" :task="task"
-            @completed="reloadHoldTasks" />
-        </template>
-        <template v-else>
-          <EmptyState :title="translate('No holds')" :message="translate('No holds on this order')" />
-          <div class="ion-text-center ion-padding">
-            <ion-button fill="outline" @click="openCreateHoldTaskModal()">{{ translate('Create hold task') }}</ion-button>
-          </div>
-        </template>
-      </div>
+      <OrderHoldsSegment
+        v-if="selectedSegment === 'holds'"
+        :has-order-hold-tasks="hasOrderHoldTasks"
+        :order-address-validation-tasks="orderAddressValidationTasks"
+        :order-swap-tasks="orderSwapTasks"
+        :order-fraud-tasks="orderFraudTasks"
+        :order-hold-tasks="orderHoldTasks"
+        :countries="seed.getCountries"
+        :translate="translate"
+        @completed="reloadHoldTasks"
+        @create-hold-task="openCreateHoldTaskModal()"
+      />
 
-      <div v-if="selectedSegment === 'comms'">
-        <div v-if="commEvents.length">
-          <div class="list-item comm-event-row" v-for="ev in commEvents" :key="ev.id">
-            <ion-item lines="none">
-              <ion-label>
-                {{ ev.id }}
-                <p>{{ translate("ID") }}</p>
-              </ion-label>
-            </ion-item>
-            <div class="tablet">
-              <ion-label class="ion-text-center">
-                {{ ev.partyIdFrom || '-' }}
-                <p>{{ translate("from") }}</p>
-              </ion-label>
-            </div>
-            <div class="tablet">
-              <ion-label class="ion-text-center">
-                {{ ev.partyIdTo || '-' }}
-                <p>{{ translate("to") }}</p>
-              </ion-label>
-            </div>
-            <div class="tablet">
-              <ion-label class="ion-text-center">
-                {{ ev.content || '-' }}
-                <p>{{ translate("content") }}</p>
-              </ion-label>
-            </div>
-            <div class="tablet">
-              <ion-label class="ion-text-center" v-if="ev.entryDate">
-                {{ formatDate(ev.entryDate) }}
-                <p>{{ translate("entry date") }}</p>
-              </ion-label>
-              <ion-label v-else>-</ion-label>
-            </div>
-          </div>
-        </div>
-        <ion-list v-if="!commEvents.length">
-          <ion-item lines="none">
-            <ion-label>{{ translate("No communication events for this order") }}</ion-label>
-          </ion-item>
-        </ion-list>
-      </div>
-
+      <OrderCommsSegment
+        v-if="selectedSegment === 'comms'"
+        :comm-events="commEvents"
+        :format-date="formatDate"
+        :translate="translate"
+      />
     </ion-content>
 
     <ion-content v-else-if="loading">
@@ -1109,17 +210,16 @@ import router from '@/router';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import AddContactModal from '@/components/AddContactModal.vue';
-import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import OrderItemAttributesModal from '@/components/orders/OrderItemAttributesModal.vue';
-import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import ManageOrderIdentificationsModal from '@/components/orders/ManageOrderIdentificationsModal.vue';
 import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import FacilityInventoryModal from '@/components/fulfillment/FacilityInventoryModal.vue';
-import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
-import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
-import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
-import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
+import OrderSummaryHeader from '@/components/orders/OrderSummaryHeader.vue';
+import OrderItemsSegment from '@/components/orders/OrderItemsSegment.vue';
+import OrderShipGroupCard from '@/components/orders/OrderShipGroupCard.vue';
+import OrderHoldsSegment from '@/components/orders/OrderHoldsSegment.vue';
+import OrderCommsSegment from '@/components/orders/OrderCommsSegment.vue';
 import { useOrderActions } from '@/composables/useOrderActions';
 import { api, commonUtil, DxpShopifyImg, logger, translate } from '@common';
 import { summarizeBrokeredFacilities } from '@/services/order';
@@ -1706,11 +806,15 @@ function shipGroupProductIdentification(identificationPref: string, item: any): 
 onIonViewWillEnter(() => loadOrder(props.orderId));
 watch(() => props.orderId, (orderId) => loadOrder(orderId));
 
+watch(customerPartyId, (partyId) => {
+  if (partyId) customerStore.loadCustomerProfile(partyId);
+}, { immediate: true });
+
 // Orders this one was exchanged from (OrderItemAssoc rows of type EXCHANGE, pointing at the
 // original via toOrderId). Distinct, and never the order itself.
 const exchangeSourceOrderIds = computed(() => [...new Set(
-  (orderDetailStore.current?.itemAssocs || [])
-    .filter((assoc: any) => assoc.orderItemAssocTypeId === 'EXCHANGE' && assoc.toOrderId && assoc.toOrderId !== orderDetailStore.current?.orderId)
+  (orderDetailStore.orderById(props.orderId)?.itemAssocs || [])
+    .filter((assoc: any) => assoc.orderItemAssocTypeId === 'EXCHANGE' && assoc.toOrderId && assoc.toOrderId !== props.orderId)
     .map((assoc: any) => assoc.toOrderId as string)
 )]);
 
@@ -1772,6 +876,17 @@ async function loadOrder(orderId: string, force = false) {
   await orderDetailStore.loadOrderAggregate(orderId, { force });
   loadRejectionReasonEnums();
   resolveShopifyOrderShop(orderId);
+  const partyId = orderDetailStore.customerPartyIdByOrderId(orderId);
+  if (partyId) {
+    await customerStore.loadCustomerProfile(partyId, force);
+  }
+  useProductMaster().init();
+  const allItems = (orderDetailStore.orderById(orderId)?.shipGroups || []).flatMap((sg: any) => sg.items || []);
+  await useProductMaster().prefetch(allItems.map((item: any) => item.productId));
+  await Promise.all([
+    orderDetailStore.fetchShippingMethods(),
+    orderDetailStore.fetchCarrierParties(),
+  ]);
 }
 
 async function openCustomerContactModal(contactMechTypeId: string, contactMechPurposeTypeId: string) {
@@ -1969,19 +1084,10 @@ async function onMethodChange(shipGroupId: string, shipmentMethodTypeId: string)
   await saveCarrierAndMethod(shipGroupId, shipmentMethodTypeId, sel.carrierId);
 }
 
-// Gift message
-const giftModalShipGroupId = ref<string | null>(null);
-const giftMessageDraft = ref('');
-
-function openGiftModal(shipGroup: any) {
-  giftMessageDraft.value = shipGroup.giftMessage ?? '';
-  giftModalShipGroupId.value = shipGroup.id;
-}
-
-async function saveGiftMessage(shipGroup: any) {
+// Ship group updates
+async function saveGiftMessage(shipGroup: any, message: string) {
   try {
-    await updateShipGroup(shipGroup.id, { giftMessage: giftMessageDraft.value });
-    giftModalShipGroupId.value = null;
+    await updateShipGroup(shipGroup.id, { giftMessage: message });
     await showToast(translate('Gift message saved.'));
   } catch {
     await showToast(translate('Failed to save gift message.'));
@@ -1997,86 +1103,38 @@ async function clearGiftMessage(shipGroup: any) {
   }
 }
 
-// 3. Shipping dates
-const shippingDatesModalShipGroupId = ref<string | null>(null);
-const shippingDatesDraft = ref({ shipAfterDate: '', shipByDate: '' });
-
-function openShippingDatesModal(shipGroup: any) {
-  shippingDatesDraft.value = {
-    shipAfterDate: toDateInputValue(shipGroup.shipAfterDate),
-    shipByDate: toDateInputValue(shipGroup.shipByDate),
-  };
-  shippingDatesModalShipGroupId.value = shipGroup.id;
-}
-
-async function saveShippingDates(shipGroup: any) {
+async function saveShippingDates(shipGroup: any, dates: { shipAfterDate: string; shipByDate: string }) {
   try {
     await updateShipGroup(shipGroup.id, {
-      shipAfterDate: shippingDatesDraft.value.shipAfterDate || null,
-      shipByDate: shippingDatesDraft.value.shipByDate || null,
+      shipAfterDate: dates.shipAfterDate || null,
+      shipByDate: dates.shipByDate || null,
     });
-    shippingDatesModalShipGroupId.value = null;
     await showToast(translate('Shipping dates saved.'));
   } catch {
     await showToast(translate('Failed to save shipping dates.'));
   }
 }
 
-// 4. Delivery dates
-const deliveryDatesModalShipGroupId = ref<string | null>(null);
-const deliveryDatesDraft = ref({ estimatedShipDate: '', estimatedDeliveryDate: '' });
-
-function openDeliveryDatesModal(shipGroup: any) {
-  deliveryDatesDraft.value = {
-    estimatedShipDate: toDateInputValue(shipGroup.estimatedShipDate),
-    estimatedDeliveryDate: toDateInputValue(shipGroup.estimatedDeliveryDate),
-  };
-  deliveryDatesModalShipGroupId.value = shipGroup.id;
-}
-
-async function saveDeliveryDates(shipGroup: any) {
+async function saveDeliveryDates(shipGroup: any, dates: { estimatedShipDate: string; estimatedDeliveryDate: string }) {
   try {
     await updateShipGroup(shipGroup.id, {
-      estimatedShipDate: deliveryDatesDraft.value.estimatedShipDate || null,
-      estimatedDeliveryDate: deliveryDatesDraft.value.estimatedDeliveryDate || null,
+      estimatedShipDate: dates.estimatedShipDate || null,
+      estimatedDeliveryDate: dates.estimatedDeliveryDate || null,
     });
-    deliveryDatesModalShipGroupId.value = null;
     await showToast(translate('Delivery dates saved.'));
   } catch {
     await showToast(translate('Failed to save delivery dates.'));
   }
 }
 
-// 5. Instruction
-const instructionModalShipGroupId = ref<string | null>(null);
-const instructionDraft = ref('');
-
-function openInstructionModal(shipGroup: any) {
-  instructionDraft.value = shipGroup.shippingInstructions ?? '';
-  instructionModalShipGroupId.value = shipGroup.id;
-}
-
-async function saveInstruction(shipGroup: any) {
+async function saveInstruction(shipGroup: any, instruction: string) {
   try {
-    await updateShipGroup(shipGroup.id, { shippingInstructions: instructionDraft.value });
-    instructionModalShipGroupId.value = null;
+    await updateShipGroup(shipGroup.id, { shippingInstructions: instruction });
     await showToast(translate('Instructions saved.'));
   } catch {
     await showToast(translate('Failed to save instructions.'));
   }
 }
-
-/** Convert a timestamp/ISO string to YYYY-MM-DD for <ion-input type="date"> */
-function toDateInputValue(value: any): string {
-  if (!value) return '';
-  const dt = /^\d+$/.test(String(value))
-    ? DateTime.fromMillis(Number(value))
-    : DateTime.fromISO(String(value));
-  return dt.isValid ? dt.toISODate() ?? '' : '';
-}
-
-// ── Shipping address display & edit ──────────────────────────────────────────
-
 
 function shipGroupShippingContactMech(shipGroup: any) {
   return shipGroup.contactMechId
@@ -2084,38 +1142,7 @@ function shipGroupShippingContactMech(shipGroup: any) {
     : orderDetailStore.contactMechsByPurposeByOrderId(props.orderId)['SHIPPING_LOCATION'];
 }
 
-const editingShipGroupId = ref<string | null>(null);
-const savingShippingAddress = ref(false);
-const shippingAddressForm = ref({
-  address1: '',
-  address2: '',
-  city: '',
-  postalCode: '',
-  stateProvinceGeoId: '',
-  countryGeoId: '',
-});
-
-const statesForCountry = computed(() => seed.getStates);
-
-function openEditShippingAddress(shipGroup: any) {
-  const mech = shipGroupShippingContactMech(shipGroup);
-  const addr = mech?.postalAddress ?? {};
-  shippingAddressForm.value = {
-    address1: addr.address1 ?? '',
-    address2: addr.address2 ?? '',
-    city: addr.city ?? '',
-    postalCode: addr.postalCode ?? '',
-    stateProvinceGeoId: addr.stateProvinceGeoId ?? '',
-    countryGeoId: addr.countryGeoId ?? '',
-  };
-  editingShipGroupId.value = shipGroup.id;
-}
-
-function closeEditShippingAddress() {
-  editingShipGroupId.value = null;
-}
-
-async function saveShippingAddress(shipGroup: any) {
+async function saveShippingAddress(shipGroup: any, form: any) {
   if (!order.value) return;
   const partyId = customerPartyId.value;
   if (!partyId) {
@@ -2124,22 +1151,18 @@ async function saveShippingAddress(shipGroup: any) {
   }
 
   const contactMechId = shipGroupShippingContactMech(shipGroup)?.contactMechId || shipGroup.contactMechId;
-  savingShippingAddress.value = true;
   try {
     await orderTaskStore.updateShippingInformation(order.value.id, shipGroup.id, {
-      ...shippingAddressForm.value,
+      ...form,
       partyId,
       contactMechId,
       contactMechPurposeTypeId: 'SHIPPING_LOCATION',
       isEdited: true,
     });
     await showToast(translate('Shipping address updated successfully.'));
-    closeEditShippingAddress();
     await loadOrder(order.value.id, true);
   } catch {
     await showToast(translate('Failed to update shipping address. Please try again.'));
-  } finally {
-    savingShippingAddress.value = false;
   }
 }
 

@@ -1,4 +1,5 @@
 import { commonUtil, translate } from '@common';
+import { DateTime } from 'luxon';
 import {
   arrowUndoOutline,
   checkmarkDoneOutline,
@@ -47,23 +48,185 @@ const FACILITY_CHANGE_ICONS: Record<string, string> = {
   PARKED: pauseCircleOutline,
 };
 
-function timelineMillis(value: any): number | undefined {
+export function timelineMillis(value: any): number | undefined {
   if (!value) return undefined;
-  const millis = commonUtil.parseDateTimeValue(value)?.toMillis();
-  return Number.isFinite(millis) ? millis : undefined;
+
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue)) {
+    return String(value).length === 10 ? numericValue * 1000 : numericValue;
+  }
+
+  const stringValue = String(value);
+  const sqlDate = DateTime.fromSQL(stringValue);
+  if (sqlDate.isValid) return sqlDate.toMillis();
+
+  const isoDate = DateTime.fromISO(stringValue);
+  return isoDate.isValid ? isoDate.toMillis() : undefined;
 }
 
-function findTimeDiff(startMillis?: number, endMillis?: number): string | undefined {
-  if (!startMillis || !endMillis || endMillis <= startMillis) return undefined;
-  const diffMs = endMillis - startMillis;
-  const minutes = Math.floor(diffMs / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
+export function findTimeDiff(startTime: any, endTime: any): string {
+  const startMillis = timelineMillis(startTime);
+  const endMillis = timelineMillis(endTime);
+  if (!startMillis || !endMillis) return '';
 
-  if (days > 0) return `${days}d`;
-  if (hours > 0) return `${hours}h`;
-  if (minutes > 0) return `${minutes}m`;
-  return '<1m';
+  const timeDiff = DateTime.fromMillis(endMillis).diff(DateTime.fromMillis(startMillis), ['years', 'months', 'days', 'hours', 'minutes']);
+  let diffString = '+ ';
+  if (timeDiff.years) diffString += `${Math.round(timeDiff.years)} years `;
+  if (timeDiff.months) diffString += `${Math.round(timeDiff.months)} months `;
+  if (timeDiff.days) diffString += `${Math.round(timeDiff.days)} days `;
+  if (timeDiff.hours) diffString += `${Math.round(timeDiff.hours)} hours `;
+  if (timeDiff.minutes) diffString += `${Math.round(timeDiff.minutes)} minutes`;
+
+  return diffString.trim() === '+' ? '' : diffString.trim();
+}
+
+function contactPurposeIds(contact: any): string[] {
+  const purposes = contact?.partyContactMechPurposes || contact?.purposes || [];
+  const directPurpose =
+    contact?.contactMechPurposeTypeId ||
+    contact?.partyContactMechPurpose?.contactMechPurposeTypeId ||
+    contact?.contactMechPurpose?.contactMechPurposeTypeId;
+  return [
+    ...purposes.map((p: any) => p.contactMechPurposeTypeId || p),
+    ...(directPurpose ? [directPurpose] : []),
+  ].filter(Boolean);
+}
+
+function contactMatchesPurpose(contact: any, purposeTypeIds: string[]) {
+  if (!purposeTypeIds.length) return true;
+  const purposes = new Set(contactPurposeIds(contact));
+  return purposeTypeIds.some((purposeTypeId) => purposes.has(purposeTypeId));
+}
+
+function contactMechTypeId(contact: any) {
+  return contact?.contactMechTypeId || contact?.contactMech?.contactMechTypeId;
+}
+
+function contactInfoString(contact: any) {
+  return contact?.contactMech?.infoString || contact?.infoString || '';
+}
+
+function contactPostalAddress(contact: any) {
+  return contact?.postalAddress || contact?.contactMech?.postalAddress;
+}
+
+function contactTelecomNumber(contact: any) {
+  return contact?.telecomNumber || contact?.contactMech?.telecomNumber;
+}
+
+function formatTelecomNumber(telecom: any) {
+  if (!telecom) return '';
+  return [telecom.countryCode, telecom.areaCode, telecom.contactNumber].filter(Boolean).join(' ');
+}
+
+function isActiveCustomerContact(contact: any) {
+  if (!contact.thruDate) return true;
+  const thruMillis = timelineMillis(contact.thruDate);
+  return !thruMillis || thruMillis > Date.now();
+}
+
+function contactMechTypeIdFromContact(contact: any, fallbackTypeId: string) {
+  return (
+    contactMechTypeId(contact) ||
+    (contactPostalAddress(contact)
+      ? 'POSTAL_ADDRESS'
+      : contactTelecomNumber(contact)
+      ? 'TELECOM_NUMBER'
+      : fallbackTypeId)
+  );
+}
+
+function findOrderContact(rawOrder: any, typeId: string, purposeTypeIds: string[]) {
+  return (rawOrder.contactMechs || []).find(
+    (contact: any) =>
+      typeId === contactMechTypeIdFromContact(contact, typeId) &&
+      contactMatchesPurpose(contact, purposeTypeIds)
+  );
+}
+
+function findCustomerContact(customerProfile: any, typeId: string, purposeTypeIds: string[]) {
+  return (customerProfile?.contactMechs || []).find(
+    (contact: any) =>
+      contact.contactMechTypeId === typeId &&
+      isActiveCustomerContact(contact) &&
+      contactMatchesPurpose(contact, purposeTypeIds)
+  );
+}
+
+function addressLines(postalAddress: any, seedStore?: any): string[] {
+  if (!postalAddress) return [];
+  return [
+    postalAddress.toName,
+    postalAddress.address1,
+    postalAddress.address2,
+    [
+      postalAddress.city,
+      seedStore?.geoName?.(postalAddress.stateProvinceGeoId) || postalAddress.stateProvinceGeoId,
+      postalAddress.postalCode,
+    ]
+      .filter(Boolean)
+      .join(', '),
+    seedStore?.geoName?.(postalAddress.countryGeoId) || postalAddress.countryGeoId,
+  ].filter(Boolean) as string[];
+}
+
+function itemAdjustmentLabel(adj: any, seedStore: any): string {
+  return (
+    adj.comments ||
+    adj.comment ||
+    adj.description ||
+    seedStore.orderAdjustmentTypeDescription?.(adj.orderAdjustmentTypeId) ||
+    adj.orderAdjustmentTypeId ||
+    translate('Adjustment')
+  );
+}
+
+function itemAdjustmentKey(adj: any, fallbackSeqId = ''): string {
+  return (
+    adj.orderAdjustmentId ||
+    [
+      fallbackSeqId || adj.orderItemSeqId || '',
+      adj.shipGroupSeqId || '',
+      adj.orderAdjustmentTypeId || '',
+      adj.comments || adj.comment || adj.description || '',
+      Number(adj.amount || 0),
+      Number(adj.amountAlreadyIncluded || 0),
+    ].join('|')
+  );
+}
+
+function itemAdjustmentSummaries(
+  rawOrder: any,
+  rawItem: any,
+  orderItemSeqId: string,
+  seedStore: any
+): Array<{ comment: string; amount: number }> {
+  const totals: Record<string, number> = {};
+  const seen = new Set<string>();
+  const adjustments = [
+    ...(rawOrder?.adjustments || []).filter((adj: any) => adj.orderItemSeqId === orderItemSeqId),
+    ...(rawItem?.adjustments || []),
+  ];
+
+  adjustments.forEach((adj: any) => {
+    const key = itemAdjustmentKey(adj, orderItemSeqId);
+    if (seen.has(key)) return;
+    seen.add(key);
+
+    const amount = Number(adj.amount || 0);
+    const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
+    const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
+    const value = isIncluded ? amountAlreadyIncluded : amount;
+    if (value === 0) return;
+
+    const baseLabel = itemAdjustmentLabel(adj, seedStore);
+    const comment = isIncluded ? `${baseLabel} (${translate('included')})` : baseLabel;
+    totals[comment] = (totals[comment] || 0) + value;
+  });
+
+  return Object.entries(totals)
+    .filter(([, amount]) => Number(amount) !== 0)
+    .map(([comment, amount]) => ({ comment, amount: Number(amount) }));
 }
 
 export interface EnrichmentAuxiliaryData {
@@ -81,6 +244,7 @@ export interface EnrichmentAuxiliaryData {
 export interface EnrichmentStores {
   seedStore: any;
   productCache: any;
+  customerStore?: any;
 }
 
 export function isVirtualFacility(facilityId: string, seedStore: any): boolean {
@@ -465,32 +629,33 @@ export function enrichOrder(
 
   // Resolve customer contacts
   const contactMechs = rawOrder.contactMechs || [];
-  const findContact = (typeId: string, purposes: string[]) =>
-    contactMechs.find((m: any) => m.contactMechTypeId === typeId && purposes.includes(m.contactMechPurposeTypeId));
-
-  const emailMech = findContact('EMAIL_ADDRESS', ['ORDER_EMAIL', 'PRIMARY_EMAIL']);
-  const phoneMech = findContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE']);
-  const billingMech = findContact('POSTAL_ADDRESS', ['BILLING_LOCATION']);
-
   const placingRole = (rawOrder.roles || []).find((r: any) => r.roleTypeId === 'PLACING_CUSTOMER');
+  const customerPartyId = placingRole?.partyId || '';
+  const customerProfile =
+    customerPartyId && stores.customerStore?.getCustomer
+      ? stores.customerStore.getCustomer(customerPartyId)
+      : null;
+
+  const emailContact =
+    findOrderContact(rawOrder, 'EMAIL_ADDRESS', ['ORDER_EMAIL']) ||
+    findCustomerContact(customerProfile, 'EMAIL_ADDRESS', ['ORDER_EMAIL', 'PRIMARY_EMAIL']);
+  const phoneContact =
+    findOrderContact(rawOrder, 'TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE']) ||
+    findCustomerContact(customerProfile, 'TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE']);
+  const billingMech =
+    findOrderContact(rawOrder, 'POSTAL_ADDRESS', ['BILLING_LOCATION']) ||
+    findCustomerContact(customerProfile, 'POSTAL_ADDRESS', ['BILLING_LOCATION']);
+
   const person = placingRole?.person;
   const customerName =
     person && (person.firstName || person.lastName)
       ? [person.firstName, person.lastName].filter(Boolean).join(' ')
       : placingRole?.partyGroup?.groupName ||
-        contactMechs.find((m: any) => m.contactMechPurposeTypeId === 'SHIPPING_LOCATION')?.postalAddress?.toName ||
+        (rawOrder.contactMechs || []).find((m: any) => m.contactMechPurposeTypeId === 'SHIPPING_LOCATION')?.postalAddress?.toName ||
         '';
 
-  const billingLines: string[] = [];
-  if (billingMech?.postalAddress) {
-    const pa = billingMech.postalAddress;
-    if (pa.toName) billingLines.push(pa.toName);
-    if (pa.address1) billingLines.push(pa.address1);
-    if (pa.address2) billingLines.push(pa.address2);
-    const cityStateZip = [pa.city, pa.stateProvinceGeoId, pa.postalCode].filter(Boolean).join(', ');
-    if (cityStateZip) billingLines.push(cityStateZip);
-    if (pa.countryGeoId) billingLines.push(pa.countryGeoId);
-  }
+  const billingPostal = contactPostalAddress(billingMech);
+  const billingLines = addressLines(billingPostal, seedStore);
 
   // Pre-enrich ship groups and items
   const shipGroups: EnrichedShipGroup[] = (rawOrder.shipGroups || []).map((sg: any) => {
@@ -569,15 +734,13 @@ export function enrichOrder(
         statusId: item.statusId,
         status,
         statusColor,
+        statuses: status ? [{ label: status, color: statusColor }] : [],
         shipGroupSeqId: sg.shipGroupSeqId,
         facilityId: sg.facilityId,
         facilityName,
         attributes: item.orderItemAttributes || item.attributes || [],
         attributeCount: (item.orderItemAttributes || item.attributes || []).length,
-        adjustments: (item.adjustments || []).map((adj: any) => ({
-          comment: adj.comments || adj.description || seedStore.orderAdjustmentTypeDescription(adj.orderAdjustmentTypeId) || '',
-          amount: Number(adj.amount || 0),
-        })),
+        adjustments: itemAdjustmentSummaries(rawOrder, item, item.orderItemSeqId, seedStore),
         actions,
         issuanceBadge,
       };
@@ -801,10 +964,10 @@ export function enrichOrder(
     localeString: rawOrder.localeString || rawOrder.locale,
     customerName: customerName,
     customer: {
-      partyId: placingRole?.partyId || '',
+      partyId: customerPartyId,
       name: customerName,
-      email: emailMech?.infoString || '',
-      phone: commonUtil.formatPhoneNumber?.(phoneMech?.telecomNumber?.contactNumber) || phoneMech?.infoString || '',
+      email: contactInfoString(emailContact),
+      phone: formatTelecomNumber(contactTelecomNumber(phoneContact)) || contactInfoString(phoneContact),
       billingAddress: billingLines.length ? { lines: billingLines } : undefined,
     },
     riskRecommendationEnumId: rawOrder.riskRecommendationEnumId,

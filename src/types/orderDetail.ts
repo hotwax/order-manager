@@ -34,6 +34,7 @@ export interface EnrichedOrderItem {
   statusId: string;
   status: string;
   statusColor: string;
+  statuses?: Array<{ label: string; color: string }>;
   shipGroupSeqId: string;
   facilityId: string;
   facilityName: string;

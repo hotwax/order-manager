@@ -1,9 +1,14 @@
 import { defineStore } from "pinia";
-import { api, commonUtil, logger} from "@common";
+import { api, commonUtil, logger, useSolrSearch } from "@common";
 import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useSeedStore } from "./seed";
-import { enrichOrder } from "@/utils/orderDetailEnrichment";
+import { useCustomerStore } from "./customer";
+import { useUserStore } from "./user";
+import Actions from "@/authorization/actions";
+import { escapeSolrValue } from "@/services/order";
+import { getReturn } from "@/services/returns";
+import { enrichOrder, timelineMillis } from "@/utils/orderDetailEnrichment";
 import type { EnrichedOrder } from "@/types/orderDetail";
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error" | "notfound";
@@ -291,6 +296,13 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     // Only loaded for orders that need it.
     issuanceByOrderId: {} as Record<string, Record<string, ItemIssuanceSummary>>,
     issuanceStatusByOrderId: {} as Record<string, LoadStatus>,
+    exchangeChildrenByOrderId: {} as Record<string, Array<{
+      orderId: string;
+      itemCount: number;
+      facilityName: string;
+      value: number;
+    }>>,
+    returnHeadersById: {} as Record<string, any | null>,
   }),
   getters: {
     current: (state) => state.byOrderId[state.currentOrderId]?.payload || null,
@@ -311,10 +323,13 @@ export const useOrderDetailStore = defineStore("orderDetail", {
             riskAssessments: this.riskAssessmentsByOrderId[orderId] || [],
             timelineByShipGroup: this.timelineByShipGroupByOrderId(orderId),
             returnedQtyBySeqId: this.returnedQtyByItemSeqIdByOrderId(orderId),
+            exchangeChildren: this.exchangeChildrenByOrderId[orderId] || [],
+            returnHeadersById: this.returnHeadersById,
           },
           {
             seedStore: useSeedStore(),
             productCache: useProductCacheStore(),
+            customerStore: useCustomerStore(),
           }
         );
       };
@@ -1055,15 +1070,78 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         )
       );
     },
+    async fetchExchangeChildren(orderId: string) {
+      const raw = this.orderById(orderId);
+      if (!raw?.orderName || orderId in this.exchangeChildrenByOrderId) return;
+      this.exchangeChildrenByOrderId = { ...this.exchangeChildrenByOrderId, [orderId]: [] };
+
+      try {
+        const response = await useSolrSearch().runSolrQuery({
+          json: {
+            params: { rows: 50, q: '*:*' },
+            filter: ['docType: ORDER', `orderName: ${escapeSolrValue(`EXC-${raw.orderName}-`)}*`]
+          }
+        });
+        const candidateIds = [...new Set(
+          (response.data?.response?.docs || [])
+            .map((doc: any) => String(doc.orderId || ''))
+            .filter((candidateId: string) => candidateId && candidateId !== orderId)
+        )] as string[];
+
+        const seedStore = useSeedStore();
+        const children: Array<{ orderId: string; itemCount: number; facilityName: string; value: number }> = [];
+        await Promise.all(candidateIds.map(async (candidateId) => {
+          await this.fetchOrder(candidateId);
+          const payload = this.byOrderId[candidateId]?.payload;
+          const assoc = (payload?.itemAssocs || []).find(
+            (row: any) => row.orderItemAssocTypeId === 'EXCHANGE' && row.toOrderId === orderId
+          );
+          if (!assoc) return;
+
+          const itemCount = (payload.shipGroups || [])
+            .flatMap((shipGroup: any) => shipGroup.items || [])
+            .reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+          children.push({
+            orderId: candidateId,
+            itemCount,
+            facilityName: payload.originFacilityId && payload.originFacilityId !== '_NA_'
+              ? seedStore.facilityName(payload.originFacilityId)
+              : '',
+            value: timelineMillis(assoc.createdStamp) || timelineMillis(payload.orderDate) || 0
+          });
+        }));
+        this.exchangeChildrenByOrderId = { ...this.exchangeChildrenByOrderId, [orderId]: children };
+      } catch (error) {
+        logger.error('Failed to discover exchange orders for timeline', error);
+      }
+    },
+    async fetchReturnHeaders(orderId: string) {
+      const userStore = useUserStore();
+      if (!userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW)) return;
+      const raw = this.orderById(orderId);
+      const returnIds = [...new Set((raw?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[];
+      await Promise.all(returnIds.map(async (returnId) => {
+        if (returnId in this.returnHeadersById) return;
+        this.returnHeadersById = { ...this.returnHeadersById, [returnId]: null };
+        try {
+          const header = await getReturn(returnId);
+          if (header) this.returnHeadersById = { ...this.returnHeadersById, [returnId]: header };
+        } catch (error) {
+          logger.debug(`Return header ${returnId} unavailable for timeline facility context`, error);
+        }
+      }));
+    },
     async loadOrderAggregate(orderId: string, options?: { force?: boolean }) {
       if (!orderId) return;
       this.currentOrderId = orderId;
+      await this.fetchOrder(orderId, options?.force);
       await Promise.allSettled([
-        this.fetchOrder(orderId, options?.force),
         this.fetchFulfillmentTimeline(orderId),
         this.fetchOrderEvents(orderId, options?.force),
         this.fetchInventoryIssuance(orderId, options?.force),
         this.fetchRiskAssessments(orderId, options?.force),
+        this.fetchExchangeChildren(orderId),
+        this.fetchReturnHeaders(orderId),
       ]);
     },
     async setCurrentOrder(orderId: string) {
