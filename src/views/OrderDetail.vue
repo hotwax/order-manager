@@ -1114,32 +1114,27 @@ import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
+import { useOrderDistances } from '@/composables/useOrderDistances';
 import router from '@/router';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import AddContactModal from '@/components/AddContactModal.vue';
-import AddItemToOrderModal from '@/components/orders/AddItemToOrderModal.vue';
 import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
-import RejectItemsModal from '@/components/orders/RejectItemsModal.vue';
-import ProductInventoryModal from '@/components/inventory/ProductInventoryModal.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
-import RoutingGroupModal from '@/components/fulfillment/RoutingGroupModal.vue';
 import OrderItemAttributesModal from '@/components/orders/OrderItemAttributesModal.vue';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import ManageOrderIdentificationsModal from '@/components/orders/ManageOrderIdentificationsModal.vue';
 import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import FacilityInventoryModal from '@/components/fulfillment/FacilityInventoryModal.vue';
-import RequestInventoryTransferModal from '@/components/inventory/RequestInventoryTransferModal.vue';
-import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
-import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
+import { useOrderActions } from '@/composables/useOrderActions';
 import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
 import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
 import { getReturn } from '@/services/returns';
-import { inventoryTransferOpenQuantity, isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
+import { isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
 import { showToast, isKit, riskLevelColor, sentimentCounts } from '@/utils';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
@@ -1242,130 +1237,15 @@ async function resolveShopifyOrderShop(orderId: string) {
 }
 
 /**
- * View model — adapts the raw order master-detail payload to the shape this template
- * already binds, joining IDs to labels through the seed store and product cache. The
- * template graph and CSS are unchanged; only the data feeding it is real now.
+ * View model — delegates to the enriched domain model from orderDetailStore.
  */
-const order = computed(() => {
-  const raw = orderDetailStore.orderById(props.orderId);
-  if (!raw) return null;
-
-  return {
-    orderName: raw.orderName,
-    id: raw.orderId,
-    externalId: raw.externalId,
-    status: seed.statusDescription(raw.statusId),
-    statusId: raw.statusId,
-    channel: seed.enumDescription(raw.salesChannelEnumId),
-    salesChannelEnumId: raw.salesChannelEnumId,
-    productStoreName: seed.productStoreName(raw.productStoreId),
-    // Origin/placed-at facility from the order header (set by the OMS order import for
-    // POS/retail-location orders). Prefer a name from the payload, then the seed facility
-    // lookup, falling back to the raw id. The Source card shows this for POS-channel
-    // orders regardless of value — '_NA_' on a POS order is a data gap worth surfacing,
-    // not something to hide.
-    originFacilityId: raw.originFacilityId || '',
-    originFacilityName: raw.originFacilityId && raw.originFacilityId !== '_NA_'
-      ? (raw.originFacilityName || seed.facility(raw.originFacilityId)?.facilityName || raw.originFacilityId)
-      : '',
-    currency: raw.currencyUom,
-    localeString: raw.localeString || raw.locale,
-    riskRecommendationEnumId: raw.riskRecommendationEnumId,
-    riskLevelEnumId: raw.riskLevelEnumId,
-    customerName: orderDetailStore.customerNameByOrderId(props.orderId),
-    history: orderDetailStore.headerStatusesByOrderId(props.orderId).map((entry: any) => ({
-      id: entry.orderStatusId,
-      label: seed.statusDescription(entry.statusId),
-      detail: entry.statusUserLogin || '',
-      changeReason: entry.changeReason || '',
-      at: entry.statusDatetime
-    })),
-    identifications: (raw.identifications || [])
-      .filter((identification: any) => !identification.thruDate || new Date(identification.thruDate).getTime() > Date.now())
-      .map((identification: any) => ({
-      orderIdentificationTypeId: identification.orderIdentificationTypeId,
-      typeLabel: seed.orderIdentificationTypeDescription(identification.orderIdentificationTypeId),
-      idValue: identification.idValue,
-      fromDate: identification.fromDate,
-      // Deep-link into the Shopify Admin order screen; prefer the per-order
-      // shopifyShopOrder record, with a constrained single-shop product-store fallback.
-      shopifyAdminUrl: identification.orderIdentificationTypeId === 'SHOPIFY_ORD_ID' ? shopifyAdminUrl.value : ''
-    })),
-    payments: (raw.paymentPreferences || []).map((payment: any) => ({
-      id: payment.orderPaymentPreferenceId,
-      paymentMethodTypeId: payment.paymentMethodTypeId,
-      paymentMethodTypeDesc: seed.paymentMethodDescription(payment.paymentMethodTypeId),
-      amount: payment.maxAmount ?? payment.presentmentAmount,
-      statusId: payment.statusId,
-      statusDesc: seed.statusDescription(payment.statusId),
-      createdDate: payment.createdDate || payment.createdStamp,
-      // Shopify carry-over lineage: on exchange orders this equals the manualRefNum of the
-      // original order's refunded OPP ('MATTR-<txn>' exchange credit, 'EPRA-<txn>' payment).
-      parentRefNum: payment.parentRefNum || ''
-    })),
-    attributes: orderAttributeRows(raw),
-    shipGroups: (raw.shipGroups || []).map((shipGroup: any) => ({
-      id: shipGroup.shipGroupSeqId,
-      facilityId: shipGroup.facilityId,
-      facilityTypeId: seed.facility(shipGroup.facilityId)?.facilityTypeId,
-      facilityParentTypeId: seed.facilityType(seed.facility(shipGroup.facilityId)?.facilityTypeId)?.parentTypeId,
-      facilityName: seed.facilityName(shipGroup.facilityId),
-      itemSummary: shipGroupItemSummary(shipGroup),
-      isGift: shipGroup.isGift,
-      giftMessage: shipGroup.giftMessage,
-      shippingInstructions: shipGroup.shippingInstructions,
-      estimatedShipDate: shipGroup.estimatedShipDate,
-      estimatedDeliveryDate: shipGroup.estimatedDeliveryDate,
-      shipAfterDate: shipGroup.shipAfterDate,
-      shipByDate: shipGroup.shipByDate,
-      picklistDate: shipGroup.picklistDate,
-      shipmentMethodTypeId: shipGroup.shipmentMethodTypeId,
-      method: shipGroup.shipmentMethodTypeId,
-      carrier: shipGroup.carrierPartyId,
-      contactMechId: shipGroup.contactMechId,
-      items: (shipGroup.items || []).map((item: any) => {
-        const product = productCache.getProduct(item.productId);
-        // parentProductName is the product title ("Abominable Hoodie"); productName is the
-        // variant ("XS / Blue", ~= itemDescription). Prefer the title, then variant, then id.
-        return {
-          id: item.orderItemSeqId,
-          productId: item.productId,
-          name: product?.parentProductName || product?.productName || item.itemDescription || item.productId,
-          sku: product?.sku || item.productId,
-          imageUrl: product?.mainImageUrl || '',
-          quantity: item.quantity,
-          // The card's progress and lifecycle read this: a group whose items are all terminal
-          // is finished no matter what the fulfillment timeline did or did not record.
-          statusId: item.statusId
-        };
-      })
-    }))
-  };
-});
+const order = computed(() => orderDetailStore.enrichedOrderByOrderId(props.orderId));
 
 const customerProfile = computed(() => customerPartyId.value ? customerStore.getCustomer(customerPartyId.value) : null);
 
-const customer = computed(() => {
-  const raw = orderDetailStore.orderById(props.orderId);
-  if (!raw) return undefined;
+const customer = computed(() => order.value?.customer);
 
-  const emailContact = findOrderContact('EMAIL_ADDRESS', ['ORDER_EMAIL'])
-    || findCustomerContact('EMAIL_ADDRESS', ['ORDER_EMAIL', 'PRIMARY_EMAIL']);
-  const phoneContact = findOrderContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE'])
-    || findCustomerContact('TELECOM_NUMBER', ['PHONE_BILLING', 'PRIMARY_PHONE', 'PHONE_SHIPPING', 'PHONE_MOBILE']);
-
-  return {
-    email: contactInfoString(emailContact),
-    phone: formatTelecomNumber(contactTelecomNumber(phoneContact)) || contactInfoString(phoneContact)
-  };
-});
-
-const billingAddress = computed(() => {
-  const mech = findOrderContact('POSTAL_ADDRESS', ['BILLING_LOCATION'])
-    || findCustomerContact('POSTAL_ADDRESS', ['BILLING_LOCATION']);
-  const lines = addressLines(contactPostalAddress(mech));
-  return lines.length ? { lines } : undefined;
-});
+const billingAddress = computed(() => order.value?.customer?.billingAddress);
 
 // Return headers hydrate lazily per returnId to name the facility a return was processed
 // at (ReturnHeader.destinationFacilityId — the embedded ReturnItem rows don't carry it).
@@ -1464,242 +1344,7 @@ const FACILITY_CHANGE_ICONS: Record<string, string> = {
   PARKED: pauseCircleOutline
 };
 
-const orderTimeline = computed(() => {
-  const raw = orderDetailStore.orderById(props.orderId);
-  if (!raw) return [];
-
-  const timeline = [] as Array<{
-    id: string;
-    icon: string;
-    label: string;
-    metaData?: string;
-    timeDiff?: string;
-    value?: number;
-    valueType: 'date-time-millis';
-    route?: string;
-  }>;
-  const usedStatusIds = new Set<string>();
-  const orderDate = timelineMillis(raw.orderDate);
-  const entryDate = timelineMillis(raw.entryDate);
-  const approvedDate = statusTimelineDate(['ORDER_APPROVED', 'ORDER_ACCEPTED']);
-  const completedDate = statusTimelineDate(['ORDER_COMPLETED']);
-  const firstBrokeredDate = fulfillmentTimelineDate('firstBrokeredDate') ?? fulfillmentTimelineDate('firstReleasedDate');
-
-  if (orderDate) {
-    timeline.push({
-      label: 'Created in Shopify',
-      id: 'orderDate',
-      value: orderDate,
-      icon: sunnyOutline,
-      valueType: 'date-time-millis'
-    });
-    usedStatusIds.add('ORDER_CREATED');
-  }
-
-  // Exchange lineage: OrderItemAssoc rows of type EXCHANGE on this order point at the
-  // order it was exchanged from (toOrderId). One entry per distinct source order.
-  const exchangeSourceOrderIds = [...new Set(
-    (raw.itemAssocs || [])
-      .filter((assoc: any) => assoc.orderItemAssocTypeId === 'EXCHANGE' && assoc.toOrderId && assoc.toOrderId !== raw.orderId)
-      .map((assoc: any) => assoc.toOrderId as string)
-  )];
-  exchangeSourceOrderIds.forEach((toOrderId) => {
-    const assoc = (raw.itemAssocs || []).find((row: any) => row.toOrderId === toOrderId);
-    timeline.push({
-      label: 'Exchanged from',
-      id: `exchange-${toOrderId}`,
-      value: timelineMillis(assoc?.createdStamp) || orderDate,
-      icon: swapHorizontalOutline,
-      valueType: 'date-time-millis',
-      metaData: toOrderId,
-      route: `/${router.currentRoute.value.path.split('/')[1] || 'orders'}/${toOrderId}`
-    });
-  });
-
-  // Returns raised against this order: one entry per distinct returnId across the embedded
-  // ReturnItem rows. The processing facility comes from the lazily-hydrated return header
-  // and the wording drops the location while (or if) that never resolves.
-  const returnGroups: Record<string, { count: number; value: number }> = {};
-  (raw.returnItems || []).forEach((item: any) => {
-    if (!item.returnId) return;
-    if (!returnGroups[item.returnId]) returnGroups[item.returnId] = { count: 0, value: 0 };
-    const group = returnGroups[item.returnId];
-    group.count += Number(item.returnQuantity || 0) || 1;
-    const created = timelineMillis(item.createdStamp);
-    if (created && (!group.value || created < group.value)) group.value = created;
-  });
-  Object.entries(returnGroups).forEach(([returnId, group]) => {
-    const facilityId = returnHeadersById.value[returnId]?.destinationFacilityId;
-    const facilityName = facilityId ? seed.facilityName(facilityId) : '';
-    const itemWord = group.count === 1 ? translate('item') : translate('items');
-    const value = group.value || orderDate;
-    timeline.push({
-      label: 'Return created',
-      id: `return-${returnId}`,
-      value,
-      icon: arrowUndoOutline,
-      valueType: 'date-time-millis',
-      timeDiff: findTimeDiff(orderDate, value),
-      metaData: facilityName
-        ? `${group.count} ${itemWord} ${translate('returned at')} ${facilityName}`
-        : `${group.count} ${itemWord} ${translate('returned')}`,
-      route: canViewReturns.value ? `/returns/${returnId}` : undefined
-    });
-  });
-
-  // Exchange orders created from this order (reverse lineage discovered asynchronously).
-  (exchangeChildrenByOrderId.value[raw.orderId] || []).forEach((child) => {
-    const itemWord = child.itemCount === 1 ? translate('item') : translate('items');
-    const value = child.value || orderDate;
-    timeline.push({
-      label: 'Exchange created',
-      id: `exchange-child-${child.orderId}`,
-      value,
-      icon: swapHorizontalOutline,
-      valueType: 'date-time-millis',
-      timeDiff: findTimeDiff(orderDate, value),
-      metaData: child.facilityName
-        ? `${child.itemCount} ${itemWord} ${translate('purchased in exchange at')} ${child.facilityName}`
-        : `${child.itemCount} ${itemWord} ${translate('purchased in exchange')}`,
-      route: `/orders/${child.orderId}`
-    });
-  });
-
-  if (entryDate) {
-    timeline.push({
-      label: 'Imported from Shopify',
-      id: 'entryDate',
-      value: entryDate,
-      icon: downloadOutline,
-      valueType: 'date-time-millis',
-      timeDiff: findTimeDiff(orderDate, entryDate)
-    });
-  }
-
-  if (approvedDate) {
-    timeline.push({
-      label: 'Approved for fulfillment',
-      id: 'approvedDate',
-      value: approvedDate,
-      icon: checkmarkDoneOutline,
-      valueType: 'date-time-millis',
-      timeDiff: findTimeDiff(orderDate, approvedDate)
-    });
-    usedStatusIds.add('ORDER_APPROVED');
-    usedStatusIds.add('ORDER_ACCEPTED');
-  }
-
-  if (firstBrokeredDate) {
-    timeline.push({
-      label: 'First Brokered',
-      id: 'firstBrokeredDate',
-      value: firstBrokeredDate,
-      icon: checkmarkDoneOutline,
-      valueType: 'date-time-millis',
-      timeDiff: findTimeDiff(orderDate, firstBrokeredDate)
-    });
-  }
-
-  if (completedDate) {
-    timeline.push({
-      label: 'Order completed',
-      id: 'completedDate',
-      value: completedDate,
-      icon: pulseOutline,
-      valueType: 'date-time-millis',
-      timeDiff: findTimeDiff(orderDate, completedDate)
-    });
-    usedStatusIds.add('ORDER_COMPLETED');
-  }
-
-  // Item cancellations and rejections, one entry per action rather than per item.
-  orderDetailStore.itemStatusEventsByOrderId(props.orderId).forEach((event) => {
-    const itemWord = event.itemCount === 1 ? translate('item') : translate('items');
-    timeline.push({
-      label: seed.statusDescription(event.statusId),
-      id: `item-status-${event.id}`,
-      value: event.value,
-      icon: closeCircleOutline,
-      valueType: 'date-time-millis',
-      timeDiff: findTimeDiff(orderDate, event.value),
-      metaData: [
-        `${event.itemCount} ${itemWord}`,
-        event.changeReason ? seed.describe(event.changeReason) : '',
-        event.statusUserLogin
-      ].filter(Boolean).join(' - ')
-    });
-  });
-
-  // Brokering, release, park and reject moves. UNFILLABLE is deliberately absent —
-  // it is summarised below instead, since a single order can carry thousands.
-  orderDetailStore.facilityChangeEventsByOrderId(props.orderId).forEach((event) => {
-    const itemWord = event.itemCount === 1 ? translate('item') : translate('items');
-    // A rejection reads by where the items came from; every other move reads by where
-    // they went. Reasons outside FACILITY_CHANGE_LABELS are rejection reasons
-    // (REPORT_VAR/REPORT_NO_VAR children, damaged, inventory not found); a row with no
-    // reason at all is just a move and says so.
-    const knownMove = FACILITY_CHANGE_LABELS[event.changeReasonEnumId];
-    const isRejection = !knownMove && !!event.changeReasonEnumId;
-    const facilityId = isRejection ? event.fromFacilityId : event.facilityId;
-    const facilityName = facilityId ? seed.facilityName(facilityId) : '';
-    const direction = isRejection ? translate('from') : translate('to');
-
-    timeline.push({
-      label: knownMove || (isRejection ? 'Rejected' : 'Facility changed'),
-      id: `facility-change-${event.id}`,
-      value: event.value,
-      icon: FACILITY_CHANGE_ICONS[event.changeReasonEnumId] || (isRejection ? closeCircleOutline : compassOutline),
-      valueType: 'date-time-millis',
-      timeDiff: findTimeDiff(orderDate, event.value),
-      metaData: [
-        `${event.itemCount} ${itemWord}`,
-        facilityName ? `${direction} ${facilityName}` : '',
-        isRejection ? seed.enumDescription(event.changeReasonEnumId) : '',
-        event.changeUserLogin
-      ].filter(Boolean).join(' - ')
-    });
-  });
-
-  // Every failed brokering attempt writes an UNFILLABLE row — 11.5k on the worst
-  // order observed — so the timeline shows the count and the last attempt, not the rows.
-  const unfillable = orderDetailStore.unfillableAttemptsByOrderId(props.orderId);
-  const lastUnfillableDate = timelineMillis(unfillable?.lastAttemptDate);
-  if (unfillable && lastUnfillableDate) {
-    timeline.push({
-      label: 'Brokering could not fill',
-      id: 'unfillable-attempts',
-      value: lastUnfillableDate,
-      icon: warningOutline,
-      valueType: 'date-time-millis',
-      timeDiff: findTimeDiff(orderDate, lastUnfillableDate),
-      metaData: `${unfillable.count}${unfillable.atLeast ? '+' : ''} ${unfillable.count === 1 ? translate('attempt') : translate('attempts')}`
-    });
-  }
-
-  orderDetailStore.headerStatusesByOrderId(props.orderId)
-    .filter((status: any) => status.statusId && !usedStatusIds.has(status.statusId))
-    .forEach((status: any) => {
-      const value = timelineMillis(status.statusDatetime);
-      if (!value) return;
-
-      timeline.push({
-        label: seed.statusDescription(status.statusId),
-        id: status.orderStatusId || `${status.statusId}-${status.statusDatetime}`,
-        value,
-        icon: pulseOutline,
-        valueType: 'date-time-millis',
-        timeDiff: findTimeDiff(orderDate, value),
-        metaData: [status.statusUserLogin, status.changeReason ? seed.describe(status.changeReason) : ''].filter(Boolean).join(' - ')
-      });
-    });
-
-  return timeline.sort((left, right) => {
-    if (left.value === right.value) return 0;
-    if (left.value == undefined) return 1;
-    if (right.value == undefined) return -1;
-    return left.value - right.value;
-  });
-});
+const orderTimeline = computed(() => order.value?.timeline || []);
 
 const timelineByShipGroup = computed(() => orderDetailStore.timelineByShipGroupByOrderId(props.orderId));
 
@@ -1824,27 +1469,11 @@ function shipGroupItemStates(shipGroup: any) {
  * card's label uses, so the two cannot disagree.
  */
 function isShipGroupReadOnly(shipGroup: any): boolean {
-  return shipGroupItemStates(shipGroup).settled;
+  return shipGroup.isReadOnly ?? shipGroupItemStates(shipGroup).settled;
 }
 
 function shipGroupProgress(shipGroup: any): number {
-  // A counter sale is finished the moment it is recorded; there is no lifecycle to
-  // measure and no timeline row to measure it from.
-  if (isPosCompleted(shipGroup)) return 1;
-
-  // Item status wins for a stopped group; the timeline only describes one still in motion.
-  // One expression covers all three terminal cases: 1 when every item landed, 0 when none
-  // did, and the fraction in between.
-  const { total, fulfilled, settled } = shipGroupItemStates(shipGroup);
-  if (settled) return fulfilled / total;
-
-  const tl = timelineByShipGroup.value[shipGroup.id];
-  let progress = 0;
-  if (isShipGroupBrokered(shipGroup)) progress += 0.25;
-  if (tl?.picklistDate) progress += 0.25;
-  if (tl?.packedDate) progress += 0.25;
-  if (tl?.shippedDate) progress += 0.25;
-  return progress;
+  return shipGroup.progress ?? 0;
 }
 
 /** A step that never got a date: still to come, or already behind us and simply not recorded. */
@@ -1915,25 +1544,11 @@ function toggleShipGroup(shipGroupId: string) {
 }
 
 function shipGroupHeaderTitle(shipGroup: any): string {
-  return `${shipGroup.id} ${shipGroup.facilityName || translate('Facility Name')}`;
+  return shipGroup.headerTitle || `${shipGroup.id} ${shipGroup.facilityName || translate('Facility Name')}`;
 }
 
 function shipGroupStatusLabel(shipGroup: any): string {
-  if (isPosCompleted(shipGroup)) return translate('Sold in store');
-
-  // A stopped group is not a point on the way to shipping, so a percentage misreads it —
-  // and neither does where its items are parked. Cancelled items are routinely moved to a
-  // virtual facility such as REJECTED_ITM_PARKING, so the brokering label has to come after
-  // these checks or the card reads "Not Brokered" over a terminal-aware progress bar.
-  const { total, fulfilled, settled } = shipGroupItemStates(shipGroup);
-  if (settled && fulfilled === 0) return translate('Cancelled');
-  if (settled && fulfilled < total) return translate('Partially complete');
-
-  if (!settled && isVirtualFacility(shipGroup)) return translate('Not Brokered');
-
-  // A physical facility is always at least brokered, so there is no 0% case left to
-  // label — the old fallback here read "Brokered", which collided with the step name.
-  return `${Math.round(shipGroupProgress(shipGroup) * 100)}% ${translate('Complete')}`;
+  return shipGroup.statusLabel || '';
 }
 
 function hasSelectableShipGroupOptions(shipGroup: any): boolean {
@@ -2013,95 +1628,19 @@ const commEvents = computed(() => (orderDetailStore.commEventsByOrderId[props.or
 const selectedItemIds = ref<Set<string>>(new Set());
 
 const groupedItems = computed(() => {
-  if (!order.value) return [];
-
-  const groups: Record<string, {
-    externalId: string;
-    productId: string;
-    name: string;
-    sku: string;
-    unitPrice: number;
-    currency: string;
-    totalQty: number;
-    totalPrice: number;
-    statuses: ItemStatusBadge[];
-    selected: boolean;
-    items: Array<{
-      orderItemSeqId: string;
-      externalId: string;
-      shipGroupSeqId: string;
-      facilityId: string;
-      facilityName: string;
-      quantity: number;
-      statusId: string;
-      status: string;
-      statusColor: string;
-      statuses: ItemStatusBadge[];
-      selected: boolean;
-      unitPrice: number;
-      returnedQty: number;
-      returnableQty: number;
-      attributes: any[];
-      attributeCount: number;
-      adjustments: Array<{ comment: string; amount: number }>;
-    }>;
-  }> = {};
-
-  (order.value.shipGroups || []).forEach((sg: any) => {
-    (sg.items || []).forEach((item: any) => {
-      const rawSg = orderDetailStore.orderById(props.orderId)?.shipGroups?.find((g: any) => g.shipGroupSeqId === sg.id);
-      const rawItem = rawSg?.items?.find((i: any) => i.orderItemSeqId === item.id);
-
-      const externalId = rawItem?.externalId || item.sku || item.id;
-      const unitPrice = Number(rawItem?.unitPrice || 0);
-      const statusId = rawItem?.statusId || '';
-      const status = seed.statusDescription(statusId);
-      const statusColor = commonUtil.getStatusColor(statusId);
-      const returnedQty = orderDetailStore.returnedQtyByItemSeqIdByOrderId(props.orderId)[item.id] || 0;
-      const returnableQty = Math.max(0, Number(item.quantity || 0) - returnedQty);
-
-      if (!groups[externalId]) {
-        groups[externalId] = {
-          externalId,
-          productId: rawItem?.productId || '',
-          name: item.name,
-          sku: item.sku,
-          unitPrice,
-          currency: order.value.currency,
-          totalQty: orderDetailStore.quantitiesByExternalId[externalId] || 0,
-          totalPrice: orderDetailStore.totalsByExternalId[externalId] || 0,
-          statuses: [],
-          get selected() { return this.items.length > 0 && this.items.every((i: any) => selectedItemIds.value.has(i.orderItemSeqId)); },
-          set selected(v: boolean) { this.items.forEach((i: any) => v ? selectedItemIds.value.add(i.orderItemSeqId) : selectedItemIds.value.delete(i.orderItemSeqId)); },
-          items: []
-        };
-      }
-      groups[externalId].items.push({
-        orderItemSeqId: item.id,
-        externalId,
-        shipGroupSeqId: sg.id,
-        facilityId: sg.facilityId || '',
-        facilityName: sg.facilityName || 'Facility',
-        quantity: item.quantity,
-        statusId,
-        status,
-        statusColor,
-        statuses: status ? [{ label: status, color: statusColor }] : [],
-        get selected() { return selectedItemIds.value.has(item.id); },
-        set selected(v: boolean) { v ? selectedItemIds.value.add(item.id) : selectedItemIds.value.delete(item.id); },
-        unitPrice,
-        returnedQty,
-        returnableQty,
-        attributes: rawItem?.orderItemAttributes || rawItem?.attributes || rawItem?.orderItemAttributeList || [],
-        attributeCount: rawItem?.orderItemAttributes?.length || rawItem?.attributes?.length || rawItem?.orderItemAttributeList?.length || 0,
-        adjustments: itemAdjustmentSummaries(rawItem, item.id)
-      });
-    });
-  });
-
-  return Object.values(groups).map((group) => {
-    group.statuses = rollUpItemStatuses(group.items);
-    return group;
+  const groups = order.value?.groupedItems || [];
+  return groups.map((group: any) => {
+    const items = (group.items || []).map((item: any) => ({
+      ...item,
+      get selected() { return selectedItemIds.value.has(item.orderItemSeqId); },
+      set selected(v: boolean) { v ? selectedItemIds.value.add(item.orderItemSeqId) : selectedItemIds.value.delete(item.orderItemSeqId); }
+    }));
+    return {
+      ...group,
+      items,
+      get selected() { return items.length > 0 && items.every((i: any) => selectedItemIds.value.has(i.orderItemSeqId)); },
+      set selected(v: boolean) { items.forEach((i: any) => v ? selectedItemIds.value.add(i.orderItemSeqId) : selectedItemIds.value.delete(i.orderItemSeqId)); }
+    };
   });
 });
 
@@ -2113,12 +1652,12 @@ const itemGroups = computed(() => groupedItems.value.map((group: any) => ({
   soleItem: group.items.length === 1 ? group.items[0] : null
 })));
 
-const orderTotals = computed(() => orderDetailStore.orderTotalsByOrderId(props.orderId));
+const orderTotals = computed(() => order.value?.totals || { subtotal: 0, adjustments: {}, includedAdjustments: {}, total: 0 });
 
 const riskAssessments = computed(() => orderDetailStore.riskAssessmentsByOrderId[props.orderId] || []);
-const riskFacts = computed(() => riskAssessments.value.flatMap((risk: any) => risk.facts || []));
-const riskCounts = computed(() => sentimentCounts(riskFacts.value));
-const riskFactCount = computed(() => riskFacts.value.length);
+const riskFacts = computed(() => order.value?.risk?.facts || []);
+const riskCounts = computed(() => order.value?.risk?.counts || { negative: 0, positive: 0, neutral: 0 });
+const riskFactCount = computed(() => order.value?.risk?.factCount || 0);
 
 async function openRiskDetails() {
   const modal = await modalController.create({
@@ -2128,84 +1667,33 @@ async function openRiskDetails() {
   await modal.present();
 }
 
-const riskSummary = computed(() => {
-  const recommendationEnumId = order.value?.riskRecommendationEnumId || '';
-  const levelEnumId = order.value?.riskLevelEnumId || '';
-
-  return {
-    hasRiskSignal: Boolean(recommendationEnumId || levelEnumId),
-    recommendation: recommendationEnumId ? seed.enumDescription(recommendationEnumId) : translate('No recommendation'),
-    level: levelEnumId ? seed.enumDescription(levelEnumId) : translate('No risk level')
-  };
+const riskSummary = computed(() => order.value?.risk || {
+  hasRiskSignal: false,
+  recommendation: translate('No recommendation'),
+  level: translate('No risk level'),
+  facts: [],
+  counts: { negative: 0, positive: 0, neutral: 0 },
+  factCount: 0
 });
-
-const PAYMENT_COLLECTED_STATUSES = new Set(['PAYMENT_AUTHORIZED', 'PAYMENT_SETTLED', 'PAYMENT_RECEIVED']);
 
 // Only preferences that actually collected money count — refunded, cancelled and
 // declined preferences would otherwise inflate this past the grand total.
-const paymentReceivedTotal = computed(() => {
-  const total = (order.value?.payments || []).reduce((sum: number, payment: any) =>
-    PAYMENT_COLLECTED_STATUSES.has(payment.statusId) ? sum + Number(payment.amount || 0) : sum, 0);
-  return Math.round(total * 100) / 100;
-});
+const paymentReceivedTotal = computed(() => order.value?.payments?.receivedTotal || 0);
 
 // Payment card sections: one divider per distinct preference status, in order of first
 // appearance, with refunded pinned to the bottom (stable sort keeps the rest in place).
-const paymentSections = computed(() => {
-  const sections: Array<{ statusId: string; label: string; payments: any[]; total: number }> = [];
-  const byStatus: Record<string, { statusId: string; label: string; payments: any[]; total: number }> = {};
-
-  (order.value?.payments || []).forEach((payment: any) => {
-    const statusId = payment.statusId || 'UNKNOWN';
-    if (!byStatus[statusId]) {
-      byStatus[statusId] = {
-        statusId,
-        label: payment.statusDesc || payment.status || statusId,
-        payments: [],
-        total: 0
-      };
-      sections.push(byStatus[statusId]);
-    }
-    byStatus[statusId].payments.push(payment);
-    byStatus[statusId].total += Number(payment.amount || 0);
-  });
-
-  sections.forEach((section) => { section.total = Math.round(section.total * 100) / 100; });
-  return sections.sort((left, right) =>
-    Number(left.statusId === 'PAYMENT_REFUNDED') - Number(right.statusId === 'PAYMENT_REFUNDED')
-  );
-});
+const paymentSections = computed(() => order.value?.payments?.sections || []);
 
 // Net collected right now: approved/settled/received preferences minus refunded ones.
 // Cancelled/declined/not-received preferences never contribute in either direction.
-const paymentNetAmount = computed(() => {
-  const net = (order.value?.payments || []).reduce((sum: number, payment: any) => {
-    if (PAYMENT_COLLECTED_STATUSES.has(payment.statusId)) return sum + Number(payment.amount || 0);
-    if (payment.statusId === 'PAYMENT_REFUNDED') return sum - Number(payment.amount || 0);
-    return sum;
-  }, 0);
-  return Math.round(net * 100) / 100;
-});
+const paymentNetAmount = computed(() => order.value?.payments?.netAmount || 0);
 
 // Every non-cancelled item fully returned (by quantity).
-const allItemsReturned = computed(() => {
-  const raw = orderDetailStore.orderById(props.orderId);
-  const items = (raw?.shipGroups || [])
-    .flatMap((shipGroup: any) => shipGroup.items || [])
-    .filter((item: any) => item.statusId !== 'ITEM_CANCELLED');
-  if (!items.length) return false;
-
-  const returnedBySeqId = orderDetailStore.returnedQtyByItemSeqIdByOrderId(props.orderId);
-  return items.every((item: any) => (returnedBySeqId[item.orderItemSeqId] || 0) >= Number(item.quantity || 0));
-});
+const allItemsReturned = computed(() => order.value?.payments?.allItemsReturned || false);
 
 // Negative net = more refunded than collected. Positive net on a fully-returned order =
 // money still held for goods that all came back — likely a refund owed.
-const paymentNetColor = computed(() => {
-  if (paymentNetAmount.value < 0) return 'danger';
-  if (paymentNetAmount.value > 0 && allItemsReturned.value) return 'warning';
-  return undefined;
-});
+const paymentNetColor = computed(() => order.value?.payments?.netColor);
 
 const orderAdjustmentRows = computed(() =>
   // orderTotals.adjustments is already keyed by the resolved comment/description
@@ -2272,7 +1760,6 @@ function actionableItemObjectsForShipGroup(shipGroup: any) {
 
 function shipGroupActionContext(shipGroup: any) {
   return {
-    timeline: timelineByShipGroup.value[shipGroup.id],
     isVirtual: isVirtualFacility(shipGroup),
     allItems: allGroupedItems.value
   };
@@ -2290,6 +1777,12 @@ function shipGroupActionValidation(shipGroup: any, actionId: any) {
 }
 
 function isShipGroupActionDisabled(shipGroup: any, actionId: any) {
+  if (shipGroup.actions) {
+    if (actionId === 'CANCEL') return !shipGroup.actions.canCancel;
+    if (actionId === 'RELEASE') return !shipGroup.actions.canRelease;
+    if (actionId === 'REASSIGN_FACILITY') return !shipGroup.actions.canReassignFacility;
+    if (actionId === 'EDIT_SHIPPING_METHOD' || actionId === 'EDIT_CARRIER_METHOD') return !shipGroup.actions.canEditShippingMethod;
+  }
   return !shipGroupActionValidation(shipGroup, actionId).allowed;
 }
 
@@ -2311,7 +1804,7 @@ function inventoryTransferItem(item: any) {
 }
 
 function isInventoryTransferRequestEligible(item: any) {
-  return isInventoryTransferEligibleItem(inventoryTransferItem(item), isVirtualFacilityForItem(item));
+  return item.actions?.canTransfer ?? isInventoryTransferEligibleItem(inventoryTransferItem(item), isVirtualFacilityForItem(item));
 }
 
 function inventoryTransferItemsForShipGroup(shipGroup: any) {
@@ -2320,44 +1813,9 @@ function inventoryTransferItemsForShipGroup(shipGroup: any) {
     .filter((item: any) => isInventoryTransferRequestEligible(item));
 }
 
-async function openInventoryTransferRequestModal(shipGroup: any, items: any[]) {
-  const modalItems = items.map((item) => {
-    const transferItem = inventoryTransferItem(item);
-    return {
-      ...transferItem,
-      quantity: inventoryTransferOpenQuantity(transferItem),
-    };
-  });
-  const modal = await modalController.create({
-    component: RequestInventoryTransferModal,
-    componentProps: {
-      orderId: order.value!.id,
-      productStoreId: orderDetailStore.orderById(props.orderId)?.productStoreId,
-      destinationFacilityId: shipGroup.facilityId,
-      items: modalItems,
-    },
-  });
-  await modal.present();
-  const { role } = await modal.onWillDismiss();
-  if (role === 'confirm') await showToast(translate('Inventory transfer requested.'));
-}
-
-async function requestInventoryTransferForItem(item: any) {
-  const shipGroup = shipGroupById(item.shipGroupSeqId);
-  if (!shipGroup || !isInventoryTransferRequestEligible(item)) return;
-  await openInventoryTransferRequestModal(shipGroup, [item]);
-}
-
-async function requestInventoryTransfersForShipGroup(shipGroup: any) {
-  const items = inventoryTransferItemsForShipGroup(shipGroup);
-  if (!items.length) return;
-  await openInventoryTransferRequestModal(shipGroup, items);
-}
-
 function itemActionContext(item: any) {
   const allowedTransitions = seed.allowedTransitions(item.statusId);
   return {
-    timeline: timelineByShipGroup.value[item.shipGroupSeqId],
     isVirtual: isVirtualFacilityForItem(item),
     itemAllowedToStatusIds: new Set(allowedTransitions.map((transition: any) => transition.toStatusId)),
     allItems: allGroupedItems.value
@@ -2386,7 +1844,7 @@ function itemFacilityActionValidation(item: any) {
 }
 
 function isItemFacilityActionDisabled(item: any) {
-  return !itemFacilityActionValidation(item).allowed;
+  return item.actions ? !item.actions.canRejectAndRelease : !itemFacilityActionValidation(item).allowed;
 }
 
 /**
@@ -2402,11 +1860,7 @@ function itemCancelValidation(item: any) {
 }
 
 function isItemCancelAllowed(item: any) {
-  return itemCancelValidation(item).allowed;
-}
-
-async function showUnavailableAction(validation: any) {
-  await showToast(validation?.reason || 'Action is not available.');
+  return item.actions?.canCancel ?? itemCancelValidation(item).allowed;
 }
 
 function toggleSelectAll(checked: boolean) {
@@ -2498,37 +1952,12 @@ function loadRejectionReasonEnums() {
 }
 
 async function loadOrder(orderId: string, force = false) {
-  if (force) {
-    await orderDetailStore.fetchOrder(orderId, true);
-  } else {
-    await orderDetailStore.setCurrentOrder(orderId);
-  }
-  // Timeline event sources (OrderStatus, OrderFacilityChange). Fire-and-forget: the
-  // header timeline fills in as they land, and the rest of the page never waits.
-  orderDetailStore.fetchOrderEvents(orderId, force);
+  await orderDetailStore.loadOrderAggregate(orderId, { force });
   loadRejectionReasonEnums();
-  // A counter sale's only remaining question is whether inventory actually left the
-  // books, so load the issuance rows for those orders and no others.
-  if ((orderDetailStore.orderById(orderId)?.shipGroups || []).some(isPosCompleted)) {
-    orderDetailStore.fetchInventoryIssuance(orderId, force);
-  }
-  // Fire-and-forget: the Shopify Admin link hydrates when it resolves; the page
-  // never waits on it.
   resolveShopifyOrderShop(orderId);
-  // Load risk facts up front for risk-flagged orders so the header Fraud risk card
-  // can show its sentiment chips without waiting for the Holds tab.
-  if (riskSummary.value.hasRiskSignal) orderDetailStore.fetchRiskAssessments(orderId);
   if (customerPartyId.value) {
     await customerStore.loadCustomerProfile(customerPartyId.value, force);
   }
-  // Rich product data (name/SKU/image): fetch only uncached products, never refetch.
-  useProductMaster().init();
-  await useProductMaster().prefetch(orderDetailStore.allItems.map((item: any) => item.productId));
-  // Fetch shipping methods and carriers (not order-specific, fetch once)
-  await Promise.all([
-    orderDetailStore.fetchShippingMethods(),
-    orderDetailStore.fetchCarrierParties(),
-  ]);
 }
 
 async function openCustomerContactModal(contactMechTypeId: string, contactMechPurposeTypeId: string) {
@@ -2643,133 +2072,54 @@ function getSelection(shipGroupId: string, shipGroup: any) {
   return shipGroupSelection.value[shipGroupId];
 }
 
-const shipGroupDistances = ref<Record<string, string>>({});
+const { shipGroupDistances } = useOrderDistances(() => props.orderId, order, isVirtualFacility);
 
-/** Great-circle distance between two lat/lon points, in miles. */
-function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 3958.8; // Earth radius in miles
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-    Math.cos((lat2 * Math.PI) / 180) *
-    Math.sin(dLon / 2) *
-    Math.sin(dLon / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
-const num = (value: any): number | undefined => {
-  const n = parseFloat(value);
-  return Number.isFinite(n) ? n : undefined;
-};
-
-/**
- * Fallback geocoder: resolve postal codes to coordinates via the Solr `postalCode`
- * core (fields: postcode / latitude / longitude), returning a { zip: {lat, lon} }
- * map. Used only for endpoints whose postal address isn't already geocoded; both
- * the ship-to address and the origin facility normally carry lat/lon directly
- * (see fetchDistancesForOrder). A failed/absent core is swallowed — the distance
- * simply isn't shown for that ship group.
- */
-async function lookupPostalCoordinates(zips: string[]): Promise<Record<string, { lat: number; lon: number }>> {
-  const coords: Record<string, { lat: number; lon: number }> = {};
-  if (!zips.length) return coords;
-  try {
-    const resp = await api({
-      url: 'api/geocode',
-      method: 'POST',
-      data: {
-        json: {
-          query: `postcode:(${zips.map((zip) => `"${zip}"`).join(' OR ')})`
-        }
-      }
-    });
-    (resp?.data?.response?.docs ?? []).forEach((doc: any) => {
-      const zip = String(doc.postcode ?? '').trim();
-      const lat = num(doc.latitude);
-      const lon = num(doc.longitude);
-      if (zip && lat !== undefined && lon !== undefined) coords[zip] = { lat, lon };
-    });
-  } catch (error) {
-    console.error('Failed to look up postal-code coordinates:', error);
-  }
-  return coords;
-}
-
-/** Origin facility coordinates from its postal address (lat/lon are returned
- *  directly by facilityContactMechs); falls back to the facility's zip for a
- *  Solr lookup when the address isn't geocoded. Deduped per facilityId. */
-async function fetchFacilityOrigins(facilityIds: string[]): Promise<Record<string, { lat?: number; lon?: number; zip?: string }>> {
-  const origins: Record<string, { lat?: number; lon?: number; zip?: string }> = {};
-  await Promise.all(facilityIds.map(async (facilityId) => {
-    try {
-      const resp = await api({ url: 'oms/facilityContactMechs', method: 'GET', params: { facilityId } });
-      const mechs: any[] = resp?.data?.facilityContactMechs ?? [];
-      const postal = mechs.find((m) => m.contactMechTypeId === 'POSTAL_ADDRESS' && m.contactMechPurposeTypeId === 'SHIP_ORIG_LOCATION')
-        || mechs.find((m) => m.contactMechTypeId === 'POSTAL_ADDRESS');
-      if (postal) origins[facilityId] = { lat: num(postal.latitude), lon: num(postal.longitude), zip: postal.postalCode?.trim() };
-    } catch (error) {
-      console.error(`Failed to load origin address for facility ${facilityId}:`, error);
-    }
-  }));
-  return origins;
-}
-
-/**
- * Distance (miles) between each BROKERED ship group's origin facility and the
- * order's ship-to address. Both endpoints expose latitude/longitude directly on
- * their postal address, so use those; the Solr `postalCode` zip lookup is only a
- * fallback for whichever endpoint isn't geocoded (and is skipped entirely when
- * nothing needs it — not every OMS exposes a `postalCode` Solr core).
- */
-const fetchDistancesForOrder = async (shipGroups: any[]) => {
-  shipGroupDistances.value = {};
-  const brokered = (shipGroups || []).filter((sg: any) => !isVirtualFacility(sg) && sg.facilityId);
-  if (!brokered.length) return;
-
-  const origins = await fetchFacilityOrigins([...new Set(brokered.map((sg: any) => sg.facilityId))]);
-
-  // Prefer the lat/lon already on each ship-to address; collect zips for a Solr
-  // fallback only for endpoints (ship-to or origin facility) that aren't geocoded.
-  const destCoordsBySg: Record<string, { lat: number; lon: number }> = {};
-  const destZipBySg: Record<string, string> = {};
-  const zipsToLookup = new Set<string>();
-  brokered.forEach((sg: any) => {
-    const mech = sg.contactMechId
-      ? orderDetailStore.contactMechsByIdByOrderId(props.orderId)[sg.contactMechId]
-      : orderDetailStore.contactMechsByPurposeByOrderId(props.orderId)['SHIPPING_LOCATION'];
-    const addr = mech?.postalAddress;
-    const destLat = num(addr?.latitude);
-    const destLon = num(addr?.longitude);
-    if (destLat !== undefined && destLon !== undefined) {
-      destCoordsBySg[sg.id] = { lat: destLat, lon: destLon };
-    } else {
-      const destZip = addr?.postalCode?.trim();
-      if (destZip) {
-        destZipBySg[sg.id] = destZip;
-        zipsToLookup.add(destZip);
-      }
-    }
-    const origin = origins[sg.facilityId];
-    if (origin && (origin.lat === undefined || origin.lon === undefined) && origin.zip) {
-      zipsToLookup.add(origin.zip);
-    }
-  });
-
-  const zipCoords = zipsToLookup.size ? await lookupPostalCoordinates([...zipsToLookup]) : {};
-
-  brokered.forEach((sg: any) => {
-    const origin = origins[sg.facilityId];
-    const originCoords = origin && origin.lat !== undefined && origin.lon !== undefined
-      ? { lat: origin.lat, lon: origin.lon }
-      : (origin?.zip ? zipCoords[origin.zip] : undefined);
-    const destCoords = destCoordsBySg[sg.id] ?? zipCoords[destZipBySg[sg.id]];
-    if (originCoords && destCoords) {
-      shipGroupDistances.value[sg.id] = haversineMiles(originCoords.lat, originCoords.lon, destCoords.lat, destCoords.lon).toFixed(1);
-    }
-  });
-};
+const {
+  showUnavailableAction,
+  brokerShipGroup,
+  cancelOrderItems,
+  cancelSingleItem,
+  rejectAndReleaseItem,
+  cancelOrder,
+  changeOrderStatus,
+  runOrderStatusAction,
+  startReturn,
+  viewInventory,
+  openCloneOrderModal,
+  footerActions,
+  runFooterAction,
+  footerActionLabel,
+  openAddTaskModal,
+  openCreateHoldTaskModal,
+  openAddItemModal,
+  parkSelectedItems,
+  rejectSelectedItems,
+  releaseSelectedItems,
+  openInventoryTransferRequestModal,
+  requestInventoryTransferForItem,
+  requestInventoryTransfersForShipGroup,
+  saveCarrierAndMethod,
+  updateShipGroup,
+} = useOrderActions({
+  orderId: props.orderId,
+  order,
+  loadOrder,
+  selectedShipGroupItems,
+  selectedItems,
+  selectedItemIds,
+  groupedItems,
+  openFacilityModal,
+  openFacilityInventoryModal,
+  shipGroupById,
+  actionableItemObjectsForShipGroup,
+  shipGroupActionValidation,
+  itemFacilityActionValidation,
+  itemCancelValidation,
+  isVirtualFacilityForItem,
+  inventoryTransferItem,
+  selectedSegment,
+  reloadHoldTasks,
+});
 
 // Keep local state in sync when order reloads (e.g. after save)
 watch(
@@ -2781,10 +2131,10 @@ watch(
         methodId: sg.shipmentMethodTypeId ?? '',
       };
     });
-    fetchDistancesForOrder(shipGroups);
   },
   { immediate: true }
 );
+
 
 function methodsForCarrier(carrierPartyId: string) {
   return [...orderDetailStore.shippingMethodsByCarrier(carrierPartyId)].sort((a, b) =>
@@ -2803,27 +2153,6 @@ async function onMethodChange(shipGroupId: string, shipmentMethodTypeId: string)
   if (!sel?.carrierId || !shipmentMethodTypeId) return;
   sel.methodId = shipmentMethodTypeId;
   await saveCarrierAndMethod(shipGroupId, shipmentMethodTypeId, sel.carrierId);
-}
-
-async function saveCarrierAndMethod(shipGroupSeqId: string, shipmentMethodTypeId: string, carrierPartyId: string) {
-  try {
-    await orderDetailStore.updateShipmentCarrierAndMethod(order.value!.id, shipGroupSeqId, shipmentMethodTypeId, carrierPartyId);
-    await showToast(translate('Carrier and shipping method updated successfully.'));
-    await loadOrder(order.value!.id, true);
-  } catch {
-    await showToast(translate('Failed to update carrier and shipping method. Please try again.'));
-  }
-}
-
-// ── Ship group attribute chips ────────────────────────────────────────────────
-
-async function updateShipGroup(shipGroupId: string, payload: Record<string, any>) {
-  await api({
-    url: `oms/orders/${order.value!.id}/shipGroups/${shipGroupId}`,
-    method: 'PUT',
-    data: payload,
-  });
-  await loadOrder(order.value!.id, true);
 }
 
 // Gift message
@@ -3019,11 +2348,6 @@ async function saveShippingAddress(shipGroup: any) {
   }
 }
 
-function shipGroupItemSummary(shipGroup: any) {
-  const items = shipGroup.items || [];
-  const units = items.reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
-  return `${items.length} ${items.length === 1 ? 'item' : 'items'} · ${units} ${units === 1 ? 'unit' : 'units'}`;
-}
 
 function addressLines(postalAddress: any): string[] {
   if (!postalAddress) return [];
@@ -3036,82 +2360,6 @@ function addressLines(postalAddress: any): string[] {
   ].filter(Boolean) as string[];
 }
 
-function orderAttributeRows(raw: any) {
-  return (raw?.attributes || raw?.orderAttributes || raw?.orderAttributeList || [])
-    .map((attribute: any, index: number) => {
-      const name = attribute.name ?? attribute.attrName ?? attribute.attributeName ?? attribute.orderAttributeName ?? attribute.orderAttributeTypeId;
-      const value = attribute.value ?? attribute.attrValue ?? attribute.attributeValue ?? attribute.orderAttributeValue;
-      const description = attribute.description ?? attribute.attrDescription ?? attribute.attributeDescription ?? '';
-
-      return {
-        id: attribute.orderAttributeId || `${name || 'attribute'}-${index}`,
-        name: name ? String(name) : translate('Attribute'),
-        value: value == undefined ? '' : String(value),
-        description: description ? String(description) : ''
-      };
-    })
-    .filter((attribute: any) => attribute.name || attribute.value || attribute.description);
-}
-
-function contactPurposeIds(contact: any): string[] {
-  return [
-    contact?.contactMechPurposeTypeId,
-    ...(contact?.purposeTypeIds || []),
-    ...((contact?.purposes || []).map((purpose: any) => purpose.contactMechPurposeTypeId))
-  ].filter(Boolean);
-}
-
-function contactMatchesPurpose(contact: any, purposeTypeIds: string[]) {
-  if (!purposeTypeIds.length) return true;
-  const purposes = new Set(contactPurposeIds(contact));
-  return purposeTypeIds.some((purposeTypeId) => purposes.has(purposeTypeId));
-}
-
-function contactMechTypeId(contact: any) {
-  return contact?.contactMechTypeId || contact?.contactMech?.contactMechTypeId;
-}
-
-function contactInfoString(contact: any) {
-  return contact?.contactMech?.infoString || contact?.infoString || '';
-}
-
-function contactPostalAddress(contact: any) {
-  return contact?.postalAddress || contact?.contactMech?.postalAddress;
-}
-
-function contactTelecomNumber(contact: any) {
-  return contact?.telecomNumber || contact?.contactMech?.telecomNumber;
-}
-
-function formatTelecomNumber(telecom: any) {
-  if (!telecom) return '';
-  return [telecom.countryCode, telecom.areaCode, telecom.contactNumber].filter(Boolean).join(' ');
-}
-
-function findOrderContact(contactMechTypeId: string, purposeTypeIds: string[]) {
-  return (orderDetailStore.orderById(props.orderId)?.contactMechs || []).find((contact: any) =>
-    contactMechTypeId === contactMechTypeIdFromContact(contact, contactMechTypeId)
-    && contactMatchesPurpose(contact, purposeTypeIds)
-  );
-}
-
-function contactMechTypeIdFromContact(contact: any, fallbackTypeId: string) {
-  return contactMechTypeId(contact) || (contactPostalAddress(contact) ? 'POSTAL_ADDRESS' : contactTelecomNumber(contact) ? 'TELECOM_NUMBER' : fallbackTypeId);
-}
-
-function isActiveCustomerContact(contact: CustomerContactMech) {
-  if (!contact.thruDate) return true;
-  const thruMillis = timelineMillis(contact.thruDate);
-  return !thruMillis || thruMillis > Date.now();
-}
-
-function findCustomerContact(contactMechTypeId: string, purposeTypeIds: string[]) {
-  return (customerProfile.value?.contactMechs || []).find((contact) =>
-    contact.contactMechTypeId === contactMechTypeId
-    && isActiveCustomerContact(contact)
-    && contactMatchesPurpose(contact, purposeTypeIds)
-  );
-}
 
 function money(value: number, currency = 'USD') {
   return commonUtil.formatCurrency(value, currency);
@@ -3131,23 +2379,6 @@ function timelineMillis(value: string | number | undefined | null) {
 
   const isoDate = DateTime.fromISO(stringValue);
   return isoDate.isValid ? isoDate.toMillis() : undefined;
-}
-
-function statusTimelineDate(statusIds: string[]) {
-  const dates = orderDetailStore.headerStatusesByOrderId(props.orderId)
-    .filter((status: any) => statusIds.includes(status.statusId))
-    .map((status: any) => timelineMillis(status.statusDatetime))
-    .filter((value): value is number => value != undefined);
-
-  return dates.length ? Math.min(...dates) : undefined;
-}
-
-function fulfillmentTimelineDate(field: string) {
-  const dates = orderDetailStore.fulfillmentTimeline
-    .map((entry: any) => timelineMillis(entry?.[field]))
-    .filter((value): value is number => value != undefined);
-
-  return dates.length ? Math.min(...dates) : undefined;
 }
 
 function formatDateTime(value: string | number | undefined) {
@@ -3311,35 +2542,6 @@ function itemAdjustmentKey(adj: any, fallbackSeqId = ""): string {
   ].join("|");
 }
 
-function itemAdjustmentSummaries(rawItem: any, orderItemSeqId: string): Array<{ comment: string; amount: number }> {
-  const totals: Record<string, number> = {};
-  const seen = new Set<string>();
-  const adjustments = [
-    ...(orderDetailStore.orderById(props.orderId)?.adjustments || []).filter((adj: any) => adj.orderItemSeqId === orderItemSeqId),
-    ...(rawItem?.adjustments || [])
-  ];
-
-  adjustments.forEach((adj: any) => {
-    const key = itemAdjustmentKey(adj, orderItemSeqId);
-    if (seen.has(key)) return;
-    seen.add(key);
-
-    const amount = Number(adj.amount || 0);
-    const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
-    const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
-    const value = isIncluded ? amountAlreadyIncluded : amount;
-    if (value === 0) return;
-
-    const baseLabel = itemAdjustmentLabel(adj);
-    const comment = isIncluded ? `${baseLabel} (${translate('included')})` : baseLabel;
-    totals[comment] = (totals[comment] || 0) + value;
-  });
-
-  return Object.entries(totals)
-    .filter(([, amount]) => Number(amount) !== 0)
-    .map(([comment, amount]) => ({ comment, amount: Number(amount) }));
-}
-
 function shippingAdjustmentDetail(typeId: string): string {
   if (!typeId || !/shipping/i.test(typeId)) return '';
   const methods = new Set(
@@ -3456,481 +2658,6 @@ async function openManageIdentificationsModal() {
   if (order.value?.id) await loadOrder(order.value.id, true);
 }
 
-async function brokerShipGroup(shipGroupSeqId: string) {
-  const shipGroup = shipGroupById(shipGroupSeqId);
-  const validation = shipGroup
-    ? shipGroupActionValidation(shipGroup, 'BROKER')
-    : { allowed: false, reason: 'Ship group is not available.' };
-  if (!validation.allowed) {
-    await showUnavailableAction(validation);
-    return;
-  }
-
-  const productStoreId = useProductStore().getCurrentProductStore.productStoreId;
-  const modal = await modalController.create({ component: RoutingGroupModal, componentProps: { productStoreId } });
-  await modal.present();
-  const { data: routingGroupId } = await modal.onWillDismiss();
-  if (!routingGroupId) return;
-  try {
-    await orderTaskStore.brokerShipGroup({ routingGroupId, orderId: order.value!.id, shipGroupSeqId, productStoreId });
-    await showToast(translate('Ship group brokered successfully.'));
-    await loadOrder(order.value!.id, true);
-  } catch {
-    await showToast(translate('Failed to broker the ship group. Please try again.'));
-  }
-}
-
-async function cancelOrderItems() {
-  const raw = orderDetailStore.orderById(props.orderId);
-  if (!raw || !selectedItems.value.length) return;
-  const itemsSnapshot = [...selectedItems.value];
-  const alert = await alertController.create({
-    header: translate('Cancel items'),
-    message: translate('Are you sure you want to cancel the {count} selected item(s)? This action cannot be undone.').replace('{count}', String(itemsSnapshot.length)),
-    buttons: [
-      { text: translate('Cancel'), role: 'cancel' },
-      {
-        text: translate('Cancel items'),
-        role: 'confirm',
-        handler: async () => {
-          try {
-            await orderTaskStore.cancelOrder(raw.orderId, itemsSnapshot.map((item: any) => ({
-              orderItemSeqId: item.orderItemSeqId,
-              shipGroupSeqId: item.shipGroupSeqId,
-              reason: "NO_VARIANCE_LOG",
-              comment: ""
-            })));
-            selectedItemIds.value.clear();
-            await showToast(translate('Selected items cancelled successfully.'));
-            await loadOrder(raw.orderId, true);
-          } catch {
-            await showToast(translate('Failed to cancel the selected items. Please try again.'));
-          }
-        }
-      }
-    ]
-  });
-  await alert.present();
-}
-
-async function rejectAndReleaseItem(item: any) {
-  const validation = itemFacilityActionValidation(item);
-  if (!validation.allowed) {
-    await showUnavailableAction(validation);
-    return;
-  }
-
-  const orderId = order.value!.id;
-
-  // Step 1 — pick a facility with inventory to release to
-  const facilityId = await openFacilityInventoryModal([item]);
-  if (!facilityId) {
-    return;
-  }
-
-  if(!isVirtualFacilityForItem(item)) {
-    // Step 2 (optional) — reject the item with default reason
-    try {
-      await api({
-        url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/reject`,
-        method: 'POST',
-        data: {
-          rejectionReasonId: 'NO_VARIANCE_LOG',
-        },
-      });
-    } catch {
-      await showToast(translate('Failed to reject the item. Please try again.'));
-      return;
-    }
-  }
-
-  // Step 3 — release to chosen facility
-  try {
-    await api({
-      url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/allocation`,
-      method: 'POST',
-      data: {
-        facilityId,
-        orderFacilityChange: {
-          changeReasonEnumId: "RELEASED"
-        }
-      },
-    });
-    await showToast(translate('Item released to facility.'));
-  } catch {
-    await showToast(translate('Failed to release the item. Please try again.'));
-  } finally {
-    await loadOrder(orderId, true);
-  }
-}
-
-async function cancelSingleItem(item: any) {
-  const raw = orderDetailStore.orderById(props.orderId);
-  if (!raw) return;
-
-  // The row can have been rendered before a refresh moved the item or the order on, so the
-  // handler asks the validator again rather than trusting the button that called it.
-  const validation = itemCancelValidation(item);
-  if (!validation.allowed) {
-    await showUnavailableAction(validation);
-    return;
-  }
-  const alert = await alertController.create({
-    header: translate('Cancel Item'),
-    message: translate('Are you sure you want to cancel this item? This action cannot be undone.'),
-    buttons: [
-      { text: translate('Cancel'), role: 'cancel' },
-      {
-        text: translate('Cancel item'),
-        role: 'confirm',
-        handler: async () => {
-          try {
-            await orderTaskStore.cancelOrder(raw.orderId, [{
-              orderItemSeqId: item.orderItemSeqId,
-              shipGroupSeqId: item.shipGroupSeqId,
-              reason: "NO_VARIANCE_LOG",
-              comment: ""
-            }]);
-            await showToast(translate('Item cancelled successfully.'));
-            await loadOrder(raw.orderId, true);
-          } catch {
-            await showToast(translate('Failed to cancel the item. Please try again.'));
-          }
-        }
-      }
-    ]
-  });
-  await alert.present();
-}
-
-async function viewInventory(productId: string) {
-  const modal = await modalController.create({
-    component: ProductInventoryModal,
-    componentProps: { productId }
-  });
-  await modal.present();
-}
-
-async function openCloneOrderModal() {
-  const modal = await modalController.create({ component: CloneOrderModal });
-  await modal.present();
-  const { data, role } = await modal.onWillDismiss();
-  if (role !== 'confirm' || !data) return;
-  // Success feedback (toast with the new Shopify order name) is shown by the modal.
-  // No reload — the cloned order lives in Shopify until the bridge syncs it back.
-}
-
-/**
- * The footer's complete, valid-only action set — ONE engine-driven list
- * (status transitions + lifecycle actions). The engine reports which actions
- * are valid for this order; we render only those we have a handler wired for
- * (Appeasement/Reship are modelled but excluded until their backend lands).
- * So a button that doesn't apply — e.g. Return on a not-yet-fulfilled order —
- * simply isn't shown.
- */
-const DISPATCHABLE_FOOTER_IDS = new Set(['CANCEL_ITEMS', 'ORDER_CANCELLED', 'RETURN']);
-const footerActions = computed(() => {
-  if (!order.value) return [];
-  const allowedTransitions = seed.allowedTransitions(order.value.statusId);
-  const ctx = {
-    allItems: groupedItems.value.flatMap((group: any) => group.items),
-    orderAllowedToStatusIds: new Set(allowedTransitions.map((transition: any) => transition.toStatusId))
-  };
-  return OrderActionValidator
-    .getOrderFooterActions(order.value, allowedTransitions, selectedItems.value, ctx)
-    .filter((action: any) => action.kind === 'status' || DISPATCHABLE_FOOTER_IDS.has(action.id));
-});
-
-function runFooterAction(action: any) {
-  // Dispatch by id (not kind) — the cancel button rides on the start as
-  // kind 'status' in both modes, but CANCEL_ITEMS has its own handler.
-  switch (action.id) {
-    case 'CLONE': return openCloneOrderModal();
-    case 'CANCEL_ITEMS': return cancelOrderItems();
-    case 'RETURN': return startReturn();
-    default: return runOrderStatusAction(action); // status transitions (Approve, Cancel order, …)
-  }
-}
-
-/** The morphing cancel shows its live selection count; everything else is a static label. */
-function footerActionLabel(action: any): string {
-  if (action.id === 'CANCEL_ITEMS') {
-    return translate('Cancel {count} items').replace('{count}', String(selectedItems.value.length));
-  }
-  return translate(action.label);
-}
-
-async function startReturn() {
-  // Returns are a separate workstream (docs/ReturnsMigrationExecution.md); this
-  // button only appears once the order has a completed (returnable) item.
-  await showToast(translate('Returns are not available here yet.'));
-}
-
-async function runOrderStatusAction(action: any) {
-  if (!order.value) return;
-  const orderId = order.value.id;
-  if (action.id === 'ORDER_CANCELLED') {
-    await cancelOrder(orderId);
-    return;
-  }
-  if (action.color === 'danger') {
-    const alert = await alertController.create({
-      header: translate(action.label),
-      message: translate("Are you sure you want to change this order's status?"),
-      buttons: [
-        { text: translate('Cancel'), role: 'cancel' },
-        { text: translate(action.label), role: 'confirm', handler: () => { changeOrderStatus(orderId, action.toStatusId); } }
-      ]
-    });
-    await alert.present();
-    return;
-  }
-  await changeOrderStatus(orderId, action.toStatusId);
-}
-
-async function cancelOrder(orderId: string) {
-  const items = groupedItems.value
-    .flatMap((group: any) => group.items)
-    .filter((item: any) => !['ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId))
-    .map((item: any) => ({
-      orderItemSeqId: item.orderItemSeqId,
-      shipGroupSeqId: item.shipGroupSeqId,
-      reason: 'NO_VARIANCE_LOG',
-      comment: ''
-    }));
-  if (!items.length) return;
-  const alert = await alertController.create({
-    header: translate('Cancel order'),
-    message: translate("Are you sure you want to cancel this order?"),
-    buttons: [
-      { text: translate('Cancel'), role: 'cancel' },
-      {
-        text: translate('Cancel order'),
-        role: 'confirm',
-        handler: async () => {
-          try {
-            await orderTaskStore.cancelOrder(orderId, items);
-            await showToast(translate('Order cancelled successfully.'));
-            await loadOrder(orderId, true);
-          } catch {
-            await showToast(translate('Failed to cancel the order. Please try again.'));
-          }
-        }
-      }
-    ]
-  });
-  await alert.present();
-}
-
-async function changeOrderStatus(orderId: string, statusId: string) {
-  try {
-    await api({
-      url: `oms/orders/${orderId}/status`,
-      method: 'POST',
-      data: { orderId, statusId, setItemStatus: true }
-    });
-    await showToast(translate('Order status updated successfully.'));
-    await loadOrder(orderId, true);
-  } catch {
-    await showToast(translate('Failed to update the order status. Please try again.'));
-  }
-}
-
-async function openAddTaskModal(shipGroup: any) {
-  const modal = await modalController.create({ component: AddOrderTaskModal });
-  await modal.present();
-  const { data, role } = await modal.onWillDismiss();
-  if (role !== 'confirm' || !data) return;
-  try {
-    await api({
-      url: 'oms/orders/tasks',
-      method: 'POST',
-      data: [{
-        orderId: order.value!.id,
-        shipGroupSeqId: shipGroup.id,
-        workEffortName: data.workEffortName,
-        workEffortTypeId: data.workEffortTypeId,
-        workEffortPurposeTypeId: data.workEffortPurposeTypeId,
-        description: data.description,
-        statusId: 'TASK_CREATED'
-      }]
-    });
-    await showToast(translate('Tasks created successfully.'));
-  } catch {
-    await showToast(translate('Failed to create tasks. Please try again.'));
-  }
-}
-
-// Create one or more hold tasks for the current order directly from the Holds
-// tab. Single-ship-group orders default automatically; multi-ship-group orders
-// let the user pick which ship groups to add the task to.
-async function openCreateHoldTaskModal() {
-  const currentOrder = order.value;
-  if (!currentOrder) return;
-
-  const shipGroups = (currentOrder.shipGroups ?? []).map((shipGroup: any) => ({
-    id: shipGroup.id,
-    label: shipGroup.facilityName ? `${shipGroup.id} · ${shipGroup.facilityName}` : shipGroup.id,
-  }));
-  if (!shipGroups.length) {
-    await showToast(translate('This order has no ship groups to add a task to.'));
-    return;
-  }
-
-  const modal = await modalController.create({
-    component: AddOrderTaskModal,
-    componentProps: {
-      shipGroups,
-      title: translate('Create hold task'),
-      defaultWorkEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
-    },
-  });
-  await modal.present();
-  const { data, role } = await modal.onWillDismiss();
-  if (role !== 'confirm' || !data) return;
-
-  const shipGroupSeqIds: string[] = data.shipGroupSeqIds?.length
-    ? data.shipGroupSeqIds
-    : shipGroups.map((shipGroup) => shipGroup.id);
-  const orderId = currentOrder.id;
-  try {
-    await api({
-      url: 'oms/orders/tasks',
-      method: 'POST',
-      data: shipGroupSeqIds.map((shipGroupSeqId) => ({
-        orderId,
-        shipGroupSeqId,
-        workEffortName: data.workEffortName,
-        workEffortTypeId: data.workEffortTypeId,
-        workEffortPurposeTypeId: data.workEffortPurposeTypeId,
-        description: data.description,
-        statusId: 'TASK_CREATED',
-      })),
-    });
-    await showToast(translate('Tasks created successfully.'));
-    selectedSegment.value = 'holds';
-    await reloadHoldTasks();
-  } catch {
-    await showToast(translate('Failed to create tasks. Please try again.'));
-  }
-}
-
-async function openAddItemModal(shipGroup: any) {
-  const modal = await modalController.create({
-    component: AddItemToOrderModal,
-    componentProps: { orderId: order.value!.id, shipGroupSeqId: shipGroup.id, onItemAdded: () => loadOrder(order.value!.id) },
-  });
-  await modal.present();
-  const { role } = await modal.onWillDismiss();
-  if (role === 'confirm') {
-    await loadOrder(order.value!.id, true);
-  }
-}
-
-async function parkSelectedItems(shipGroup: any) {
-  const validation = shipGroupActionValidation(shipGroup, 'PARK_ITEMS');
-  if (!validation.allowed) {
-    await showUnavailableAction(validation);
-    return;
-  }
-
-  const itemIds = actionableItemObjectsForShipGroup(shipGroup)
-    .filter((item: any) => !OrderActionValidator.isItemTerminal(item))
-    .map((item: any) => item.orderItemSeqId);
-  if (!itemIds.length) return;
-  const facilityId = await openFacilityModal();
-  if (!facilityId) return;
-  const orderId = order.value!.id;
-  try {
-    for(let orderItemSeqId of itemIds) {
-      await api({
-        url: `oms/orders/${orderId}/moveItemToParking`,
-        method: 'POST',
-        data: { orderId, orderItemSeqId, shipGroupSeqId: shipGroup.id, toFacilityId: facilityId },
-      })
-    }
-    selectedShipGroupItems.value[shipGroup.id] = new Set();
-    await showToast(translate('Items moved to parking.'));
-    await loadOrder(orderId, true);
-  } catch {
-    await showToast(translate('Failed to park items. Please try again.'));
-  }
-}
-
-async function rejectSelectedItems(shipGroup: any) {
-  const validation = shipGroupActionValidation(shipGroup, 'PULL_BACK');
-  if (!validation.allowed) {
-    await showUnavailableAction(validation);
-    return;
-  }
-
-  const itemIds = actionableItemObjectsForShipGroup(shipGroup)
-    .filter((item: any) => !OrderActionValidator.isItemTerminal(item))
-    .map((item: any) => item.orderItemSeqId);
-  if (!itemIds.length) return;
-
-  const modal = await modalController.create({ component: RejectItemsModal });
-  await modal.present();
-  const { data, role } = await modal.onWillDismiss();
-  if (role !== 'confirm') return;
-
-  const rejectionReasonId = data?.rejectionReasonId;
-  const orderId = order.value!.id;
-  try {
-    await api({
-      url: `oms/orders/${orderId}/reject`,
-      method: 'POST',
-      data: {
-        orderId,
-        items: itemIds.map((orderItemSeqId) => ({
-          orderItemSeqId,
-          quantity: '1',
-          rejectionReasonId,
-        })),
-      },
-    });
-    selectedShipGroupItems.value[shipGroup.id] = new Set();
-    await showToast(translate('Items rejected successfully.'));
-    await loadOrder(orderId, true);
-  } catch {
-    await showToast(translate('Failed to reject items. Please try again.'));
-  }
-}
-
-async function releaseSelectedItems(shipGroup: any) {
-  const validation = shipGroupActionValidation(shipGroup, 'RELEASE');
-  if (!validation.allowed) {
-    await showUnavailableAction(validation);
-    return;
-  }
-
-  const releasableItems = actionableItemObjectsForShipGroup(shipGroup)
-    .filter((item: any) => OrderActionValidator.isItemPreFulfill(item));
-  const itemIds = releasableItems.map((item: any) => item.orderItemSeqId);
-  if (!itemIds.length) return;
-  const facilityId = await openFacilityInventoryModal(releasableItems);
-  if (!facilityId) return;
-  const orderId = order.value!.id;
-  try {
-    for(let orderItemSeqId of itemIds) {
-      await api({
-        url: `oms/orders/${orderId}/items/${orderItemSeqId}/allocation`,
-        method: 'POST',
-        data: {
-          facilityId,
-          orderFacilityChange:{
-          changeReasonEnumId: "RELEASED"
-          }
-        },
-      })
-    }
-    selectedShipGroupItems.value[shipGroup.id] = new Set();
-    await showToast(translate('Items released to facility.'));
-    await loadOrder(orderId, true);
-  } catch {
-    await showToast(translate('Failed to release items. Please try again.'));
-  }
-}
 </script>
 
 <style scoped>

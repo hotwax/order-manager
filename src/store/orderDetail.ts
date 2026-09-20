@@ -3,6 +3,8 @@ import { api, commonUtil, logger} from "@common";
 import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useSeedStore } from "./seed";
+import { enrichOrder } from "@/utils/orderDetailEnrichment";
+import type { EnrichedOrder } from "@/types/orderDetail";
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error" | "notfound";
 
@@ -295,6 +297,31 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     currentEntry: (state) => state.byOrderId[state.currentOrderId] || null,
     isLoading: (state) => state.byOrderId[state.currentOrderId]?.status === "loading",
     error: (state) => state.byOrderId[state.currentOrderId]?.error || "",
+
+    enrichedOrderByOrderId(): (orderId: string) => EnrichedOrder | null {
+      return (orderId: string) => {
+        const raw = this.orderById(orderId);
+        if (!raw) return null;
+        return enrichOrder(
+          raw,
+          {
+            facilityChanges: this.facilityChangeEventsByOrderId(orderId),
+            unfillable: this.unfillableAttemptsByOrderId(orderId),
+            issuanceByItem: this.issuanceByItemSeqIdByOrderId(orderId),
+            riskAssessments: this.riskAssessmentsByOrderId[orderId] || [],
+            timelineByShipGroup: this.timelineByShipGroupByOrderId(orderId),
+            returnedQtyBySeqId: this.returnedQtyByItemSeqIdByOrderId(orderId),
+          },
+          {
+            seedStore: useSeedStore(),
+            productCache: useProductCacheStore(),
+          }
+        );
+      };
+    },
+    currentEnrichedOrder(): EnrichedOrder | null {
+      return this.currentOrderId ? this.enrichedOrderByOrderId(this.currentOrderId) : null;
+    },
 
     orderById: (state) => (orderId: string) => state.byOrderId[orderId]?.payload || null,
     loadingById: (state) => (orderId: string) => state.byOrderId[orderId]?.status === "loading",
@@ -1028,10 +1055,21 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         )
       );
     },
+    async loadOrderAggregate(orderId: string, options?: { force?: boolean }) {
+      if (!orderId) return;
+      this.currentOrderId = orderId;
+      await Promise.allSettled([
+        this.fetchOrder(orderId, options?.force),
+        this.fetchFulfillmentTimeline(orderId),
+        this.fetchOrderEvents(orderId, options?.force),
+        this.fetchInventoryIssuance(orderId, options?.force),
+        this.fetchRiskAssessments(orderId, options?.force),
+        this.fetchCommEvents(orderId),
+      ]);
+    },
     async setCurrentOrder(orderId: string) {
       this.currentOrderId = orderId;
-      await this.fetchOrder(orderId);
-      this.fetchFulfillmentTimeline(orderId);
+      await this.loadOrderAggregate(orderId);
     },
     reset() {
       this.$reset();

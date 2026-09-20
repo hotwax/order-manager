@@ -15,6 +15,7 @@ vi.mock('@common', () => ({
   cookieHelper: () => ({
     get: () => ''
   }),
+  translate: (key: string) => key,
   logger: {
     debug: vi.fn(),
     error: vi.fn(),
@@ -327,6 +328,47 @@ describe('order detail store', () => {
         }
       ]
     });
+  });
+
+  it('builds an enriched order domain model with precomputed ship groups, items, and action capabilities', () => {
+    const store = useOrderDetailStore();
+    store.byOrderId.M100821 = {
+      payload: {
+        orderId: 'M100821',
+        orderName: 'Order #100821',
+        statusId: 'ORDER_APPROVED',
+        currencyUom: 'USD',
+        grandTotal: 63.98,
+        shipGroups: [{
+          shipGroupSeqId: '00001',
+          facilityId: 'BROADWAY',
+          items: [{
+            orderItemSeqId: '01',
+            productId: 'P1001',
+            externalId: '15617773142165',
+            unitPrice: 59,
+            quantity: 1,
+            statusId: 'ITEM_APPROVED',
+          }]
+        }]
+      },
+      status: 'loaded',
+      loadedAt: '',
+      error: ''
+    };
+
+    const enriched = store.enrichedOrderByOrderId('M100821');
+    expect(enriched).toBeTruthy();
+    expect(enriched?.id).toBe('M100821');
+    expect(enriched?.orderName).toBe('Order #100821');
+    expect(enriched?.shipGroups).toHaveLength(1);
+    expect(enriched?.shipGroups[0].id).toBe('00001');
+    expect(enriched?.shipGroups[0].headerTitle).toContain('00001');
+    expect(enriched?.shipGroups[0].items).toHaveLength(1);
+    expect(enriched?.shipGroups[0].items[0].id).toBe('01');
+    expect(enriched?.shipGroups[0].items[0].actions).toHaveProperty('canCancel');
+    expect(enriched?.shipGroups[0].items[0].actions).toHaveProperty('canTransfer');
+    expect(enriched?.totals.total).toBe(59);
   });
 });
 
