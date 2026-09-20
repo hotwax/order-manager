@@ -336,7 +336,21 @@ async function loadMoreAddressValidationTasks(event: any) {
 
 onIonViewWillEnter(async () => {
   loadPhysicalFacilities();
-  await seedStore.loadGeos();
+
+  // The cards name a country from the geo dataset, so the queue waits for it. The page's own
+  // loading state has to be raised for that wait too: with nothing in the store yet, the
+  // template would otherwise render the "no addresses to review" empty state for the whole of
+  // the geo request, and a request that never settles would leave that false answer on screen.
+  // Only when there is nothing to show — a revisit keeps its hydrated cards, as the task fetch
+  // itself does. The fetch raises the flag again in the same tick, so there is no flicker.
+  const showFullLoading = !addressValidationTasks.value.length;
+  if (showFullLoading) loading.value = true;
+  try {
+    await seedStore.loadGeos();
+  } finally {
+    if (showFullLoading) loading.value = false;
+  }
+
   await replaceAddressValidationTasks();
 });
 </script>
