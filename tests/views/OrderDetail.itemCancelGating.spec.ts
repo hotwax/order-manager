@@ -22,7 +22,7 @@ describe('order detail per-item cancel gating', () => {
     expect(itemList).not.toContain("ITEM_CANCELLED', 'ITEM_COMPLETED'].includes(item.statusId)");
   });
 
-  it('asks the same validator the action runs, with the row's own item context', () => {
+  it("asks the same validator the action runs, with the row's own item context", () => {
     expect(source).toContain("OrderActionValidator.validateItemAction(order.value, item, 'CANCEL_ITEM', itemActionContext(item))");
   });
 
