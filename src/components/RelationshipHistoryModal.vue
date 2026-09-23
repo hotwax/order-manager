@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>Relationship History</ion-title>
+      <ion-title>{{ translate('Relationship History') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -38,7 +38,7 @@
     </ion-list>
 
     <div v-else class="ion-padding ion-text-center">
-      <p>No relationship history for this customer.</p>
+      <p>{{ translate('No relationship history for this customer.') }}</p>
     </div>
   </ion-content>
 </template>

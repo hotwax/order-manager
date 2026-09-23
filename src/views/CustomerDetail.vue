@@ -161,22 +161,22 @@
       <!-- ===== Segment ===== -->
       <ion-segment v-model="selectedSegment" scrollable>
         <ion-segment-button value="dashboard">
-          <ion-label>Dashboard</ion-label>
+          <ion-label>{{ translate('Dashboard') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="tasks">
-          <ion-label>Tasks</ion-label>
+          <ion-label>{{ translate('Tasks') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="unfillable">
-          <ion-label>Unfillable</ion-label>
+          <ion-label>{{ translate('Unfillable') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="orders">
-          <ion-label>Orders</ion-label>
+          <ion-label>{{ translate('Orders') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button v-if="canViewReturns" value="returns">
-          <ion-label>Returns</ion-label>
+          <ion-label>{{ translate('Returns') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="comms">
-          <ion-label>Comms</ion-label>
+          <ion-label>{{ translate('Comms') }}</ion-label>
         </ion-segment-button>
       </ion-segment>
 
