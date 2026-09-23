@@ -32,3 +32,7 @@
 ## 2024-08-30 - Localizing UI Text
 **Learning:** Found multiple instances of hardcoded UI strings (e.g., 'View history', 'Merged Contacts', 'Merge') in template files that missed the localization pass. This leads to inconsistent user experience for international users who expect all interface elements to be translated.
 **Action:** Always wrap plain text strings in Vue templates with the application's `translate()` function (e.g., `{{ translate('Text') }}`) to ensure full localization coverage.
+
+## 2024-03-12 - Inline Validation on Forms
+**Learning:** Found a UX gap in form validation, specifically in `CreateOrder.vue` for the line item quantity. Previously, validation only showed a toast notification on submission instead of inline error messages near the invalid input.
+**Action:** When working on inputs that have specific constraints (e.g., quantity > 0), use Ionic's built in `:error-text` and `:class="{ 'ion-invalid ion-touched': condition }"` to provide immediate contextual inline validation, improving user feedback and reducing form submission friction.
