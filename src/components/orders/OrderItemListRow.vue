@@ -30,6 +30,7 @@
           {{ primary }}
           <ion-badge v-if="badgeLabel" color="dark">{{ badgeLabel }}</ion-badge>
         </div>
+        <p v-if="features" class="order-item-features" :title="features">{{ features }}</p>
         <p v-if="secondary">{{ secondary }}</p>
       </ion-label>
     </ion-item>
@@ -63,7 +64,11 @@
     </div>
 
     <ion-label class="tablet order-item-status">
-      <ion-badge v-if="statusLabel" :color="statusColor">{{ statusLabel }}</ion-badge>
+      <div v-if="statuses.length" class="order-item-status-badges">
+        <ion-badge v-for="status in statuses" :key="status.label" :color="status.color || 'medium'">
+          {{ statusBadgeLabel(status) }}
+        </ion-badge>
+      </div>
       <p v-if="statusDetail">{{ statusDetail }}</p>
     </ion-label>
 
@@ -74,7 +79,9 @@
       </ion-note>
     </ion-label>
 
-    <div></div>
+    <div>
+      <slot name="actions" />
+    </div>
   </div>
 </template>
 
@@ -83,11 +90,14 @@ import { computed } from 'vue';
 import { IonBadge, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonThumbnail } from '@ionic/vue';
 import { businessOutline, listOutline } from 'ionicons/icons';
 import { DxpShopifyImg, translate } from '@common';
+import type { ItemStatusBadge } from '@/utils/itemStatusBadges';
 
 const props = withDefaults(defineProps<{
   primary: string;
   secondary?: string;
   badgeLabel?: string;
+  /** The variant's selectable features as one line, e.g. "Green M". */
+  features?: string;
   imageUrl?: string;
   previewProduct?: any;
   selectable?: boolean;
@@ -100,14 +110,14 @@ const props = withDefaults(defineProps<{
   facilityDisabled?: boolean;
   attributesLabel?: string;
   attributesDisabled?: boolean;
-  statusLabel?: string;
-  statusColor?: string;
+  statuses?: ItemStatusBadge[];
   statusDetail?: string;
   amount: string;
   adjustments?: Array<{ label: string; amount: string }>;
 }>(), {
   secondary: '',
   badgeLabel: '',
+  features: '',
   imageUrl: '',
   previewProduct: undefined,
   selectable: true,
@@ -118,8 +128,7 @@ const props = withDefaults(defineProps<{
   facilityDisabled: false,
   attributesLabel: '',
   attributesDisabled: false,
-  statusLabel: '',
-  statusColor: 'medium',
+  statuses: () => [],
   statusDetail: '',
   adjustments: () => [],
 });
@@ -131,6 +140,10 @@ const props = withDefaults(defineProps<{
  * `ion-accordion` header toggles the group — opt out with `selectOnRowClick`.
  */
 const rowSelects = computed(() => props.selectable && props.selectOnRowClick);
+
+function statusBadgeLabel(status: ItemStatusBadge): string {
+  return status.count == undefined ? status.label : `${status.count} ${status.label}`;
+}
 
 const emit = defineEmits<{
   (event: 'update:selected', value: boolean): void;
@@ -174,7 +187,24 @@ const emit = defineEmits<{
   text-align: center;
 }
 
+/* Badges stack inside the column so the grid cell keeps the display the row layout gives it. */
+.order-item-status-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacer-2xs);
+}
+
 .order-item-amount {
   min-width: 7rem;
 }
+
+/* A variant can carry many feature values — an e-gift card lists every denomination — and the
+   identity column is narrow. Keep features to one line and put the full value on hover. */
+.order-item-features {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 </style>

@@ -104,10 +104,10 @@
                 <div>
                   <h5 class="ion-margin-horizontal">{{ translate("Add items") }}</h5>
                   <ion-segment v-model="mode" @ionChange="segmentChange($event.target.value as string)">
-                    <ion-segment-button value="scan">
+                    <ion-segment-button value="scan" :aria-label="translate('Scan')">
                       <ion-icon :icon="barcodeOutline" />
                     </ion-segment-button>
-                    <ion-segment-button value="search">
+                    <ion-segment-button value="search" :aria-label="translate('Search')">
                       <ion-icon :icon="searchOutline" />
                     </ion-segment-button>
                   </ion-segment>
@@ -281,8 +281,9 @@
       </div>
 
       <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-        <ion-fab-button data-testid="create-order-submit-btn" @click="submitOrder" :aria-label="translate('Submit order')">
-          <ion-icon :icon="checkmarkDoneOutline" />
+        <ion-fab-button data-testid="create-order-submit-btn" @click="submitOrder" :aria-label="translate('Submit order')" :disabled="isSubmitting">
+          <ion-spinner v-if="isSubmitting" name="crescent" />
+          <ion-icon v-else :icon="checkmarkDoneOutline" />
         </ion-fab-button>
       </ion-fab>
     </ion-content>
@@ -311,6 +312,7 @@ const queryString = ref("");
 const isSearchingProduct = ref(false);
 const searchedProduct = ref({}) as any;
 const isScanningEnabled = ref(false);
+const isSubmitting = ref(false);
 
 const barcodeIdentifier = computed(() => useProductStore().getBarcodeIdentifierPref);
 const barcodeIdentificationDesc = computed(() => useProductStore().getBarcodeIdentifierOptions);
@@ -709,6 +711,7 @@ async function submitOrder() {
     tags: form.tags
   };
 
+  isSubmitting.value = true;
   emitter.emit('presentLoader', { message: 'Submitting Shopify Order...' });
 
   try {
@@ -736,6 +739,8 @@ async function submitOrder() {
     emitter.emit('dismissLoader');
     const errMsg = err?.message || translate('Error occurred while creating Shopify order.');
     await commonUtil.showToast(err?.message ? `${translate('Failed to create Shopify order:')} ${errMsg}` : errMsg);
+  } finally {
+    isSubmitting.value = false;
   }
 }
 

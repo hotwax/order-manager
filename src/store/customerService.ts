@@ -31,10 +31,7 @@ import { useUserStore } from '@/store/user';
 
 const CHANNELS = ['WEB_SALES_CHANNEL', 'POS_SALES_CHANNEL', 'MOBILE_SALES_CHANNEL', 'MARKETPLACE_CHANNEL'];
 const BROKERABLE_ORDER_STATUSES = ['ORDER_CREATED', 'ORDER_APPROVED'];
-// The Unfillable queue should only count orders whose parked item is still active
-// (created/approved) — not items that were since cancelled or completed.
 export const UNFILLABLE_FACILITY_ID = 'UNFILLABLE_PARKING';
-const UNFILLABLE_ITEM_STATUSES = ['ITEM_CREATED', 'ITEM_APPROVED'];
 // Holds already completed/cancelled orders per its own backend description, so it is an
 // archive rather than a work queue. It is the one virtual facility left out of the list.
 const GENERAL_OPS_PARKING_FACILITY_ID = 'GENERAL_OPS_PARKING';
@@ -550,8 +547,10 @@ export const useCustomerServiceStore = defineStore('customerService', {
 
       try {
         const allFacilityIds = uniqueValues(facilities.map((facility) => facility.facilityId));
-        // Unfillable is counted with an extra item-status filter (item must be created/approved);
-        // the remaining virtual locations keep the order-status-only count.
+        // Unfillable is counted with UNFILLABLE_QUEUE_ORDER_STATUSES, the same statuses the
+        // Unfillable card and the Unfillable page use, so this row and the card can never
+        // report different totals for the same facility. The remaining virtual locations are
+        // brokering queues and keep the brokerable-status count.
         const otherFacilityIds = allFacilityIds.filter((facilityId) => facilityId !== UNFILLABLE_FACILITY_ID);
 
         const [otherCounts, unfillableCounts] = await Promise.all([
@@ -566,8 +565,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
             ? fetchVirtualLocationOrderCounts({
                 productStoreId,
                 facilityIds: [UNFILLABLE_FACILITY_ID],
-                status: BROKERABLE_ORDER_STATUSES,
-                itemStatus: UNFILLABLE_ITEM_STATUSES
+                status: UNFILLABLE_QUEUE_ORDER_STATUSES
               })
             : Promise.resolve([])
         ]);

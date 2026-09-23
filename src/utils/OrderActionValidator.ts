@@ -254,6 +254,14 @@ export interface OrderLifecycleContext {
 /* ── Lifecycle constants (kept local; mirror seed/ground-truth) ───────────── */
 
 const TERMINAL_ITEM_STATUSES = ['ITEM_CANCELLED', 'ITEM_COMPLETED'];
+// Ship-group actions a settled group must not offer. Every one of them acts on a shipment
+// that is still going to happen: moving the group through fulfillment, changing how it ships,
+// or adding work to it. Nothing is exempt — a group whose items have all stopped takes no
+// further input, including new tasks.
+const SETTLED_BLOCKED_ACTIONS = [
+  'BROKER', 'PARK_ITEMS', 'PULL_BACK', 'RELEASE', 'ADD_TASK', 'ADD_ITEMS',
+  'EDIT_CARRIER_METHOD', 'EDIT_ADDRESS'
+];
 // Product decision 2026-06-11: ORDER_REJECTED / ORDER_EXPIRED have no known
 // use case today and are intentionally NOT treated as terminal.
 const TERMINAL_ORDER_STATUSES = ['ORDER_CANCELLED', 'ORDER_COMPLETED'];
@@ -357,6 +365,19 @@ export const OrderActionValidator = {
   /** Item is in a terminal status (cancelled/completed). Matches OrderDetail.vue:215,228. */
   isItemTerminal(item: any): boolean {
     return TERMINAL_ITEM_STATUSES.includes(item?.statusId);
+  },
+
+  /**
+   * Every item in the ship group has stopped, so the group itself will not move again.
+   *
+   * The order-level `isOrderTerminal` check is not enough: a ship group can be fully
+   * cancelled inside an order that is still open, and until now nothing asked. Items
+   * without a `statusId` are ignored so a group whose statuses have not loaded reads as
+   * still moving rather than briefly locking itself.
+   */
+  isShipGroupSettled(shipGroup: any): boolean {
+    const known = (shipGroup?.items || []).filter((item: any) => item?.statusId);
+    return known.length > 0 && known.every((item: any) => this.isItemTerminal(item));
   },
 
   /** Item is still early enough in its lifecycle to be brokered/parked/released. */
@@ -634,9 +655,17 @@ export const OrderActionValidator = {
     const virtual = this.isVirtualFacility(shipGroup, ctx);
     const hasSelection = (selectedItems || []).length > 0;
 
+    // A settled ship group is read-only. Everything it can offer either moves the group
+    // through fulfillment, changes how it ships, or adds work to it, and none of that means
+    // anything once every item has stopped — a cancelled group offering a carrier change is
+    // the card contradicting itself.
+    if (SETTLED_BLOCKED_ACTIONS.includes(actionId) && this.isShipGroupSettled(shipGroup)) {
+      return { allowed: false, reason: 'Every item in this ship group has been cancelled or completed.' };
+    }
+
     switch (actionId) {
       /**
-       * BROKER — "Broker ship group" (OrderDetail.vue:604).
+       * BROKER — the "Broker" ship-group button.
        * Holds intentionally do NOT gate this (product decision 2026-06-11:
        * hold tasks never prevent a ship group from being brokered).
        */
@@ -648,9 +677,8 @@ export const OrderActionValidator = {
       }
 
       /**
-       * PARK_ITEMS — the "Park Items" face of the dual button (OrderDetail.vue:605,
-       * shown when virtual). Moves selected not-yet-brokered items to a parking
-       * facility.
+       * PARK_ITEMS — the "Park" face of the dual ship-group button (shown when
+       * virtual). Moves selected not-yet-brokered items to a parking facility.
        */
       case 'PARK_ITEMS': {
         if (!virtual) return { allowed: false, reason: 'Items can only be parked from a virtual/brokering facility.' };
@@ -858,11 +886,11 @@ export const OrderActionValidator = {
     const actions: ShipGroupAction[] = [];
 
     if (virtual) {
-      actions.push({ id: 'BROKER', label: 'Broker ship group', validation: this.validateShipGroupAction(order, shipGroup, 'BROKER', selectedItems, ctx) });
-      actions.push({ id: 'PARK_ITEMS', label: 'Park Items', validation: this.validateShipGroupAction(order, shipGroup, 'PARK_ITEMS', selectedItems, ctx) });
+      actions.push({ id: 'BROKER', label: 'Broker', validation: this.validateShipGroupAction(order, shipGroup, 'BROKER', selectedItems, ctx) });
+      actions.push({ id: 'PARK_ITEMS', label: 'Park', validation: this.validateShipGroupAction(order, shipGroup, 'PARK_ITEMS', selectedItems, ctx) });
       actions.push({ id: 'RELEASE', label: 'Release', validation: this.validateShipGroupAction(order, shipGroup, 'RELEASE', selectedItems, ctx) });
     } else {
-      // Physical facility: the dual button shows "Pull back" instead of "Park Items".
+      // Physical facility: the dual button shows "Pull back" instead of "Park".
       actions.push({ id: 'PULL_BACK', label: 'Pull back', validation: this.validateShipGroupAction(order, shipGroup, 'PULL_BACK', selectedItems, ctx) });
     }
 

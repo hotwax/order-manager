@@ -208,8 +208,8 @@
                   </ion-thumbnail>
                   <ion-label class="ion-text-wrap">
                     <h2>{{ itemLabel(item) }}</h2>
-                    <p v-if="item.sku || item.productId">
-                      {{ item.sku || item.productId }}
+                    <p v-if="itemSecondaryLabel(item)">
+                      {{ itemSecondaryLabel(item) }}
                     </p>
                   </ion-label>
                 </div>
@@ -676,7 +676,22 @@ function itemAmount(item: ReturnItemDetail) {
 }
 
 function itemLabel(item: ReturnItemDetail) {
-  return item.productName || item.description || item.sku || item.productId || translate("Return item");
+  return productMaster.primaryId(productCache.getProduct(item.productId) || item, [
+    item.productName,
+    item.description,
+    item.sku,
+    item.productId,
+    translate("Return item")
+  ]);
+}
+
+// A returned line can predate the product cache, and a custom line has no catalog product at
+// all, so the item's own fields stay as fallbacks behind the operator's chosen identifier.
+function itemSecondaryLabel(item: ReturnItemDetail) {
+  return productMaster.secondaryId(productCache.getProduct(item.productId) || item, [
+    item.sku,
+    item.productId
+  ]);
 }
 
 function itemReferenceLabel(item: ReturnItemDetail) {

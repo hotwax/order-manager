@@ -142,6 +142,71 @@ describe('getOrderFooterActions (unified footer)', () => {
   });
 });
 
+describe('settled ship groups are read-only', () => {
+  const approvedOrder = { statusId: 'ORDER_APPROVED' };
+  const virtual = { isVirtual: true };
+  const group = (items: any[]) => ({
+    id: '00001',
+    facilityId: 'BROKERING_QUEUE',
+    facilityParentTypeId: 'VIRTUAL_FACILITY',
+    items,
+  });
+  const completed = { orderItemSeqId: '01', statusId: 'ITEM_COMPLETED' };
+  const cancelled = { orderItemSeqId: '02', statusId: 'ITEM_CANCELLED' };
+  const open = { orderItemSeqId: '03', statusId: 'ITEM_APPROVED' };
+
+  const check = (items: any[], actionId: any, selection = items) =>
+    OrderActionValidator.validateShipGroupAction(approvedOrder, group(items), actionId, selection, virtual);
+
+  it('recognises a group whose items have all stopped', () => {
+    expect(OrderActionValidator.isShipGroupSettled(group([completed, cancelled]))).toBe(true);
+    expect(OrderActionValidator.isShipGroupSettled(group([completed, open]))).toBe(false);
+  });
+
+  it('does not lock a group whose item statuses have not loaded', () => {
+    // Mid-load the card must read as still moving, not briefly freeze itself.
+    expect(OrderActionValidator.isShipGroupSettled(group([{ orderItemSeqId: '01' }]))).toBe(false);
+    expect(OrderActionValidator.isShipGroupSettled(group([]))).toBe(false);
+    expect(check([{ orderItemSeqId: '01' }], 'EDIT_CARRIER_METHOD').allowed).toBe(true);
+  });
+
+  it('blocks every action that would move or re-ship a cancelled group', () => {
+    const cancelledGroup = [cancelled];
+    for (const actionId of ['BROKER', 'PARK_ITEMS', 'RELEASE', 'ADD_TASK', 'ADD_ITEMS', 'EDIT_CARRIER_METHOD', 'EDIT_ADDRESS']) {
+      const result = check(cancelledGroup, actionId);
+      expect(result.allowed, actionId).toBe(false);
+      expect(result.reason, actionId).toBe('Every item in this ship group has been cancelled or completed.');
+    }
+  });
+
+  it('blocks the same actions on a completed and on a partially fulfilled group', () => {
+    expect(check([completed], 'EDIT_CARRIER_METHOD').allowed).toBe(false);
+    expect(check([completed, cancelled], 'EDIT_CARRIER_METHOD').allowed).toBe(false);
+    expect(check([completed, cancelled], 'ADD_ITEMS').allowed).toBe(false);
+  });
+
+  it('blocks pull back on a settled physical group', () => {
+    const physical = { id: '00001', facilityId: 'BROADWAY', items: [cancelled] };
+    const result = OrderActionValidator.validateShipGroupAction(
+      approvedOrder, physical, 'PULL_BACK', [cancelled], { isVirtual: false }
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toBe('Every item in this ship group has been cancelled or completed.');
+  });
+
+  it('blocks adding a task to a group that has stopped', () => {
+    expect(check([cancelled], 'ADD_TASK').allowed).toBe(false);
+    expect(check([completed, cancelled], 'ADD_TASK').allowed).toBe(false);
+    // ...but a group still in motion takes tasks as before.
+    expect(check([completed, open], 'ADD_TASK').allowed).toBe(true);
+  });
+
+  it('leaves a group with any open item fully actionable', () => {
+    expect(check([completed, open], 'EDIT_CARRIER_METHOD').allowed).toBe(true);
+    expect(check([completed, open], 'BROKER', []).allowed).toBe(true);
+  });
+});
+
 describe('ship-group fulfillment approval gate', () => {
   const createdOrder = { statusId: 'ORDER_CREATED' };
   const approvedOrder = { statusId: 'ORDER_APPROVED' };
@@ -230,5 +295,74 @@ describe('ship-group fulfillment approval gate', () => {
       'REJECT_AND_RELEASE',
       { isVirtual: false }
     ).allowed).toBe(true);
+  });
+});
+
+/**
+ * The per-row Cancel button reads this, so what it refuses is what the row must not offer.
+ * A row that only checked the item's own status would offer every case below.
+ */
+describe('validateItemAction CANCEL_ITEM', () => {
+  const approvedItem = { orderItemSeqId: '01', statusId: 'ITEM_APPROVED' };
+  const cancellable = new Set(['ITEM_CANCELLED', 'ITEM_COMPLETED']);
+
+  it('allows cancelling a live item on a live order the table lets reach ITEM_CANCELLED', () => {
+    const result = OrderActionValidator.validateItemAction(
+      { statusId: 'ORDER_APPROVED' },
+      approvedItem,
+      'CANCEL_ITEM',
+      { itemAllowedToStatusIds: cancellable, allItems: [approvedItem] }
+    );
+    expect(result.allowed).toBe(true);
+  });
+
+  it('refuses a live item once the ORDER is terminal', () => {
+    ['ORDER_COMPLETED', 'ORDER_CANCELLED'].forEach((statusId) => {
+      const result = OrderActionValidator.validateItemAction(
+        { statusId },
+        approvedItem,
+        'CANCEL_ITEM',
+        { itemAllowedToStatusIds: cancellable, allItems: [approvedItem] }
+      );
+      expect(result.allowed).toBe(false);
+      expect(result.reason).toMatch(/Order is already/);
+    });
+  });
+
+  it('refuses when the status flow has no ITEM_CANCELLED edge from the current item status', () => {
+    const result = OrderActionValidator.validateItemAction(
+      { statusId: 'ORDER_APPROVED' },
+      approvedItem,
+      'CANCEL_ITEM',
+      { itemAllowedToStatusIds: new Set(['ITEM_COMPLETED']), allItems: [approvedItem] }
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/status flow/);
+  });
+
+  it('refuses when store policy restricts cancellation to another ship group phase', () => {
+    const result = OrderActionValidator.validateItemAction(
+      { statusId: 'ORDER_APPROVED' },
+      approvedItem,
+      'CANCEL_ITEM',
+      {
+        itemAllowedToStatusIds: cancellable,
+        allItems: [approvedItem],
+        policy: { cancelAllowedWhen: 'unbrokered' },
+        timeline: { firstBrokeredDate: 1_700_000_000_000 }
+      }
+    );
+    expect(result.allowed).toBe(false);
+    expect(result.reason).toMatch(/policy/i);
+  });
+
+  it('still refuses an item that is itself terminal', () => {
+    const result = OrderActionValidator.validateItemAction(
+      { statusId: 'ORDER_APPROVED' },
+      { orderItemSeqId: '01', statusId: 'ITEM_COMPLETED' },
+      'CANCEL_ITEM',
+      { itemAllowedToStatusIds: cancellable, allItems: [] }
+    );
+    expect(result.allowed).toBe(false);
   });
 });

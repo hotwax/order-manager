@@ -1,15 +1,15 @@
 import { DateTime, Settings } from "luxon";
 import { defineStore } from "pinia";
 import { api, commonUtil, cookieHelper, logger, translate } from "@common";
-import { clearAllCaches } from "@common/cache";
+import { clearLocalDb } from "@common/db";
 import { useAuth } from "@common/composables/useAuth";
 import { showToast } from "@/utils";
-import { orderManagerDb } from "@/cache/appCacheDb";
+import { getOrderManagerDb } from "@/db/orderManagerDb";
 import { useSeedStore } from "./seed";
 import { useOrderDetailStore } from "./orderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useProductStore } from "@/store/productStore";
-import { getCacheSyncToken, startAppCacheSync } from "@/services/appCacheSync";
+import { getSyncToken, startAppDbSync } from "@/services/appDbSync";
 
 export const useUserStore = defineStore("user", {
   state: () => ({
@@ -171,16 +171,16 @@ export const useUserStore = defineStore("user", {
         await useProductStore().fetchProductStores();
         await useProductStore().fetchProductStorePreference();
 
-        // Start non-blocking Web Worker sync to hydrate and update IndexedDB cache
-        startAppCacheSync(getCacheSyncToken(), () => useSeedStore().populateFromCache())
+        // Start non-blocking Web Worker sync to hydrate and update the local IndexedDB
+        startAppDbSync(getSyncToken(), () => useSeedStore().populateFromDb())
           .catch((err) => {
-            logger.warn("Cache background sync notice:", err);
+            logger.warn("Database background sync notice:", err);
           });
 
-        // Initialize in-memory seed store from cache/API
-        await useSeedStore().initSeedCache();
+        // Initialize in-memory seed store from the local database/API
+        await useSeedStore().initSeedDb();
 
-        // On a fresh login the cache is still filling in the worker, so load whatever the seed
+        // On a fresh login the database is still filling in the worker, so load whatever the seed
         // store does not have yet directly from the API rather than waiting on the bootstrap.
         const productStoreIds = (useProductStore().productStores || [])
           .map((store: any) => store.productStoreId)
@@ -191,7 +191,7 @@ export const useUserStore = defineStore("user", {
       }
     },
     async postLogout() {
-      await clearAllCaches(orderManagerDb);
+      await clearLocalDb(getOrderManagerDb(commonUtil.getOMSInstanceName()));
       useSeedStore().resetSeedData();
       useOrderDetailStore().reset();
       useProductCacheStore().reset();

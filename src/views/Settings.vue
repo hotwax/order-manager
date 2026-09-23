@@ -111,7 +111,7 @@
             <div class="card-header">
               <div>
                 <ion-card-title>{{ translate('Data Fetch Status') }}</ion-card-title>
-                <ion-card-subtitle v-if="cacheSubtitle">{{ cacheSubtitle }}</ion-card-subtitle>
+                <ion-card-subtitle v-if="syncSubtitle">{{ syncSubtitle }}</ion-card-subtitle>
               </div>
               <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()" :aria-label="translate('Refresh all data')">
                 <ion-spinner v-if="refreshing === '*'" name="dots" slot="icon-only" />
@@ -120,7 +120,7 @@
             </div>
           </ion-card-header>
           <ion-list lines="none">
-            <!-- Session data: held in memory, not in the local cache. -->
+            <!-- Session data: held in memory, not in the local database. -->
             <ion-item v-for="item in sessionFetchStatus" :key="item.label">
               <ion-icon slot="start" :icon="getStatusIcon(item.status)" :color="getStatusColor(item.status)" />
               <ion-label>
@@ -133,9 +133,9 @@
               </ion-button>
             </ion-item>
 
-            <!-- Local cache (IndexedDB): live row counts straight from the database. -->
+            <!-- Local database (IndexedDB): live row counts straight from the database. -->
             <ion-item-divider>
-              <ion-label>{{ translate("Local cache") }} · {{ totalRows }} {{ translate("records") }}</ion-label>
+              <ion-label>{{ translate("Local database") }} · {{ totalRows }} {{ translate("records") }}</ion-label>
             </ion-item-divider>
             <ion-item v-for="domain in domains" :key="domain.name">
               <ion-icon slot="start" :icon="getStatusIcon(domain.status)" :color="getStatusColor(domain.status)" />
@@ -225,12 +225,12 @@ import { checkmarkCircle, closeCircle, closeOutline, openOutline, saveOutline, s
 import { DateTime } from 'luxon';
 import { computed, onBeforeMount, ref } from 'vue';
 import { api, commonUtil, cookieHelper, i18n, translate } from '@common';
-import { useCacheStatus } from '@common/cache';
+import { useDbStatus } from '@common/db';
 import { useAuth } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
-import { orderManagerDb } from '@/cache/appCacheDb';
-import { ORDER_MANAGER_CACHE_CATALOG } from '@/config/appSyncConfig';
+import { getOrderManagerDb } from '@/db/orderManagerDb';
+import { ORDER_MANAGER_SYNC_CATALOG } from '@/config/appSyncConfig';
 import DxpProductIdentifier from "@/components/settings/DxpProductIdentifier.vue";
 import DxpAppVersionInfo from "@/components/settings/DxpAppVersionInfo.vue";
 import Actions from "@/authorization/actions";
@@ -361,16 +361,16 @@ function clearSearch() {
   isLoading.value = true;
 }
 
-// Live IndexedDB cache status
+// Live IndexedDB status
 const {
   domains, refreshing, totalRows, oldestSyncedAt, lastSyncedAt, refreshDomain, refreshAll,
-} = useCacheStatus(orderManagerDb, ORDER_MANAGER_CACHE_CATALOG);
+} = useDbStatus(getOrderManagerDb(commonUtil.getOMSInstanceName()), ORDER_MANAGER_SYNC_CATALOG);
 
 const formatSyncTime = (millis: number) =>
   DateTime.fromMillis(millis).toLocaleString(DateTime.DATETIME_MED);
 
-const cacheSubtitle = computed(() => {
-  if (!lastSyncedAt.value) return translate("Cache not synced yet");
+const syncSubtitle = computed(() => {
+  if (!lastSyncedAt.value) return translate("Database not synced yet");
   const parts = [`${translate("Last sync:")} ${formatSyncTime(lastSyncedAt.value)}`];
   if (oldestSyncedAt.value && oldestSyncedAt.value !== lastSyncedAt.value) {
     parts.push(`${translate("oldest:")} ${formatSyncTime(oldestSyncedAt.value)}`);

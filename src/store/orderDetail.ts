@@ -35,7 +35,8 @@ const adjustmentUniqueKey = (adj: any, fallbackSeqId = "") =>
     adj.shipGroupSeqId || "",
     adj.orderAdjustmentTypeId || "",
     adjustmentDisplayLabel(adj),
-    Number(adj.amount || 0)
+    Number(adj.amount || 0),
+    Number(adj.amountAlreadyIncluded || 0)
   ].join("|");
 
 const NON_CANCELLABLE_ITEM_STATUSES = new Set(["ITEM_CANCELLED", "ITEM_COMPLETED"]);
@@ -411,6 +412,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       });
 
       const adjustments: Record<string, number> = {};
+      const includedAdjustments: Record<string, number> = {};
       let adjustmentsTotal = 0;
       const seenAdjustments = new Set<string>();
 
@@ -422,8 +424,18 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         const amount = Number(adj.amount || 0);
         adjustmentsTotal += amount;
 
+        const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
+        const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
         const label = adjustmentDisplayLabel(adj);
-        adjustments[label] = (adjustments[label] || 0) + amount;
+
+        // Included and excluded amounts stay in separate buckets: a label can carry both
+        // (an included tax on one item, an ordinary one on another), and merging them would
+        // label the ordinary amount "included" while it still adds to the grand total.
+        if (isIncluded) {
+          includedAdjustments[label] = (includedAdjustments[label] || 0) + amountAlreadyIncluded;
+        } else {
+          adjustments[label] = (adjustments[label] || 0) + amount;
+        }
       };
 
       (current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
@@ -440,11 +452,16 @@ export const useOrderDetailStore = defineStore("orderDetail", {
           delete adjustments[key];
         }
       });
+      Object.keys(includedAdjustments).forEach((key) => {
+        if (includedAdjustments[key] === 0) {
+          delete includedAdjustments[key];
+        }
+      });
 
       const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
       const total = computedTotal || current.grandTotal || 0;
 
-      return { subtotal, adjustments, total };
+      return { subtotal, adjustments, total, includedAdjustments };
     },
 
     allItemsByOrderId: (state) => (orderId: string) => {
@@ -563,9 +580,13 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       return map;
     },
 
-    /** Adjustments grouped by orderItemExternalId and comment, summing their amounts. */
-    adjustmentsByExternalId(): Record<string, Record<string, number>> {
-      const index: Record<string, Record<string, number>> = {};
+    /**
+     * Adjustments grouped by orderItemExternalId, summing their amounts. Inclusion is carried
+     * as metadata rather than baked into the label so the view can translate it at render time,
+     * and so an included and an ordinary adjustment sharing a label stay separate rows.
+     */
+    adjustmentsByExternalId(): Record<string, Array<{ label: string; amount: number; isIncluded: boolean }>> {
+      const index: Record<string, Record<string, { label: string; amount: number; isIncluded: boolean }>> = {};
       const seqIdToExtId = this.itemExternalIdBySeqId;
       const seenAdjustments = new Set<string>();
 
@@ -575,9 +596,17 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         const uniqueKey = `${extId}:${adjustmentUniqueKey(adj, seqId)}`;
         if (seenAdjustments.has(uniqueKey)) return;
         seenAdjustments.add(uniqueKey);
-        const comment = adjustmentDisplayLabel(adj);
+
+        const amount = Number(adj.amount || 0);
+        const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
+        const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
+        const displayAmount = isIncluded ? amountAlreadyIncluded : amount;
+        const label = adjustmentDisplayLabel(adj);
+        const bucketKey = isIncluded ? `${label}\u0000included` : label;
+
         if (!index[extId]) index[extId] = {};
-        index[extId][comment] = (index[extId][comment] || 0) + Number(adj.amount || 0);
+        const bucket = index[extId][bucketKey] || (index[extId][bucketKey] = { label, amount: 0, isIncluded });
+        bucket.amount += displayAmount;
       };
 
       // 1. Process top-level adjustments (which carry orderItemSeqId)
@@ -598,7 +627,9 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         });
       });
 
-      return index;
+      return Object.fromEntries(
+        Object.entries(index).map(([extId, buckets]) => [extId, Object.values(buckets)])
+      );
     },
 
     /** Rolled up item price totals (sum of unitPrice * quantity) grouped by orderItemExternalId */
@@ -638,8 +669,8 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     },
 
     /** Order totals (subtotal, adjustments grouped by comment/type, total) */
-    totals(): { subtotal: number; adjustments: Record<string, number>; total: number } {
-      if (!this.current) return { subtotal: 0, adjustments: {}, total: 0 };
+    totals(): { subtotal: number; adjustments: Record<string, number>; total: number; includedAdjustments: Record<string, number> } {
+      if (!this.current) return { subtotal: 0, adjustments: {}, total: 0, includedAdjustments: {} };
 
       let subtotal = 0;
       (this.current.shipGroups || []).forEach((sg: any) => {
@@ -649,6 +680,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       });
 
       const adjustments: Record<string, number> = {};
+      const includedAdjustments: Record<string, number> = {};
       let adjustmentsTotal = 0;
       const seenAdjustments = new Set<string>();
 
@@ -660,8 +692,18 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         const amount = Number(adj.amount || 0);
         adjustmentsTotal += amount;
 
+        const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
+        const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
         const label = adjustmentDisplayLabel(adj);
-        adjustments[label] = (adjustments[label] || 0) + amount;
+
+        // Included and excluded amounts stay in separate buckets: a label can carry both
+        // (an included tax on one item, an ordinary one on another), and merging them would
+        // label the ordinary amount "included" while it still adds to the grand total.
+        if (isIncluded) {
+          includedAdjustments[label] = (includedAdjustments[label] || 0) + amountAlreadyIncluded;
+        } else {
+          adjustments[label] = (adjustments[label] || 0) + amount;
+        }
       };
 
       (this.current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
@@ -678,6 +720,11 @@ export const useOrderDetailStore = defineStore("orderDetail", {
           delete adjustments[key];
         }
       });
+      Object.keys(includedAdjustments).forEach((key) => {
+        if (includedAdjustments[key] === 0) {
+          delete includedAdjustments[key];
+        }
+      });
 
       // Sum the rows actually displayed (subtotal + every adjustment, including tax) rather than
       // trusting the backend's grandTotal, which has been observed to exclude tax. Round to avoid
@@ -685,7 +732,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
       const total = computedTotal || this.current.grandTotal || 0;
 
-      return { subtotal, adjustments, total };
+      return { subtotal, adjustments, total, includedAdjustments };
     },
 
     /** Flat list of all items across ship groups, each carrying its ship group context. */
@@ -718,7 +765,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     riskAssessmentsStatus: (state): LoadStatus => state.riskAssessmentsStatusByOrderId[state.currentOrderId] || "idle",
     riskAssessmentsError: (state): string => state.riskAssessmentsErrorByOrderId[state.currentOrderId] || "",
 
-    /** Shipping methods for a given carrier partyId, derived from the fetched carrierShipmentMethods list or local cache. */
+    /** Shipping methods for a given carrier partyId, derived from the fetched carrierShipmentMethods list or the local database. */
     shippingMethodsByCarrier: (state) => (carrierPartyId: string) => {
       const fromDetail = state.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId);
       if (fromDetail.length) return fromDetail;

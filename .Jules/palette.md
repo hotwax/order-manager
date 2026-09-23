@@ -32,6 +32,13 @@
 ## 2024-08-30 - Localizing UI Text
 **Learning:** Found multiple instances of hardcoded UI strings (e.g., 'View history', 'Merged Contacts', 'Merge') in template files that missed the localization pass. This leads to inconsistent user experience for international users who expect all interface elements to be translated.
 **Action:** Always wrap plain text strings in Vue templates with the application's `translate()` function (e.g., `{{ translate('Text') }}`) to ensure full localization coverage.
+## 2024-05-14 - FAB Button Loading States
+**Learning:** In Ionic applications, `<ion-fab-button>` elements behave differently than standard `<ion-button>` elements when adding loading states. While a standard icon-only `<ion-button>` requires `slot="icon-only"` on its inner `<ion-spinner>` to maintain layout, an `<ion-fab-button>` centers its content by default, and its inner elements do not need the `slot="icon-only"` attribute.
+**Action:** When adding async loading feedback to primary action `<ion-fab-button>` elements, use standard `v-if/v-else` conditional rendering to swap the `<ion-icon>` with an `<ion-spinner>` without worrying about slot overrides, while remembering to bind `:disabled="isSubmitting"` to prevent double submissions.
+
+## 2026-09-19 - Add aria-labels to icon-only ion-segment-button
+**Learning:** In Ionic Vue, icon-only `<ion-segment-button>` components require an explicit `:aria-label` (using the `translate()` function) to ensure proper screen reader accessibility, as they lack visible text.
+**Action:** Always verify that icon-only buttons (including segment buttons, fab buttons) have appropriate ARIA attributes.
 
 ## 2024-03-12 - Inline Validation on Forms
 **Learning:** Found a UX gap in form validation, specifically in `CreateOrder.vue` for the line item quantity. Previously, validation only showed a toast notification on submission instead of inline error messages near the invalid input.
