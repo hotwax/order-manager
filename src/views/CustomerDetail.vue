@@ -46,11 +46,11 @@
                   <ion-item class="contact-section" lines="none">
                     <ion-label color="medium">{{ section.label }}</ion-label>
                     <ion-button v-if="!section.values.length" slot="end" fill="clear" size="small" @click="onAddContact(section.contactMechTypeId)">
-                      Add
+                      {{ translate('Add') }}
                       <ion-icon slot="end" :icon="addCircleOutline" />
                     </ion-button>
                     <ion-button v-else slot="end" fill="clear" size="small" @click="onEditContact(section)">
-                      Edit
+                      {{ translate('Edit') }}
                       <ion-icon slot="end" :icon="pencilOutline" />
                     </ion-button>
                   </ion-item>
@@ -79,7 +79,7 @@
                       <p>{{ relationship.relatedPartyId }}</p>
                     </ion-label>
                     <ion-button slot="end" fill="outline" size="small" :disabled="!relationship.active" @click="onExpireRelationship(relationship)">
-                      {{ relationship.active ? 'Expire' : 'Expired' }}
+                      {{ relationship.active ? translate('Expire') : translate('Expired') }}
                     </ion-button>
                   </ion-item>
                   <ion-item v-if="!personalRelationships.length" lines="none">
@@ -87,15 +87,15 @@
                   </ion-item>
                 </ion-list>
                 <div class="card-actions">
-                  <ion-button fill="clear" size="small" @click="onViewRelationshipHistory('personal')">View history</ion-button>
-                  <ion-button fill="clear" size="small" @click="onAddRelationship()">Add new</ion-button>
+                  <ion-button fill="clear" size="small" @click="onViewRelationshipHistory('personal')">{{ translate('View history') }}</ion-button>
+                  <ion-button fill="clear" size="small" @click="onAddRelationship()">{{ translate('Add new') }}</ion-button>
                 </div>
               </ion-card>
 
               <!-- Merged contacts -->
               <ion-card>
                 <ion-card-header>
-                  <ion-card-title>Merged Contacts</ion-card-title>
+                  <ion-card-title>{{ translate('Merged Contacts') }}</ion-card-title>
                 </ion-card-header>
                 <ion-list lines="none">
                   <!-- Already-merged duplicates (active only; expired ones are in View history) -->
@@ -107,7 +107,7 @@
                         <p>{{ duplicate.isCanonical ? duplicate.duplicatePartyId : duplicate.canonicalPartyId }}</p>
                       </ion-label>
                       <ion-button slot="end" fill="outline" size="small" @click="onExpireDuplicateRelationship(duplicate)">
-                        Expire
+                        {{ translate('Expire') }}
                       </ion-button>
                     </ion-item>
                   </template>
@@ -123,7 +123,7 @@
                     </ion-button>
                     <ion-button slot="end" fill="solid" size="small" color="primary" :disabled="mergingIds.includes(candidate.partyId)" @click="onMergeCandidate(candidate.partyId)" :aria-label="translate('Merge customer')">
                       <ion-spinner v-if="mergingIds.includes(candidate.partyId)" name="crescent" slot="icon-only" />
-                      <template v-else>Merge</template>
+                      <template v-else>{{ translate('Merge') }}</template>
                     </ion-button>
                   </ion-item>
                   <ion-item v-if="!hasActiveDuplicateRelationship && !mergableDuplicates.length" lines="none">
@@ -131,7 +131,7 @@
                   </ion-item>
                 </ion-list>
                 <div class="card-actions">
-                  <ion-button fill="clear" size="small" @click="onViewRelationshipHistory('duplicate')">View history</ion-button>
+                  <ion-button fill="clear" size="small" @click="onViewRelationshipHistory('duplicate')">{{ translate('View history') }}</ion-button>
                 </div>
               </ion-card>
             </div>
@@ -185,7 +185,7 @@
         <!-- Open tasks — first task only; full list is in the Tasks segment -->
         <div class="section-header">
           <h2>{{ translate('Open tasks') }}</h2>
-          <ion-button fill="outline" size="small" @click="selectedSegment = 'tasks'">View all</ion-button>
+          <ion-button fill="outline" size="small" @click="selectedSegment = 'tasks'">{{ translate('View all') }}</ion-button>
         </div>
 
         <HoldTaskCard
@@ -203,8 +203,8 @@
 
         <!-- Recent orders (real when present, placeholder until the Solr orders query lands) -->
         <div class="section-header">
-          <h2>Recent orders</h2>
-          <ion-button fill="outline" size="small" @click="selectedSegment = 'orders'">View all</ion-button>
+          <h2>{{ translate('Recent orders') }}</h2>
+          <ion-button fill="outline" size="small" @click="selectedSegment = 'orders'">{{ translate('View all') }}</ion-button>
         </div>
 
         <div class="ion-padding-horizontal">
