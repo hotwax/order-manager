@@ -35,3 +35,6 @@
 ## 2024-05-14 - FAB Button Loading States
 **Learning:** In Ionic applications, `<ion-fab-button>` elements behave differently than standard `<ion-button>` elements when adding loading states. While a standard icon-only `<ion-button>` requires `slot="icon-only"` on its inner `<ion-spinner>` to maintain layout, an `<ion-fab-button>` centers its content by default, and its inner elements do not need the `slot="icon-only"` attribute.
 **Action:** When adding async loading feedback to primary action `<ion-fab-button>` elements, use standard `v-if/v-else` conditional rendering to swap the `<ion-icon>` with an `<ion-spinner>` without worrying about slot overrides, while remembering to bind `:disabled="isSubmitting"` to prevent double submissions.
+## $(date +%Y-%m-%d) - Native Tooltips for Icon-Only Buttons
+**Learning:** Native `title` attributes act as effective and simple tooltips for icon-only `<ion-button>` elements that aren't instantly obvious to sighted users.
+**Action:** When auditing or implementing icon-only buttons, add a native HTML `:title` attribute wrapped in the application's `translate()` function to improve discoverability alongside the existing `:aria-label`.

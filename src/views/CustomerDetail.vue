@@ -8,7 +8,7 @@
         </ion-buttons>
         <ion-title>Customer Detail</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="onDeleteCustomer" :disabled="deleting || customer?.statusId === 'PARTY_DISABLED'" :aria-label="translate('Delete customer')">
+          <ion-button @click="onDeleteCustomer" :disabled="deleting || customer?.statusId === 'PARTY_DISABLED'" :aria-label="translate('Delete customer')" :title="translate('Delete customer')">
             <ion-spinner v-if="deleting" name="crescent" slot="icon-only" />
             <ion-icon v-else slot="icon-only" :icon="trashOutline" />
           </ion-button>
@@ -118,10 +118,10 @@
                       <h3>{{ candidate.name }}</h3>
                       <p>{{ candidate.partyId }}</p>
                     </ion-label>
-                    <ion-button slot="end" fill="clear" size="small" :router-link="`/customers/${candidate.partyId}`" :aria-label="translate('Open customer profile')">
+                    <ion-button slot="end" fill="clear" size="small" :router-link="`/customers/${candidate.partyId}`" :aria-label="translate('Open customer profile')" :title="translate('Open customer profile')">
                       <ion-icon slot="icon-only" :icon="openOutline" />
                     </ion-button>
-                    <ion-button slot="end" fill="solid" size="small" color="primary" :disabled="mergingIds.includes(candidate.partyId)" @click="onMergeCandidate(candidate.partyId)" :aria-label="translate('Merge customer')">
+                    <ion-button slot="end" fill="solid" size="small" color="primary" :disabled="mergingIds.includes(candidate.partyId)" @click="onMergeCandidate(candidate.partyId)" :aria-label="translate('Merge customer')" :title="translate('Merge customer')">
                       <ion-spinner v-if="mergingIds.includes(candidate.partyId)" name="crescent" slot="icon-only" />
                       <template v-else>{{ translate('Merge') }}</template>
                     </ion-button>

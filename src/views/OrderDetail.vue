@@ -485,7 +485,7 @@
               <div class="ship-group-status-toggle">
                 <p>{{ shipGroupStatusLabel(shipGroup) }}</p>
                 <!-- A counter sale has one state, so there is nothing to expand into. -->
-                <ion-button v-if="!isPosCompleted(shipGroup)" fill="clear" color="medium" @click="toggleShipGroup(shipGroup.id)" :aria-label="translate('Toggle ship group')">
+                <ion-button v-if="!isPosCompleted(shipGroup)" fill="clear" color="medium" @click="toggleShipGroup(shipGroup.id)" :aria-label="translate('Toggle ship group')" :title="translate('Toggle ship group')">
                   <ion-icon slot="icon-only" :icon="isShipGroupExpanded(shipGroup.id) ? chevronUp : chevronDown" />
                 </ion-button>
               </div>
@@ -545,6 +545,7 @@
                     fill="clear"
                     color="medium"
                     :aria-label="translate('Clear gift message')"
+                    :title="translate('Clear gift message')"
                     @click.stop="clearGiftMessage(shipGroup)"
                   >
                     <ion-icon slot="icon-only" :icon="trashOutline" />
@@ -706,7 +707,7 @@
                     <!-- Inventory lookup answers "can we still fulfil this?"; the goods have
                          already left the store. What matters instead is whether the stock
                          they left with came off the books. -->
-                    <ion-button v-if="!isPosCompleted(shipGroup)" slot="end" fill="clear" color="medium" @click.stop="viewInventory(item.productId)" :aria-label="translate('View inventory')">
+                    <ion-button v-if="!isPosCompleted(shipGroup)" slot="end" fill="clear" color="medium" @click.stop="viewInventory(item.productId)" :aria-label="translate('View inventory')" :title="translate('View inventory')">
                       <ion-icon slot="icon-only" :icon="cubeOutline" />
                     </ion-button>
                     <div v-else-if="itemIssuanceBadges[item.id]" slot="end" class="ship-group-item-issuance">
@@ -767,7 +768,7 @@
                     <p slot="end" v-if="!isVirtualFacility(shipGroup) && shipGroupDistances[shipGroup.id]">
                       {{ shipGroupDistances[shipGroup.id] }} {{ translate('miles') }}
                     </p>
-                    <ion-button slot="end" fill="clear" color="medium" :id="'shipping-opt-trigger-' + shipGroup.id" :aria-label="translate('Shipping options')">
+                    <ion-button slot="end" fill="clear" color="medium" :id="'shipping-opt-trigger-' + shipGroup.id" :aria-label="translate('Shipping options')" :title="translate('Shipping options')">
                       <ion-icon slot="icon-only" :icon="ellipsisVertical" />
                     </ion-button>
                     <ion-popover :trigger="'shipping-opt-trigger-' + shipGroup.id" dismiss-on-select
