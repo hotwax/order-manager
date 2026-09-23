@@ -1046,13 +1046,15 @@
              action that doesn't apply to the order simply isn't rendered. -->
         <ion-buttons slot="start">
           <ion-button v-for="action in footerActions.filter(a => a.kind === 'status')" :key="action.id"
-            :color="action.color" :fill="action.fill" @click="runFooterAction(action)">
+            :color="action.color" :fill="action.fill" :disabled="!!performingActionId" @click="runFooterAction(action)">
+            <ion-spinner v-if="performingActionId === action.id" name="crescent" slot="start" />
             {{ footerActionLabel(action) }}
           </ion-button>
         </ion-buttons>
         <ion-buttons slot="end">
           <ion-button v-for="action in footerActions.filter(a => a.kind === 'footer')" :key="action.id"
-            :color="action.color" :fill="action.fill" @click="runFooterAction(action)">
+            :color="action.color" :fill="action.fill" :disabled="!!performingActionId" @click="runFooterAction(action)">
+            <ion-spinner v-if="performingActionId === action.id" name="crescent" slot="start" />
             {{ footerActionLabel(action) }}
           </ion-button>
         </ion-buttons>
@@ -1071,7 +1073,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
+import { IonAccordion, IonAccordionGroup, IonBackButton, IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent, IonFab, IonFabButton, IonFooter, IonHeader, IonIcon, IonInput, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonNote, IonPage, IonPopover, IonProgressBar, IonSegment, IonSegmentButton, IonSpinner, IonSelect, IonSelectOption, IonSkeletonText, IonTextarea, IonThumbnail, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { DateTime } from 'luxon';
 import { arrowUndoOutline, calendarOutline, checkmarkDoneOutline, chevronDown, chevronUp, closeCircleOutline, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline, downloadOutline, ellipsisVertical, giftOutline, mailOutline, openOutline, pauseCircleOutline, pulseOutline, saveOutline, sendOutline, shieldOutline, storefrontOutline, sunnyOutline, swapHorizontalOutline, ticketOutline, timeOutline, trashOutline, warningOutline } from 'ionicons/icons';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -1119,6 +1121,7 @@ const props = defineProps<{
 }>();
 
 const orderDetailStore = useOrderDetailStore();
+const performingActionId = ref<string | null>(null);
 const seed = useSeedStore();
 const productCache = useProductCacheStore();
 const customerStore = useCustomerStore();
@@ -3319,6 +3322,7 @@ async function cancelOrderItems() {
         text: translate('Cancel items'),
         role: 'confirm',
         handler: async () => {
+          performingActionId.value = 'CANCEL_ITEMS';
           try {
             await orderTaskStore.cancelOrder(raw.orderId, itemsSnapshot.map((item: any) => ({
               orderItemSeqId: item.orderItemSeqId,
@@ -3331,6 +3335,8 @@ async function cancelOrderItems() {
             await loadOrder(raw.orderId, true);
           } catch {
             await showToast(translate('Failed to cancel the selected items. Please try again.'));
+          } finally {
+            performingActionId.value = null;
           }
         }
       }
@@ -3459,13 +3465,19 @@ const footerActions = computed(() => {
     .filter((action: any) => action.kind === 'status' || DISPATCHABLE_FOOTER_IDS.has(action.id));
 });
 
-function runFooterAction(action: any) {
-  // Dispatch by id (not kind) — the cancel button rides on the start as
-  // kind 'status' in both modes, but CANCEL_ITEMS has its own handler.
+async function runFooterAction(action: any) {
+  if (performingActionId.value) return;
+
   switch (action.id) {
-    case 'CLONE': return openCloneOrderModal();
+    case 'CLONE':
+      performingActionId.value = action.id;
+      try { await openCloneOrderModal(); } finally { performingActionId.value = null; }
+      break;
     case 'CANCEL_ITEMS': return cancelOrderItems();
-    case 'RETURN': return startReturn();
+    case 'RETURN':
+      performingActionId.value = action.id;
+      try { await startReturn(); } finally { performingActionId.value = null; }
+      break;
     default: return runOrderStatusAction(action); // status transitions (Approve, Cancel order, …)
   }
 }
@@ -3497,13 +3509,25 @@ async function runOrderStatusAction(action: any) {
       message: translate("Are you sure you want to change this order's status?"),
       buttons: [
         { text: translate('Cancel'), role: 'cancel' },
-        { text: translate(action.label), role: 'confirm', handler: () => { changeOrderStatus(orderId, action.toStatusId); } }
+        { text: translate(action.label), role: 'confirm', handler: async () => {
+          performingActionId.value = action.id;
+          try {
+            await changeOrderStatus(orderId, action.toStatusId);
+          } finally {
+            performingActionId.value = null;
+          }
+        } }
       ]
     });
     await alert.present();
     return;
   }
-  await changeOrderStatus(orderId, action.toStatusId);
+  performingActionId.value = action.id;
+  try {
+    await changeOrderStatus(orderId, action.toStatusId);
+  } finally {
+    performingActionId.value = null;
+  }
 }
 
 async function cancelOrder(orderId: string) {
@@ -3526,12 +3550,15 @@ async function cancelOrder(orderId: string) {
         text: translate('Cancel order'),
         role: 'confirm',
         handler: async () => {
+          performingActionId.value = 'ORDER_CANCELLED';
           try {
             await orderTaskStore.cancelOrder(orderId, items);
             await showToast(translate('Order cancelled successfully.'));
             await loadOrder(orderId, true);
           } catch {
             await showToast(translate('Failed to cancel the order. Please try again.'));
+          } finally {
+            performingActionId.value = null;
           }
         }
       }

@@ -32,3 +32,6 @@
 ## 2024-08-30 - Localizing UI Text
 **Learning:** Found multiple instances of hardcoded UI strings (e.g., 'View history', 'Merged Contacts', 'Merge') in template files that missed the localization pass. This leads to inconsistent user experience for international users who expect all interface elements to be translated.
 **Action:** Always wrap plain text strings in Vue templates with the application's `translate()` function (e.g., `{{ translate('Text') }}`) to ensure full localization coverage.
+## 2024-09-02 - Guarding Async Footer Actions with Spinners
+**Learning:** Dynamic footer actions in `OrderDetail.vue` triggered asynchronous operations (like cancel, approve) but lacked feedback and did not disable themselves during the request. Unlike single-purpose buttons that bind their own `saving` refs, dynamic lists require a centralized state (e.g., `performingActionId`) to track which item is loading. This prevents double-clicks and communicates loading status clearly.
+**Action:** When implementing or auditing dynamic lists of asynchronous action buttons, ensure a shared state tracks the currently running action ID, disables the buttons during execution, and renders a localized loading spinner next to the action text.
