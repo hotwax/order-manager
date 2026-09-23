@@ -35,3 +35,6 @@
 ## 2024-05-14 - FAB Button Loading States
 **Learning:** In Ionic applications, `<ion-fab-button>` elements behave differently than standard `<ion-button>` elements when adding loading states. While a standard icon-only `<ion-button>` requires `slot="icon-only"` on its inner `<ion-spinner>` to maintain layout, an `<ion-fab-button>` centers its content by default, and its inner elements do not need the `slot="icon-only"` attribute.
 **Action:** When adding async loading feedback to primary action `<ion-fab-button>` elements, use standard `v-if/v-else` conditional rendering to swap the `<ion-icon>` with an `<ion-spinner>` without worrying about slot overrides, while remembering to bind `:disabled="isSubmitting"` to prevent double submissions.
+## 2024-10-25 - Empty States for Lists
+**Learning:** Found an `<ion-list>` without an empty state placeholder. This means the layout behaves inconsistently or completely collapses when data is empty.
+**Action:** Always include a fallback for empty lists, such as `<ion-item v-else lines="none"><ion-label color="medium" class="ion-text-center">{{ translate('No items found') }}</ion-label></ion-item>`.

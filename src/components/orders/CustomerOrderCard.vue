@@ -21,13 +21,20 @@
       <ion-list-header>
         <ion-label>{{ translate('Items') }}</ion-label>
       </ion-list-header>
-      <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
-        <ion-thumbnail slot="start">
-          <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
-        </ion-thumbnail>
-        <ion-label>
-          {{ item.name }}
-          <p>{{ item.secondary }}</p>
+      <template v-if="order.items?.length">
+        <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
+          <ion-thumbnail slot="start">
+            <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
+          </ion-thumbnail>
+          <ion-label>
+            {{ item.name }}
+            <p>{{ item.secondary }}</p>
+          </ion-label>
+        </ion-item>
+      </template>
+      <ion-item v-else lines="none">
+        <ion-label color="medium" class="ion-text-center">
+          {{ translate('No items found') }}
         </ion-label>
       </ion-item>
     </ion-list>
