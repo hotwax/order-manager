@@ -273,8 +273,9 @@
       </div>
 
       <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-        <ion-fab-button data-testid="create-order-submit-btn" @click="submitOrder" :aria-label="translate('Submit order')">
-          <ion-icon :icon="checkmarkDoneOutline" />
+        <ion-fab-button data-testid="create-order-submit-btn" :disabled="isSubmitting" @click="submitOrder" :aria-label="translate('Submit order')">
+          <ion-spinner v-if="isSubmitting" name="crescent" />
+          <ion-icon v-else :icon="checkmarkDoneOutline" />
         </ion-fab-button>
       </ion-fab>
     </ion-content>
@@ -336,6 +337,8 @@ const getProduct = (productId: string) => useProductCacheStore().getProduct(prod
 
 const scanInput = ref("") as any;
 const searchInput = ref("") as any;
+
+const isSubmitting = ref(false);
 
 const orderForm = ref({
   shopId: '',
@@ -701,7 +704,7 @@ async function submitOrder() {
     tags: form.tags
   };
 
-  emitter.emit('presentLoader', { message: 'Submitting Shopify Order...' });
+  isSubmitting.value = true;
 
   try {
     const response = await api({
@@ -709,8 +712,6 @@ async function submitOrder() {
       method: 'post',
       data: payload
     });
-
-    emitter.emit('dismissLoader');
 
     if (response?.data?.shopifyOrderName) {
       orderResponseData.value = {
@@ -725,9 +726,10 @@ async function submitOrder() {
       throw new Error("Invalid response schema from order API");
     }
   } catch (err: any) {
-    emitter.emit('dismissLoader');
     const errMsg = err?.message || translate('Error occurred while creating Shopify order.');
     await commonUtil.showToast(err?.message ? `${translate('Failed to create Shopify order:')} ${errMsg}` : errMsg);
+  } finally {
+    isSubmitting.value = false;
   }
 }
 
