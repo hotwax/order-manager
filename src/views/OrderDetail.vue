@@ -1122,7 +1122,7 @@ import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
 import FraudTaskCard from '@/components/tasks/FraudTaskCard.vue';
 import HoldTaskCard from '@/components/tasks/HoldTaskCard.vue';
 import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
-import { api, commonUtil, DxpShopifyImg, logger, translate, useSolrSearch } from '@common';
+import { api, commonUtil, DxpShopifyImg, emitter, logger, translate, useSolrSearch } from '@common';
 import { escapeSolrValue, summarizeBrokeredFacilities } from '@/services/order';
 import { getReturn } from '@/services/returns';
 import { inventoryTransferOpenQuantity, isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
@@ -3379,11 +3379,14 @@ async function brokerShipGroup(shipGroupSeqId: string) {
   const { data: routingGroupId } = await modal.onWillDismiss();
   if (!routingGroupId) return;
   try {
+    emitter.emit('presentLoader', { message: 'Brokering ship group...' });
     await orderTaskStore.brokerShipGroup({ routingGroupId, orderId: order.value!.id, shipGroupSeqId, productStoreId });
     await showToast(translate('Ship group brokered successfully.'));
-    await loadOrder(order.value!.id, true);
   } catch {
     await showToast(translate('Failed to broker the ship group. Please try again.'));
+  } finally {
+    emitter.emit('dismissLoader');
+    await loadOrder(order.value!.id, true);
   }
 }
 
@@ -3401,6 +3404,7 @@ async function cancelOrderItems() {
         role: 'confirm',
         handler: async () => {
           try {
+            emitter.emit('presentLoader', { message: 'Canceling items...' });
             await orderTaskStore.cancelOrder(raw.orderId, itemsSnapshot.map((item: any) => ({
               orderItemSeqId: item.orderItemSeqId,
               shipGroupSeqId: item.shipGroupSeqId,
@@ -3409,9 +3413,11 @@ async function cancelOrderItems() {
             })));
             selectedItemIds.value.clear();
             await showToast(translate('Selected items cancelled successfully.'));
-            await loadOrder(raw.orderId, true);
           } catch {
             await showToast(translate('Failed to cancel the selected items. Please try again.'));
+          } finally {
+            emitter.emit('dismissLoader');
+            await loadOrder(raw.orderId, true);
           }
         }
       }
