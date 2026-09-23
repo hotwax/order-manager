@@ -823,7 +823,8 @@
                       </ion-list>
                       <ion-fab vertical="bottom" horizontal="end" slot="fixed">
                         <ion-fab-button :disabled="savingShippingAddress" @click="saveShippingAddress(shipGroup)" :aria-label="translate('Save')">
-                          <ion-icon :icon="saveOutline" />
+                          <ion-spinner v-if="savingShippingAddress" name="crescent" />
+                          <ion-icon v-else :icon="saveOutline" />
                         </ion-fab-button>
                       </ion-fab>
                     </ion-content>

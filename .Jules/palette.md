@@ -28,4 +28,10 @@
 ## 2024-05-24 - External Link Indicators
 **Learning:** Adding an `openOutline` icon to buttons with `target="_blank"` improves predictability by visually warning users that the action will open in a new tab.
 **Action:** Always append `<ion-icon slot="end" :icon="openOutline" />` to elements that open external resources in a new tab.
-## 2026-08-08 - Adding loading states to destructive actions\n**Learning:** Destructive actions, such as deleting a customer profile, often use an icon-only button (e.g., trash icon) without visual feedback during asynchronous processing. In Vue and Ionic applications, these async processes typically have a reactive state flag (e.g., `deleting`).\n**Action:** When inspecting destructive or asynchronous actions in icon-only buttons, replace the default icon with an `<ion-spinner>` when the async state is true. Ensure the `<ion-spinner>` has the `slot="icon-only"` attribute to maintain proper alignment during loading.
+## 2026-08-08 - Adding loading states to destructive actions
+**Learning:** Destructive actions, such as deleting a customer profile, often use an icon-only button (e.g., trash icon) without visual feedback during asynchronous processing. In Vue and Ionic applications, these async processes typically have a reactive state flag (e.g., `deleting`).
+**Action:** When inspecting destructive or asynchronous actions in icon-only buttons, replace the default icon with an `<ion-spinner>` when the async state is true. Ensure the `<ion-spinner>` has the `slot="icon-only"` attribute to maintain proper alignment during loading.
+
+## 2024-08-26 - Missing loading states on Ionic Fab Buttons
+**Learning:** Found an `<ion-fab-button>` for an async form submission (`saveShippingAddress`) that used the `disabled` property during the operation, but lacked visual feedback (an `<ion-spinner>`). This is a common missed opportunity for micro-UX improvement where adding a conditional spinner makes the button state much clearer.
+**Action:** Always check async buttons, especially `ion-fab-button`s, for a loading state and ensure they swap out the icon for an `<ion-spinner>` when processing to provide immediate user feedback.
