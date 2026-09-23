@@ -27,6 +27,24 @@ describe('OrderItemListRow', () => {
     expect(detailSource).toContain(':select-on-row-click="false"');
   });
 
+  it('renders the action column slot the item rows pass a Cancel button into', () => {
+    // 447a92c rewrote the amount column and dropped the slot with it, leaving both
+    // `<template #actions>` blocks in OrderDetail.vue rendering nothing.
+    expect(rowSource).toContain('<slot name="actions" />');
+    expect(rowSource).not.toContain('<div></div>');
+    expect(detailSource).toContain('<template #actions>');
+  });
+
+  it('shows a product variant its selectable features under the primary identity', () => {
+    expect(rowSource).toContain('<p v-if="features" class="order-item-features" :title="features">{{ features }}</p>');
+    // A gift-card variant can carry every denomination, so the line must not grow the row.
+    expect(rowSource).toContain('text-overflow: ellipsis;');
+    // Above the secondary line, so the features read as part of the identity block.
+    expect(rowSource.indexOf('v-if="features"')).toBeLessThan(rowSource.indexOf('v-if="secondary"'));
+    expect(detailSource).toContain(':features="productFeatureLabel(group.productId)"');
+    expect(detailSource).toContain('return commonUtil.getFeatures(getProduct(productId)?.productFeatures);');
+  });
+
   it('hides visible quantity on single-unit item detail rows without removing the column', () => {
     expect(rowSource).toContain('<template v-if="showQuantity">');
     expect(detailSource).toContain(':show-quantity="false"');

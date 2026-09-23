@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { api, logger } from '@common';
@@ -69,6 +71,55 @@ vi.mock('@/store/user', () => ({
 vi.mock('@/utils/dashboardDate', () => ({
   getDashboardDateFilter: vi.fn(() => '2026-07-04'),
 }));
+
+describe('unfillable is counted the same way everywhere', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    vi.mocked(api).mockReset();
+    vi.mocked(logger.error).mockClear();
+    vi.mocked(searchOrders).mockReset();
+    vi.mocked(fetchUnfillableTrend).mockReset();
+    vi.mocked(fetchVirtualLocationOrderCounts).mockReset();
+  });
+
+  /**
+   * Issue #336: the Funnel's Unfillable Parking row and its Unfillable card counted the same
+   * facility with different filters, so the row disagreed with both the card and the page it
+   * links to. The filters coincide on datasets with no ORDER_HOLD orders, which is why this is
+   * pinned as an invariant rather than left to whatever data a given instance happens to hold.
+   */
+  it('asks for the same order statuses on the card and on the virtual-location row', async () => {
+    vi.mocked(searchOrders).mockResolvedValue({ total: 0, orders: [] } as any);
+    vi.mocked(fetchUnfillableTrend).mockResolvedValue({ points: [], days: [], totalOrders: 0 } as any);
+    vi.mocked(fetchVirtualLocationOrderCounts).mockResolvedValue([]);
+
+    const store = useCustomerServiceStore();
+
+    await store.fetchUnfillable('STORE_A');
+    const cardStatuses = vi.mocked(searchOrders).mock.calls[0][0].status;
+
+    // The action discovers its facilities from admin/facilities before counting them.
+    vi.mocked(api).mockResolvedValue({
+      data: [{ facilityId: 'UNFILLABLE_PARKING', facilityName: 'Unfillable Parking' }]
+    } as any);
+    await store.fetchVirtualLocationCounts('STORE_A');
+
+    const unfillableCall = vi.mocked(fetchVirtualLocationOrderCounts).mock.calls
+      .map(([params]) => params)
+      .find((params: any) => params.facilityIds.includes('UNFILLABLE_PARKING'));
+
+    expect(unfillableCall, 'no unfillable count was requested').toBeTruthy();
+    expect(unfillableCall!.status).toEqual(cardStatuses);
+    expect(cardStatuses).toContain('ORDER_HOLD');
+  });
+
+  it('does not narrow the unfillable row by item status', () => {
+    // The Unfillable page applies no item-status filter, so a count that did would report
+    // fewer orders than the page it links to.
+    const source = readFileSync(resolve(process.cwd(), 'src/store/customerService.ts'), 'utf8');
+    expect(source).not.toContain('itemStatus');
+  });
+});
 
 describe('customer service latest Funnel request scope', () => {
   beforeEach(() => {

@@ -12,6 +12,17 @@ export interface CachedProduct {
   parentProductName: string;
   internalName: string;
   mainImageUrl: string;
+  /** Solr `productFeatures` verbatim: `"SIZE/M"`-style entries, empty when the variant has none. */
+  productFeatures: string[];
+  /**
+   * The remaining static identifiers Settings > Product identifier offers
+   * (productStore.prepareProductIdentifierOptions). Cached so a store that identifies goods by
+   * any of them resolves from the cache instead of falling through to a call site's fallback.
+   */
+  groupId: string;
+  groupName: string;
+  primaryProductCategoryName: string;
+  title: string;
   goodIdentifications: ProductIdentification[];
   updatedAt: number;
 }
