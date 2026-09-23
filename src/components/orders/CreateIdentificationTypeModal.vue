@@ -38,7 +38,7 @@
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
       <ion-fab-button :disabled="saving" @click="createType()" :aria-label="translate('Create')">
-        <ion-spinner v-if="saving" name="crescent" />
+        <ion-spinner v-if="saving" name="crescent" slot="icon-only" />
         <ion-icon v-else :icon="checkmarkDoneOutline" />
       </ion-fab-button>
     </ion-fab>

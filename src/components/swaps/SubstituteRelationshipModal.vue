@@ -69,7 +69,7 @@
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
       <ion-fab-button :disabled="!dirty || saving" :aria-label="translate('Save')" @click="save()">
-        <ion-spinner v-if="saving" name="crescent" />
+        <ion-spinner v-if="saving" name="crescent" slot="icon-only" />
         <ion-icon v-else :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>

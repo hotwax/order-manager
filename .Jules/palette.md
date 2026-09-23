@@ -32,3 +32,6 @@
 ## 2024-08-30 - Localizing UI Text
 **Learning:** Found multiple instances of hardcoded UI strings (e.g., 'View history', 'Merged Contacts', 'Merge') in template files that missed the localization pass. This leads to inconsistent user experience for international users who expect all interface elements to be translated.
 **Action:** Always wrap plain text strings in Vue templates with the application's `translate()` function (e.g., `{{ translate('Text') }}`) to ensure full localization coverage.
+## 2024-09-02 - Missing slot="icon-only" on spinners in ion-fab-button
+**Learning:** When replacing an `<ion-icon>` with an `<ion-spinner>` inside an `<ion-fab-button>` during asynchronous operations (like saving or adding), the spinner must include the `slot="icon-only"` attribute. Without it, the Ionic layout gets disrupted when the spinner appears, causing visual jarring during the loading state.
+**Action:** When adding or auditing loading states in icon-only buttons (including `<ion-fab-button>`), ensure the `<ion-spinner>` element explicitly includes the `slot="icon-only"` attribute to maintain consistent spacing and alignment.

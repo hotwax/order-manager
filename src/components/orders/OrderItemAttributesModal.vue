@@ -79,7 +79,7 @@
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
       <ion-fab-button :disabled="!form.attrName.trim() || saving" :aria-label="translate('Add Attribute')" @click="addAttribute">
-        <ion-spinner v-if="saving" name="crescent" />
+        <ion-spinner v-if="saving" name="crescent" slot="icon-only" />
         <ion-icon v-else :icon="addOutline" />
       </ion-fab-button>
     </ion-fab>
