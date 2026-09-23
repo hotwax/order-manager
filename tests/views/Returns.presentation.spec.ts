@@ -34,6 +34,7 @@ describe("Find Returns integration surface", () => {
     expect(detail).not.toContain("approveReturn");
     expect(detail).not.toContain("completeReturn");
     expect(detail).not.toContain("pushToShopify");
+    expect(detail).not.toContain("openOutline");
   });
 
   it("uses compact accordion headers with the shared columnar return-item contract", () => {
