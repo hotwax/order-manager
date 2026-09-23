@@ -23,7 +23,7 @@
               {{ entry.typeLabel }}
             </ion-chip>
             <ion-badge :color="entry.active ? 'primary' : 'medium'">
-              {{ entry.active ? 'Active' : 'Expired' }}
+              {{ entry.active ? translate('Active') : translate('Expired') }}
             </ion-badge>
           </div>
           <h3>{{ entry.partyName }}</h3>
@@ -31,7 +31,7 @@
           <p class="date-range">
             {{ formatDate(entry.fromDate) }}
             <span v-if="entry.thruDate"> → {{ formatDate(entry.thruDate) }}</span>
-            <span v-else> → Active</span>
+            <span v-else> → {{ translate('Active') }}</span>
           </p>
         </ion-label>
       </ion-item>
