@@ -837,15 +837,21 @@
               <!-- Broker, park, pull back and release all move a group through fulfillment.
                    A counter sale has none left, so only the order-level actions remain. -->
               <ion-button v-if="isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)" fill="clear"
-                :disabled="isShipGroupActionDisabled(shipGroup, 'BROKER')" @click="brokerShipGroup(shipGroup.id)">{{
-                translate('Broker ship group') }}</ion-button>
+                :disabled="actionInFlight === 'broker_' + shipGroup.id || isShipGroupActionDisabled(shipGroup, 'BROKER')" @click="brokerShipGroup(shipGroup.id)">
+                <ion-spinner v-if="actionInFlight === 'broker_' + shipGroup.id" name="crescent" slot="start" />
+                {{ translate('Broker ship group') }}
+              </ion-button>
               <ion-button v-if="!isPosCompleted(shipGroup)" fill="clear"
-                :disabled="isShipGroupActionDisabled(shipGroup, isVirtualFacility(shipGroup) ? 'PARK_ITEMS' : 'PULL_BACK')"
-                @click="isVirtualFacility(shipGroup) ? parkSelectedItems(shipGroup) : rejectSelectedItems(shipGroup)">{{
-                  isVirtualFacility(shipGroup) ? translate('Park Items') : translate('Pull back') }}</ion-button>
+                :disabled="actionInFlight === 'park_' + shipGroup.id || actionInFlight === 'reject_' + shipGroup.id || isShipGroupActionDisabled(shipGroup, isVirtualFacility(shipGroup) ? 'PARK_ITEMS' : 'PULL_BACK')"
+                @click="isVirtualFacility(shipGroup) ? parkSelectedItems(shipGroup) : rejectSelectedItems(shipGroup)">
+                <ion-spinner v-if="actionInFlight === 'park_' + shipGroup.id || actionInFlight === 'reject_' + shipGroup.id" name="crescent" slot="start" />
+                {{ isVirtualFacility(shipGroup) ? translate('Park Items') : translate('Pull back') }}
+              </ion-button>
               <ion-button v-if="isVirtualFacility(shipGroup) && !isPosCompleted(shipGroup)" fill="clear"
-                :disabled="isShipGroupActionDisabled(shipGroup, 'RELEASE')" @click="releaseSelectedItems(shipGroup)">{{
-                  translate('Release') }}</ion-button>
+                :disabled="actionInFlight === 'release_' + shipGroup.id || isShipGroupActionDisabled(shipGroup, 'RELEASE')" @click="releaseSelectedItems(shipGroup)">
+                <ion-spinner v-if="actionInFlight === 'release_' + shipGroup.id" name="crescent" slot="start" />
+                {{ translate('Release') }}
+              </ion-button>
               <ion-button fill="clear" @click="openAddTaskModal(shipGroup)">{{ translate('Add Task') }}</ion-button>
               <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)" fill="clear" @click="openAddItemModal(shipGroup)">{{ translate('Add Items') }}</ion-button>
             </div>
@@ -1127,6 +1133,8 @@ const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_
 
 const loading = computed(() => orderDetailStore.loadingById(props.orderId));
 const error = computed(() => orderDetailStore.errorById(props.orderId));
+
+const actionInFlight = ref('');
 
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 const customerPartyId = computed(() => orderDetailStore.customerPartyIdByOrderId(props.orderId));
@@ -3297,12 +3305,15 @@ async function brokerShipGroup(shipGroupSeqId: string) {
   await modal.present();
   const { data: routingGroupId } = await modal.onWillDismiss();
   if (!routingGroupId) return;
+  actionInFlight.value = 'broker_' + shipGroupSeqId;
   try {
     await orderTaskStore.brokerShipGroup({ routingGroupId, orderId: order.value!.id, shipGroupSeqId, productStoreId });
     await showToast(translate('Ship group brokered successfully.'));
     await loadOrder(order.value!.id, true);
   } catch {
     await showToast(translate('Failed to broker the ship group. Please try again.'));
+  } finally {
+    actionInFlight.value = '';
   }
 }
 
@@ -3659,6 +3670,7 @@ async function parkSelectedItems(shipGroup: any) {
   const facilityId = await openFacilityModal();
   if (!facilityId) return;
   const orderId = order.value!.id;
+  actionInFlight.value = 'park_' + shipGroup.id;
   try {
     for(let orderItemSeqId of itemIds) {
       await api({
@@ -3672,6 +3684,8 @@ async function parkSelectedItems(shipGroup: any) {
     await loadOrder(orderId, true);
   } catch {
     await showToast(translate('Failed to park items. Please try again.'));
+  } finally {
+    actionInFlight.value = '';
   }
 }
 
@@ -3694,6 +3708,7 @@ async function rejectSelectedItems(shipGroup: any) {
 
   const rejectionReasonId = data?.rejectionReasonId;
   const orderId = order.value!.id;
+  actionInFlight.value = 'reject_' + shipGroup.id;
   try {
     await api({
       url: `oms/orders/${orderId}/reject`,
@@ -3712,6 +3727,8 @@ async function rejectSelectedItems(shipGroup: any) {
     await loadOrder(orderId, true);
   } catch {
     await showToast(translate('Failed to reject items. Please try again.'));
+  } finally {
+    actionInFlight.value = '';
   }
 }
 
@@ -3729,6 +3746,7 @@ async function releaseSelectedItems(shipGroup: any) {
   const facilityId = await openFacilityInventoryModal(releasableItems);
   if (!facilityId) return;
   const orderId = order.value!.id;
+  actionInFlight.value = 'release_' + shipGroup.id;
   try {
     for(let orderItemSeqId of itemIds) {
       await api({
@@ -3747,6 +3765,8 @@ async function releaseSelectedItems(shipGroup: any) {
     await loadOrder(orderId, true);
   } catch {
     await showToast(translate('Failed to release items. Please try again.'));
+  } finally {
+    actionInFlight.value = '';
   }
 }
 </script>

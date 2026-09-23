@@ -32,3 +32,6 @@
 ## 2024-08-30 - Localizing UI Text
 **Learning:** Found multiple instances of hardcoded UI strings (e.g., 'View history', 'Merged Contacts', 'Merge') in template files that missed the localization pass. This leads to inconsistent user experience for international users who expect all interface elements to be translated.
 **Action:** Always wrap plain text strings in Vue templates with the application's `translate()` function (e.g., `{{ translate('Text') }}`) to ensure full localization coverage.
+## 2024-05-15 - Async Interaction Feedback with Context
+**Learning:** In list views with multiple items that trigger the same async operation (e.g., fulfilling ship groups in OrderDetail.vue), tracking global "loading" boolean state breaks down.
+**Action:** When implementing interaction feedback on multiple repeating actions, use a dynamic string/ID tracker (e.g., `actionInFlight.value = 'broker_' + shipGroup.id`) rather than a simple boolean to ensure the UI spinner and disabled state specifically attach to the item being operated on, rather than disabling all elements on the page.
