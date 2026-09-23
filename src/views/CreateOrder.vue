@@ -241,7 +241,7 @@
                   :label="translate('Qty')"
                   label-placement="floating"
                   min="0"
-                  :class="{ 'ion-invalid ion-touched': lineItem.quantity <= 0 }"
+                  :class="{ 'ion-invalid ion-touched': !lineItem.quantity || lineItem.quantity <= 0 }"
                   :error-text="translate('Quantity must be greater than 0')"
                 />
               </ion-item>
