@@ -197,17 +197,18 @@
                   <p>{{ id.typeLabel }}</p>
                   {{ id.idValue }}
                 </ion-label>
-                <a
+                <ion-button
                   v-if="id.shopifyAdminUrl"
                   slot="end"
+                  fill="clear"
                   :href="id.shopifyAdminUrl"
                   target="_blank"
                   rel="noopener noreferrer"
                   :aria-label="translate('View in Shopify')"
                   :title="translate('View in Shopify')"
                 >
-                  <ion-icon :icon="openOutline" />
-                </a>
+                  <ion-icon slot="icon-only" :icon="openOutline" />
+                </ion-button>
               </ion-item>
             </ion-list>
           </ion-card>
