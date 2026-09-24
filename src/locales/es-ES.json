@@ -904,5 +904,11 @@
   "{count} items by order date": "{count} artículos por fecha de pedido",
   "{count} items by order date since {date}": "{count} artículos por fecha de pedido desde {date}",
   "Order {orderId} was not found in the database. It may have been removed, or a stale search index is still listing it.": "No se encontró el pedido {orderId} en la base de datos. Es posible que se haya eliminado o que un índice de búsqueda desactualizado lo siga mostrando.",
-  "This order appears to have already been cloned — an order with external ID {externalId} already exists.": "Parece que este pedido ya fue clonado: ya existe un pedido con el ID externo {externalId}."
+  "This order appears to have already been cloned — an order with external ID {externalId} already exists.": "Parece que este pedido ya fue clonado: ya existe un pedido con el ID externo {externalId}.",
+  "Customer name": "Nombre del cliente",
+  "years": "años",
+  "months": "meses",
+  "days": "días",
+  "hours": "horas",
+  "minutes": "minutos"
 }

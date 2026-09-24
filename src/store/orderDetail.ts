@@ -8,7 +8,9 @@ import { useUserStore } from "./user";
 import Actions from "@/authorization/actions";
 import { escapeSolrValue } from "@/services/order";
 import { getReturn } from "@/services/returns";
-import { enrichOrder, timelineMillis } from "@/utils/orderDetailEnrichment";
+import { enrichOrder, isPosCompletedShipGroup, type ExchangeChild } from "@/utils/orderDetailEnrichment";
+import { timelineMillis } from "@/utils/orderDetailDates";
+import { adjustmentAmount, adjustmentKey, adjustmentLabel } from "@/utils/orderAdjustments";
 import type { EnrichedOrder } from "@/types/orderDetail";
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error" | "notfound";
@@ -24,27 +26,66 @@ const HEADER_SEQ_ID = "_NA_";
 
 const newEntry = (): OrderEntry => ({ payload: null, status: "idle", loadedAt: "", error: "" });
 
-// Order adjustments (e.g. tax) commonly carry only an orderAdjustmentTypeId, no free-text
-// comment/description — fall back to the seeded enum description so rows show "Sales Tax"
-// rather than the raw "SALES_TAX" id. This also backs the rollup grouping key below, so
-// adjustments only merge under their human-readable label, not the raw type id.
 const adjustmentDisplayLabel = (adj: any) =>
-  adj.comments
-  || adj.comment
-  || adj.description
-  || useSeedStore().orderAdjustmentTypeDescription(adj.orderAdjustmentTypeId)
-  || adj.orderAdjustmentTypeId
-  || "OTHER_ADJUSTMENT";
+  adjustmentLabel(adj, useSeedStore().orderAdjustmentTypeDescription, "OTHER_ADJUSTMENT");
 
 const adjustmentUniqueKey = (adj: any, fallbackSeqId = "") =>
-  adj.orderAdjustmentId || [
-    fallbackSeqId || adj.orderItemSeqId || "",
-    adj.shipGroupSeqId || "",
-    adj.orderAdjustmentTypeId || "",
-    adjustmentDisplayLabel(adj),
-    Number(adj.amount || 0),
-    Number(adj.amountAlreadyIncluded || 0)
-  ].join("|");
+  adjustmentKey(adj, adjustmentDisplayLabel(adj), fallbackSeqId);
+
+/**
+ * Subtotal, adjustments grouped by label, and grand total. Sums the rows actually displayed
+ * (subtotal + every adjustment, including tax) rather than trusting the backend's grandTotal,
+ * which has been observed to exclude tax. Rounded to avoid floating-point drift
+ * (e.g. 59 + 1.53 + 0.59 + 2.86 = 63.980000000000004).
+ */
+function orderTotals(order: any) {
+  if (!order) return { subtotal: 0, adjustments: {}, total: 0, includedAdjustments: {} };
+
+  let subtotal = 0;
+  (order.shipGroups || []).forEach((sg: any) => {
+    (sg.items || []).forEach((item: any) => {
+      subtotal += Number(item.unitPrice || 0) * Number(item.quantity || 0);
+    });
+  });
+
+  const adjustments: Record<string, number> = {};
+  const includedAdjustments: Record<string, number> = {};
+  let adjustmentsTotal = 0;
+  const seenAdjustments = new Set<string>();
+
+  const recordAdjustment = (adj: any, fallbackSeqId = "") => {
+    const uniqueKey = adjustmentUniqueKey(adj, fallbackSeqId);
+    if (seenAdjustments.has(uniqueKey)) return;
+    seenAdjustments.add(uniqueKey);
+
+    adjustmentsTotal += Number(adj.amount || 0);
+    const { amount, isIncluded } = adjustmentAmount(adj);
+    const label = adjustmentDisplayLabel(adj);
+
+    // Included and excluded amounts stay in separate buckets: a label can carry both
+    // (an included tax on one item, an ordinary one on another), and merging them would
+    // label the ordinary amount "included" while it still adds to the grand total.
+    const bucket = isIncluded ? includedAdjustments : adjustments;
+    bucket[label] = (bucket[label] || 0) + amount;
+  };
+
+  (order.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
+  (order.shipGroups || []).forEach((sg: any) => {
+    (sg.items || []).forEach((item: any) => {
+      (item.adjustments || []).forEach((adj: any) => recordAdjustment(adj, item.orderItemSeqId));
+    });
+  });
+
+  // Filter out zero-sum adjustments
+  [adjustments, includedAdjustments].forEach((bucket) => {
+    Object.keys(bucket).forEach((key) => {
+      if (bucket[key] === 0) delete bucket[key];
+    });
+  });
+
+  const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
+  return { subtotal, adjustments, total: computedTotal || order.grandTotal || 0, includedAdjustments };
+}
 
 const NON_CANCELLABLE_ITEM_STATUSES = new Set(["ITEM_CANCELLED", "ITEM_COMPLETED"]);
 
@@ -284,7 +325,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     commEventsByOrderId: {} as Record<string, any[]>,
     shippingMethods: [] as any[],
     carrierParties: [] as any[],
-    fulfillmentTimeline: [] as any[],
     fulfillmentTimelineByOrderId: {} as Record<string, any[]>,
     // Order event sources behind the header timeline. OrderStatus and
     // OrderFacilityChange are the only places OMS records who changed what and why;
@@ -296,12 +336,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     // Only loaded for orders that need it.
     issuanceByOrderId: {} as Record<string, Record<string, ItemIssuanceSummary>>,
     issuanceStatusByOrderId: {} as Record<string, LoadStatus>,
-    exchangeChildrenByOrderId: {} as Record<string, Array<{
-      orderId: string;
-      itemCount: number;
-      facilityName: string;
-      value: number;
-    }>>,
+    exchangeChildrenByOrderId: {} as Record<string, ExchangeChild[]>,
     returnHeadersById: {} as Record<string, any | null>,
   }),
   getters: {
@@ -310,32 +345,36 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     isLoading: (state) => state.byOrderId[state.currentOrderId]?.status === "loading",
     error: (state) => state.byOrderId[state.currentOrderId]?.error || "",
 
+    /**
+     * The order page's view model: the raw order document joined with the loaded auxiliary
+     * sources (events, fulfillment timeline, issuance, risk, returns, exchanges) and the seed,
+     * product and customer caches. See utils/orderDetailEnrichment.
+     */
     enrichedOrderByOrderId(): (orderId: string) => EnrichedOrder | null {
       return (orderId: string) => {
         const raw = this.orderById(orderId);
         if (!raw) return null;
-        return enrichOrder(
-          raw,
-          {
-            facilityChanges: this.facilityChangeEventsByOrderId(orderId),
-            unfillable: this.unfillableAttemptsByOrderId(orderId),
-            issuanceByItem: this.issuanceByItemSeqIdByOrderId(orderId),
-            riskAssessments: this.riskAssessmentsByOrderId[orderId] || [],
-            timelineByShipGroup: this.timelineByShipGroupByOrderId(orderId),
-            returnedQtyBySeqId: this.returnedQtyByItemSeqIdByOrderId(orderId),
-            exchangeChildren: this.exchangeChildrenByOrderId[orderId] || [],
-            returnHeadersById: this.returnHeadersById,
-          },
-          {
-            seedStore: useSeedStore(),
-            productCache: useProductCacheStore(),
-            customerStore: useCustomerStore(),
-          }
-        );
+        const customerPartyId = this.customerPartyIdByOrderId(orderId);
+        return enrichOrder(raw, {
+          totals: this.orderTotalsByOrderId(orderId),
+          groupAdjustments: this.adjustmentsByExternalIdByOrderId(orderId),
+          customerPartyId,
+          customerName: this.customerNameByOrderId(orderId),
+          customerProfile: customerPartyId ? useCustomerStore().getCustomer(customerPartyId) : null,
+          headerStatuses: this.headerStatusesByOrderId(orderId),
+          itemStatusEvents: this.itemStatusEventsByOrderId(orderId),
+          facilityChangeEvents: this.facilityChangeEventsByOrderId(orderId),
+          facilityChangeRows: this.facilityChangesByOrderId[orderId] || [],
+          unfillable: this.unfillableAttemptsByOrderId(orderId),
+          fulfillmentTimeline: this.fulfillmentTimelineByOrderId[orderId] || [],
+          timelineByShipGroup: this.timelineByShipGroupByOrderId(orderId),
+          issuanceByItem: this.issuanceByItemSeqIdByOrderId(orderId),
+          riskAssessments: this.riskAssessmentsByOrderId[orderId] || [],
+          returnedQtyBySeqId: this.returnedQtyByItemSeqIdByOrderId(orderId),
+          exchangeChildren: this.exchangeChildrenByOrderId[orderId] || [],
+          returnHeadersById: this.returnHeadersById,
+        }, { seed: useSeedStore(), productCache: useProductCacheStore() });
       };
-    },
-    currentEnrichedOrder(): EnrichedOrder | null {
-      return this.currentOrderId ? this.enrichedOrderByOrderId(this.currentOrderId) : null;
     },
 
     orderById: (state) => (orderId: string) => state.byOrderId[orderId]?.payload || null,
@@ -442,69 +481,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       return totals;
     },
 
-    orderTotalsByOrderId: (state) => (orderId: string) => {
-      const current = state.byOrderId[orderId]?.payload;
-      if (!current) return { subtotal: 0, adjustments: {}, total: 0 };
-
-      let subtotal = 0;
-      (current.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          subtotal += Number(item.unitPrice || 0) * Number(item.quantity || 0);
-        });
-      });
-
-      const adjustments: Record<string, number> = {};
-      const includedAdjustments: Record<string, number> = {};
-      let adjustmentsTotal = 0;
-      const seenAdjustments = new Set<string>();
-
-      const recordAdjustment = (adj: any, fallbackSeqId = "") => {
-        const uniqueKey = adjustmentUniqueKey(adj, fallbackSeqId);
-        if (seenAdjustments.has(uniqueKey)) return;
-        seenAdjustments.add(uniqueKey);
-
-        const amount = Number(adj.amount || 0);
-        adjustmentsTotal += amount;
-
-        const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
-        const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
-        const label = adjustmentDisplayLabel(adj);
-
-        // Included and excluded amounts stay in separate buckets: a label can carry both
-        // (an included tax on one item, an ordinary one on another), and merging them would
-        // label the ordinary amount "included" while it still adds to the grand total.
-        if (isIncluded) {
-          includedAdjustments[label] = (includedAdjustments[label] || 0) + amountAlreadyIncluded;
-        } else {
-          adjustments[label] = (adjustments[label] || 0) + amount;
-        }
-      };
-
-      (current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
-
-      (current.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          (item.adjustments || []).forEach((adj: any) => recordAdjustment(adj, item.orderItemSeqId));
-        });
-      });
-
-      // Filter out zero-sum adjustments
-      Object.keys(adjustments).forEach((key) => {
-        if (adjustments[key] === 0) {
-          delete adjustments[key];
-        }
-      });
-      Object.keys(includedAdjustments).forEach((key) => {
-        if (includedAdjustments[key] === 0) {
-          delete includedAdjustments[key];
-        }
-      });
-
-      const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
-      const total = computedTotal || current.grandTotal || 0;
-
-      return { subtotal, adjustments, total, includedAdjustments };
-    },
+    orderTotalsByOrderId: (state) => (orderId: string) => orderTotals(state.byOrderId[orderId]?.payload),
 
     allItemsByOrderId: (state) => (orderId: string) => {
       const current = state.byOrderId[orderId]?.payload;
@@ -548,30 +525,22 @@ export const useOrderDetailStore = defineStore("orderDetail", {
 
     /** Contact mechs indexed by purpose (ORDER_EMAIL, SHIPPING_LOCATION, BILLING_LOCATION, …). */
     contactMechsByPurpose(): Record<string, any> {
-      const index: Record<string, any> = {};
-      (this.current?.contactMechs || []).forEach((mech: any) => {
-        if (mech.contactMechPurposeTypeId) index[mech.contactMechPurposeTypeId] = mech;
-      });
-      return index;
+      return this.contactMechsByPurposeByOrderId(this.currentOrderId);
     },
 
     /** Contact mechs indexed by contactMechId — used to resolve a ship group's address. */
     contactMechsById(): Record<string, any> {
-      const index: Record<string, any> = {};
-      (this.current?.contactMechs || []).forEach((mech: any) => {
-        if (mech.contactMechId) index[mech.contactMechId] = mech;
-      });
-      return index;
+      return this.contactMechsByIdByOrderId(this.currentOrderId);
     },
 
     /** The placing-customer order role (carries party + joined person/partyGroup). */
     placingCustomerRole(): any {
-      return (this.current?.roles || []).find((role: any) => role.roleTypeId === "PLACING_CUSTOMER") || null;
+      return this.placingCustomerRoleByOrderId(this.currentOrderId);
     },
 
     /** partyId of the placing customer, for any party-scoped UI. */
     customerPartyId(): string {
-      return this.placingCustomerRole?.partyId || "";
+      return this.customerPartyIdByOrderId(this.currentOrderId);
     },
 
     /**
@@ -580,46 +549,29 @@ export const useOrderDetailStore = defineStore("orderDetail", {
      * the shipping address `toName` until that master change is deployed, then "".
      */
     customerName(): string {
-      const role = this.placingCustomerRole;
-      const person = role?.person;
-      if (person && (person.firstName || person.lastName)) {
-        return [person.firstName, person.lastName].filter(Boolean).join(" ");
-      }
-      if (role?.partyGroup?.groupName) return role.partyGroup.groupName;
-
-      const shipping = (this.current?.contactMechs || []).find(
-        (mech: any) => mech.contactMechPurposeTypeId === "SHIPPING_LOCATION"
-      );
-      return shipping?.postalAddress?.toName || "";
+      return this.customerNameByOrderId(this.currentOrderId);
     },
 
     /** Returned quantity summed by orderItemSeqId — crosses the top-level returnItems array. */
     returnedQtyByItemSeqId(): Record<string, number> {
-      const totals: Record<string, number> = {};
-      (this.current?.returnItems || []).forEach((item: any) => {
-        const seqId = item.orderItemSeqId;
-        if (!seqId) return;
-        totals[seqId] = (totals[seqId] || 0) + Number(item.returnQuantity || 0);
-      });
-      return totals;
+      return this.returnedQtyByItemSeqIdByOrderId(this.currentOrderId);
     },
 
     /** Maps orderItemSeqId to its orderItemExternalId. */
-    itemExternalIdBySeqId(): Record<string, string> {
-      const map: Record<string, string> = {};
-      const productCache = useProductCacheStore();
-      
-      (this.current?.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          const seqId = item.orderItemSeqId;
-          if (seqId) {
-            const product = productCache.getProduct(item.productId);
-            const sku = product?.sku || item.productId;
+    itemExternalIdBySeqIdByOrderId(): (orderId: string) => Record<string, string> {
+      return (orderId: string) => {
+        const map: Record<string, string> = {};
+        const productCache = useProductCacheStore();
+        (this.orderById(orderId)?.shipGroups || []).forEach((sg: any) => {
+          (sg.items || []).forEach((item: any) => {
+            const seqId = item.orderItemSeqId;
+            if (!seqId) return;
+            const sku = productCache.getProduct(item.productId)?.sku || item.productId;
             map[seqId] = item.externalId || sku || seqId;
-          }
+          });
         });
-      });
-      return map;
+        return map;
+      };
     },
 
     /**
@@ -627,174 +579,60 @@ export const useOrderDetailStore = defineStore("orderDetail", {
      * as metadata rather than baked into the label so the view can translate it at render time,
      * and so an included and an ordinary adjustment sharing a label stay separate rows.
      */
-    adjustmentsByExternalId(): Record<string, Array<{ label: string; amount: number; isIncluded: boolean }>> {
-      const index: Record<string, Record<string, { label: string; amount: number; isIncluded: boolean }>> = {};
-      const seqIdToExtId = this.itemExternalIdBySeqId;
-      const seenAdjustments = new Set<string>();
+    adjustmentsByExternalIdByOrderId(): (orderId: string) => Record<string, Array<{ label: string; amount: number; isIncluded: boolean }>> {
+      return (orderId: string) => {
+        const current = this.orderById(orderId);
+        const index: Record<string, Record<string, { label: string; amount: number; isIncluded: boolean }>> = {};
+        const seqIdToExtId = this.itemExternalIdBySeqIdByOrderId(orderId);
+        const seenAdjustments = new Set<string>();
 
-      const recordAdj = (seqId: string, adj: any) => {
-        const extId = seqIdToExtId[seqId] || seqId;
-        if (!extId) return;
-        const uniqueKey = `${extId}:${adjustmentUniqueKey(adj, seqId)}`;
-        if (seenAdjustments.has(uniqueKey)) return;
-        seenAdjustments.add(uniqueKey);
+        const recordAdj = (seqId: string, adj: any) => {
+          const extId = seqIdToExtId[seqId] || seqId;
+          if (!extId) return;
+          const uniqueKey = `${extId}:${adjustmentUniqueKey(adj, seqId)}`;
+          if (seenAdjustments.has(uniqueKey)) return;
+          seenAdjustments.add(uniqueKey);
 
-        const amount = Number(adj.amount || 0);
-        const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
-        const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
-        const displayAmount = isIncluded ? amountAlreadyIncluded : amount;
-        const label = adjustmentDisplayLabel(adj);
-        const bucketKey = isIncluded ? `${label}\u0000included` : label;
+          const { amount, isIncluded } = adjustmentAmount(adj);
+          const label = adjustmentDisplayLabel(adj);
+          const bucketKey = isIncluded ? `${label}\u0000included` : label;
+          const buckets = index[extId] ||= {};
+          const bucket = buckets[bucketKey] ||= { label, amount: 0, isIncluded };
+          bucket.amount += amount;
+        };
 
-        if (!index[extId]) index[extId] = {};
-        const bucket = index[extId][bucketKey] || (index[extId][bucketKey] = { label, amount: 0, isIncluded });
-        bucket.amount += displayAmount;
-      };
+        // 1. Top-level adjustments carry their orderItemSeqId
+        (current?.adjustments || []).forEach((adj: any) => {
+          const seqId = adj.orderItemSeqId;
+          if (seqId && seqId !== HEADER_SEQ_ID) recordAdj(seqId, adj);
+        });
 
-      // 1. Process top-level adjustments (which carry orderItemSeqId)
-      (this.current?.adjustments || []).forEach((adj: any) => {
-        const seqId = adj.orderItemSeqId;
-        if (!seqId || seqId === HEADER_SEQ_ID) return;
-        recordAdj(seqId, adj);
-      });
-
-      // 2. Process nested ship group item adjustments
-      (this.current?.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          const seqId = item.orderItemSeqId;
-          if (!seqId) return;
-          (item.adjustments || []).forEach((adj: any) => {
-            recordAdj(seqId, adj);
+        // 2. Adjustments nested under each ship group item
+        (current?.shipGroups || []).forEach((sg: any) => {
+          (sg.items || []).forEach((item: any) => {
+            const seqId = item.orderItemSeqId;
+            if (seqId) (item.adjustments || []).forEach((adj: any) => recordAdj(seqId, adj));
           });
         });
-      });
 
-      return Object.fromEntries(
-        Object.entries(index).map(([extId, buckets]) => [extId, Object.values(buckets)])
-      );
+        return Object.fromEntries(
+          Object.entries(index).map(([extId, buckets]) => [extId, Object.values(buckets)])
+        );
+      };
     },
 
-    /** Rolled up item price totals (sum of unitPrice * quantity) grouped by orderItemExternalId */
-    totalsByExternalId(): Record<string, number> {
-      const totals: Record<string, number> = {};
-      const seqIdToExtId = this.itemExternalIdBySeqId;
-
-      (this.current?.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          const seqId = item.orderItemSeqId;
-          const extId = seqIdToExtId[seqId] || seqId;
-          if (!extId) return;
-          const unitPrice = Number(item.unitPrice || 0);
-          const quantity = Number(item.quantity || 0);
-          totals[extId] = (totals[extId] || 0) + (unitPrice * quantity);
-        });
-      });
-
-      return totals;
-    },
-
-    /** Rolled up item quantities grouped by orderItemExternalId */
-    quantitiesByExternalId(): Record<string, number> {
-      const quantities: Record<string, number> = {};
-      const seqIdToExtId = this.itemExternalIdBySeqId;
-
-      (this.current?.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          const seqId = item.orderItemSeqId;
-          const extId = seqIdToExtId[seqId] || seqId;
-          if (!extId) return;
-          quantities[extId] = (quantities[extId] || 0) + Number(item.quantity || 0);
-        });
-      });
-
-      return quantities;
+    adjustmentsByExternalId(): Record<string, Array<{ label: string; amount: number; isIncluded: boolean }>> {
+      return this.adjustmentsByExternalIdByOrderId(this.currentOrderId);
     },
 
     /** Order totals (subtotal, adjustments grouped by comment/type, total) */
     totals(): { subtotal: number; adjustments: Record<string, number>; total: number; includedAdjustments: Record<string, number> } {
-      if (!this.current) return { subtotal: 0, adjustments: {}, total: 0, includedAdjustments: {} };
-
-      let subtotal = 0;
-      (this.current.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          subtotal += Number(item.unitPrice || 0) * Number(item.quantity || 0);
-        });
-      });
-
-      const adjustments: Record<string, number> = {};
-      const includedAdjustments: Record<string, number> = {};
-      let adjustmentsTotal = 0;
-      const seenAdjustments = new Set<string>();
-
-      const recordAdjustment = (adj: any, fallbackSeqId = "") => {
-        const uniqueKey = adjustmentUniqueKey(adj, fallbackSeqId);
-        if (seenAdjustments.has(uniqueKey)) return;
-        seenAdjustments.add(uniqueKey);
-
-        const amount = Number(adj.amount || 0);
-        adjustmentsTotal += amount;
-
-        const amountAlreadyIncluded = Number(adj.amountAlreadyIncluded || 0);
-        const isIncluded = amount === 0 && amountAlreadyIncluded > 0;
-        const label = adjustmentDisplayLabel(adj);
-
-        // Included and excluded amounts stay in separate buckets: a label can carry both
-        // (an included tax on one item, an ordinary one on another), and merging them would
-        // label the ordinary amount "included" while it still adds to the grand total.
-        if (isIncluded) {
-          includedAdjustments[label] = (includedAdjustments[label] || 0) + amountAlreadyIncluded;
-        } else {
-          adjustments[label] = (adjustments[label] || 0) + amount;
-        }
-      };
-
-      (this.current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
-
-      (this.current.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          (item.adjustments || []).forEach((adj: any) => recordAdjustment(adj, item.orderItemSeqId));
-        });
-      });
-
-      // Filter out zero-sum adjustments
-      Object.keys(adjustments).forEach((key) => {
-        if (adjustments[key] === 0) {
-          delete adjustments[key];
-        }
-      });
-      Object.keys(includedAdjustments).forEach((key) => {
-        if (includedAdjustments[key] === 0) {
-          delete includedAdjustments[key];
-        }
-      });
-
-      // Sum the rows actually displayed (subtotal + every adjustment, including tax) rather than
-      // trusting the backend's grandTotal, which has been observed to exclude tax. Round to avoid
-      // floating-point drift (e.g. 59 + 1.53 + 0.59 + 2.86 = 63.980000000000004).
-      const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
-      const total = computedTotal || this.current.grandTotal || 0;
-
-      return { subtotal, adjustments, total, includedAdjustments };
+      return this.orderTotalsByOrderId(this.currentOrderId);
     },
 
     /** Flat list of all items across ship groups, each carrying its ship group context. */
     allItems(): any[] {
-      return (this.current?.shipGroups || []).flatMap((shipGroup: any) =>
-        (shipGroup.items || []).map((item: any) => ({
-          ...item,
-          shipGroupSeqId: shipGroup.shipGroupSeqId,
-          facilityId: shipGroup.facilityId
-        }))
-      );
-    },
-
-    /** Fulfillment timeline indexed by shipGroupSeqId for O(1) lookup in the template. */
-    timelineByShipGroup: (state): Record<string, any> => {
-      const index: Record<string, any> = {};
-      state.fulfillmentTimeline.forEach((entry: any) => {
-        if (entry.shipGroupSeqId) index[entry.shipGroupSeqId] = entry;
-      });
-      return index;
+      return this.allItemsByOrderId(this.currentOrderId);
     },
 
     openHolds: (state) => state.orderHeaderWorkEfforts,
@@ -881,7 +719,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         if (commonUtil.hasError(resp)) throw resp.data;
         const docs = Array.isArray(resp.data) ? resp.data : (resp.data?.timeline ?? resp.data?.docs ?? []);
         this.fulfillmentTimelineByOrderId[orderId] = docs;
-        this.fulfillmentTimeline = docs;
       } catch (error: any) {
         logger.error('Failed to load fulfillment timeline', error);
       }
@@ -1007,13 +844,12 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         logger.error('Failed to load carrier parties', error);
       }
     },
+    async updateShipGroup(orderId: string, shipGroupSeqId: string, data: Record<string, any>) {
+      return api({ url: `oms/orders/${orderId}/shipGroups/${shipGroupSeqId}`, method: 'PUT', data });
+    },
     async updateShipmentCarrierAndMethod(orderId: string, shipGroupSeqId: string, shipmentMethodTypeId: string, carrierPartyId: string) {
       try {
-        await api({
-          url: `oms/orders/${orderId}/shipGroups/${shipGroupSeqId}`,
-          method: 'PUT',
-          data: { shipmentMethodTypeId, carrierPartyId },
-        });
+        await this.updateShipGroup(orderId, shipGroupSeqId, { shipmentMethodTypeId, carrierPartyId });
       } catch (error: any) {
         logger.error('Failed to update carrier/method', error);
         throw error;
@@ -1073,7 +909,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     async fetchExchangeChildren(orderId: string) {
       const raw = this.orderById(orderId);
       if (!raw?.orderName || orderId in this.exchangeChildrenByOrderId) return;
-      this.exchangeChildrenByOrderId = { ...this.exchangeChildrenByOrderId, [orderId]: [] };
+      this.exchangeChildrenByOrderId[orderId] = [];
 
       try {
         const response = await useSolrSearch().runSolrQuery({
@@ -1089,7 +925,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         )] as string[];
 
         const seedStore = useSeedStore();
-        const children: Array<{ orderId: string; itemCount: number; facilityName: string; value: number }> = [];
+        const children: ExchangeChild[] = [];
         await Promise.all(candidateIds.map(async (candidateId) => {
           await this.fetchOrder(candidateId);
           const payload = this.byOrderId[candidateId]?.payload;
@@ -1110,43 +946,51 @@ export const useOrderDetailStore = defineStore("orderDetail", {
             value: timelineMillis(assoc.createdStamp) || timelineMillis(payload.orderDate) || 0
           });
         }));
-        this.exchangeChildrenByOrderId = { ...this.exchangeChildrenByOrderId, [orderId]: children };
+        this.exchangeChildrenByOrderId[orderId] = children;
       } catch (error) {
         logger.error('Failed to discover exchange orders for timeline', error);
       }
     },
+    /**
+     * Return headers name the facility a return was processed at
+     * (ReturnHeader.destinationFacilityId — the embedded ReturnItem rows don't carry it).
+     * null = header unavailable; the timeline wording then drops the location.
+     */
     async fetchReturnHeaders(orderId: string) {
-      const userStore = useUserStore();
-      if (!userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW)) return;
-      const raw = this.orderById(orderId);
-      const returnIds = [...new Set((raw?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[];
+      if (!useUserStore().hasPermission(Actions.APP_ORDER_RETURN_VIEW)) return;
+      const returnIds = [...new Set((this.orderById(orderId)?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[];
       await Promise.all(returnIds.map(async (returnId) => {
         if (returnId in this.returnHeadersById) return;
-        this.returnHeadersById = { ...this.returnHeadersById, [returnId]: null };
+        this.returnHeadersById[returnId] = null;
         try {
           const header = await getReturn(returnId);
-          if (header) this.returnHeadersById = { ...this.returnHeadersById, [returnId]: header };
+          if (header) this.returnHeadersById[returnId] = header;
         } catch (error) {
           logger.debug(`Return header ${returnId} unavailable for timeline facility context`, error);
         }
       }));
     },
-    async loadOrderAggregate(orderId: string, options?: { force?: boolean }) {
+    /**
+     * Load an order and the sources behind its page. Only the order document is awaited; the
+     * rest is fire-and-forget, so the page renders as soon as the order does and each section
+     * fills in as its source lands.
+     */
+    async loadOrderAggregate(orderId: string, force = false) {
       if (!orderId) return;
       this.currentOrderId = orderId;
-      await this.fetchOrder(orderId, options?.force);
-      await Promise.allSettled([
-        this.fetchFulfillmentTimeline(orderId),
-        this.fetchOrderEvents(orderId, options?.force),
-        this.fetchInventoryIssuance(orderId, options?.force),
-        this.fetchRiskAssessments(orderId, options?.force),
-        this.fetchExchangeChildren(orderId),
-        this.fetchReturnHeaders(orderId),
-      ]);
-    },
-    async setCurrentOrder(orderId: string) {
-      this.currentOrderId = orderId;
-      await this.loadOrderAggregate(orderId);
+      await this.fetchOrder(orderId, force);
+      const raw = this.orderById(orderId);
+
+      this.fetchFulfillmentTimeline(orderId);
+      this.fetchOrderEvents(orderId, force);
+      // A counter sale's only remaining question is whether inventory actually left the
+      // books, so load the issuance rows for those orders and no others.
+      if ((raw?.shipGroups || []).some(isPosCompletedShipGroup)) this.fetchInventoryIssuance(orderId, force);
+      // Risk facts up front for risk-flagged orders, so the header Fraud risk card can show
+      // its sentiment chips without waiting for the Holds tab.
+      if (raw?.riskRecommendationEnumId || raw?.riskLevelEnumId) this.fetchRiskAssessments(orderId);
+      this.fetchExchangeChildren(orderId);
+      this.fetchReturnHeaders(orderId);
     },
     reset() {
       this.$reset();

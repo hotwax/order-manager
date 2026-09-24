@@ -1,18 +1,16 @@
 <template>
   <div class="order-detail-header">
-    <!-- direct child matching .order-detail-header>ion-item -->
     <ion-item lines="none">
       <ion-icon slot="start" :icon="ticketOutline" />
       <ion-label>
         <h1>{{ order.orderName ? order.orderName : order.id }}</h1>
         <p>{{ order.id }}</p>
       </ion-label>
-      <ion-badge v-if="order.status" slot="end" :color="getStatusColor(order.statusId)">
+      <ion-badge v-if="order.status" slot="end" :color="commonUtil.getStatusColor(order.statusId)">
         {{ order.status }}
       </ion-badge>
     </ion-item>
 
-    <!-- timeline: child matching .order-detail-timeline -->
     <div class="timeline order-detail-timeline">
       <ion-item lines="none">
         <ion-icon slot="start" :icon="timeOutline" />
@@ -20,19 +18,19 @@
       </ion-item>
 
       <ion-list>
-        <ion-item v-for="event in orderTimeline" :key="event.id" :router-link="event.route" :button="!!event.route" :detail="false">
+        <ion-item v-for="event in timeline" :key="event.id" :router-link="event.route" :button="!!event.route" :detail="false">
           <ion-icon :icon="event.icon" slot="start" />
           <ion-label>
             <p v-if="event.timeDiff">{{ event.timeDiff }}</p>
             {{ translate(event.label) }}
             <p v-if="event.metaData">{{ event.metaData }}</p>
           </ion-label>
-          <ion-note slot="end" v-if="event.value && event.valueType === 'date-time-millis'">
+          <ion-note slot="end" v-if="event.value">
             {{ formatDateTime(event.value) }}
           </ion-note>
         </ion-item>
 
-        <template v-if="!orderTimeline.length">
+        <template v-if="!timeline.length">
           <ion-item>
             <ion-icon :icon="pulseOutline" slot="start" />
             <ion-label>
@@ -51,16 +49,15 @@
       </ion-list>
     </div>
 
-    <!-- details wrapper: child matching .order-detail-header-details -->
     <div class="order-detail-header-details">
       <ion-card class="customer-summary-card">
         <ion-card-header>
           <ion-item lines="none">
             <ion-label>
-              <ion-card-title>{{ order.customerName || 'Customer name' }}</ion-card-title>
+              <ion-card-title>{{ order.customer.name || translate('Customer name') }}</ion-card-title>
             </ion-label>
-            <ion-button v-if="customerPartyId" slot="end" fill="clear" size="small"
-              :router-link="'/customers/' + customerPartyId">
+            <ion-button v-if="order.customer.partyId" slot="end" fill="clear" size="small"
+              :router-link="'/customers/' + order.customer.partyId">
               {{ translate('View details') }}
             </ion-button>
           </ion-item>
@@ -69,20 +66,20 @@
           <ion-item>
             <ion-label>
               <p>{{ translate('Email') }}</p>
-              {{ customer?.email || translate('Email not available') }}
+              {{ order.customer.email || translate('Email not available') }}
             </ion-label>
-            <ion-button v-if="!customer?.email && customerPartyId" slot="end" fill="clear" size="small"
-              @click="$emit('open-customer-contact', 'EMAIL_ADDRESS', 'ORDER_EMAIL')">
+            <ion-button v-if="!order.customer.email && order.customer.partyId" slot="end" fill="clear" size="small"
+              @click="emit('open-customer-contact', 'EMAIL_ADDRESS', 'ORDER_EMAIL')">
               {{ translate('Add') }}
             </ion-button>
           </ion-item>
           <ion-item>
             <ion-label>
               <p>{{ translate('Phone') }}</p>
-              {{ customer?.phone || translate('Phone not available') }}
+              {{ order.customer.phone || translate('Phone not available') }}
             </ion-label>
-            <ion-button v-if="!customer?.phone && customerPartyId" slot="end" fill="clear" size="small"
-              @click="$emit('open-customer-contact', 'TELECOM_NUMBER', 'PHONE_BILLING')">
+            <ion-button v-if="!order.customer.phone && order.customer.partyId" slot="end" fill="clear" size="small"
+              @click="emit('open-customer-contact', 'TELECOM_NUMBER', 'PHONE_BILLING')">
               {{ translate('Add') }}
             </ion-button>
           </ion-item>
@@ -91,20 +88,20 @@
               <p>{{ translate('Locale') }}</p>
               {{ order.localeString || translate('Locale not available') }}
             </ion-label>
-            <ion-button v-if="!order.localeString" slot="end" fill="clear" size="small" @click="$emit('open-locale-prompt')">
+            <ion-button v-if="!order.localeString" slot="end" fill="clear" size="small" @click="emit('open-locale-prompt')">
               {{ translate('Add') }}
             </ion-button>
           </ion-item>
           <ion-item>
             <ion-label>
               <p>{{ translate('Billing address') }}</p>
-              <template v-if="billingAddress?.lines?.length">
-                <div v-for="(line, idx) in billingAddress.lines" :key="idx">{{ line }}</div>
+              <template v-if="order.customer.billingAddress">
+                <div v-for="(line, idx) in order.customer.billingAddress.lines" :key="idx">{{ line }}</div>
               </template>
               <div v-else>{{ translate('Billing address not available') }}</div>
             </ion-label>
-            <ion-button v-if="!billingAddress?.lines?.length && customerPartyId" slot="end" fill="clear" size="small"
-              @click="$emit('open-customer-contact', 'POSTAL_ADDRESS', 'BILLING_LOCATION')">
+            <ion-button v-if="!order.customer.billingAddress && order.customer.partyId" slot="end" fill="clear" size="small"
+              @click="emit('open-customer-contact', 'POSTAL_ADDRESS', 'BILLING_LOCATION')">
               {{ translate('Add') }}
             </ion-button>
           </ion-item>
@@ -156,7 +153,7 @@
       <ion-card>
         <ion-card-header>
           <ion-card-title>{{ translate('Order identifications') }}</ion-card-title>
-          <ion-button fill="clear" size="small" @click="$emit('open-manage-identifications')">
+          <ion-button fill="clear" size="small" @click="emit('open-manage-identifications')">
             {{ translate('Manage') }}
           </ion-button>
         </ion-card-header>
@@ -185,10 +182,10 @@
               {{ id.idValue }}
             </ion-label>
             <ion-button
-              v-if="id.shopifyAdminUrl || (id.orderIdentificationTypeId === 'SHOPIFY_ORD_ID' && shopifyAdminUrl)"
+              v-if="id.orderIdentificationTypeId === 'SHOPIFY_ORD_ID' && shopifyAdminUrl"
               slot="end"
               fill="clear"
-              :href="id.shopifyAdminUrl || shopifyAdminUrl"
+              :href="shopifyAdminUrl"
               target="_blank"
               rel="noopener noreferrer"
               :aria-label="translate('View in Shopify')"
@@ -218,26 +215,26 @@
         </ion-list>
       </ion-card>
 
-      <ion-card v-if="riskSummary.hasRiskSignal">
+      <ion-card v-if="order.risk.hasRiskSignal">
         <ion-card-header>
           <ion-card-title>{{ translate('Fraud risk') }}</ion-card-title>
         </ion-card-header>
         <ion-list lines="none">
           <ion-item lines="none">
-            <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(order.riskLevelEnumId)" />
+            <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(order.riskLevelEnumId || '')" />
             <ion-label>
               <p>{{ translate('Recommendation') }}</p>
-              {{ riskSummary.recommendation }}
+              {{ order.risk.recommendation }}
             </ion-label>
-            <ion-badge slot="end" :color="riskLevelColor(order.riskLevelEnumId)">
-              {{ riskSummary.level }}
+            <ion-badge slot="end" :color="riskLevelColor(order.riskLevelEnumId || '')">
+              {{ order.risk.level }}
             </ion-badge>
           </ion-item>
-          <ion-item v-if="riskFactCount" button detail lines="none" @click="$emit('open-risk-details')">
+          <ion-item v-if="order.risk.facts.length" button detail lines="none" @click="emit('open-risk-details')">
             <div class="sentiment-chips">
-              <ion-chip color="danger" outline>{{ riskCounts.negative }} {{ translate('negative') }}</ion-chip>
-              <ion-chip color="medium" outline>{{ riskCounts.neutral }} {{ translate('neutral') }}</ion-chip>
-              <ion-chip color="success" outline>{{ riskCounts.positive }} {{ translate('positive') }}</ion-chip>
+              <ion-chip color="danger" outline>{{ order.risk.counts.negative }} {{ translate('negative') }}</ion-chip>
+              <ion-chip color="medium" outline>{{ order.risk.counts.neutral }} {{ translate('neutral') }}</ion-chip>
+              <ion-chip color="success" outline>{{ order.risk.counts.positive }} {{ translate('positive') }}</ion-chip>
             </div>
           </ion-item>
         </ion-list>
@@ -247,86 +244,80 @@
 </template>
 
 <script setup lang="ts">
-import {
-  IonBadge,
-  IonButton,
-  IonCard,
-  IonCardHeader,
-  IonCardTitle,
-  IonChip,
-  IonIcon,
-  IonItem,
-  IonLabel,
-  IonList,
-  IonNote,
-  IonSkeletonText,
-} from '@ionic/vue';
-import {
-  compassOutline,
-  openOutline,
-  pulseOutline,
-  shieldOutline,
-  ticketOutline,
-  timeOutline,
-} from 'ionicons/icons';
+import { IonBadge, IonButton, IonCard, IonCardHeader, IonCardTitle, IonChip, IonIcon, IonItem, IonLabel, IonList, IonNote, IonSkeletonText } from '@ionic/vue';
+import { compassOutline, openOutline, pulseOutline, shieldOutline, ticketOutline, timeOutline } from 'ionicons/icons';
+import { commonUtil, translate } from '@common';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
+import { riskLevelColor } from '@/utils';
+import { formatDateTime } from '@/utils/orderDetailDates';
+import type { EnrichedOrder, EnrichedOrderTimelineEvent } from '@/types/orderDetail';
 
 defineProps<{
-  order: any;
-  customer: any;
-  customerPartyId: string;
-  billingAddress: any;
-  orderTimeline: any[];
-  exchangeSources: any[];
+  order: EnrichedOrder;
+  /** Timeline entries with their links resolved against the current route and permissions. */
+  timeline: Array<EnrichedOrderTimelineEvent & { route?: string }>;
+  /** The orders this one was exchanged from, hydrated as they load. */
+  exchangeSources: Array<{ orderId: string; loading: boolean; orderName: string; returnIds: string[] }>;
   canViewReturns: boolean;
-  shopifyAdminUrl?: string;
-  riskSummary: any;
-  riskFactCount: number;
-  riskCounts: { negative: number; neutral: number; positive: number };
-  getStatusColor: (statusId: string) => string;
-  riskLevelColor: (riskLevelEnumId: string) => string;
-  formatDateTime: (dt: any) => string;
-  translate: (key: string) => string;
+  shopifyAdminUrl: string;
 }>();
 
-defineEmits<{
-  (e: 'open-customer-contact', contactMechPurposeTypeId: string, contactMechTypeId: string): void;
-  (e: 'open-locale-prompt'): void;
-  (e: 'open-manage-identifications'): void;
-  (e: 'open-risk-details'): void;
+const emit = defineEmits<{
+  'open-customer-contact': [contactMechTypeId: string, contactMechPurposeTypeId: string];
+  'open-locale-prompt': [];
+  'open-manage-identifications': [];
+  'open-risk-details': [];
 }>();
 </script>
 
+<style scoped src="./orderDetailCardHeader.css"></style>
+
 <style scoped>
-.order-detail-header {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  align-items: start;
+.sentiment-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacer-xs);
 }
 
-.order-detail-header > ion-item {
-  grid-column: 1 / -1;
+.order-detail-header {
+  display: grid;
+  gap: var(--spacer-base);
+  grid-template-columns: 1fr 357px;
+  grid-template-rows: auto 1fr;
+}
+
+.order-detail-header>ion-item {
+  grid-row: 1;
+  grid-column: 1;
 }
 
 .order-detail-header-details {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
-  grid-column: span 2;
-  align-items: start;
+  grid-row: 2;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: start;
 }
 
 .order-detail-header-details ion-card {
-  margin: var(--spacer-xs);
+  flex: 1 1 300px;
+  max-width: 375px;
 }
 
-@media (min-width: 991px) {
+.order-detail-timeline {
+  grid-column: 2;
+  grid-row: span 2;
+  border-left: var(--border-medium);
+}
+
+@media (min-width: 900px) {
   .order-detail-header {
-    grid-template-columns: 1fr 375px;
-    grid-template-areas: "title title" "main timeline";
+    align-items: start;
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
   }
 
   .order-detail-header-details {
-    grid-area: main;
+    align-items: start;
+    grid-template-columns: 1fr;
   }
 }
 

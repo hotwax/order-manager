@@ -926,5 +926,11 @@
   "{count} later date": "{count} later date",
   "{count} later dates": "{count} later dates",
   "{count} items by order date": "{count} items by order date",
-  "{count} items by order date since {date}": "{count} items by order date since {date}"
+  "{count} items by order date since {date}": "{count} items by order date since {date}",
+  "Customer name": "Customer name",
+  "years": "years",
+  "months": "months",
+  "days": "days",
+  "hours": "hours",
+  "minutes": "minutes"
 }

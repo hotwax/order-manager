@@ -2,66 +2,40 @@
   <div class="order-items">
     <ion-list lines="none" class="order-items-list">
       <ion-item lines="full" class="order-items-toolbar">
-        <ion-checkbox
-          :checked="areAllSelected"
-          justify="start"
-          label-placement="end"
-          @ionChange="$emit('toggle-select-all', $event.detail.checked)"
-        >
-          {{ translate('Select all') }}
-        </ion-checkbox>
-        <ion-button
-          v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order?.statusId)"
-          slot="end"
-          fill="outline"
-          color="medium"
-          @click="$emit('open-add-item')"
-        >
+        <ion-checkbox :checked="areAllSelected" justify="start" label-placement="end"
+          @ionChange="selectItems(allItems, $event.detail.checked)">{{ translate('Select all') }}</ion-checkbox>
+        <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order.statusId)" slot="end" fill="outline" color="medium" @click="emit('add-item')">
           {{ translate('Add items') }}
         </ion-button>
       </ion-item>
       <ion-accordion-group>
-        <template v-for="{ group, soleItem } in itemGroups" :key="group.externalId">
+        <template v-for="group in order.groupedItems" :key="group.externalId">
           <!-- Nothing to roll up when the group is a single order item, so the item row is
                rendered directly with the product identity the rolled up header would carry. -->
           <OrderItemListRow
-            v-if="soleItem"
-            :primary="groupPrimaryIdentifier(group)"
-            :secondary="groupSecondaryIdentifier(group)"
-            :badge-label="isKit(group) ? translate('Kit') : ''"
-            :features="productFeatureLabel(group.productId)"
-            :image-url="getProduct(group.productId)?.mainImageUrl"
-            :preview-product="getProduct(group.productId)"
-            :selected="soleItem.selected"
-            :quantity="soleItem.quantity"
+            v-if="group.items.length === 1"
+            v-bind="productRowProps(group)"
+            :selected="isSelected(group.items[0])"
+            :quantity="group.items[0].quantity"
             :quantity-label="translate('qty')"
-            :facility-label="soleItem.facilityName"
-            :facility-disabled="isItemFacilityActionDisabled(soleItem)"
-            :attributes-label="attributeChipLabel(soleItem.attributeCount)"
-            :statuses="soleItem.statuses"
-            :status-detail="itemStatusDetail(soleItem)"
-            :amount="money(itemLineTotal(soleItem), order.currency)"
-            :adjustments="getItemAdjustmentRows(soleItem)"
-            @update:selected="soleItem.selected = $event"
-            @facility-click="$emit('reject-and-release', soleItem)"
-            @attributes-click="$emit('open-item-attributes', soleItem)"
+            :facility-label="group.items[0].facilityName"
+            :facility-disabled="itemActions[group.items[0].orderItemSeqId]?.facilityDisabled"
+            :attributes-label="attributeChipLabel(group.items[0].attributeCount)"
+            :statuses="group.items[0].statuses"
+            :status-detail="itemStatusDetail(group.items[0])"
+            :amount="money(group.items[0].unitPrice * group.items[0].quantity)"
+            :adjustments="itemAdjustmentRows(group.items[0])"
+            @update:selected="selectItems(group.items, $event)"
+            @facility-click="emit('reject-and-release', group.items[0])"
+            @attributes-click="emit('open-item-attributes', group.items[0])"
           >
             <template #actions>
-              <ion-button
-                v-if="canRequestInventoryTransfer && isInventoryTransferRequestEligible(soleItem)"
-                fill="clear"
-                size="small"
-                @click.stop="$emit('request-inventory-transfer', soleItem)"
-              >
+              <ion-button v-if="itemActions[group.items[0].orderItemSeqId]?.canTransfer" fill="clear" size="small"
+                @click.stop="emit('request-inventory-transfer', group.items[0])">
                 {{ translate('Request transfer') }}
               </ion-button>
-              <ion-button
-                v-if="isItemCancelAllowed(soleItem)"
-                fill="clear"
-                size="small"
-                color="danger"
-                @click.stop="$emit('cancel-single-item', soleItem)"
-              >
+              <ion-button v-if="itemActions[group.items[0].orderItemSeqId]?.canCancel" fill="clear" size="small" color="danger"
+                @click.stop="emit('cancel-single-item', group.items[0])">
                 {{ translate('Cancel') }}
               </ion-button>
             </template>
@@ -70,21 +44,16 @@
             <OrderItemListRow
               slot="header"
               :select-on-row-click="false"
-              :primary="groupPrimaryIdentifier(group)"
-              :secondary="groupSecondaryIdentifier(group)"
-              :badge-label="isKit(group) ? translate('Kit') : ''"
-              :features="productFeatureLabel(group.productId)"
-              :image-url="getProduct(group.productId)?.mainImageUrl"
-              :preview-product="getProduct(group.productId)"
-              :selected="group.selected"
+              v-bind="productRowProps(group)"
+              :selected="group.items.every(isSelected)"
               :quantity="group.totalQty"
               :quantity-label="translate('qty')"
-              :facility-label="groupLocationLabel(group)"
+              :facility-label="group.locationLabel"
               :facility-disabled="true"
               :statuses="group.statuses"
-              :amount="money(group.totalPrice, order.currency)"
-              :adjustments="getGroupAdjustmentRows(group)"
-              @update:selected="group.selected = $event"
+              :amount="money(group.totalPrice)"
+              :adjustments="group.adjustments.map((adj) => ({ label: adj.isIncluded ? `${adj.label} (${translate('included')})` : adj.label, amount: money(adj.amount) }))"
+              @update:selected="selectItems(group.items, $event)"
             />
             <div slot="content">
               <ion-list lines="none">
@@ -94,37 +63,28 @@
                   class="order-item-detail-entry"
                   :primary="`${translate('Item')} ${item.orderItemSeqId}`"
                   :secondary="item.externalId && item.externalId !== 'null' ? `${translate('External ID')}: ${item.externalId}` : ''"
-                  :selected="item.selected"
+                  :selected="isSelected(item)"
                   :quantity="item.quantity"
                   :quantity-label="translate('qty')"
                   :show-quantity="false"
                   :facility-label="item.facilityName"
-                  :facility-disabled="isItemFacilityActionDisabled(item)"
+                  :facility-disabled="itemActions[item.orderItemSeqId]?.facilityDisabled"
                   :attributes-label="attributeChipLabel(item.attributeCount)"
                   :statuses="item.statuses"
                   :status-detail="itemStatusDetail(item)"
-                  :amount="money(itemLineTotal(item), order.currency)"
-                  :adjustments="getItemAdjustmentRows(item)"
-                  @update:selected="item.selected = $event"
-                  @facility-click="$emit('reject-and-release', item)"
-                  @attributes-click="$emit('open-item-attributes', item)"
+                  :amount="money(item.unitPrice * item.quantity)"
+                  :adjustments="itemAdjustmentRows(item)"
+                  @update:selected="selectItems([item], $event)"
+                  @facility-click="emit('reject-and-release', item)"
+                  @attributes-click="emit('open-item-attributes', item)"
                 >
                   <template #actions>
-                    <ion-button
-                      v-if="canRequestInventoryTransfer && isInventoryTransferRequestEligible(item)"
-                      fill="clear"
-                      size="small"
-                      @click.stop="$emit('request-inventory-transfer', item)"
-                    >
+                    <ion-button v-if="itemActions[item.orderItemSeqId]?.canTransfer" fill="clear" size="small"
+                      @click.stop="emit('request-inventory-transfer', item)">
                       {{ translate('Request transfer') }}
                     </ion-button>
-                    <ion-button
-                      v-if="isItemCancelAllowed(item)"
-                      fill="clear"
-                      size="small"
-                      color="danger"
-                      @click.stop="$emit('cancel-single-item', item)"
-                    >
+                    <ion-button v-if="itemActions[item.orderItemSeqId]?.canCancel" fill="clear" size="small" color="danger"
+                      @click.stop="emit('cancel-single-item', item)">
                       {{ translate('Cancel') }}
                     </ion-button>
                   </template>
@@ -136,46 +96,43 @@
       </ion-accordion-group>
     </ion-list>
 
-    <!-- Totals Card -->
     <div class="order-summary">
       <ion-card class="payment-card">
         <ion-card-header>
           <ion-card-title>{{ translate('Payment') }}</ion-card-title>
-          <ion-card-subtitle v-if="order.payments.length" :color="paymentNetColor">
-            {{ translate('Net') }} {{ money(paymentNetAmount, order.currency) }}
+          <ion-card-subtitle v-if="order.payments.list.length" :color="order.payments.netColor">
+            {{ translate('Net') }} {{ money(order.payments.netAmount) }}
           </ion-card-subtitle>
         </ion-card-header>
         <ion-list lines="none">
-          <template v-for="section in paymentSections" :key="section.statusId">
+          <template v-for="section in order.payments.sections" :key="section.statusId">
             <ion-item-divider color="light">
               <ion-label>{{ section.label }}</ion-label>
-              <ion-label slot="end">{{ money(section.total, order.currency) }}</ion-label>
+              <ion-label slot="end">{{ money(section.total) }}</ion-label>
             </ion-item-divider>
             <ion-item v-for="(payment, index) in section.payments" :key="payment.id || `${payment.paymentMethodTypeId}-${index}`">
               <ion-label>
-                <p class="overline">{{ payment.paymentMethodTypeId || payment.method }}</p>
-                {{ payment.paymentMethodTypeDesc || payment.method }}
-                <p>{{ payment.statusDesc || payment.status || payment.statusId }}</p>
+                <p class="overline">{{ payment.paymentMethodTypeId }}</p>
+                {{ payment.paymentMethodTypeDesc }}
+                <p>{{ payment.statusDesc || payment.statusId }}</p>
                 <p v-if="payment.createdDate">{{ formatDateTime(payment.createdDate) }}</p>
-                <template v-if="canViewReturns">
-                  <ion-button
-                    v-for="returnId in carriedOverReturnIds(payment)"
-                    :key="returnId"
-                    fill="clear"
-                    size="small"
-                    class="payment-return-link"
-                    :router-link="`/returns/${returnId}`"
-                    @click.stop
-                  >
-                    <ion-icon slot="start" :icon="openOutline" />
-                    {{ translate('Return') }} {{ returnId }}
-                  </ion-button>
-                </template>
+                <ion-button
+                  v-for="returnId in paymentReturnIds[payment.id] || []"
+                  :key="returnId"
+                  fill="clear"
+                  size="small"
+                  class="payment-return-link"
+                  :router-link="`/returns/${returnId}`"
+                  @click.stop
+                >
+                  <ion-icon slot="start" :icon="openOutline" />
+                  {{ translate('Return') }} {{ returnId }}
+                </ion-button>
               </ion-label>
-              <ion-label slot="end">{{ money(payment.amount, order.currency) }}</ion-label>
+              <ion-label slot="end">{{ money(payment.amount) }}</ion-label>
             </ion-item>
           </template>
-          <ion-item v-if="!order.payments.length">
+          <ion-item v-if="!order.payments.list.length">
             <ion-label>{{ translate('No payment preference records') }}</ion-label>
           </ion-item>
         </ion-list>
@@ -187,25 +144,25 @@
         <ion-list lines="full">
           <ion-item>
             <ion-label>{{ translate('Subtotal') }}</ion-label>
-            <ion-label slot="end">{{ money(orderTotals.subtotal, order.currency) }}</ion-label>
+            <ion-label slot="end">{{ money(order.totals.subtotal) }}</ion-label>
           </ion-item>
-          <ion-item v-for="adjustment in (orderTotals.adjustmentRows || [])" :key="adjustment.label">
+          <ion-item v-for="adjustment in order.totals.adjustmentRows" :key="adjustment.label">
             <ion-label>
               {{ adjustment.label }}
               <p v-if="adjustment.detail">{{ adjustment.detail }}</p>
             </ion-label>
-            <ion-note slot="end" :color="adjustment.isIncluded ? 'medium' : undefined">
-              {{ money(adjustment.amount, order.currency) }}
-              <template v-if="adjustment.isIncluded"> ({{ translate('included') }})</template>
-            </ion-note>
+            <ion-label slot="end" class="ion-text-end">
+              {{ money(adjustment.amount) }}
+              <p v-if="adjustment.isIncluded">{{ translate('Included') }}</p>
+            </ion-label>
           </ion-item>
           <ion-item class="grand-total-row">
             <ion-label>{{ translate('Grand total') }}</ion-label>
-            <ion-label slot="end" color="dark">{{ money(orderTotals.total, order.currency) }}</ion-label>
+            <ion-label slot="end" color="dark">{{ money(order.totals.total) }}</ion-label>
           </ion-item>
           <ion-item>
             <ion-label>{{ translate('Payment received') }}</ion-label>
-            <ion-label slot="end">{{ money(paymentReceivedTotal, order.currency) }}</ion-label>
+            <ion-label slot="end">{{ money(order.payments.receivedTotal) }}</ion-label>
           </ion-item>
         </ion-list>
       </ion-card>
@@ -214,65 +171,71 @@
 </template>
 
 <script setup lang="ts">
-import {
-  IonAccordion,
-  IonAccordionGroup,
-  IonButton,
-  IonCard,
-  IonCardHeader,
-  IonCardSubtitle,
-  IonCardTitle,
-  IonCheckbox,
-  IonIcon,
-  IonItem,
-  IonItemDivider,
-  IonLabel,
-  IonList,
-  IonNote,
-} from '@ionic/vue';
+import { computed } from 'vue';
+import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonIcon, IonItem, IonItemDivider, IonLabel, IonList } from '@ionic/vue';
 import { openOutline } from 'ionicons/icons';
+import { commonUtil, translate } from '@common';
 import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
+import { useProductIdentity } from '@/composables/useProductIdentity';
+import { isKit } from '@/utils';
+import { formatDateTime } from '@/utils/orderDetailDates';
+import type { EnrichedItemGroup, EnrichedOrder, EnrichedOrderItem } from '@/types/orderDetail';
 
-defineProps<{
-  order: any;
-  areAllSelected: boolean;
-  itemGroups: any[];
-  orderTotals: any;
-  paymentReceivedTotal: number;
-  paymentSections: any[];
-  paymentNetAmount: number;
-  paymentNetColor: string;
-  canViewReturns: boolean;
-  canRequestInventoryTransfer: boolean;
-  isKit: (g: any) => boolean;
-  getProduct: (productId: string) => any;
-  productFeatureLabel: (productId: string) => string;
-  groupPrimaryIdentifier: (g: any) => string;
-  groupSecondaryIdentifier: (g: any) => string;
-  groupLocationLabel: (g: any) => string;
-  attributeChipLabel: (c: number) => string;
-  isItemFacilityActionDisabled: (item: any) => boolean;
-  itemStatusDetail: (item: any) => string;
-  itemLineTotal: (item: any) => number;
-  getItemAdjustmentRows: (item: any) => any[];
-  getGroupAdjustmentRows: (group: any) => any[];
-  isInventoryTransferRequestEligible: (item: any) => boolean;
-  isItemCancelAllowed: (item: any) => boolean;
-  carriedOverReturnIds: (payment: any) => string[];
-  money: (amount: any, currency?: string) => string;
-  formatDateTime: (dt: any) => string;
-  translate: (key: string) => string;
+const props = defineProps<{
+  order: EnrichedOrder;
+  selectedItemIds: Set<string>;
+  /** Per order item, what its row may offer — decided by the page's action validator. */
+  itemActions: Record<string, { canCancel: boolean; canTransfer: boolean; facilityDisabled: boolean }>;
+  /** Returns carried over onto exchange credit/payment preferences, keyed by payment id. */
+  paymentReturnIds: Record<string, string[]>;
 }>();
 
-defineEmits<{
-  (e: 'toggle-select-all', checked: boolean): void;
-  (e: 'open-add-item'): void;
-  (e: 'reject-and-release', item: any): void;
-  (e: 'open-item-attributes', item: any): void;
-  (e: 'request-inventory-transfer', item: any): void;
-  (e: 'cancel-single-item', item: any): void;
+const emit = defineEmits<{
+  'update:selectedItemIds': [ids: Set<string>];
+  'add-item': [];
+  'reject-and-release': [item: EnrichedOrderItem];
+  'open-item-attributes': [item: EnrichedOrderItem];
+  'request-inventory-transfer': [item: EnrichedOrderItem];
+  'cancel-single-item': [item: EnrichedOrderItem];
 }>();
+
+const { getProduct, primaryIdentifier, secondaryIdentifier, featureLabel } = useProductIdentity();
+
+const allItems = computed(() => props.order.groupedItems.flatMap((group) => group.items));
+const areAllSelected = computed(() => allItems.value.length > 0 && allItems.value.every(isSelected));
+
+function isSelected(item: EnrichedOrderItem) {
+  return props.selectedItemIds.has(item.orderItemSeqId);
+}
+
+function selectItems(items: EnrichedOrderItem[], selected: boolean) {
+  const ids = new Set(props.selectedItemIds);
+  items.forEach((item) => selected ? ids.add(item.orderItemSeqId) : ids.delete(item.orderItemSeqId));
+  emit('update:selectedItemIds', ids);
+}
+
+const money = (value: number) => commonUtil.formatCurrency(value, props.order.currency || 'USD');
+
+/** The product identity a rolled up (or sole item) row shows. */
+function productRowProps(group: EnrichedItemGroup) {
+  const product = getProduct(group.productId);
+  return {
+    primary: primaryIdentifier(group.productId) || group.name || group.externalId,
+    secondary: secondaryIdentifier(group.productId) || group.externalId,
+    badgeLabel: isKit(group) ? translate('Kit') : '',
+    features: featureLabel(group.productId),
+    imageUrl: product?.mainImageUrl,
+    previewProduct: product,
+  };
+}
+
+const attributeChipLabel = (count: number) => `${count || 0} ${Number(count) === 1 ? translate('attribute') : translate('attributes')}`;
+const itemStatusDetail = (item: EnrichedOrderItem) => item.shipGroupSeqId ? `${translate('#')}${item.shipGroupSeqId}` : '';
+const itemAdjustmentRows = (item: EnrichedOrderItem) => item.adjustments.map((adj) => ({ label: adj.comment, amount: money(adj.amount) }));
+
 </script>
+
+<style scoped src="./orderDetailCardHeader.css"></style>
 
 <style scoped>
 .order-items-list {
@@ -293,17 +256,6 @@ defineEmits<{
   align-items: start;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-}
-
-.item-key-header,
-.item-key-content {
-  pointer-events: none;
-}
-
-.item-key-header ion-checkbox,
-.item-key-header ion-thumbnail,
-.item-key-content ion-checkbox {
-  pointer-events: auto;
 }
 
 @media (max-width: 699px) {

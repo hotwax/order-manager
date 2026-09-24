@@ -10,7 +10,9 @@ const orderDetailApi = vi.hoisted(() => ({
 vi.mock('@common', () => ({
   api: vi.fn(),
   commonUtil: {
-    hasError: () => false
+    hasError: () => false,
+    getStatusColor: () => 'medium',
+    parseDateTimeValue: (value: any) => ({ toMillis: () => Number(value) })
   },
   cookieHelper: () => ({
     get: () => ''
@@ -330,7 +332,7 @@ describe('order detail store', () => {
     });
   });
 
-  it('builds an enriched order domain model with precomputed ship groups, items, and action capabilities', () => {
+  it('builds the enriched order from the store getters it already has', () => {
     const store = useOrderDetailStore();
     store.byOrderId.M100821 = {
       payload: {
@@ -339,36 +341,31 @@ describe('order detail store', () => {
         statusId: 'ORDER_APPROVED',
         currencyUom: 'USD',
         grandTotal: 63.98,
+        adjustments: [taxAdjustment('M100510', '01', 'Utah State Tax', 2.86)],
+        statuses: [
+          { orderStatusId: 'S1', orderItemSeqId: '01', statusId: 'ITEM_CANCELLED', statusDatetime: 1_700_000_000_000, statusUserLogin: 'amy' }
+        ],
         shipGroups: [{
           shipGroupSeqId: '00001',
           facilityId: 'BROADWAY',
-          items: [{
-            orderItemSeqId: '01',
-            productId: 'P1001',
-            externalId: '15617773142165',
-            unitPrice: 59,
-            quantity: 1,
-            statusId: 'ITEM_APPROVED',
-          }]
+          items: [{ orderItemSeqId: '01', productId: 'P1001', externalId: '15617773142165', unitPrice: 59, quantity: 1, statusId: 'ITEM_APPROVED' }]
         }]
       },
       status: 'loaded',
       loadedAt: '',
       error: ''
     };
+    store.fulfillmentTimelineByOrderId.M100821 = [{ shipGroupSeqId: '00001', picklistDate: 1_700_000_100_000 }];
 
-    const enriched = store.enrichedOrderByOrderId('M100821');
-    expect(enriched).toBeTruthy();
-    expect(enriched?.id).toBe('M100821');
-    expect(enriched?.orderName).toBe('Order #100821');
-    expect(enriched?.shipGroups).toHaveLength(1);
-    expect(enriched?.shipGroups[0].id).toBe('00001');
-    expect(enriched?.shipGroups[0].headerTitle).toContain('00001');
-    expect(enriched?.shipGroups[0].items).toHaveLength(1);
-    expect(enriched?.shipGroups[0].items[0].id).toBe('01');
-    expect(enriched?.shipGroups[0].items[0].actions).toHaveProperty('canCancel');
-    expect(enriched?.shipGroups[0].items[0].actions).toHaveProperty('canTransfer');
-    expect(enriched?.totals.total).toBe(59);
+    const enriched = store.enrichedOrderByOrderId('M100821')!;
+    // Totals come from orderTotalsByOrderId, so the page and the store agree on the numbers.
+    expect(enriched.totals).toEqual(expect.objectContaining({ subtotal: 59, total: 61.86 }));
+    expect(enriched.totals.adjustmentRows).toEqual([{ label: 'Utah State Tax', detail: '', amount: 2.86, isIncluded: false }]);
+    // Item status rows reach the header timeline through itemStatusEventsByOrderId.
+    expect(enriched.timeline.map((event) => event.label)).toContain('ITEM_CANCELLED');
+    // The ship group reads its lifecycle from timelineByShipGroupByOrderId.
+    expect(enriched.shipGroups[0].lifecycle.picklistDate).toBe(1_700_000_100_000);
+    expect(store.enrichedOrderByOrderId('unknown')).toBeNull();
   });
 });
 

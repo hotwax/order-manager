@@ -1,10 +1,10 @@
 <template>
-  <div class="order-comms-segment">
+  <div>
     <div v-if="commEvents.length">
-      <div class="list-item comm-event-row" v-for="ev in commEvents" :key="ev.id">
+      <div class="list-item comm-event-row" v-for="ev in commEvents" :key="ev.communicationEventId">
         <ion-item lines="none">
           <ion-label>
-            {{ ev.id }}
+            {{ ev.communicationEventId }}
             <p>{{ translate("ID") }}</p>
           </ion-label>
         </ion-item>
@@ -35,7 +35,7 @@
         </div>
       </div>
     </div>
-    <ion-list v-if="!commEvents.length">
+    <ion-list v-else>
       <ion-item lines="none">
         <ion-label>{{ translate("No communication events for this order") }}</ion-label>
       </ion-item>
@@ -44,16 +44,13 @@
 </template>
 
 <script setup lang="ts">
-import {
-  IonItem,
-  IonLabel,
-  IonList,
-} from '@ionic/vue';
+import { IonItem, IonLabel, IonList } from '@ionic/vue';
+import { translate } from '@common';
+import { formatDate } from '@/utils/orderDetailDates';
 
 defineProps<{
+  /** CommunicationEvent rows as the order store loads them. */
   commEvents: any[];
-  formatDate: (date: any) => string;
-  translate: (key: string) => string;
 }>();
 </script>
 
@@ -63,7 +60,7 @@ defineProps<{
   --columns-tablet: 5;
 }
 
-.comm-event-row > ion-item {
+.comm-event-row>ion-item {
   width: 100%;
 }
 </style>
