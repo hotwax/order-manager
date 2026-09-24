@@ -31,37 +31,31 @@
  * unreachable; it was removed rather than left in place looking live. If that
  * config lands, reintroduce it together with the caller that populates it.
  *
- * ── Remediation & lifecycle-restart actions (product decisions 2026-06-11) ──
- *   - RETURN becomes available as soon as the order has ≥1 item in
- *     ITEM_COMPLETED. Before that, the remediation actions are APPEASEMENT
- *     and RESHIP (these may have been dropped in the OFBiz→Moqui migration;
- *     surfacing them here so the UI exposes them — server wiring TBD).
- *   - CLONE is available at ALL times, including on cancelled/completed
- *     orders. It copies the order + items + logically related details into a
- *     NEW order at the start of its lifecycle, optionally posting to Shopify.
- *     Wire it to the create-order API: POST `oms/orders/shopify`
- *     (see CreateOrder.vue:1089).
+ * ── Footer scope ────────────────────────────────────────────────────────────
+ * The footer offers the seed table's status transitions plus the bulk
+ * "Cancel items" (hidden while cancels do not reach Shopify). Return,
+ * Appeasement, Reship and Clone were modelled here without a reachable
+ * handler and were removed: returns are hotwax/order-manager#6, the rest
+ * #554 (Appeasement), #555 (Reship) and #556 (Clone).
  *
- * ── Zero imports on purpose ─────────────────────────────────────────────────
- * Drops in cleanly. `any` for payloads matches house style (the order-detail
- * view model is untyped — see OrderDetail.vue `order` computed).
+ * `any` for payloads matches house style.
  *
  * ╔══════════════════════════════════════════════════════════════════════════╗
  * ║ OPEN ASSUMPTIONS — CONFIRM DURING TWEAKING                                ║
  * ╠══════════════════════════════════════════════════════════════════════════╣
- * ║ R1. APPEASEMENT/RESHIP stay available AFTER the first item completes too  ║
- * ║     (alongside RETURN), and are blocked only on ORDER_CANCELLED.          ║
- * ║ R2. Reject quantity is hardcoded '1' in the current UI; this engine is    ║
+ * ║ R1. Reject quantity is hardcoded '1' in the current UI; this engine is    ║
  * ║     status-only and does NOT compute partial-qty eligibility.             ║
- * ║ R3. allowedTransitions has no statusFlowId scoping; sales orders run the  ║
+ * ║ R2. allowedTransitions has no statusFlowId scoping; sales orders run the  ║
  * ║     implicit Default flow, so we pass the set in as-is.                   ║
  * ╚══════════════════════════════════════════════════════════════════════════╝
  */
 
+import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
+
 /* ── Action id unions, split by the three levels in OrderDetail.vue ───────── */
 
 /** ORDER / footer level (renders only on the Items segment, OrderDetail.vue:724). */
-export type OrderFooterActionId = 'CANCEL_ITEMS' | 'RETURN' | 'APPEASEMENT' | 'RESHIP' | 'CLONE';
+export type OrderFooterActionId = 'CANCEL_ITEMS';
 
 /** SHIP-GROUP level (action row, OrderDetail.vue:603-609). */
 export type ShipGroupActionId =
@@ -77,28 +71,12 @@ export type ShipGroupActionId =
 /** ITEM level (per-row, OrderDetail.vue:215-231). */
 export type OrderItemActionId = 'CANCEL_ITEM' | 'REJECT_AND_RELEASE' | 'VIEW_ATTRIBUTES';
 
-export type AnyActionId = OrderFooterActionId | ShipGroupActionId | OrderItemActionId;
-
-/* ── Result + descriptor shapes (mirror the transfers structure) ──────────── */
-
-import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
+/* ── Result + descriptor shapes ──────────────────────────────────────────── */
 
 export interface ActionValidationResult {
   allowed: boolean;
   reason?: string;
 }
-
-export interface OrderAction<TId extends string = AnyActionId> {
-  id: TId;
-  label: string;
-  color?: string;
-  icon?: string;
-  validation: ActionValidationResult;
-}
-
-export type OrderFooterAction = OrderAction<OrderFooterActionId>;
-export type ShipGroupAction = OrderAction<ShipGroupActionId>;
-export type OrderItemAction = OrderAction<OrderItemActionId>;
 
 /**
  * An order-level STATUS-CHANGE action, derived from the seed transition table —
@@ -119,8 +97,8 @@ export interface OrderStatusAction {
 
 /**
  * A single footer button as the view renders it — the UNIFIED shape across
- * table-driven status transitions (`kind: 'status'`) and the lifecycle/bulk
- * footer actions (`kind: 'footer'`). The footer is built from one list of these
+ * table-driven status transitions (`kind: 'status'`) and the cancel button
+ * on the end (`kind: 'footer'`). The footer is built from one list of these
  * (see getOrderFooterActions); only VALID actions are included, so a button
  * that shouldn't apply to the order simply isn't present.
  */
@@ -162,16 +140,6 @@ export interface OrderLifecycleContext {
    * it on item-level calls, where no shipGroup object is in scope.
    */
   isVirtual?: boolean;
-  /**
-   * Flattened item pool WITH statusId for order-level gates (e.g. RETURN's
-   * "≥1 completed item" check). The mapped view-model ship-group items do NOT
-   * carry statusId, so pass the FLATTENED grouped item rows —
-   * `groupedItems.flatMap(g => g.items)` — NOT the group rows (a group's own
-   * statusId is just its first item's and can hide a completed item inside a
-   * mixed group). Without this, the fallback scan finds no statusId and only
-   * an ORDER_COMPLETED header keeps RETURN available.
-   */
-  allItems?: any[];
 }
 
 /* ── Lifecycle constants (kept local; mirror seed/ground-truth) ───────────── */
@@ -263,19 +231,6 @@ export const OrderActionValidator = {
   },
 
   /**
-   * RETURN eligibility driver: the order has at least one completed item.
-   * An ORDER_COMPLETED header short-circuits true (all items completed).
-   * Otherwise prefers ctx.allItems (rows that carry statusId); the fallback
-   * scan of order.shipGroups[].items only works on payloads whose item rows
-   * carry statusId — the mapped view model's do NOT, so pass ctx.allItems.
-   */
-  hasAnyCompletedItem(order: any, ctx?: OrderLifecycleContext): boolean {
-    if (order?.statusId === 'ORDER_COMPLETED') return true;
-    const pool = ctx?.allItems ?? (order?.shipGroups || []).flatMap((sg: any) => sg.items || []);
-    return pool.some((item: any) => this.isItemFulfilled(item));
-  },
-
-  /**
    * STATUS-TABLE BRIDGE. Returns whether `toStatusId` is a legal next status
    * for the given FROM status. Consults the injected seed transition set when
    * present (authoritative); otherwise returns `undefined` to signal "table
@@ -343,19 +298,14 @@ export const OrderActionValidator = {
 
   /**
    * DISCOVERY — the COMPLETE, valid-only footer action set for an order, in one
-   * flat list the view can render directly. It unifies:
-   *   - table-driven status transitions (Approve, Cancel order, …), and
-   *   - the lifecycle/bulk footer actions (Return, Clone, Cancel items,
-   *     Appeasement, Reship).
-   * INVALID actions are omitted entirely — the footer shows only what is
-   * currently doable (no disabled-but-visible buttons). The engine reports
-   * validity; the VIEW still decides which ids it has a handler wired for and
-   * skips the rest (e.g. Appeasement/Reship until their backend lands).
+   * flat list the view can render directly: the table-driven status
+   * transitions (Approve, …) plus one cancel button. INVALID actions are
+   * omitted entirely — the footer shows only what is currently doable (no
+   * disabled-but-visible buttons).
    */
   getOrderFooterActions(order: any, allowedTransitions: any[], selectedItems: any[], ctx?: OrderLifecycleContext): FooterActionView[] {
     const actions: FooterActionView[] = [];
     const statusActions = this.getOrderStatusActions(order, allowedTransitions);
-    const footer = this.getFooterActions(order, selectedItems, ctx);
 
     // Status transitions on the start — EXCEPT order-cancel, which is folded
     // into the single morphing cancel button below.
@@ -378,27 +328,13 @@ export const OrderActionValidator = {
     // Hidden while cancel does not reach Shopify; the button then falls through to
     // the whole-order "Cancel order" below, which is unaffected.
     const bulkCancelValid = !HIDE_SHOPIFY_UNSYNCED_ACTIONS &&
-      footer.some((action) => action.id === 'CANCEL_ITEMS' && action.validation.allowed);
+      this.validateFooterAction(order, 'CANCEL_ITEMS', selectedItems, ctx).allowed;
     const orderCancelValid = statusActions.some((transition) => transition.id === 'ORDER_CANCELLED');
     if (bulkCancelValid) {
       actions.push({ id: 'CANCEL_ITEMS', kind: 'footer', label: 'Cancel items', color: 'danger', fill: 'outline' });
     } else if (orderCancelValid) {
       const orderCancel = statusActions.find((transition) => transition.id === 'ORDER_CANCELLED')!;
       actions.push({ id: 'ORDER_CANCELLED', kind: 'footer', toStatusId: 'ORDER_CANCELLED', label: orderCancel.label, color: 'danger', fill: 'outline' });
-    }
-
-    // Remaining lifecycle actions on the end (cancel handled above).
-    for (const action of footer) {
-      if (action.id === 'CANCEL_ITEMS') continue;
-      if (HIDE_SHOPIFY_UNSYNCED_ACTIONS && action.id === 'RETURN') continue;
-      if (!action.validation.allowed) continue;
-      actions.push({
-        id: action.id,
-        kind: 'footer',
-        label: action.label,
-        color: action.color,
-        fill: 'outline'
-      });
     }
 
     return actions;
@@ -434,53 +370,6 @@ export const OrderActionValidator = {
         if (!cancellable.length) {
           return { allowed: false, reason: 'Select at least one item that can still be cancelled.' };
         }
-        return { allowed: true };
-      }
-
-      /**
-       * RETURN — footer "Return" (OrderDetail.vue:730).
-       * Product decision 2026-06-11: returns open up as soon as the order has
-       * at least one ITEM_COMPLETED item. Before that, remediation happens via
-       * APPEASEMENT / RESHIP instead.
-       */
-      case 'RETURN': {
-        if (order?.statusId === 'ORDER_CANCELLED') {
-          return { allowed: false, reason: 'Returns are not available for a cancelled order.' };
-        }
-        if (!this.hasAnyCompletedItem(order, ctx)) {
-          return { allowed: false, reason: 'Returns become available once at least one item is completed. Until then, issue an appeasement or reship.' };
-        }
-        return { allowed: true };
-      }
-
-      /**
-       * APPEASEMENT / RESHIP — remediation actions (product decision
-       * 2026-06-11). Confirmed both backend-gaps in src/services/orderActions.ts
-       * (legacy AddOrderAppeasement.ftl / ReShipOrderItems.ftl, dropped in the
-       * OFBiz→Moqui migration — server wiring still needed). Available on any
-       * non-cancelled order, including AFTER items complete (confirmed
-       * 2026-06-11) — they coexist with RETURN, not just precede it.
-       */
-      case 'APPEASEMENT':
-      case 'RESHIP': {
-        if (order?.statusId === 'ORDER_CANCELLED') {
-          return { allowed: false, reason: 'Not available for a cancelled order.' };
-        }
-        return { allowed: true };
-      }
-
-      /**
-       * CLONE — available at ALL times, including terminal orders (product
-       * decision 2026-06-11). Creates a NEW order AS IF placed again from an
-       * external system: it carries the order + items + logically related
-       * details, but NOT holds, payment capture, fulfillment/shipment records,
-       * inventory reservations, status history, or the order number/dates —
-       * the OMS re-adds holds and re-captures payment after the fact. Whether
-       * unit prices / taxes / discounts are carried verbatim or recomputed may
-       * become a user-confirmation modal (design pending clone research). Wire
-       * to POST `oms/orders/shopify` (CreateOrder.vue:1089). No lifecycle gate.
-       */
-      case 'CLONE': {
         return { allowed: true };
       }
 
@@ -679,94 +568,5 @@ export const OrderActionValidator = {
       default:
         return { allowed: false, reason: 'Unknown item action.' };
     }
-  },
-
-  /* ════════════════════════════════════════════════════════════════════════
-   * DISCOVERY MODE — each method returns actions carrying their validation.
-   * (Footer/ship-group keep disabled-but-visible items, like the transfers app;
-   *  item-level filters to allowed, matching how the chips/buttons render.)
-   * ════════════════════════════════════════════════════════════════════════ */
-
-  getFooterActions(order: any, selectedItems: any[], ctx?: OrderLifecycleContext): OrderFooterAction[] {
-    return [
-      {
-        id: 'CANCEL_ITEMS',
-        label: 'Cancel items',
-        color: 'danger',
-        validation: this.validateFooterAction(order, 'CANCEL_ITEMS', selectedItems, ctx)
-      },
-      {
-        id: 'RETURN',
-        label: 'Return',
-        color: 'warning',
-        validation: this.validateFooterAction(order, 'RETURN', selectedItems, ctx)
-      },
-      {
-        id: 'APPEASEMENT',
-        label: 'Appeasement',
-        validation: this.validateFooterAction(order, 'APPEASEMENT', selectedItems, ctx)
-      },
-      {
-        id: 'RESHIP',
-        label: 'Reship',
-        validation: this.validateFooterAction(order, 'RESHIP', selectedItems, ctx)
-      },
-      {
-        id: 'CLONE',
-        label: 'Clone order',
-        validation: this.validateFooterAction(order, 'CLONE', selectedItems, ctx)
-      }
-    ];
-  },
-
-  getShipGroupActions(order: any, shipGroup: any, selectedItems: any[], ctx?: OrderLifecycleContext): ShipGroupAction[] {
-    const virtual = this.isVirtualFacility(shipGroup, ctx);
-    const actions: ShipGroupAction[] = [];
-
-    if (virtual) {
-      actions.push({ id: 'BROKER', label: 'Broker', validation: this.validateShipGroupAction(order, shipGroup, 'BROKER', selectedItems, ctx) });
-      actions.push({ id: 'PARK_ITEMS', label: 'Park', validation: this.validateShipGroupAction(order, shipGroup, 'PARK_ITEMS', selectedItems, ctx) });
-      actions.push({ id: 'RELEASE', label: 'Release', validation: this.validateShipGroupAction(order, shipGroup, 'RELEASE', selectedItems, ctx) });
-    } else {
-      // Physical facility: the dual button shows "Pull back" instead of "Park".
-      actions.push({ id: 'PULL_BACK', label: 'Pull back', validation: this.validateShipGroupAction(order, shipGroup, 'PULL_BACK', selectedItems, ctx) });
-    }
-
-    actions.push({ id: 'ADD_TASK', label: 'Add Task', validation: this.validateShipGroupAction(order, shipGroup, 'ADD_TASK', selectedItems, ctx) });
-    actions.push({ id: 'ADD_ITEMS', label: 'Add Items', validation: this.validateShipGroupAction(order, shipGroup, 'ADD_ITEMS', selectedItems, ctx) });
-    actions.push({ id: 'EDIT_CARRIER_METHOD', label: 'Edit carrier & method', validation: this.validateShipGroupAction(order, shipGroup, 'EDIT_CARRIER_METHOD', selectedItems, ctx) });
-    actions.push({ id: 'EDIT_ADDRESS', label: 'Edit shipping address', validation: this.validateShipGroupAction(order, shipGroup, 'EDIT_ADDRESS', selectedItems, ctx) });
-
-    return actions;
-  },
-
-  getItemActions(order: any, item: any, ctx?: OrderLifecycleContext): OrderItemAction[] {
-    // Returns ALL actions with their validation (disabled-but-visible),
-    // consistent with the footer/ship-group levels. The view decides hide vs
-    // disable per affordance — note the REJECT_AND_RELEASE chip doubles as the
-    // item's facility-name display (OrderDetail.vue:215-218) and must stay
-    // visible-but-disabled, never hidden.
-    return [
-      { id: 'REJECT_AND_RELEASE', label: 'Reject & release', validation: this.validateItemAction(order, item, 'REJECT_AND_RELEASE', ctx) },
-      { id: 'CANCEL_ITEM', label: 'Cancel', color: 'danger', validation: this.validateItemAction(order, item, 'CANCEL_ITEM', ctx) },
-      { id: 'VIEW_ATTRIBUTES', label: 'View attributes', validation: this.validateItemAction(order, item, 'VIEW_ATTRIBUTES', ctx) }
-    ];
-  },
-
-  /* ════════════════════════════════════════════════════════════════════════
-   * BULK HELPERS — which items can participate in a selection-driven action.
-   * ════════════════════════════════════════════════════════════════════════ */
-
-  /** Items eligible for the footer Cancel (drives selectable checkboxes). */
-  getBulkSelectableItems(order: any, items: any[], ctx?: OrderLifecycleContext): any[] {
-    return (items || []).filter((it) => this.isItemSelectable(order, it, ctx));
-  },
-
-  /** An item is selectable for a bulk action if any selection-driven action is valid for it. */
-  isItemSelectable(order: any, item: any, ctx?: OrderLifecycleContext): boolean {
-    return (
-      this.validateItemAction(order, item, 'CANCEL_ITEM', ctx).allowed ||
-      this.validateItemAction(order, item, 'REJECT_AND_RELEASE', ctx).allowed
-    );
   }
 };

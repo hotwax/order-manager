@@ -15,7 +15,6 @@ import type { EnrichedOrder, EnrichedOrderItem, EnrichedShipGroup } from '@/type
 import AddContactModal from '@/components/AddContactModal.vue';
 import AddItemToOrderModal from '@/components/orders/AddItemToOrderModal.vue';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
-import CloneOrderModal from '@/components/orders/CloneOrderModal.vue';
 import FacilityInventoryModal from '@/components/fulfillment/FacilityInventoryModal.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import ManageOrderIdentificationsModal from '@/components/orders/ManageOrderIdentificationsModal.vue';
@@ -37,11 +36,20 @@ export interface UseOrderActionsOptions {
 }
 
 const FOOTER_TERMINAL_ITEM_STATUSES = ['ITEM_CANCELLED', 'ITEM_COMPLETED'];
+
 /**
- * The footer renders only the actions the engine reports as valid AND that have a handler here
- * (Appeasement/Reship are modelled but excluded until their backend lands).
+ * A ship group action that moves the group's actionable items somewhere: park, pull back and
+ * release differ only in which items qualify, what they ask the operator, and the call they make.
  */
-const DISPATCHABLE_FOOTER_IDS = new Set(['CANCEL_ITEMS', 'ORDER_CANCELLED', 'RETURN']);
+interface SelectionAction<Input> {
+  actionId: ShipGroupActionId;
+  eligible: (item: EnrichedOrderItem) => boolean;
+  /** Ask the operator for what the call needs; null means they backed out. */
+  prompt: (items: EnrichedOrderItem[]) => Promise<Input | null>;
+  apply: (orderId: string, items: EnrichedOrderItem[], input: Input) => Promise<unknown>;
+  success: string;
+  failure: string;
+}
 
 /**
  * The order page's actions and the one validator path that gates them. A button's enabled state
@@ -71,10 +79,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
 
   function shipGroupActionValidation(shipGroup: EnrichedShipGroup, actionId: ShipGroupActionId) {
     if (!order.value) return { allowed: false };
-    return OrderActionValidator.validateShipGroupAction(order.value, shipGroup, actionId, actionableItems(shipGroup), {
-      isVirtual: shipGroup.isVirtual,
-      allItems: allItems.value
-    });
+    return OrderActionValidator.validateShipGroupAction(order.value, shipGroup, actionId, actionableItems(shipGroup), { isVirtual: shipGroup.isVirtual });
   }
 
   const isShipGroupActionDisabled = (shipGroup: EnrichedShipGroup, actionId: ShipGroupActionId) =>
@@ -83,8 +88,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
   function itemActionContext(item: EnrichedOrderItem) {
     return {
       isVirtual: isVirtualForItem(item),
-      itemAllowedToStatusIds: new Set<string>(seed.allowedTransitions(item.statusId).map((transition: any) => transition.toStatusId)),
-      allItems: allItems.value
+      itemAllowedToStatusIds: new Set<string>(seed.allowedTransitions(item.statusId).map((transition: any) => transition.toStatusId))
     };
   }
 
@@ -93,7 +97,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     if (!order.value) return { allowed: false };
     const shipGroup = shipGroupById(item.shipGroupSeqId);
     if (shipGroup?.isVirtual) {
-      return OrderActionValidator.validateShipGroupAction(order.value, shipGroup, 'RELEASE', [item], { isVirtual: true, allItems: allItems.value });
+      return OrderActionValidator.validateShipGroupAction(order.value, shipGroup, 'RELEASE', [item], { isVirtual: true });
     }
     return OrderActionValidator.validateItemAction(order.value, item, 'REJECT_AND_RELEASE', itemActionContext(item));
   }
@@ -133,7 +137,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     const modal = await modalController.create({ component: FacilityModal });
     await modal.present();
     const { data: facilityId } = await modal.onWillDismiss();
-    return facilityId ?? null;
+    return facilityId || null;
   }
 
   /**
@@ -157,7 +161,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     });
     await modal.present();
     const { data: facilityId } = await modal.onWillDismiss();
-    return facilityId ?? null;
+    return facilityId || null;
   }
 
   async function openInventoryTransferRequestModal(shipGroup: EnrichedShipGroup, items: EnrichedOrderItem[]) {
@@ -177,6 +181,12 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     const { role } = await modal.onWillDismiss();
     if (role === 'confirm') await showToast(translate('Inventory transfer requested.'));
   }
+
+  const allocateItem = (orderId: string, orderItemSeqId: string, facilityId: string) => api({
+    url: `oms/orders/${orderId}/items/${orderItemSeqId}/allocation`,
+    method: 'POST',
+    data: { facilityId, orderFacilityChange: { changeReasonEnumId: 'RELEASED' } },
+  });
 
   /* ── Ship group actions ───────────────────────────────────────────────── */
 
@@ -198,94 +208,94 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     }
   }
 
-  async function parkSelectedItems(shipGroup: EnrichedShipGroup) {
-    const validation = shipGroupActionValidation(shipGroup, 'PARK_ITEMS');
+  async function runSelectionAction<Input>(shipGroup: EnrichedShipGroup, action: SelectionAction<Input>) {
+    const validation = shipGroupActionValidation(shipGroup, action.actionId);
     if (!validation.allowed) return showUnavailableAction(validation);
 
-    const itemIds = actionableItems(shipGroup)
-      .filter((item) => !OrderActionValidator.isItemTerminal(item))
-      .map((item) => item.orderItemSeqId);
-    if (!itemIds.length) return;
-    const facilityId = await openFacilityModal();
-    if (!facilityId) return;
+    const items = actionableItems(shipGroup).filter(action.eligible);
+    if (!items.length) return;
+    const input = await action.prompt(items);
+    if (input === null) return;
     const orderId = order.value!.id;
     try {
-      for (const orderItemSeqId of itemIds) {
-        await api({
-          url: `oms/orders/${orderId}/moveItemToParking`,
-          method: 'POST',
-          data: { orderId, orderItemSeqId, shipGroupSeqId: shipGroup.id, toFacilityId: facilityId },
-        });
-      }
+      await action.apply(orderId, items, input);
       selectedShipGroupItems.value[shipGroup.id] = [];
-      await showToast(translate('Items moved to parking.'));
+      await showToast(translate(action.success));
       await loadOrder(orderId, true);
     } catch {
-      await showToast(translate('Failed to park items. Please try again.'));
+      await showToast(translate(action.failure));
     }
   }
 
-  async function rejectSelectedItems(shipGroup: EnrichedShipGroup) {
-    const validation = shipGroupActionValidation(shipGroup, 'PULL_BACK');
-    if (!validation.allowed) return showUnavailableAction(validation);
+  const isOpenItem = (item: EnrichedOrderItem) => !OrderActionValidator.isItemTerminal(item);
 
-    const itemIds = actionableItems(shipGroup)
-      .filter((item) => !OrderActionValidator.isItemTerminal(item))
-      .map((item) => item.orderItemSeqId);
-    if (!itemIds.length) return;
-
+  async function openRejectItemsModal(): Promise<{ rejectionReasonId?: string } | null> {
     const modal = await modalController.create({ component: RejectItemsModal });
     await modal.present();
     const { data, role } = await modal.onWillDismiss();
-    if (role !== 'confirm') return;
-
-    const orderId = order.value!.id;
-    try {
-      await api({
-        url: `oms/orders/${orderId}/reject`,
-        method: 'POST',
-        data: {
-          orderId,
-          items: itemIds.map((orderItemSeqId) => ({ orderItemSeqId, quantity: '1', rejectionReasonId: data?.rejectionReasonId })),
-        },
-      });
-      selectedShipGroupItems.value[shipGroup.id] = [];
-      await showToast(translate('Items rejected successfully.'));
-      await loadOrder(orderId, true);
-    } catch {
-      await showToast(translate('Failed to reject items. Please try again.'));
-    }
+    return role === 'confirm' ? data ?? {} : null;
   }
 
-  async function releaseSelectedItems(shipGroup: EnrichedShipGroup) {
-    const validation = shipGroupActionValidation(shipGroup, 'RELEASE');
-    if (!validation.allowed) return showUnavailableAction(validation);
-
-    const releasableItems = actionableItems(shipGroup).filter((item) => OrderActionValidator.isItemPreFulfill(item));
-    if (!releasableItems.length) return;
-    const facilityId = await openFacilityInventoryModal(releasableItems);
-    if (!facilityId) return;
-    const orderId = order.value!.id;
-    try {
-      for (const { orderItemSeqId } of releasableItems) {
+  const parkSelectedItems = (shipGroup: EnrichedShipGroup) => runSelectionAction(shipGroup, {
+    actionId: 'PARK_ITEMS',
+    eligible: isOpenItem,
+    prompt: () => openFacilityModal(),
+    apply: async (orderId, items, toFacilityId) => {
+      for (const { orderItemSeqId } of items) {
         await api({
-          url: `oms/orders/${orderId}/items/${orderItemSeqId}/allocation`,
+          url: `oms/orders/${orderId}/moveItemToParking`,
           method: 'POST',
-          data: { facilityId, orderFacilityChange: { changeReasonEnumId: 'RELEASED' } },
+          data: { orderId, orderItemSeqId, shipGroupSeqId: shipGroup.id, toFacilityId },
         });
       }
-      selectedShipGroupItems.value[shipGroup.id] = [];
-      await showToast(translate('Items released to facility.'));
-      await loadOrder(orderId, true);
-    } catch {
-      await showToast(translate('Failed to release items. Please try again.'));
-    }
-  }
+    },
+    success: 'Items moved to parking.',
+    failure: 'Failed to park items. Please try again.',
+  });
+
+  const rejectSelectedItems = (shipGroup: EnrichedShipGroup) => runSelectionAction(shipGroup, {
+    actionId: 'PULL_BACK',
+    eligible: isOpenItem,
+    prompt: openRejectItemsModal,
+    apply: (orderId, items, { rejectionReasonId }) => api({
+      url: `oms/orders/${orderId}/reject`,
+      method: 'POST',
+      data: { orderId, items: items.map(({ orderItemSeqId }) => ({ orderItemSeqId, quantity: '1', rejectionReasonId })) },
+    }),
+    success: 'Items rejected successfully.',
+    failure: 'Failed to reject items. Please try again.',
+  });
+
+  const releaseSelectedItems = (shipGroup: EnrichedShipGroup) => runSelectionAction(shipGroup, {
+    actionId: 'RELEASE',
+    eligible: (item) => OrderActionValidator.isItemPreFulfill(item),
+    prompt: openFacilityInventoryModal,
+    apply: async (orderId, items, facilityId) => {
+      for (const { orderItemSeqId } of items) await allocateItem(orderId, orderItemSeqId, facilityId);
+    },
+    success: 'Items released to facility.',
+    failure: 'Failed to release items. Please try again.',
+  });
 
   async function requestInventoryTransfersForShipGroup(shipGroup: EnrichedShipGroup) {
     const items = inventoryTransferItemsForShipGroup(shipGroup);
     if (items.length) await openInventoryTransferRequestModal(shipGroup, items);
   }
+
+  /** One task per ship group, from what AddOrderTaskModal returns. */
+  const createTasks = (orderId: string, shipGroupSeqIds: string[], task: any) => api({
+    url: 'oms/orders/tasks',
+    method: 'POST',
+    data: shipGroupSeqIds.map((shipGroupSeqId) => ({
+      orderId,
+      shipGroupSeqId,
+      workEffortName: task.workEffortName,
+      workEffortTypeId: task.workEffortTypeId,
+      workEffortPurposeTypeId: task.workEffortPurposeTypeId,
+      description: task.description,
+      statusId: 'TASK_CREATED',
+    })),
+  });
 
   async function openAddTaskModal(shipGroup: EnrichedShipGroup) {
     const modal = await modalController.create({ component: AddOrderTaskModal });
@@ -293,19 +303,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     const { data, role } = await modal.onWillDismiss();
     if (role !== 'confirm' || !data) return;
     try {
-      await api({
-        url: 'oms/orders/tasks',
-        method: 'POST',
-        data: [{
-          orderId: order.value!.id,
-          shipGroupSeqId: shipGroup.id,
-          workEffortName: data.workEffortName,
-          workEffortTypeId: data.workEffortTypeId,
-          workEffortPurposeTypeId: data.workEffortPurposeTypeId,
-          description: data.description,
-          statusId: 'TASK_CREATED'
-        }]
-      });
+      await createTasks(order.value!.id, [shipGroup.id], data);
       await showToast(translate('Tasks created successfully.'));
     } catch {
       await showToast(translate('Failed to create tasks. Please try again.'));
@@ -358,11 +356,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     }
 
     try {
-      await api({
-        url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/allocation`,
-        method: 'POST',
-        data: { facilityId, orderFacilityChange: { changeReasonEnumId: 'RELEASED' } },
-      });
+      await allocateItem(orderId, item.orderItemSeqId, facilityId);
       await showToast(translate('Item released to facility.'));
     } catch {
       await showToast(translate('Failed to release the item. Please try again.'));
@@ -504,42 +498,18 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     await changeOrderStatus(orderId, action.toStatusId);
   }
 
-  async function startReturn() {
-    // Returns are a separate workstream (docs/ReturnsMigrationExecution.md); this button only
-    // appears once the order has a completed (returnable) item.
-    await showToast(translate('Returns are not available here yet.'));
-  }
-
-  async function openCloneOrderModal() {
-    const modal = await modalController.create({ component: CloneOrderModal });
-    await modal.present();
-    // Success feedback (toast with the new Shopify order name) is shown by the modal. No reload —
-    // the cloned order lives in Shopify until the bridge syncs it back.
-    await modal.onWillDismiss();
-  }
-
-  /** The footer's valid-only action set: status transitions plus lifecycle actions. */
+  /** The footer's valid-only action set: status transitions plus the cancel button. */
   const footerActions = computed(() => {
     if (!order.value) return [];
     const allowedTransitions = seed.allowedTransitions(order.value.statusId);
-    const context = {
-      allItems: allItems.value,
-      orderAllowedToStatusIds: new Set<string>(allowedTransitions.map((transition: any) => transition.toStatusId))
-    };
-    return OrderActionValidator
-      .getOrderFooterActions(order.value, allowedTransitions, selectedItems.value, context)
-      .filter((action: any) => action.kind === 'status' || DISPATCHABLE_FOOTER_IDS.has(action.id));
+    const orderAllowedToStatusIds = new Set<string>(allowedTransitions.map((transition: any) => transition.toStatusId));
+    return OrderActionValidator.getOrderFooterActions(order.value, allowedTransitions, selectedItems.value, { orderAllowedToStatusIds });
   });
 
   function runFooterAction(action: any) {
     // Dispatch by id (not kind) — the cancel button rides on the start as kind 'status' in both
     // modes, but CANCEL_ITEMS has its own handler.
-    switch (action.id) {
-      case 'CLONE': return openCloneOrderModal();
-      case 'CANCEL_ITEMS': return cancelOrderItems();
-      case 'RETURN': return startReturn();
-      default: return runOrderStatusAction(action);
-    }
+    return action.id === 'CANCEL_ITEMS' ? cancelOrderItems() : runOrderStatusAction(action);
   }
 
   /** The morphing cancel shows its live selection count; everything else is a static label. */
@@ -646,19 +616,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
 
     const shipGroupSeqIds: string[] = data.shipGroupSeqIds?.length ? data.shipGroupSeqIds : shipGroups.map((shipGroup) => shipGroup.id);
     try {
-      await api({
-        url: 'oms/orders/tasks',
-        method: 'POST',
-        data: shipGroupSeqIds.map((shipGroupSeqId) => ({
-          orderId: currentOrder.id,
-          shipGroupSeqId,
-          workEffortName: data.workEffortName,
-          workEffortTypeId: data.workEffortTypeId,
-          workEffortPurposeTypeId: data.workEffortPurposeTypeId,
-          description: data.description,
-          statusId: 'TASK_CREATED',
-        })),
-      });
+      await createTasks(currentOrder.id, shipGroupSeqIds, data);
       await showToast(translate('Tasks created successfully.'));
       selectedSegment.value = 'holds';
       await reloadHoldTasks();

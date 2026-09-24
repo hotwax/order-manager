@@ -77,28 +77,22 @@ describe('getOrderStatusActions', () => {
 describe('getOrderFooterActions (unified footer)', () => {
   const createdOrder = { statusId: 'ORDER_CREATED' };
 
-  it('a created order with no selection and no completed items: Approve + Cancel order (status) and Clone, but NOT Return or Cancel items', () => {
-    const actions = OrderActionValidator.getOrderFooterActions(createdOrder, createdOrderTransitions(), [], { allItems: [] });
-    const ids = actions.map((a) => a.id);
-    expect(ids).toContain('ORDER_APPROVED');
-    expect(ids).toContain('ORDER_CANCELLED'); // "Cancel order" status transition
-    expect(ids).toContain('CLONE');
-    expect(ids).not.toContain('RETURN');       // no completed item → invalid → absent
-    expect(ids).not.toContain('CANCEL_ITEMS'); // no selection → invalid → absent
+  it('a created order with no selection: Approve + Cancel order, and nothing else', () => {
+    const actions = OrderActionValidator.getOrderFooterActions(createdOrder, createdOrderTransitions(), []);
+    expect(actions.map((a) => a.id)).toEqual(['ORDER_APPROVED', 'ORDER_CANCELLED']);
   });
 
-  it('tags status transitions kind=status (Approve solid) and footer actions kind=footer', () => {
-    const actions = OrderActionValidator.getOrderFooterActions(createdOrder, createdOrderTransitions(), [], { allItems: [] });
+  it('tags status transitions kind=status (Approve solid) and the cancel button kind=footer', () => {
+    const actions = OrderActionValidator.getOrderFooterActions(createdOrder, createdOrderTransitions(), []);
     const approve = actions.find((a) => a.id === 'ORDER_APPROVED')!;
     expect(approve.kind).toBe('status');
     expect(approve.fill).toBe('solid');
     expect(approve.toStatusId).toBe('ORDER_APPROVED');
     expect(actions.find((a) => a.id === 'ORDER_CANCELLED')!.kind).toBe('footer');
-    expect(actions.find((a) => a.id === 'CLONE')!.kind).toBe('footer');
   });
 
   it('keeps the bulk "Cancel items" half hidden while cancel does not sync to Shopify, leaving whole-order cancel intact', () => {
-    const noSelection = OrderActionValidator.getOrderFooterActions(createdOrder, createdOrderTransitions(), [], { allItems: [] });
+    const noSelection = OrderActionValidator.getOrderFooterActions(createdOrder, createdOrderTransitions(), []);
     expect(noSelection.map((a) => a.id)).toContain('ORDER_CANCELLED');
     expect(noSelection.map((a) => a.id)).not.toContain('CANCEL_ITEMS');
 
@@ -107,7 +101,7 @@ describe('getOrderFooterActions (unified footer)', () => {
       createdOrder,
       createdOrderTransitions(),
       selected,
-      { allItems: selected, orderAllowedToStatusIds: new Set(['ORDER_APPROVED', 'ORDER_CANCELLED']) }
+      { orderAllowedToStatusIds: new Set(['ORDER_APPROVED', 'ORDER_CANCELLED']) }
     );
     // selecting items no longer morphs the button into the bulk cancel...
     expect(withSelection.map((a) => a.id)).not.toContain('CANCEL_ITEMS');
@@ -116,29 +110,14 @@ describe('getOrderFooterActions (unified footer)', () => {
     expect(withSelection.find((a) => a.id === 'ORDER_CANCELLED')!.kind).toBe('footer');
   });
 
-  it('keeps Return out of the footer while returns do not sync to Shopify', () => {
-    const actions = OrderActionValidator.getOrderFooterActions(
-      createdOrder,
-      createdOrderTransitions(),
-      [],
-      { allItems: [{ statusId: 'ITEM_COMPLETED' }] }
-    );
-    expect(actions.map((a) => a.id)).not.toContain('RETURN');
-  });
-
-  it('still validates the hidden bulk actions, so clearing the flag restores them', () => {
+  it('still validates the hidden bulk cancel, so clearing the flag restores it', () => {
     const selected = [{ orderItemSeqId: '1', statusId: 'ITEM_CREATED' }];
-    const cancellable = OrderActionValidator.getFooterActions(createdOrder, selected, { allItems: selected });
-    expect(cancellable.find((a) => a.id === 'CANCEL_ITEMS')!.validation.allowed).toBe(true);
-
-    const returnable = OrderActionValidator.getFooterActions(createdOrder, [], { allItems: [{ statusId: 'ITEM_COMPLETED' }] });
-    expect(returnable.find((a) => a.id === 'RETURN')!.validation.allowed).toBe(true);
+    expect(OrderActionValidator.validateFooterAction(createdOrder, 'CANCEL_ITEMS', selected).allowed).toBe(true);
+    expect(OrderActionValidator.validateFooterAction(createdOrder, 'CANCEL_ITEMS', []).allowed).toBe(false);
   });
 
-  it('a terminal order yields no status transitions (Clone still valid)', () => {
-    const actions = OrderActionValidator.getOrderFooterActions({ statusId: 'ORDER_COMPLETED' }, createdOrderTransitions(), [], { allItems: [] });
-    expect(actions.filter((a) => a.kind === 'status')).toEqual([]);
-    expect(actions.map((a) => a.id)).toContain('CLONE');
+  it('a terminal order yields an empty footer', () => {
+    expect(OrderActionValidator.getOrderFooterActions({ statusId: 'ORDER_COMPLETED' }, createdOrderTransitions(), [])).toEqual([]);
   });
 });
 
@@ -311,7 +290,7 @@ describe('validateItemAction CANCEL_ITEM', () => {
       { statusId: 'ORDER_APPROVED' },
       approvedItem,
       'CANCEL_ITEM',
-      { itemAllowedToStatusIds: cancellable, allItems: [approvedItem] }
+      { itemAllowedToStatusIds: cancellable }
     );
     expect(result.allowed).toBe(true);
   });
@@ -322,7 +301,7 @@ describe('validateItemAction CANCEL_ITEM', () => {
         { statusId },
         approvedItem,
         'CANCEL_ITEM',
-        { itemAllowedToStatusIds: cancellable, allItems: [approvedItem] }
+        { itemAllowedToStatusIds: cancellable }
       );
       expect(result.allowed).toBe(false);
       expect(result.reason).toMatch(/Order is already/);
@@ -334,7 +313,7 @@ describe('validateItemAction CANCEL_ITEM', () => {
       { statusId: 'ORDER_APPROVED' },
       approvedItem,
       'CANCEL_ITEM',
-      { itemAllowedToStatusIds: new Set(['ITEM_COMPLETED']), allItems: [approvedItem] }
+      { itemAllowedToStatusIds: new Set(['ITEM_COMPLETED']) }
     );
     expect(result.allowed).toBe(false);
     expect(result.reason).toMatch(/status flow/);
@@ -345,7 +324,7 @@ describe('validateItemAction CANCEL_ITEM', () => {
       { statusId: 'ORDER_APPROVED' },
       { orderItemSeqId: '01', statusId: 'ITEM_COMPLETED' },
       'CANCEL_ITEM',
-      { itemAllowedToStatusIds: cancellable, allItems: [] }
+      { itemAllowedToStatusIds: cancellable }
     );
     expect(result.allowed).toBe(false);
   });

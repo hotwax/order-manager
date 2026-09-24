@@ -12,34 +12,7 @@
         <template v-for="group in order.groupedItems" :key="group.externalId">
           <!-- Nothing to roll up when the group is a single order item, so the item row is
                rendered directly with the product identity the rolled up header would carry. -->
-          <OrderItemListRow
-            v-if="group.items.length === 1"
-            v-bind="productRowProps(group)"
-            :selected="isSelected(group.items[0])"
-            :quantity="group.items[0].quantity"
-            :quantity-label="translate('qty')"
-            :facility-label="group.items[0].facilityName"
-            :facility-disabled="itemActions[group.items[0].orderItemSeqId]?.facilityDisabled"
-            :attributes-label="attributeChipLabel(group.items[0].attributeCount)"
-            :statuses="group.items[0].statuses"
-            :status-detail="itemStatusDetail(group.items[0])"
-            :amount="money(group.items[0].unitPrice * group.items[0].quantity)"
-            :adjustments="itemAdjustmentRows(group.items[0])"
-            @update:selected="selectItems(group.items, $event)"
-            @facility-click="emit('reject-and-release', group.items[0])"
-            @attributes-click="emit('open-item-attributes', group.items[0])"
-          >
-            <template #actions>
-              <ion-button v-if="itemActions[group.items[0].orderItemSeqId]?.canTransfer" fill="clear" size="small"
-                @click.stop="emit('request-inventory-transfer', group.items[0])">
-                {{ translate('Request transfer') }}
-              </ion-button>
-              <ion-button v-if="itemActions[group.items[0].orderItemSeqId]?.canCancel" fill="clear" size="small" color="danger"
-                @click.stop="emit('cancel-single-item', group.items[0])">
-                {{ translate('Cancel') }}
-              </ion-button>
-            </template>
-          </OrderItemListRow>
+          <OrderItemListRow v-if="group.items.length === 1" v-bind="itemRow(group.items[0], productRowProps(group))" />
           <ion-accordion v-else :value="group.externalId">
             <OrderItemListRow
               slot="header"
@@ -61,34 +34,8 @@
                   v-for="item in group.items"
                   :key="item.orderItemSeqId"
                   class="order-item-detail-entry"
-                  :primary="`${translate('Item')} ${item.orderItemSeqId}`"
-                  :secondary="item.externalId && item.externalId !== 'null' ? `${translate('External ID')}: ${item.externalId}` : ''"
-                  :selected="isSelected(item)"
-                  :quantity="item.quantity"
-                  :quantity-label="translate('qty')"
-                  :show-quantity="false"
-                  :facility-label="item.facilityName"
-                  :facility-disabled="itemActions[item.orderItemSeqId]?.facilityDisabled"
-                  :attributes-label="attributeChipLabel(item.attributeCount)"
-                  :statuses="item.statuses"
-                  :status-detail="itemStatusDetail(item)"
-                  :amount="money(item.unitPrice * item.quantity)"
-                  :adjustments="itemAdjustmentRows(item)"
-                  @update:selected="selectItems([item], $event)"
-                  @facility-click="emit('reject-and-release', item)"
-                  @attributes-click="emit('open-item-attributes', item)"
-                >
-                  <template #actions>
-                    <ion-button v-if="itemActions[item.orderItemSeqId]?.canTransfer" fill="clear" size="small"
-                      @click.stop="emit('request-inventory-transfer', item)">
-                      {{ translate('Request transfer') }}
-                    </ion-button>
-                    <ion-button v-if="itemActions[item.orderItemSeqId]?.canCancel" fill="clear" size="small" color="danger"
-                      @click.stop="emit('cancel-single-item', item)">
-                      {{ translate('Cancel') }}
-                    </ion-button>
-                  </template>
-                </OrderItemListRow>
+                  v-bind="itemRow(item, itemIdentity(item))"
+                />
               </ion-list>
             </div>
           </ion-accordion>
@@ -229,9 +176,40 @@ function productRowProps(group: EnrichedItemGroup) {
   };
 }
 
-const attributeChipLabel = (count: number) => `${count || 0} ${Number(count) === 1 ? translate('attribute') : translate('attributes')}`;
-const itemStatusDetail = (item: EnrichedOrderItem) => item.shipGroupSeqId ? `${translate('#')}${item.shipGroupSeqId}` : '';
-const itemAdjustmentRows = (item: EnrichedOrderItem) => item.adjustments.map((adj) => ({ label: adj.comment, amount: money(adj.amount) }));
+/** Inside a rolled up group the item row names the order item rather than the product. */
+function itemIdentity(item: EnrichedOrderItem) {
+  return {
+    primary: `${translate('Item')} ${item.orderItemSeqId}`,
+    secondary: item.externalId && item.externalId !== 'null' ? `${translate('External ID')}: ${item.externalId}` : '',
+    showQuantity: false,
+  };
+}
+
+/** Everything one order item's row shows and does, under the given identity. */
+function itemRow(item: EnrichedOrderItem, identity: ReturnType<typeof productRowProps> | ReturnType<typeof itemIdentity>) {
+  const actions = props.itemActions[item.orderItemSeqId];
+  const attributeCount = Number(item.attributeCount) || 0;
+  return {
+    ...identity,
+    selected: isSelected(item),
+    quantity: item.quantity,
+    quantityLabel: translate('qty'),
+    facilityLabel: item.facilityName,
+    facilityDisabled: actions?.facilityDisabled,
+    attributesLabel: `${attributeCount} ${attributeCount === 1 ? translate('attribute') : translate('attributes')}`,
+    statuses: item.statuses,
+    statusDetail: item.shipGroupSeqId ? `${translate('#')}${item.shipGroupSeqId}` : '',
+    amount: money(item.unitPrice * item.quantity),
+    adjustments: item.adjustments.map((adj) => ({ label: adj.comment, amount: money(adj.amount) })),
+    canTransfer: actions?.canTransfer,
+    canCancel: actions?.canCancel,
+    'onUpdate:selected': (selected: boolean) => selectItems([item], selected),
+    onFacilityClick: () => emit('reject-and-release', item),
+    onAttributesClick: () => emit('open-item-attributes', item),
+    onTransferClick: () => emit('request-inventory-transfer', item),
+    onCancelClick: () => emit('cancel-single-item', item),
+  };
+}
 
 </script>
 

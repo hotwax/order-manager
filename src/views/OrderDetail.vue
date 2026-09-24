@@ -152,7 +152,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { IonBackButton, IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonItem, IonLabel, IonList, IonMenuButton, IonPage, IonProgressBar, IonSegment, IonSegmentButton, IonTitle, IonToolbar, onIonViewWillEnter } from '@ionic/vue';
-import { api, logger, translate } from '@common';
+import { logger, translate } from '@common';
 import router from '@/router';
 import Actions from '@/authorization/actions';
 import EmptyState from '@/components/common/EmptyState.vue';
@@ -199,8 +199,8 @@ const expandedShipGroupIds = ref<Set<string>>(new Set());
 async function loadOrder(orderId: string, force = false) {
   await orderDetailStore.loadOrderAggregate(orderId, force);
   loadRejectionReasonEnums();
-  // Fire-and-forget: the Shopify Admin link hydrates when it resolves; the page never waits on it.
-  resolveShopifyOrderShop(orderId);
+  // Shops load at boot; this retries a failed boot load (a no-op once loaded) without waiting on it.
+  if (shopifyOrderId.value) seed.loadShopifyShops();
   const partyId = orderDetailStore.customerPartyIdByOrderId(orderId);
   if (partyId) await customerStore.loadCustomerProfile(partyId, force);
   // Rich product data (name/SKU/image): fetch only uncached products, never refetch.
@@ -210,10 +210,8 @@ async function loadOrder(orderId: string, force = false) {
   await Promise.all([orderDetailStore.fetchShippingMethods(), orderDetailStore.fetchCarrierParties()]);
 }
 
-// Ionic caches routed page instances: navigating /orders/A → /orders/B and back re-activates A's
-// instance without re-mounting, while the store's currentOrderId still points at B. Load on every
-// view activation (the store skips the refetch when the order is already loaded) so the page
-// re-asserts its own order.
+// Ionic caches routed page instances, so a page re-activated from /orders/A → /orders/B → back does
+// not re-mount. Load on every view activation; the store skips the refetch when the order is loaded.
 onIonViewWillEnter(() => loadOrder(props.orderId));
 watch(() => props.orderId, (orderId) => loadOrder(orderId));
 
@@ -332,60 +330,22 @@ const paymentReturnIds = computed(() => canViewReturns.value
 
 /* ── Shopify Admin link ───────────────────────────────────────────────── */
 
-// Primary source is the order's own shopifyShopOrder record (the shop it actually came from —
-// same source CloneOrderModal uses). That endpoint isn't exposed by the connector yet
-// (hotwax/mantle-shopify-connector#381), so until it ships the shop is inferred from the order's
-// product store, but ONLY when exactly one Shopify shop maps to that store — an ambiguous or
-// unknown store degrades to no link, so we never point at the wrong store.
-const shopifyOrderShopId = ref('');
-// Successful resolutions are memoized (the order→shop mapping is immutable): force reloads skip
-// the refetch, and a transient refetch failure can't erase an already-resolved link.
-let resolvedShopifyShop = { orderId: '', shopId: '' };
-
+// The OMS has no read endpoint for the shop an order came from (hotwax/mantle-shopify-connector#381),
+// so the shop is inferred from the order's product store, and ONLY when exactly one Shopify shop maps
+// to that store: an ambiguous or unknown store degrades to no link rather than the wrong store.
 const shopifyOrderId = computed(() =>
   (orderDetailStore.orderById(props.orderId)?.identifications || [])
     .find((identification: any) => identification.orderIdentificationTypeId === 'SHOPIFY_ORD_ID')?.idValue ?? '');
 
-// Reactive over the seed dataset so the link appears even when the boot-time shops load finishes
-// after the order renders. Skipped once the record-based id is known.
-const fallbackShopIdByProductStore = computed(() => {
-  if (shopifyOrderShopId.value) return '';
-  const productStoreId = orderDetailStore.orderById(props.orderId)?.productStoreId;
-  if (!productStoreId) return '';
-  return singleShopIdForProductStore(seed.shopifyShops.ids.map((id: string) => seed.shopifyShops.byId[id]), productStoreId);
-});
-
+// Reactive over the seed dataset, so the link appears even when the shops finish loading after the
+// order renders.
 const shopifyAdminUrl = computed(() => {
-  if (!shopifyOrderId.value) return '';
-  const shopId = shopifyOrderShopId.value || fallbackShopIdByProductStore.value;
+  const productStoreId = orderDetailStore.orderById(props.orderId)?.productStoreId;
+  if (!shopifyOrderId.value || !productStoreId) return '';
+  const shopId = singleShopIdForProductStore(seed.shopifyShops.ids.map((id: string) => seed.shopifyShops.byId[id]), productStoreId);
   const shop: any = shopId ? seed.shopifyShops.byId[shopId] : null;
   return shop ? shopifyAdminOrderUrl(shop.myshopifyDomain || shop.domain, shopifyOrderId.value) : '';
 });
-
-async function resolveShopifyOrderShop(orderId: string) {
-  // Stale caller: a slow loadOrder for a previously viewed order must not clobber this one.
-  if (orderId !== props.orderId) return;
-  if (resolvedShopifyShop.orderId === orderId) {
-    // Already resolved — re-assert rather than trust the ref: a racing resolver for another order
-    // may have cleared it before its stale response was discarded.
-    shopifyOrderShopId.value = resolvedShopifyShop.shopId;
-    return;
-  }
-  shopifyOrderShopId.value = '';
-  if (!shopifyOrderId.value) return;
-  seed.loadShopifyShops();
-  try {
-    const resp = await api({ url: `oms/orders/${orderId}/shopifyShopOrder`, method: 'GET' });
-    const rows: any[] = Array.isArray(resp.data) ? resp.data : (resp.data?.docs ?? []);
-    if (orderId !== props.orderId) return; // stale response after navigating to another order
-    shopifyOrderShopId.value = rows.find((row: any) => row.shopId)?.shopId || '';
-    resolvedShopifyShop = { orderId, shopId: shopifyOrderShopId.value };
-  } catch (error: any) {
-    // 404 is expected until the connector exposes this endpoint; the product-store fallback covers
-    // the link meanwhile. Only surface genuinely unexpected failures.
-    if (error?.response?.status !== 404) logger.error('Failed to resolve the Shopify shop for the order', error);
-  }
-}
 
 // Rejection reasons live under these two enum parent types and are otherwise only loaded when the
 // Reject items modal opens — without them a timeline rejection reads as its raw id

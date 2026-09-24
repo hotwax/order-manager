@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { api, commonUtil, logger, useSolrSearch } from "@common";
-import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from "@/composables/useOrderDetail";
+import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail, type IssuanceLine } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useSeedStore } from "./seed";
 import { useCustomerStore } from "./customer";
@@ -315,13 +315,8 @@ function cancellableOrderItems(order: any) {
 export const useOrderDetailStore = defineStore("orderDetail", {
   state: () => ({
     byOrderId: {} as Record<string, OrderEntry>,
-    currentOrderId: "",
-    orderHeaderWorkEfforts: [] as any[],
-    orderHeaderWorkEffortsByOrderId: {} as Record<string, any[]>,
     riskAssessmentsByOrderId: {} as Record<string, any[]>,
     riskAssessmentsStatusByOrderId: {} as Record<string, LoadStatus>,
-    riskAssessmentsErrorByOrderId: {} as Record<string, string>,
-    commEvents: [] as any[],
     commEventsByOrderId: {} as Record<string, any[]>,
     shippingMethods: [] as any[],
     carrierParties: [] as any[],
@@ -340,11 +335,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     returnHeadersById: {} as Record<string, any | null>,
   }),
   getters: {
-    current: (state) => state.byOrderId[state.currentOrderId]?.payload || null,
-    currentEntry: (state) => state.byOrderId[state.currentOrderId] || null,
-    isLoading: (state) => state.byOrderId[state.currentOrderId]?.status === "loading",
-    error: (state) => state.byOrderId[state.currentOrderId]?.error || "",
-
     /**
      * The order page's view model: the raw order document joined with the loaded auxiliary
      * sources (events, fulfillment timeline, issuance, risk, returns, exchanges) and the seed,
@@ -453,24 +443,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     issuanceByItemSeqIdByOrderId: (state) => (orderId: string) =>
       state.issuanceStatusByOrderId[orderId] === "loaded" ? (state.issuanceByOrderId[orderId] || {}) : null,
 
-    contactMechsByPurposeByOrderId: (state) => (orderId: string) => {
-      const current = state.byOrderId[orderId]?.payload;
-      const index: Record<string, any> = {};
-      (current?.contactMechs || []).forEach((mech: any) => {
-        if (mech.contactMechPurposeTypeId) index[mech.contactMechPurposeTypeId] = mech;
-      });
-      return index;
-    },
-
-    contactMechsByIdByOrderId: (state) => (orderId: string) => {
-      const current = state.byOrderId[orderId]?.payload;
-      const index: Record<string, any> = {};
-      (current?.contactMechs || []).forEach((mech: any) => {
-        if (mech.contactMechId) index[mech.contactMechId] = mech;
-      });
-      return index;
-    },
-
     returnedQtyByItemSeqIdByOrderId: (state) => (orderId: string) => {
       const current = state.byOrderId[orderId]?.payload;
       const totals: Record<string, number> = {};
@@ -501,60 +473,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         if (entry.shipGroupSeqId) index[entry.shipGroupSeqId] = entry;
       });
       return index;
-    },
-
-    /** Order-header timeline: status rows that are NOT item-scoped, newest first. */
-    headerStatuses(): any[] {
-      return this.headerStatusesByOrderId(this.currentOrderId);
-    },
-
-    /** Item cancel/reject events for the current order, oldest first. */
-    itemStatusEvents(): ItemStatusEvent[] {
-      return this.itemStatusEventsByOrderId(this.currentOrderId);
-    },
-
-    /** Facility-change events for the current order, oldest first. */
-    facilityChangeEvents(): FacilityChangeEvent[] {
-      return this.facilityChangeEventsByOrderId(this.currentOrderId);
-    },
-
-    /** Unfillable brokering summary for the current order, or null. */
-    unfillableAttempts(): UnfillableSummary | null {
-      return this.unfillableAttemptsByOrderId(this.currentOrderId);
-    },
-
-    /** Contact mechs indexed by purpose (ORDER_EMAIL, SHIPPING_LOCATION, BILLING_LOCATION, …). */
-    contactMechsByPurpose(): Record<string, any> {
-      return this.contactMechsByPurposeByOrderId(this.currentOrderId);
-    },
-
-    /** Contact mechs indexed by contactMechId — used to resolve a ship group's address. */
-    contactMechsById(): Record<string, any> {
-      return this.contactMechsByIdByOrderId(this.currentOrderId);
-    },
-
-    /** The placing-customer order role (carries party + joined person/partyGroup). */
-    placingCustomerRole(): any {
-      return this.placingCustomerRoleByOrderId(this.currentOrderId);
-    },
-
-    /** partyId of the placing customer, for any party-scoped UI. */
-    customerPartyId(): string {
-      return this.customerPartyIdByOrderId(this.currentOrderId);
-    },
-
-    /**
-     * Customer name from the joined Person/PartyGroup on the placing-customer role
-     * (requires the extended OrderRole master — see docs/MoquiChanges.md). Falls back to
-     * the shipping address `toName` until that master change is deployed, then "".
-     */
-    customerName(): string {
-      return this.customerNameByOrderId(this.currentOrderId);
-    },
-
-    /** Returned quantity summed by orderItemSeqId — crosses the top-level returnItems array. */
-    returnedQtyByItemSeqId(): Record<string, number> {
-      return this.returnedQtyByItemSeqIdByOrderId(this.currentOrderId);
     },
 
     /** Maps orderItemSeqId to its orderItemExternalId. */
@@ -621,30 +539,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       };
     },
 
-    adjustmentsByExternalId(): Record<string, Array<{ label: string; amount: number; isIncluded: boolean }>> {
-      return this.adjustmentsByExternalIdByOrderId(this.currentOrderId);
-    },
-
-    /** Order totals (subtotal, adjustments grouped by comment/type, total) */
-    totals(): { subtotal: number; adjustments: Record<string, number>; total: number; includedAdjustments: Record<string, number> } {
-      return this.orderTotalsByOrderId(this.currentOrderId);
-    },
-
-    /** Flat list of all items across ship groups, each carrying its ship group context. */
-    allItems(): any[] {
-      return this.allItemsByOrderId(this.currentOrderId);
-    },
-
-    openHolds: (state) => state.orderHeaderWorkEfforts,
-
-    hasOpenHolds(): boolean {
-      return this.openHolds.length > 0;
-    },
-
-    riskAssessments: (state): any[] => state.riskAssessmentsByOrderId[state.currentOrderId] || [],
-    riskAssessmentsStatus: (state): LoadStatus => state.riskAssessmentsStatusByOrderId[state.currentOrderId] || "idle",
-    riskAssessmentsError: (state): string => state.riskAssessmentsErrorByOrderId[state.currentOrderId] || "",
-
     /** Shipping methods for a given carrier partyId, derived from the fetched carrierShipmentMethods list or the local database. */
     shippingMethodsByCarrier: (state) => (carrierPartyId: string) => {
       const fromDetail = state.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId);
@@ -699,19 +593,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         entry.error = error?.message || "Failed to load order";
       }
     },
-    async fetchOrderHeaderWorkEfforts(orderId: string) {
-      if (!orderId) return;
-      try {
-        const resp = await useOrderDetail().getWorkEfforts(orderId);
-        if (commonUtil.hasError(resp)) throw resp.data;
-        const docs = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
-        this.orderHeaderWorkEffortsByOrderId[orderId] = docs;
-        this.orderHeaderWorkEfforts = docs;
-      } catch (error: any) {
-        logger.error("Failed to load work efforts", error);
-      }
-    },
-
     async fetchFulfillmentTimeline(orderId: string) {
       if (!orderId) return;
       try {
@@ -784,10 +665,11 @@ export const useOrderDetailStore = defineStore("orderDetail", {
 
       this.issuanceStatusByOrderId[orderId] = "loading";
       try {
-        const resp = await useOrderDetail().getInventoryIssuance(orderId);
-        if (commonUtil.hasError(resp)) throw resp.data;
-
-        this.issuanceByOrderId[orderId] = summariseIssuance(responseList(resp.data));
+        const lines = (this.orderById(orderId)?.shipGroups || [])
+          .filter(isPosCompletedShipGroup)
+          .flatMap((shipGroup: any) => (shipGroup.items || []).map((item: any) => ({ productId: item.productId, facilityId: shipGroup.facilityId })))
+          .filter((line: IssuanceLine) => line.productId && line.facilityId);
+        this.issuanceByOrderId[orderId] = summariseIssuance(await useOrderDetail().getInventoryIssuance(orderId, lines));
         this.issuanceStatusByOrderId[orderId] = "loaded";
       } catch (error: any) {
         logger.error(`Failed to load inventory issuance for [${orderId}]`, error);
@@ -802,7 +684,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         if (commonUtil.hasError(resp)) throw resp.data;
         const docs = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
         this.commEventsByOrderId[orderId] = docs;
-        this.commEvents = docs;
       } catch (error: any) {
         logger.error("Failed to load communication events", error);
       }
@@ -814,7 +695,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       if (this.riskAssessmentsStatusByOrderId[orderId] === "loading") return;
 
       this.riskAssessmentsStatusByOrderId[orderId] = "loading";
-      this.riskAssessmentsErrorByOrderId[orderId] = "";
 
       try {
         const resp = await useOrderDetail().getRiskAssessments(orderId);
@@ -824,7 +704,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       } catch (error: any) {
         logger.error("Failed to load order risk assessments", error);
         this.riskAssessmentsStatusByOrderId[orderId] = "error";
-        this.riskAssessmentsErrorByOrderId[orderId] = error?.message || "Failed to load order risk assessments";
       }
     },
 
@@ -977,7 +856,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
      */
     async loadOrderAggregate(orderId: string, force = false) {
       if (!orderId) return;
-      this.currentOrderId = orderId;
       await this.fetchOrder(orderId, force);
       const raw = this.orderById(orderId);
 
