@@ -273,11 +273,11 @@
             </ion-item>
 
             <!-- Edit shipping address modal -->
-            <ion-modal :is-open="editingAddress" @didDismiss="editingAddress = false">
+            <ion-modal :is-open="editor === 'address'" @didDismiss="closeEditor('address')">
               <ion-header>
                 <ion-toolbar>
                   <ion-buttons slot="start">
-                    <ion-button @click="editingAddress = false" :aria-label="translate('Close')"><ion-icon slot="icon-only"
+                    <ion-button @click="closeEditor('address')" :aria-label="translate('Close')"><ion-icon slot="icon-only"
                         :icon="closeOutline" /></ion-button>
                   </ion-buttons>
                   <ion-title>{{ translate('Edit Shipping Address') }}</ion-title>
@@ -324,7 +324,7 @@
                   </ion-item>
                 </ion-list>
                 <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                  <ion-fab-button :disabled="savingShippingAddress" @click="saveShippingAddress" :aria-label="translate('Save')">
+                  <ion-fab-button :disabled="saving" @click="saveShippingAddress" :aria-label="translate('Save')">
                     <ion-icon :icon="saveOutline" />
                   </ion-fab-button>
                 </ion-fab>
@@ -357,10 +357,10 @@
     </div>
 
     <!-- Gift message modal -->
-    <ion-modal :is-open="giftModalOpen" @didDismiss="giftModalOpen = false">
+    <ion-modal :is-open="editor === 'gift'" @didDismiss="closeEditor('gift')">
       <ion-header>
         <ion-toolbar>
-          <ion-buttons slot="start"><ion-button @click="giftModalOpen = false" :aria-label="translate('Close')"><ion-icon slot="icon-only"
+          <ion-buttons slot="start"><ion-button @click="closeEditor('gift')" :aria-label="translate('Close')"><ion-icon slot="icon-only"
                 :icon="closeOutline" /></ion-button></ion-buttons>
           <ion-title>{{ translate('Gift message') }}</ion-title>
         </ion-toolbar>
@@ -371,7 +371,7 @@
             :placeholder="translate('Enter gift message')" v-model="giftMessageDraft" />
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-          <ion-fab-button @click="saveGiftMessage" :aria-label="translate('Save')">
+          <ion-fab-button :disabled="saving" @click="saveGiftMessage" :aria-label="translate('Save')">
             <ion-icon :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
@@ -379,10 +379,10 @@
     </ion-modal>
 
     <!-- Shipping dates modal -->
-    <ion-modal :is-open="shippingDatesModalOpen" @didDismiss="shippingDatesModalOpen = false">
+    <ion-modal :is-open="editor === 'shippingDates'" @didDismiss="closeEditor('shippingDates')">
       <ion-header>
         <ion-toolbar>
-          <ion-buttons slot="start"><ion-button @click="shippingDatesModalOpen = false" :aria-label="translate('Close')"><ion-icon
+          <ion-buttons slot="start"><ion-button @click="closeEditor('shippingDates')" :aria-label="translate('Close')"><ion-icon
                 slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
           <ion-title>{{ translate('Shipping dates') }}</ion-title>
         </ion-toolbar>
@@ -397,7 +397,7 @@
             v-model="shippingDatesDraft.shipByDate" />
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-          <ion-fab-button @click="saveShippingDates" :aria-label="translate('Save')">
+          <ion-fab-button :disabled="saving" @click="saveShippingDates" :aria-label="translate('Save')">
             <ion-icon :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
@@ -405,10 +405,10 @@
     </ion-modal>
 
     <!-- Delivery dates modal -->
-    <ion-modal :is-open="deliveryDatesModalOpen" @didDismiss="deliveryDatesModalOpen = false">
+    <ion-modal :is-open="editor === 'deliveryDates'" @didDismiss="closeEditor('deliveryDates')">
       <ion-header>
         <ion-toolbar>
-          <ion-buttons slot="start"><ion-button @click="deliveryDatesModalOpen = false" :aria-label="translate('Close')"><ion-icon
+          <ion-buttons slot="start"><ion-button @click="closeEditor('deliveryDates')" :aria-label="translate('Close')"><ion-icon
                 slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
           <ion-title>{{ translate('Delivery dates') }}</ion-title>
         </ion-toolbar>
@@ -423,7 +423,7 @@
             v-model="deliveryDatesDraft.estimatedDeliveryDate" />
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-          <ion-fab-button @click="saveDeliveryDates" :aria-label="translate('Save')">
+          <ion-fab-button :disabled="saving" @click="saveDeliveryDates" :aria-label="translate('Save')">
             <ion-icon :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
@@ -431,10 +431,10 @@
     </ion-modal>
 
     <!-- Instruction modal -->
-    <ion-modal :is-open="instructionModalOpen" @didDismiss="instructionModalOpen = false">
+    <ion-modal :is-open="editor === 'instructions'" @didDismiss="closeEditor('instructions')">
       <ion-header>
         <ion-toolbar>
-          <ion-buttons slot="start"><ion-button @click="instructionModalOpen = false" :aria-label="translate('Close')"><ion-icon
+          <ion-buttons slot="start"><ion-button @click="closeEditor('instructions')" :aria-label="translate('Close')"><ion-icon
                 slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
           <ion-title>{{ translate('Shipping instructions') }}</ion-title>
         </ion-toolbar>
@@ -445,7 +445,7 @@
             :placeholder="translate('Enter shipping instructions')" v-model="instructionDraft" />
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-          <ion-fab-button @click="saveInstruction" :aria-label="translate('Save')">
+          <ion-fab-button :disabled="saving" @click="saveInstruction" :aria-label="translate('Save')">
             <ion-icon :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
@@ -468,18 +468,16 @@ import {
 import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
-import { isKit, showToast } from '@/utils';
+import { isKit } from '@/utils';
 import { findTimeDiff, formatDate, formatTime, toDateInputValue } from '@/utils/orderDetailDates';
 import type { ShipGroupActionId } from '@/utils/OrderActionValidator';
-import type { EnrichedShipGroup, ItemIssuance } from '@/types/orderDetail';
+import type { EnrichedShipGroup, ItemIssuance, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 
 const props = defineProps<{
   shipGroup: EnrichedShipGroup;
   orderId: string;
   orderStatusId: string;
-  customerPartyId: string;
   expanded: boolean;
   /** This group's checked items; the selection narrows its release / park / pull back actions. */
   selectedItemIds: string[];
@@ -490,6 +488,10 @@ const props = defineProps<{
   disabledActions: Partial<Record<ShipGroupActionId, boolean>>;
   canRequestInventoryTransfer: boolean;
   hasTransferableItems: boolean;
+  /** The inline editor that is open. The page closes it once a save succeeds. */
+  editor: ShipGroupEditor | null;
+  /** A save from this card is in flight. */
+  saving: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -505,13 +507,13 @@ const emit = defineEmits<{
   'add-items': [];
   'view-inventory': [productId: string];
   'change-carrier-method': [carrierPartyId: string, shipmentMethodTypeId: string];
-  /** An inline edit (gift message, dates, instructions, address) was saved. */
-  changed: [];
+  'update:editor': [editor: ShipGroupEditor | null];
+  'save-fields': [edit: ShipGroupFieldsEdit];
+  'save-address': [address: ShipGroupAddressEdit];
 }>();
 
 const seed = useSeedStore();
 const orderDetailStore = useOrderDetailStore();
-const orderTaskStore = useOrderTaskStore();
 const { getProduct, primaryIdentifier, secondaryIdentifier, featureLabel } = useProductIdentity();
 
 const ISSUANCE_LABELS: Record<ItemIssuance['kind'], string> = {
@@ -605,66 +607,59 @@ function onMethodChange(shipmentMethodTypeId: string) {
 
 /* ── Inline edits ─────────────────────────────────────────────────────── */
 
-async function saveShipGroup(payload: Record<string, any>, success: string, failure: string, close?: () => void) {
-  try {
-    await orderDetailStore.updateShipGroup(props.orderId, props.shipGroup.id, payload);
-    close?.();
-    await showToast(translate(success));
-    emit('changed');
-  } catch {
-    await showToast(translate(failure));
-  }
+function openEditor(editor: ShipGroupEditor) {
+  emit('update:editor', editor);
 }
 
-const giftModalOpen = ref(false);
+/** Closes the editor only if it is still the open one, so a late dismiss cannot close the next. */
+function closeEditor(editor: ShipGroupEditor) {
+  if (props.editor === editor) emit('update:editor', null);
+}
+
+const saveFields = (fields: Record<string, any>, success: string, failure: string) => emit('save-fields', { fields, success, failure });
+
 const giftMessageDraft = ref('');
 function openGiftModal() {
   giftMessageDraft.value = props.shipGroup.giftMessage ?? '';
-  giftModalOpen.value = true;
+  openEditor('gift');
 }
-const saveGiftMessage = () => saveShipGroup({ giftMessage: giftMessageDraft.value }, 'Gift message saved.', 'Failed to save gift message.', () => { giftModalOpen.value = false; });
-const clearGiftMessage = () => saveShipGroup({ giftMessage: null }, 'Gift message cleared.', 'Failed to clear gift message.');
+const saveGiftMessage = () => saveFields({ giftMessage: giftMessageDraft.value }, 'Gift message saved.', 'Failed to save gift message.');
+const clearGiftMessage = () => saveFields({ giftMessage: null }, 'Gift message cleared.', 'Failed to clear gift message.');
 
-const shippingDatesModalOpen = ref(false);
 const shippingDatesDraft = ref({ shipAfterDate: '', shipByDate: '' });
 function openShippingDatesModal() {
   shippingDatesDraft.value = {
     shipAfterDate: toDateInputValue(props.shipGroup.shipAfterDate),
     shipByDate: toDateInputValue(props.shipGroup.shipByDate),
   };
-  shippingDatesModalOpen.value = true;
+  openEditor('shippingDates');
 }
-const saveShippingDates = () => saveShipGroup({
+const saveShippingDates = () => saveFields({
   shipAfterDate: shippingDatesDraft.value.shipAfterDate || null,
   shipByDate: shippingDatesDraft.value.shipByDate || null,
-}, 'Shipping dates saved.', 'Failed to save shipping dates.', () => { shippingDatesModalOpen.value = false; });
+}, 'Shipping dates saved.', 'Failed to save shipping dates.');
 
-const deliveryDatesModalOpen = ref(false);
 const deliveryDatesDraft = ref({ estimatedShipDate: '', estimatedDeliveryDate: '' });
 function openDeliveryDatesModal() {
   deliveryDatesDraft.value = {
     estimatedShipDate: toDateInputValue(props.shipGroup.estimatedShipDate),
     estimatedDeliveryDate: toDateInputValue(props.shipGroup.estimatedDeliveryDate),
   };
-  deliveryDatesModalOpen.value = true;
+  openEditor('deliveryDates');
 }
-const saveDeliveryDates = () => saveShipGroup({
+const saveDeliveryDates = () => saveFields({
   estimatedShipDate: deliveryDatesDraft.value.estimatedShipDate || null,
   estimatedDeliveryDate: deliveryDatesDraft.value.estimatedDeliveryDate || null,
-}, 'Delivery dates saved.', 'Failed to save delivery dates.', () => { deliveryDatesModalOpen.value = false; });
+}, 'Delivery dates saved.', 'Failed to save delivery dates.');
 
-const instructionModalOpen = ref(false);
 const instructionDraft = ref('');
 function openInstructionModal() {
   instructionDraft.value = props.shipGroup.shippingInstructions ?? '';
-  instructionModalOpen.value = true;
+  openEditor('instructions');
 }
-const saveInstruction = () => saveShipGroup({ shippingInstructions: instructionDraft.value }, 'Instructions saved.', 'Failed to save instructions.', () => { instructionModalOpen.value = false; });
+const saveInstruction = () => saveFields({ shippingInstructions: instructionDraft.value }, 'Instructions saved.', 'Failed to save instructions.');
 
-const editingAddress = ref(false);
-const savingShippingAddress = ref(false);
-const shippingAddressForm = ref({ address1: '', address2: '', city: '', postalCode: '', stateProvinceGeoId: '', countryGeoId: '' });
-
+const shippingAddressForm = ref<ShipGroupAddressEdit>({ address1: '', address2: '', city: '', postalCode: '', stateProvinceGeoId: '', countryGeoId: '' });
 function openEditShippingAddress() {
   const addr = props.shipGroup.shippingAddress?.postalAddress ?? {};
   shippingAddressForm.value = {
@@ -675,30 +670,9 @@ function openEditShippingAddress() {
     stateProvinceGeoId: addr.stateProvinceGeoId ?? '',
     countryGeoId: addr.countryGeoId ?? '',
   };
-  editingAddress.value = true;
+  openEditor('address');
 }
-
-async function saveShippingAddress() {
-  if (!props.customerPartyId) return showToast(translate('Customer is not available for this order.'));
-
-  savingShippingAddress.value = true;
-  try {
-    await orderTaskStore.updateShippingInformation(props.orderId, props.shipGroup.id, {
-      ...shippingAddressForm.value,
-      partyId: props.customerPartyId,
-      contactMechId: props.shipGroup.shippingAddress?.contactMechId || props.shipGroup.contactMechId,
-      contactMechPurposeTypeId: 'SHIPPING_LOCATION',
-      isEdited: true,
-    });
-    await showToast(translate('Shipping address updated successfully.'));
-    editingAddress.value = false;
-    emit('changed');
-  } catch {
-    await showToast(translate('Failed to update shipping address. Please try again.'));
-  } finally {
-    savingShippingAddress.value = false;
-  }
-}
+const saveShippingAddress = () => emit('save-address', { ...shippingAddressForm.value });
 
 /* ── Collapsible height ───────────────────────────────────────────────── */
 

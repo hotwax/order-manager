@@ -80,19 +80,14 @@
     </ion-label>
 
     <div>
-      <ion-button v-if="canTransfer" fill="clear" size="small" @click.stop="emit('transfer-click')">
-        {{ translate('Request transfer') }}
-      </ion-button>
-      <ion-button v-if="canCancel" fill="clear" size="small" color="danger" @click.stop="emit('cancel-click')">
-        {{ translate('Cancel') }}
-      </ion-button>
+      <slot name="actions" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonBadge, IonButton, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonNote, IonThumbnail } from '@ionic/vue';
+import { IonBadge, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonNote, IonThumbnail } from '@ionic/vue';
 import { businessOutline, listOutline } from 'ionicons/icons';
 import { DxpShopifyImg, translate } from '@common';
 import type { ItemStatusBadge } from '@/utils/itemStatusBadges';
@@ -119,8 +114,6 @@ const props = withDefaults(defineProps<{
   statusDetail?: string;
   amount: string;
   adjustments?: Array<{ label: string; amount: string }>;
-  canTransfer?: boolean;
-  canCancel?: boolean;
 }>(), {
   secondary: '',
   badgeLabel: '',
@@ -138,8 +131,6 @@ const props = withDefaults(defineProps<{
   statuses: () => [],
   statusDetail: '',
   adjustments: () => [],
-  canTransfer: false,
-  canCancel: false,
 });
 
 /**
@@ -158,8 +149,6 @@ const emit = defineEmits<{
   (event: 'update:selected', value: boolean): void;
   (event: 'facility-click'): void;
   (event: 'attributes-click'): void;
-  (event: 'transfer-click'): void;
-  (event: 'cancel-click'): void;
 }>();
 </script>
 

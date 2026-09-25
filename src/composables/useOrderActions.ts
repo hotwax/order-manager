@@ -1,4 +1,4 @@
-import { computed, type Ref } from 'vue';
+import { computed, ref, type Ref } from 'vue';
 import { alertController, modalController } from '@ionic/vue';
 import { api, translate } from '@common';
 import { showToast } from '@/utils';
@@ -10,7 +10,7 @@ import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useProductStore } from '@/store/productStore';
 import { useSeedStore } from '@/store/seed';
-import type { EnrichedOrder, EnrichedOrderItem, EnrichedShipGroup } from '@/types/orderDetail';
+import type { EnrichedOrder, EnrichedOrderItem, EnrichedShipGroup, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 
 import AddContactModal from '@/components/AddContactModal.vue';
 import AddItemToOrderModal from '@/components/orders/AddItemToOrderModal.vue';
@@ -336,6 +336,54 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     }
   }
 
+  /**
+   * The ship group editor that is open. The page owns it, so a save closes the editor only once
+   * it has succeeded and a failed save leaves the operator's draft on screen.
+   */
+  const openShipGroupEditor = ref<{ shipGroupId: string; editor: ShipGroupEditor } | null>(null);
+  const savingShipGroupId = ref('');
+
+  const shipGroupEditor = (shipGroup: EnrichedShipGroup) =>
+    openShipGroupEditor.value?.shipGroupId === shipGroup.id ? openShipGroupEditor.value.editor : null;
+
+  function setShipGroupEditor(shipGroup: EnrichedShipGroup, editor: ShipGroupEditor | null) {
+    openShipGroupEditor.value = editor ? { shipGroupId: shipGroup.id, editor } : null;
+  }
+
+  async function saveShipGroupEdit(shipGroup: EnrichedShipGroup, save: () => Promise<unknown>, success: string, failure: string) {
+    const orderId = order.value!.id;
+    savingShipGroupId.value = shipGroup.id;
+    try {
+      await save();
+      if (openShipGroupEditor.value?.shipGroupId === shipGroup.id) openShipGroupEditor.value = null;
+      await showToast(translate(success));
+      await loadOrder(orderId, true);
+    } catch {
+      await showToast(translate(failure));
+    } finally {
+      savingShipGroupId.value = '';
+    }
+  }
+
+  const saveShipGroupFields = (shipGroup: EnrichedShipGroup, { fields, success, failure }: ShipGroupFieldsEdit) =>
+    saveShipGroupEdit(shipGroup, () => orderDetailStore.updateShipGroup(order.value!.id, shipGroup.id, fields), success, failure);
+
+  async function saveShippingAddress(shipGroup: EnrichedShipGroup, address: ShipGroupAddressEdit) {
+    // The editor can have been opened before a refresh settled the group, so ask again.
+    const validation = shipGroupActionValidation(shipGroup, 'EDIT_ADDRESS');
+    if (!validation.allowed) return showUnavailableAction(validation);
+    const partyId = order.value?.customer.partyId;
+    if (!partyId) return showToast(translate('Customer is not available for this order.'));
+
+    await saveShipGroupEdit(shipGroup, () => orderTaskStore.updateShippingInformation(order.value!.id, shipGroup.id, {
+      ...address,
+      partyId,
+      contactMechId: shipGroup.shippingAddress?.contactMechId || shipGroup.contactMechId,
+      contactMechPurposeTypeId: 'SHIPPING_LOCATION',
+      isEdited: true,
+    }), 'Shipping address updated successfully.', 'Failed to update shipping address. Please try again.');
+  }
+
   /* ── Item actions ─────────────────────────────────────────────────────── */
 
   async function rejectAndReleaseItem(item: EnrichedOrderItem) {
@@ -642,6 +690,11 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     openAddItemModal,
     viewInventory,
     saveCarrierAndMethod,
+    shipGroupEditor,
+    setShipGroupEditor,
+    savingShipGroupId,
+    saveShipGroupFields,
+    saveShippingAddress,
     // items
     rejectAndReleaseItem,
     requestInventoryTransferForItem,

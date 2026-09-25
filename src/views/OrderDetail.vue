@@ -60,7 +60,6 @@
             :ship-group="shipGroup"
             :order-id="order.id"
             :order-status-id="order.statusId"
-            :customer-party-id="order.customer.partyId"
             :expanded="expandedShipGroupIds.has(shipGroup.id)"
             :selected-item-ids="selectedShipGroupItems[shipGroup.id] || []"
             :hold-task-count="countShipGroupHoldTasks(allHoldTasks, shipGroup.id)"
@@ -69,6 +68,8 @@
             :disabled-actions="shipGroupDisabledActions[shipGroup.id]"
             :can-request-inventory-transfer="canRequestInventoryTransfer"
             :has-transferable-items="inventoryTransferItemsForShipGroup(shipGroup).length > 0"
+            :editor="shipGroupEditor(shipGroup)"
+            :saving="savingShipGroupId === shipGroup.id"
             @update:expanded="$event ? expandedShipGroupIds.add(shipGroup.id) : expandedShipGroupIds.delete(shipGroup.id)"
             @update:selected-item-ids="selectedShipGroupItems[shipGroup.id] = $event"
             @show-holds="selectedSegment = 'holds'"
@@ -81,7 +82,9 @@
             @add-items="openAddItemModal(shipGroup)"
             @view-inventory="viewInventory"
             @change-carrier-method="(carrierPartyId, shipmentMethodTypeId) => saveCarrierAndMethod(shipGroup, carrierPartyId, shipmentMethodTypeId)"
-            @changed="loadOrder(order.id, true)"
+            @update:editor="setShipGroupEditor(shipGroup, $event)"
+            @save-fields="saveShipGroupFields(shipGroup, $event)"
+            @save-address="saveShippingAddress(shipGroup, $event)"
           />
         </template>
         <EmptyState v-else :title="translate('No ship groups')"
@@ -227,6 +230,7 @@ const {
   isShipGroupActionDisabled, isItemFacilityActionDisabled, isItemCancelAllowed, isInventoryTransferRequestEligible,
   inventoryTransferItemsForShipGroup, brokerShipGroup, parkSelectedItems, rejectSelectedItems, releaseSelectedItems,
   requestInventoryTransfersForShipGroup, openAddTaskModal, openAddItemModal, viewInventory, saveCarrierAndMethod,
+  shipGroupEditor, setShipGroupEditor, savingShipGroupId, saveShipGroupFields, saveShippingAddress,
   rejectAndReleaseItem, requestInventoryTransferForItem, cancelSingleItem, openItemAttributesModal, openAddItemFromItemsSegment,
   footerActions, runFooterAction, footerActionLabel, openCustomerContactModal, openLocalePrompt, openManageIdentificationsModal,
   openRiskDetails, openCreateHoldTaskModal, reloadHoldTasks,

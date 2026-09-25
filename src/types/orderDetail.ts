@@ -84,6 +84,25 @@ export interface EnrichedShipGroup {
   items: EnrichedOrderItem[];
 }
 
+/** The inline editors on a ship group card: gift message, dates, instructions and address. */
+export type ShipGroupEditor = 'gift' | 'shippingDates' | 'deliveryDates' | 'instructions' | 'address';
+
+/** A ship group field edit as the card hands it over: what to save and what to tell the operator. */
+export interface ShipGroupFieldsEdit {
+  fields: Record<string, any>;
+  success: string;
+  failure: string;
+}
+
+export interface ShipGroupAddressEdit {
+  address1: string;
+  address2: string;
+  city: string;
+  postalCode: string;
+  stateProvinceGeoId: string;
+  countryGeoId: string;
+}
+
 export interface EnrichedPayment {
   id: string;
   paymentMethodTypeId: string;

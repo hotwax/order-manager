@@ -12,7 +12,18 @@
         <template v-for="group in order.groupedItems" :key="group.externalId">
           <!-- Nothing to roll up when the group is a single order item, so the item row is
                rendered directly with the product identity the rolled up header would carry. -->
-          <OrderItemListRow v-if="group.items.length === 1" v-bind="itemRow(group.items[0], productRowProps(group))" />
+          <OrderItemListRow v-if="group.items.length === 1" v-bind="itemRow(group.items[0], productRowProps(group))">
+            <template #actions>
+              <ion-button v-if="itemActions[group.items[0].orderItemSeqId]?.canTransfer" fill="clear" size="small"
+                @click.stop="emit('request-inventory-transfer', group.items[0])">
+                {{ translate('Request transfer') }}
+              </ion-button>
+              <ion-button v-if="itemActions[group.items[0].orderItemSeqId]?.canCancel" fill="clear" size="small" color="danger"
+                @click.stop="emit('cancel-single-item', group.items[0])">
+                {{ translate('Cancel') }}
+              </ion-button>
+            </template>
+          </OrderItemListRow>
           <ion-accordion v-else :value="group.externalId">
             <OrderItemListRow
               slot="header"
@@ -35,7 +46,18 @@
                   :key="item.orderItemSeqId"
                   class="order-item-detail-entry"
                   v-bind="itemRow(item, itemIdentity(item))"
-                />
+                >
+                  <template #actions>
+                    <ion-button v-if="itemActions[item.orderItemSeqId]?.canTransfer" fill="clear" size="small"
+                      @click.stop="emit('request-inventory-transfer', item)">
+                      {{ translate('Request transfer') }}
+                    </ion-button>
+                    <ion-button v-if="itemActions[item.orderItemSeqId]?.canCancel" fill="clear" size="small" color="danger"
+                      @click.stop="emit('cancel-single-item', item)">
+                      {{ translate('Cancel') }}
+                    </ion-button>
+                  </template>
+                </OrderItemListRow>
               </ion-list>
             </div>
           </ion-accordion>
@@ -185,9 +207,8 @@ function itemIdentity(item: EnrichedOrderItem) {
   };
 }
 
-/** Everything one order item's row shows and does, under the given identity. */
+/** Everything one order item's row shows and reports, under the given identity. Its buttons stay in the slot. */
 function itemRow(item: EnrichedOrderItem, identity: ReturnType<typeof productRowProps> | ReturnType<typeof itemIdentity>) {
-  const actions = props.itemActions[item.orderItemSeqId];
   const attributeCount = Number(item.attributeCount) || 0;
   return {
     ...identity,
@@ -195,19 +216,15 @@ function itemRow(item: EnrichedOrderItem, identity: ReturnType<typeof productRow
     quantity: item.quantity,
     quantityLabel: translate('qty'),
     facilityLabel: item.facilityName,
-    facilityDisabled: actions?.facilityDisabled,
+    facilityDisabled: props.itemActions[item.orderItemSeqId]?.facilityDisabled,
     attributesLabel: `${attributeCount} ${attributeCount === 1 ? translate('attribute') : translate('attributes')}`,
     statuses: item.statuses,
     statusDetail: item.shipGroupSeqId ? `${translate('#')}${item.shipGroupSeqId}` : '',
     amount: money(item.unitPrice * item.quantity),
     adjustments: item.adjustments.map((adj) => ({ label: adj.comment, amount: money(adj.amount) })),
-    canTransfer: actions?.canTransfer,
-    canCancel: actions?.canCancel,
     'onUpdate:selected': (selected: boolean) => selectItems([item], selected),
     onFacilityClick: () => emit('reject-and-release', item),
     onAttributesClick: () => emit('open-item-attributes', item),
-    onTransferClick: () => emit('request-inventory-transfer', item),
-    onCancelClick: () => emit('cancel-single-item', item),
   };
 }
 
