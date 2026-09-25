@@ -375,3 +375,37 @@ function taxAdjustment(orderAdjustmentId: string, orderItemSeqId: string, commen
     amount
   };
 }
+
+describe('order detail read getters', () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it('counts an order as pending until it has an answer, including before the fetch starts', () => {
+    const store = useOrderDetailStore();
+    const entry = (status: string) => ({ payload: null, status, loadedAt: '', error: '' }) as any;
+    store.byOrderId.IDLE = entry('idle');
+    store.byOrderId.LOADING = entry('loading');
+    store.byOrderId.LOADED = entry('loaded');
+    store.byOrderId.FAILED = entry('error');
+    store.byOrderId.MISSING = entry('notfound');
+
+    expect(store.pendingById('NEVER_REQUESTED')).toBe(true);
+    expect(store.pendingById('IDLE')).toBe(true);
+    expect(store.pendingById('LOADING')).toBe(true);
+    expect(store.pendingById('LOADED')).toBe(false);
+    expect(store.pendingById('FAILED')).toBe(false);
+    expect(store.pendingById('MISSING')).toBe(false);
+    // loadingById stays the narrower "a request is in flight".
+    expect(store.loadingById('NEVER_REQUESTED')).toBe(false);
+  });
+
+  it('returns an empty list, not undefined, for comm events and risks not loaded yet', () => {
+    const store = useOrderDetailStore();
+    expect(store.commEventsForOrder('O1')).toEqual([]);
+    expect(store.riskAssessmentsForOrder('O1')).toEqual([]);
+
+    store.commEventsByOrderId.O1 = [{ communicationEventId: 'CE1' }];
+    store.riskAssessmentsByOrderId.O1 = [{ riskAssessmentId: 'R1' }];
+    expect(store.commEventsForOrder('O1')).toEqual([{ communicationEventId: 'CE1' }]);
+    expect(store.riskAssessmentsForOrder('O1')).toEqual([{ riskAssessmentId: 'R1' }]);
+  });
+});

@@ -101,7 +101,7 @@
         @create-hold-task="openCreateHoldTaskModal"
       />
 
-      <OrderCommsSegment v-if="selectedSegment === 'comms'" :comm-events="orderDetailStore.commEventsByOrderId[orderId] || []" />
+      <OrderCommsSegment v-if="selectedSegment === 'comms'" :comm-events="orderDetailStore.commEventsForOrder(orderId)" />
     </ion-content>
 
     <ion-content v-else-if="loading">
@@ -298,11 +298,10 @@ const exchangeSourceOrderIds = computed(() => [...new Set<string>(
 watch(exchangeSourceOrderIds, (ids) => ids.forEach((id) => orderDetailStore.fetchOrder(id)), { immediate: true });
 
 const exchangeSources = computed(() => exchangeSourceOrderIds.value.map((orderId) => {
-  const entry = orderDetailStore.byOrderId[orderId];
-  const payload = entry?.payload;
+  const payload = orderDetailStore.orderById(orderId);
   return {
     orderId,
-    loading: !entry || entry.status === 'loading' || entry.status === 'idle',
+    loading: orderDetailStore.pendingById(orderId),
     orderName: payload?.orderName || payload?.externalId || orderId,
     returnIds: [...new Set((payload?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[]
   };
@@ -319,7 +318,7 @@ function carriedOverReturnIds(payment: EnrichedPayment): string[] {
   let sources = exchangeSources.value;
   if (payment.parentRefNum && sources.length > 1) {
     const matching = sources.filter((source) =>
-      (orderDetailStore.byOrderId[source.orderId]?.payload?.paymentPreferences || []).some(
+      (orderDetailStore.orderById(source.orderId)?.paymentPreferences || []).some(
         (opp: any) => opp.manualRefNum === payment.parentRefNum
       )
     );

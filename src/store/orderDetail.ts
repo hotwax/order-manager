@@ -359,7 +359,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
           fulfillmentTimeline: this.fulfillmentTimelineByOrderId[orderId] || [],
           timelineByShipGroup: this.timelineByShipGroupByOrderId(orderId),
           issuanceByItem: this.issuanceByItemSeqIdByOrderId(orderId),
-          riskAssessments: this.riskAssessmentsByOrderId[orderId] || [],
+          riskAssessments: this.riskAssessmentsForOrder(orderId),
           returnedQtyBySeqId: this.returnedQtyByItemSeqIdByOrderId(orderId),
           exchangeChildren: this.exchangeChildrenByOrderId[orderId] || [],
           returnHeadersById: this.returnHeadersById,
@@ -370,6 +370,16 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     orderById: (state) => (orderId: string) => state.byOrderId[orderId]?.payload || null,
     loadingById: (state) => (orderId: string) => state.byOrderId[orderId]?.status === "loading",
     errorById: (state) => (orderId: string) => state.byOrderId[orderId]?.error || "",
+    /**
+     * The order has not been answered yet: never requested, queued or in flight. Unlike
+     * loadingById, a missing entry counts too, because callers ask before the fetch has started.
+     */
+    pendingById: (state) => (orderId: string) => {
+      const status = state.byOrderId[orderId]?.status;
+      return !status || status === "idle" || status === "loading";
+    },
+    commEventsForOrder: (state) => (orderId: string): any[] => state.commEventsByOrderId[orderId] || [],
+    riskAssessmentsForOrder: (state) => (orderId: string): any[] => state.riskAssessmentsByOrderId[orderId] || [],
 
     placingCustomerRoleByOrderId: (state) => (orderId: string) => {
       const current = state.byOrderId[orderId]?.payload;

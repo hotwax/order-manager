@@ -633,7 +633,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
   async function openRiskDetails() {
     const modal = await modalController.create({
       component: RiskAssessmentModal,
-      componentProps: { risks: orderDetailStore.riskAssessmentsByOrderId[order.value!.id] || [] },
+      componentProps: { risks: orderDetailStore.riskAssessmentsForOrder(order.value!.id) },
     });
     await modal.present();
   }
