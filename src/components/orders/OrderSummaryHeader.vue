@@ -200,6 +200,9 @@
       <ion-card>
         <ion-card-header>
           <ion-card-title>{{ translate('Attributes') }}</ion-card-title>
+          <ion-button fill="clear" size="small" @click="emit('open-manage-attributes')">
+            {{ translate('Manage') }}
+          </ion-button>
         </ion-card-header>
         <ion-list lines="none">
           <AttributeListItem
@@ -266,6 +269,7 @@ const emit = defineEmits<{
   'open-customer-contact': [contactMechTypeId: string, contactMechPurposeTypeId: string];
   'open-locale-prompt': [];
   'open-manage-identifications': [];
+  'open-manage-attributes': [];
   'open-risk-details': [];
 }>();
 </script>

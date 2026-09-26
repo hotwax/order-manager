@@ -17,6 +17,7 @@ import AddItemToOrderModal from '@/components/orders/AddItemToOrderModal.vue';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import FacilityInventoryModal from '@/components/fulfillment/FacilityInventoryModal.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
+import ManageOrderAttributesModal from '@/components/orders/ManageOrderAttributesModal.vue';
 import ManageOrderIdentificationsModal from '@/components/orders/ManageOrderIdentificationsModal.vue';
 import OrderItemAttributesModal from '@/components/orders/OrderItemAttributesModal.vue';
 import ProductInventoryModal from '@/components/inventory/ProductInventoryModal.vue';
@@ -632,6 +633,26 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     if (role === 'confirm') await loadOrder(orderId, true);
   }
 
+  async function openManageAttributesModal() {
+    const orderId = order.value!.id;
+    const modal = await modalController.create({
+      component: ManageOrderAttributesModal,
+      componentProps: {
+        orderId,
+        // The view model keeps a missing value or description as '', which must not be written back.
+        attributes: order.value!.attributes.map((attribute) => ({
+          attrName: attribute.name,
+          attrValue: attribute.value || undefined,
+          attrDescription: attribute.description || undefined,
+        })),
+      }
+    });
+    await modal.present();
+    // A backdrop tap or Escape can't say whether anything changed, so only a clean close skips the reload.
+    const { role } = await modal.onWillDismiss();
+    if (role !== 'cancel') await loadOrder(orderId, true);
+  }
+
   async function openRiskDetails() {
     const modal = await modalController.create({
       component: RiskAssessmentModal,
@@ -711,6 +732,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     openCustomerContactModal,
     openLocalePrompt,
     openManageIdentificationsModal,
+    openManageAttributesModal,
     openRiskDetails,
     openCreateHoldTaskModal,
     reloadHoldTasks,

@@ -21,6 +21,7 @@
         @open-customer-contact="openCustomerContactModal"
         @open-locale-prompt="openLocalePrompt"
         @open-manage-identifications="openManageIdentificationsModal"
+        @open-manage-attributes="openManageAttributesModal"
         @open-risk-details="openRiskDetails"
       />
 
@@ -233,7 +234,7 @@ const {
   shipGroupEditor, setShipGroupEditor, savingShipGroupId, saveShipGroupFields, saveShippingAddress,
   rejectAndReleaseItem, requestInventoryTransferForItem, cancelSingleItem, openItemAttributesModal, openAddItemFromItemsSegment,
   footerActions, runFooterAction, footerActionLabel, openCustomerContactModal, openLocalePrompt, openManageIdentificationsModal,
-  openRiskDetails, openCreateHoldTaskModal, reloadHoldTasks,
+  openManageAttributesModal, openRiskDetails, openCreateHoldTaskModal, reloadHoldTasks,
 } = useOrderActions({ order, loadOrder, selectedItemIds, selectedShipGroupItems, selectedSegment });
 
 /* ── Items tab ────────────────────────────────────────────────────────── */
