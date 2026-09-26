@@ -2,7 +2,7 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="modalController.dismiss(undefined, savedSome ? 'confirm' : 'cancel')" :aria-label="translate('Close')" :title="translate('Close')">
+        <ion-button :disabled="saving" @click="modalController.dismiss(undefined, savedSome ? 'confirm' : 'cancel')" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
@@ -10,7 +10,7 @@
     </ion-toolbar>
   </ion-header>
 
-  <ion-content>
+  <ion-content ref="content">
     <ion-list>
       <ion-list-header>
         <ion-label>{{ translate('Add Attribute') }}</ion-label>
@@ -111,7 +111,7 @@ import {
   IonLabel, IonList, IonListHeader, IonSpinner, IonTitle, IonToolbar, modalController
 } from '@ionic/vue';
 import { checkmarkDoneOutline, closeOutline, createOutline, saveOutline, trashOutline } from 'ionicons/icons';
-import { computed, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref } from 'vue';
 import { api, commonUtil, translate } from '@common';
 import EmptyState from '@/components/common/EmptyState.vue';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
@@ -131,6 +131,14 @@ const draft = ref<Attribute[]>(props.attributes.map((attr) => ({ ...attr })));
 const saving = ref(false);
 // Part of a failed save went through, so the order has changed even if the modal is closed.
 const savedSome = ref(false);
+
+// The writes run one after another, so the modal must not close part way through: the order
+// would reload before the last of them landed. canDismiss covers Escape and backdrop taps too.
+const content = ref();
+onMounted(() => {
+  const modal = content.value?.$el?.closest('ion-modal');
+  if (modal) modal.canDismiss = () => !saving.value;
+});
 
 const form = reactive({ attrName: '', attrValue: '', attrDescription: '' });
 
@@ -228,6 +236,8 @@ async function save() {
       saved.value = [...saved.value.filter((entry) => entry.attrName !== attr.attrName), { ...attr }];
       savedSome.value = true;
     }
+    // canDismiss refuses while saving, including this dismiss.
+    saving.value = false;
     await showToast(translate('Attributes saved.'));
     await modalController.dismiss(undefined, 'confirm');
   } catch {

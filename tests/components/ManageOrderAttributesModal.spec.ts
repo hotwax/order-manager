@@ -169,6 +169,31 @@ describe('manage order attributes modal', () => {
     expect(unsaved(wrapper)).toEqual(['gift_message']);
   });
 
+  it('cannot be closed, by any route, while a save is still writing', async () => {
+    const host = document.createElement('ion-modal') as HTMLElement & { canDismiss?: () => boolean };
+    document.body.appendChild(host);
+    let finish!: (value: unknown) => void;
+    mocks.api.mockReturnValueOnce(new Promise((resolve) => { finish = resolve; }));
+    const wrapper = mount(ManageOrderAttributesModal, { props: { orderId: 'O1', attributes: [] }, attachTo: host });
+    await fill(wrapper, { Name: 'gift_message' });
+    expect(host.canDismiss?.()).toBe(true);
+
+    await button(wrapper, 'Save').trigger('click');
+    await flushPromises();
+
+    expect(host.canDismiss?.()).toBe(false);
+    expect(button(wrapper, 'Close').attributes('disabled')).toBeDefined();
+    expect(mocks.dismiss).not.toHaveBeenCalled();
+
+    finish({ data: {} });
+    await flushPromises();
+
+    expect(host.canDismiss?.()).toBe(true);
+    expect(mocks.dismiss).toHaveBeenCalledWith(undefined, 'confirm');
+    wrapper.unmount();
+    host.remove();
+  });
+
   it('keeps Save disabled and closes without a reload when nothing changed', async () => {
     const wrapper = mountWith([{ attrName: 'gift_message', attrValue: 'Hi' }]);
 
