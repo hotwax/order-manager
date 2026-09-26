@@ -127,7 +127,7 @@
       :inert="expanded">
       <div class="ship-group-summary-content">
         <ion-list lines="none" :aria-label="translate('Items')">
-          <ion-item v-for="item in shipGroup.items.slice(0, 3)" :key="item.orderItemSeqId">
+          <ion-item v-for="item in shipGroup.items.slice(0, COLLAPSED_ITEM_LIMIT)" :key="item.orderItemSeqId">
             <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="getProduct(item.productId)?.mainImageUrl">
               <DxpShopifyImg :src="item.imageUrl" :key="getProduct(item.productId)?.mainImageUrl" size="small" />
             </ion-thumbnail>
@@ -140,6 +140,9 @@
               <p v-if="featureLabel(item.productId)" class="ship-group-item-features" :title="featureLabel(item.productId)">{{ featureLabel(item.productId) }}</p>
             </ion-label>
             <ion-note slot="end">{{ item.quantity }} {{ translate('units') }}</ion-note>
+          </ion-item>
+          <ion-item v-if="hiddenItemCount" button :detail="false" @click="emit('update:expanded', true)">
+            <ion-label color="medium">{{ translate('+{count} more', { count: hiddenItemCount }) }}</ion-label>
           </ion-item>
         </ion-list>
 
@@ -533,6 +536,11 @@ const LIFECYCLE_STEPS = [
 
 /** Whether the item detail block is showing — always, for a counter sale with no toggle. */
 const detailsOpen = computed(() => props.shipGroup.isPosCompleted || props.expanded);
+
+// The collapsed card lists only the first few items so a large order does not take over the page
+// (#516); the rest are one tap away, and the "+N more" row says how many.
+const COLLAPSED_ITEM_LIMIT = 3;
+const hiddenItemCount = computed(() => Math.max(props.shipGroup.items.length - COLLAPSED_ITEM_LIMIT, 0));
 const orderIsTerminal = computed(() => OrderActionValidator.isOrderTerminal({ statusId: props.orderStatusId }));
 
 /** A stopped group is read-only: its options describe a shipment that will no longer change. */
