@@ -157,7 +157,7 @@ async function deleteAttribute(attr: Attribute) {
 
 <style scoped>
 ion-content {
-  --padding-bottom: 16px;
+  --padding-bottom: 80px;
 }
 
 .attribute-form__pair {

@@ -318,7 +318,7 @@ async function openCreateTypeModal() {
 
 <style scoped>
 ion-content {
-  --padding-bottom: 16px;
+  --padding-bottom: 80px;
 }
 
 .identification-form__pair {

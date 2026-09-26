@@ -628,8 +628,9 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       componentProps: { orderId, identifications: order.value!.identifications }
     });
     await modal.present();
+    // A backdrop tap or Escape can't say whether anything changed, so only a clean close skips the reload.
     const { role } = await modal.onWillDismiss();
-    if (role === 'confirm') await loadOrder(orderId, true);
+    if (role !== 'cancel') await loadOrder(orderId, true);
   }
 
   async function openRiskDetails() {
