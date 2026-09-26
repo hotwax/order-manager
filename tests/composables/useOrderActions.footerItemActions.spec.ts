@@ -1,8 +1,11 @@
+import { flushPromises } from '@vue/test-utils';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ref } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
-import { modalController } from '@ionic/vue';
+import { alertController, modalController } from '@ionic/vue';
 import { useOrderActions } from '@/composables/useOrderActions';
+import { useOrderTaskStore } from '@/store/orderTask';
+import { useSeedStore } from '@/store/seed';
 import type { EnrichedOrder, EnrichedOrderItem, EnrichedShipGroup } from '@/types/orderDetail';
 
 // Like the app's i18n: named placeholders are filled from the params, and render empty without them.
@@ -10,7 +13,7 @@ vi.mock('@common', async (importOriginal) => ({
   ...(await importOriginal<any>()),
   translate: (key: string, params?: Record<string, unknown>) => key.replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? '')),
 }));
-vi.mock('@ionic/vue', async (importOriginal) => ({ ...(await importOriginal<any>()), modalController: { create: vi.fn() } }));
+vi.mock('@ionic/vue', async (importOriginal) => ({ ...(await importOriginal<any>()), modalController: { create: vi.fn() }, alertController: { create: vi.fn() } }));
 vi.mock('@/utils', async (importOriginal) => ({ ...(await importOriginal<any>()), showToast: vi.fn() }));
 
 const item = (orderItemSeqId: string, shipGroupSeqId: string, statusId = 'ITEM_APPROVED') =>
@@ -124,5 +127,45 @@ describe('footer item actions', () => {
 
     expect(destinations()).toHaveLength(1);
     expect(selectedItemIds.value.size).toBe(2);
+  });
+});
+
+describe('footer bulk cancel', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    // In this status flow only an approved item can move to ITEM_CANCELLED.
+    const seed = useSeedStore();
+    seed.statusFlowTransitions.ids = ['T1'];
+    seed.statusFlowTransitions.byId = { T1: { statusId: 'ITEM_APPROVED', toStatusId: 'ITEM_CANCELLED' } };
+    // Confirm every alert as soon as it is presented.
+    vi.mocked(alertController.create).mockImplementation(async (options: any) => ({
+      present: vi.fn(async () => options.buttons.find((button: any) => button.role === 'confirm').handler()),
+    }) as any);
+  });
+
+  // The button itself stays hidden while cancels don't reach Shopify, so these drive the handler directly.
+  it('counts and cancels only the selected items that can still be cancelled', async () => {
+    const { actions, selectedItemIds } = setup([item('01', '00001'), item('02', '00001', 'ITEM_COMPLETED'), item('03', '00002')], ['01', '02', '03']);
+    const cancelOrder = vi.spyOn(useOrderTaskStore(), 'cancelOrder').mockResolvedValue(undefined as any);
+
+    expect(actions.footerActionLabel({ id: 'CANCEL_ITEMS' })).toBe('Cancel 2 items');
+    await actions.runFooterAction({ id: 'CANCEL_ITEMS' });
+    await flushPromises();
+
+    expect(cancelOrder).toHaveBeenCalledWith('O1', [
+      { orderItemSeqId: '01', shipGroupSeqId: '00001', reason: 'NO_VARIANCE_LOG', comment: '' },
+      { orderItemSeqId: '03', shipGroupSeqId: '00002', reason: 'NO_VARIANCE_LOG', comment: '' },
+    ]);
+    expect(selectedItemIds.value.size).toBe(0);
+  });
+
+  it('sends nothing when no selected item can be cancelled', async () => {
+    const { actions } = setup([item('01', '00001', 'ITEM_COMPLETED')], ['01']);
+    const cancelOrder = vi.spyOn(useOrderTaskStore(), 'cancelOrder').mockResolvedValue(undefined as any);
+
+    await actions.runFooterAction({ id: 'CANCEL_ITEMS' });
+    await flushPromises();
+
+    expect(cancelOrder).not.toHaveBeenCalled();
   });
 });

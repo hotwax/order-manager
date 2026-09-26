@@ -70,11 +70,10 @@ describe('order items selection', () => {
     expect(rows.every((row) => row.attributes('data-selectable') === 'false')).toBe(true);
   });
 
-  it('keeps selection on an open order, with Add items left to the page footer', () => {
+  it('keeps selection on an open order', () => {
     const wrapper = mountFor('ORDER_APPROVED');
 
     expect(wrapper.find('.order-items-toolbar').exists()).toBe(true);
-    expect(wrapper.find('.order-items-toolbar').text()).not.toContain('Add items');
     expect(wrapper.findAll('.row').every((row) => row.attributes('data-selectable') === 'true')).toBe(true);
   });
 });

@@ -465,10 +465,17 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
 
   /* ── Order (footer) actions ───────────────────────────────────────────── */
 
+  /**
+   * The selected items the bulk cancel acts on. Completed and cancelled items, and any the status
+   * flow can't take to ITEM_CANCELLED, stay out of both the button and the request.
+   */
+  const cancellableSelectedItems = computed(() => selectedItems.value.filter((item) =>
+    !!order.value && OrderActionValidator.validateItemAction(order.value, item, 'CANCEL_ITEM', itemActionContext(item)).allowed));
+
   async function cancelOrderItems() {
-    if (!order.value || !selectedItems.value.length) return;
+    if (!order.value || !cancellableSelectedItems.value.length) return;
     const orderId = order.value.id;
-    const itemsSnapshot = [...selectedItems.value];
+    const itemsSnapshot = [...cancellableSelectedItems.value];
     const message = translate('Are you sure you want to cancel the {count} selected item(s)? This action cannot be undone.', { count: itemsSnapshot.length });
     await confirmAlert(translate('Cancel items'), message, translate('Cancel items'), async () => {
       try {
@@ -552,7 +559,8 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     if (!order.value) return [];
     const allowedTransitions = seed.allowedTransitions(order.value.statusId);
     const orderAllowedToStatusIds = new Set<string>(allowedTransitions.map((transition: any) => transition.toStatusId));
-    const actions = OrderActionValidator.getOrderFooterActions(order.value, allowedTransitions, selectedItems.value, { orderAllowedToStatusIds });
+    // The validator only offers "Cancel N items" for items it could cancel, so hand it those.
+    const actions = OrderActionValidator.getOrderFooterActions(order.value, allowedTransitions, cancellableSelectedItems.value, { orderAllowedToStatusIds });
     const additions: FooterActionView[] = [];
     if (order.value.shipGroups.length && !OrderActionValidator.isOrderTerminal(order.value)) {
       additions.push({ id: 'ADD_ITEMS', kind: 'footer', label: 'Add items', fill: 'outline' });
@@ -576,7 +584,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
 
   /** Item actions show how many selected items they apply to; everything else is a static label. */
   function footerActionLabel(action: any): string {
-    if (action.id === 'CANCEL_ITEMS') return translate('Cancel {count} items', { count: selectedItems.value.length });
+    if (action.id === 'CANCEL_ITEMS') return translate('Cancel {count} items', { count: cancellableSelectedItems.value.length });
     if (action.id === 'REQUEST_TRANSFER') return translate('Request transfer for {count} items', { count: transferableSelectedItems.value.length });
     return translate(action.label);
   }
