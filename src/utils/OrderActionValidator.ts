@@ -54,7 +54,7 @@ import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 
 /* ── Action id unions, split by the three levels in OrderDetail.vue ───────── */
 
-/** ORDER / footer level (renders only on the Items segment, OrderDetail.vue:724). */
+/** ORDER / footer level (the Order Detail footer, shown on the Items segment). */
 export type OrderFooterActionId = 'CANCEL_ITEMS';
 
 /** SHIP-GROUP level (action row, OrderDetail.vue:603-609). */
@@ -68,8 +68,8 @@ export type ShipGroupActionId =
   | 'EDIT_CARRIER_METHOD'
   | 'EDIT_ADDRESS';
 
-/** ITEM level (per-row, OrderDetail.vue:215-231). */
-export type OrderItemActionId = 'CANCEL_ITEM' | 'REJECT_AND_RELEASE' | 'VIEW_ATTRIBUTES';
+/** ITEM level: the facility chip on each item row, and which items the footer's bulk cancel includes. */
+export type OrderItemActionId = 'CANCEL_ITEM' | 'REJECT_AND_RELEASE';
 
 /* ── Result + descriptor shapes ──────────────────────────────────────────── */
 
@@ -342,7 +342,7 @@ export const OrderActionValidator = {
 
   /* ════════════════════════════════════════════════════════════════════════
    * VALIDATION MODE — ORDER / FOOTER level
-   * Footer renders only on the Items segment (OrderDetail.vue:724).
+   * The footer renders only on the Items segment.
    * ════════════════════════════════════════════════════════════════════════ */
 
   validateFooterAction(
@@ -353,8 +353,8 @@ export const OrderActionValidator = {
   ): ActionValidationResult {
     switch (actionId) {
       /**
-       * CANCEL_ITEMS — footer "Cancel" (OrderDetail.vue:727).
-       * Gated by terminal statuses only.
+       * CANCEL_ITEMS — footer "Cancel N items". Offered while the order can still be cancelled
+       * and at least one selected item can (CANCEL_ITEM below).
        */
       case 'CANCEL_ITEMS': {
         if (this.isOrderTerminal(order)) {
@@ -499,7 +499,7 @@ export const OrderActionValidator = {
   },
 
   /* ════════════════════════════════════════════════════════════════════════
-   * VALIDATION MODE — ITEM level (OrderDetail.vue:215-231)
+   * VALIDATION MODE — ITEM level
    * For phase gating, supply ctx.timeline / ctx.isVirtual for the ITEM's
    * ship group (no shipGroup object is in scope at this level).
    * ════════════════════════════════════════════════════════════════════════ */
@@ -512,7 +512,7 @@ export const OrderActionValidator = {
   ): ActionValidationResult {
     switch (actionId) {
       /**
-       * CANCEL_ITEM — per-row "Cancel" (OrderDetail.vue:228).
+       * CANCEL_ITEM — whether the footer's bulk cancel may include this item.
        * Gated by terminal statuses and the seed transition table.
        */
       case 'CANCEL_ITEM': {
@@ -530,7 +530,7 @@ export const OrderActionValidator = {
       }
 
       /**
-       * REJECT_AND_RELEASE — facility chip (OrderDetail.vue:215). Combined
+       * REJECT_AND_RELEASE — facility chip on the item row. Combined
        * reject-from-current-facility + release-to-another. A pull-back
        * variant, so it follows the pull-back phase policy and (when the
        * caller tells us via ctx.isVirtual) requires a PHYSICAL facility —
@@ -550,17 +550,6 @@ export const OrderActionValidator = {
         }
         if (ctx?.isVirtual === true) {
           return { allowed: false, reason: 'Reject only applies to items at a physical facility — release the item instead.' };
-        }
-        return { allowed: true };
-      }
-
-      /**
-       * VIEW_ATTRIBUTES — attribute chip (OrderDetail.vue:220). Read-only modal,
-       * shown only when item.attributeCount > 0. No lifecycle guard needed.
-       */
-      case 'VIEW_ATTRIBUTES': {
-        if (!Number(item?.attributeCount || 0)) {
-          return { allowed: false, reason: 'This item has no attributes to view.' };
         }
         return { allowed: true };
       }

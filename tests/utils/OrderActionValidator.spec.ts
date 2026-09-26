@@ -278,8 +278,9 @@ describe('ship-group fulfillment approval gate', () => {
 });
 
 /**
- * The per-row Cancel button reads this, so what it refuses is what the row must not offer.
- * A row that only checked the item's own status would offer every case below.
+ * The footer's bulk "Cancel N items" includes only items this allows, so what it refuses is
+ * what the bulk cancel must leave out. Checking the item's own status alone would let every
+ * case below through.
  */
 describe('validateItemAction CANCEL_ITEM', () => {
   const approvedItem = { orderItemSeqId: '01', statusId: 'ITEM_APPROVED' };
