@@ -95,7 +95,7 @@
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
       <ion-fab-button :disabled="!canAdd || adding" :aria-label="translate('Add identification')" @click="addIdentification">
-        <ion-spinner v-if="adding" name="crescent" />
+        <ion-spinner v-if="adding" name="crescent" slot="icon-only" />
         <ion-icon v-else :icon="addOutline" />
       </ion-fab-button>
     </ion-fab>
