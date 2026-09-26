@@ -620,6 +620,7 @@
   "qty": "qty",
   "Qty": "Qty",
   "Quantity": "Cantidad",
+  "Quantity must be greater than 0": "La cantidad debe ser mayor que 0",
   "Queue Breakdown": "Desglose de la cola",
   "Ratelimit": "Límite de tasa",
   "Reason unavailable": "Motivo no disponible",

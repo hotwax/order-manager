@@ -235,7 +235,15 @@
                 <ion-label>{{ formatMoney(lineItem.price) }}</ion-label>
               </div>
               <ion-item>
-                <ion-input v-model="lineItem.quantity" type="number" :label="translate('Qty')" label-placement="floating" min="0"/>
+                <ion-input
+                  v-model="lineItem.quantity"
+                  type="number"
+                  :label="translate('Qty')"
+                  label-placement="floating"
+                  min="1"
+                  :class="{ 'ion-invalid ion-touched': !lineItem.quantity || lineItem.quantity <= 0 }"
+                  :error-text="translate('Quantity must be greater than 0')"
+                />
               </ion-item>
               <ion-button color="danger" fill="clear" @click="removeLineItem(index)" :aria-label="translate('Remove item')" :title="translate('Remove item')">
                 <ion-icon slot="icon-only" :icon="trashOutline"/>

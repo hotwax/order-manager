@@ -640,6 +640,7 @@
   "qty": "qty",
   "Qty": "Qty",
   "Quantity": "Quantity",
+  "Quantity must be greater than 0": "Quantity must be greater than 0",
   "Queue Breakdown": "Queue Breakdown",
   "Ratelimit": "Ratelimit",
   "Ready": "Ready",
