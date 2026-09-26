@@ -46,11 +46,8 @@
         :order="order"
         :item-actions="itemActions"
         :payment-return-ids="paymentReturnIds"
-        @add-item="openAddItemFromItemsSegment"
         @reject-and-release="rejectAndReleaseItem"
         @open-item-attributes="openItemAttributesModal"
-        @request-inventory-transfer="requestInventoryTransferForItem"
-        @cancel-single-item="cancelSingleItem"
       />
 
       <div v-if="selectedSegment === 'ship-groups'" class="ion-padding">
@@ -124,10 +121,10 @@
 
     <ion-footer v-if="order && selectedSegment === 'items'">
       <ion-toolbar>
-        <!-- The footer is one engine-driven list (OrderActionValidator.getOrderFooterActions):
-             status transitions (Approve, …) on the start, lifecycle and cancel actions
-             (Cancel items, Cancel order, Return) on the end. Only VALID actions are present — an
-             action that doesn't apply to the order simply isn't rendered. -->
+        <!-- The footer is one list (useOrderActions footerActions): status transitions (Approve, …)
+             on the start; on the end, Add items, then the item actions for the selected rows
+             (Request transfer, Cancel items) or Cancel order. Only VALID actions are present — an
+             action that doesn't apply to the order or the selection simply isn't rendered. -->
         <ion-buttons slot="start">
           <ion-button v-for="action in footerActions.filter(a => a.kind === 'status')" :key="action.id"
             :color="action.color" :fill="action.fill" @click="runFooterAction(action)">
@@ -228,24 +225,20 @@ watch(selectedSegment, (segment) => {
 });
 
 const {
-  isShipGroupActionDisabled, isItemFacilityActionDisabled, isItemCancelAllowed, isInventoryTransferRequestEligible,
+  isShipGroupActionDisabled, isItemFacilityActionDisabled,
   inventoryTransferItemsForShipGroup, brokerShipGroup, parkSelectedItems, rejectSelectedItems, releaseSelectedItems,
   requestInventoryTransfersForShipGroup, openAddTaskModal, openAddItemModal, viewInventory, saveCarrierAndMethod,
   shipGroupEditor, setShipGroupEditor, savingShipGroupId, saveShipGroupFields, saveShippingAddress,
-  rejectAndReleaseItem, requestInventoryTransferForItem, cancelSingleItem, openItemAttributesModal, openAddItemFromItemsSegment,
+  rejectAndReleaseItem, openItemAttributesModal,
   footerActions, runFooterAction, footerActionLabel, openCustomerContactModal, openLocalePrompt, openManageIdentificationsModal,
   openManageAttributesModal, openRiskDetails, openCreateHoldTaskModal, reloadHoldTasks,
-} = useOrderActions({ order, loadOrder, selectedItemIds, selectedShipGroupItems, selectedSegment });
+} = useOrderActions({ order, loadOrder, selectedItemIds, selectedShipGroupItems, selectedSegment, canRequestInventoryTransfer });
 
 /* ── Items tab ────────────────────────────────────────────────────────── */
 
 const itemActions = computed(() => Object.fromEntries((order.value?.groupedItems || [])
   .flatMap((group) => group.items)
-  .map((item) => [item.orderItemSeqId, {
-    canCancel: isItemCancelAllowed(item),
-    canTransfer: canRequestInventoryTransfer.value && isInventoryTransferRequestEligible(item),
-    facilityDisabled: isItemFacilityActionDisabled(item),
-  }])));
+  .map((item) => [item.orderItemSeqId, { facilityDisabled: isItemFacilityActionDisabled(item) }])));
 
 /* ── Ship groups tab ──────────────────────────────────────────────────── */
 

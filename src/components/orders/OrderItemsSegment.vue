@@ -4,31 +4,16 @@
       <ion-item v-if="!isTerminal" lines="full" class="order-items-toolbar">
         <ion-checkbox :checked="areAllSelected" justify="start" label-placement="end"
           @ionChange="selectItems(allItems, $event.detail.checked)">{{ translate('Select all') }}</ion-checkbox>
-        <ion-button slot="end" fill="outline" color="medium" @click="emit('add-item')">
-          {{ translate('Add items') }}
-        </ion-button>
       </ion-item>
       <ion-accordion-group>
         <template v-for="group in order.groupedItems" :key="group.externalId">
           <!-- Nothing to roll up when the group is a single order item, so the item row is
                rendered directly with the product identity the rolled up header would carry. -->
-          <OrderItemListRow v-if="group.items.length === 1" v-bind="itemRow(group.items[0], productRowProps(group))">
-            <template #actions>
-              <ion-button v-if="itemActions[group.items[0].orderItemSeqId]?.canTransfer" fill="clear" size="small"
-                @click.stop="emit('request-inventory-transfer', group.items[0])">
-                {{ translate('Request transfer') }}
-              </ion-button>
-              <ion-button v-if="itemActions[group.items[0].orderItemSeqId]?.canCancel" fill="clear" size="small" color="danger"
-                @click.stop="emit('cancel-single-item', group.items[0])">
-                {{ translate('Cancel') }}
-              </ion-button>
-            </template>
-          </OrderItemListRow>
+          <OrderItemListRow v-if="group.items.length === 1" v-bind="itemRow(group.items[0], productRowProps(group))" />
           <ion-accordion v-else :value="group.externalId">
             <OrderItemListRow
               slot="header"
               :selectable="!isTerminal"
-              :select-on-row-click="false"
               v-bind="productRowProps(group)"
               :selected="group.items.every(isSelected)"
               :quantity="group.totalQty"
@@ -45,20 +30,8 @@
                 <OrderItemListRow
                   v-for="item in group.items"
                   :key="item.orderItemSeqId"
-                  class="order-item-detail-entry"
                   v-bind="itemRow(item, itemIdentity(item))"
-                >
-                  <template #actions>
-                    <ion-button v-if="itemActions[item.orderItemSeqId]?.canTransfer" fill="clear" size="small"
-                      @click.stop="emit('request-inventory-transfer', item)">
-                      {{ translate('Request transfer') }}
-                    </ion-button>
-                    <ion-button v-if="itemActions[item.orderItemSeqId]?.canCancel" fill="clear" size="small" color="danger"
-                      @click.stop="emit('cancel-single-item', item)">
-                      {{ translate('Cancel') }}
-                    </ion-button>
-                  </template>
-                </OrderItemListRow>
+                />
               </ion-list>
             </div>
           </ion-accordion>
@@ -154,18 +127,15 @@ const props = defineProps<{
   order: EnrichedOrder;
   selectedItemIds: Set<string>;
   /** Per order item, what its row may offer — decided by the page's action validator. */
-  itemActions: Record<string, { canCancel: boolean; canTransfer: boolean; facilityDisabled: boolean }>;
+  itemActions: Record<string, { facilityDisabled: boolean }>;
   /** Returns carried over onto exchange credit/payment preferences, keyed by payment id. */
   paymentReturnIds: Record<string, string[]>;
 }>();
 
 const emit = defineEmits<{
   'update:selectedItemIds': [ids: Set<string>];
-  'add-item': [];
   'reject-and-release': [item: EnrichedOrderItem];
   'open-item-attributes': [item: EnrichedOrderItem];
-  'request-inventory-transfer': [item: EnrichedOrderItem];
-  'cancel-single-item': [item: EnrichedOrderItem];
 }>();
 
 const { getProduct, primaryIdentifier, secondaryIdentifier, featureLabel } = useProductIdentity();

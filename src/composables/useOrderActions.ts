@@ -2,7 +2,7 @@ import { computed, ref, type Ref } from 'vue';
 import { alertController, modalController } from '@ionic/vue';
 import { api, translate } from '@common';
 import { showToast } from '@/utils';
-import { OrderActionValidator, type ShipGroupActionId } from '@/utils/OrderActionValidator';
+import { OrderActionValidator, type FooterActionView, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import { inventoryTransferOpenQuantity, isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useCustomerStore } from '@/store/customer';
@@ -29,11 +29,13 @@ import RoutingGroupModal from '@/components/fulfillment/RoutingGroupModal.vue';
 export interface UseOrderActionsOptions {
   order: Ref<EnrichedOrder | null>;
   loadOrder: (orderId: string, force?: boolean) => Promise<void>;
-  /** Items checked on the Items tab; they drive "Cancel items". */
+  /** Items checked on the Items tab; they drive the footer's item actions. */
   selectedItemIds: Ref<Set<string>>;
   /** Items checked on each ship group card, keyed by ship group id. */
   selectedShipGroupItems: Ref<Record<string, string[]>>;
   selectedSegment: Ref<string>;
+  /** Whether the user may request inventory transfers; without it the footer never offers one. */
+  canRequestInventoryTransfer?: Ref<boolean>;
 }
 
 const FOOTER_TERMINAL_ITEM_STATUSES = ['ITEM_CANCELLED', 'ITEM_COMPLETED'];
@@ -57,7 +59,7 @@ interface SelectionAction<Input> {
  * and its click handler both ask the same question, so a button never offers what the handler
  * then refuses.
  */
-export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShipGroupItems, selectedSegment }: UseOrderActionsOptions) {
+export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShipGroupItems, selectedSegment, canRequestInventoryTransfer }: UseOrderActionsOptions) {
   const orderDetailStore = useOrderDetailStore();
   const orderTaskStore = useOrderTaskStore();
   const customerStore = useCustomerStore();
@@ -101,16 +103,6 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       return OrderActionValidator.validateShipGroupAction(order.value, shipGroup, 'RELEASE', [item], { isVirtual: true });
     }
     return OrderActionValidator.validateItemAction(order.value, item, 'REJECT_AND_RELEASE', itemActionContext(item));
-  }
-
-  /**
-   * Whether this row may offer Cancel. A non-terminal item is not enough: the validator also
-   * refuses once the ORDER is terminal, and when the seed transition table has no
-   * ITEM_CANCELLED edge from the item's current status.
-   */
-  function itemCancelValidation(item: EnrichedOrderItem) {
-    if (!order.value) return { allowed: false, reason: 'Order is not loaded.' };
-    return OrderActionValidator.validateItemAction(order.value, item, 'CANCEL_ITEM', itemActionContext(item));
   }
 
   /** What the transfer modal and the facility picker show for an item. */
@@ -181,6 +173,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     await modal.present();
     const { role } = await modal.onWillDismiss();
     if (role === 'confirm') await showToast(translate('Inventory transfer requested.'));
+    return role === 'confirm';
   }
 
   const allocateItem = (orderId: string, orderItemSeqId: string, facilityId: string) => api({
@@ -416,12 +409,6 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     }
   }
 
-  async function requestInventoryTransferForItem(item: EnrichedOrderItem) {
-    const shipGroup = shipGroupById(item.shipGroupSeqId);
-    if (!shipGroup || !isInventoryTransferRequestEligible(item)) return;
-    await openInventoryTransferRequestModal(shipGroup, [item]);
-  }
-
   function cancelItems(orderId: string, items: EnrichedOrderItem[]) {
     return orderTaskStore.cancelOrder(orderId, items.map((item) => ({
       orderItemSeqId: item.orderItemSeqId,
@@ -443,25 +430,6 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     await alert.present();
   }
 
-  async function cancelSingleItem(item: EnrichedOrderItem) {
-    if (!order.value) return;
-    // The row can have been rendered before a refresh moved the item or the order on, so the
-    // handler asks the validator again rather than trusting the button that called it.
-    const validation = itemCancelValidation(item);
-    if (!validation.allowed) return showUnavailableAction(validation);
-
-    const orderId = order.value.id;
-    await confirmAlert(translate('Cancel Item'), translate('Are you sure you want to cancel this item? This action cannot be undone.'), translate('Cancel item'), async () => {
-      try {
-        await cancelItems(orderId, [item]);
-        await showToast(translate('Item cancelled successfully.'));
-        await loadOrder(orderId, true);
-      } catch {
-        await showToast(translate('Failed to cancel the item. Please try again.'));
-      }
-    });
-  }
-
   async function openItemAttributesModal(item: EnrichedOrderItem) {
     const orderId = order.value!.id;
     const modal = await modalController.create({
@@ -473,7 +441,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     await loadOrder(orderId, true);
   }
 
-  /** Items tab "Add items": straight to the only ship group, or ask which one. */
+  /** Footer "Add items": straight to the only ship group, or ask which one. */
   async function openAddItemFromItemsSegment() {
     const shipGroups = order.value?.shipGroups || [];
     if (!shipGroups.length) return showToast(translate('No ship groups are available for this order.'));
@@ -501,7 +469,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     if (!order.value || !selectedItems.value.length) return;
     const orderId = order.value.id;
     const itemsSnapshot = [...selectedItems.value];
-    const message = translate('Are you sure you want to cancel the {count} selected item(s)? This action cannot be undone.').replace('{count}', String(itemsSnapshot.length));
+    const message = translate('Are you sure you want to cancel the {count} selected item(s)? This action cannot be undone.', { count: itemsSnapshot.length });
     await confirmAlert(translate('Cancel items'), message, translate('Cancel items'), async () => {
       try {
         await cancelItems(orderId, itemsSnapshot);
@@ -549,23 +517,67 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     await changeOrderStatus(orderId, action.toStatusId);
   }
 
-  /** The footer's valid-only action set: status transitions plus the cancel button. */
+  /** The selected items a transfer can be requested for: open, at a physical facility, with quantity left. */
+  const transferableSelectedItems = computed(() =>
+    canRequestInventoryTransfer?.value ? selectedItems.value.filter(isInventoryTransferRequestEligible) : []);
+
+  /**
+   * Footer "Request transfer". A request goes to one destination, so the selection is split by
+   * the facility each item ships from, one modal after another; cancelling one stops the rest.
+   */
+  async function requestTransferForSelectedItems() {
+    const itemsByFacility = new Map<string, { shipGroup: EnrichedShipGroup; items: EnrichedOrderItem[] }>();
+    transferableSelectedItems.value.forEach((item) => {
+      const shipGroup = shipGroupById(item.shipGroupSeqId);
+      if (!shipGroup) return;
+      const entry = itemsByFacility.get(shipGroup.facilityId) || { shipGroup, items: [] };
+      entry.items.push(item);
+      itemsByFacility.set(shipGroup.facilityId, entry);
+    });
+
+    let requested = false;
+    for (const { shipGroup, items } of itemsByFacility.values()) {
+      if (!(await openInventoryTransferRequestModal(shipGroup, items))) break;
+      requested = true;
+    }
+    if (requested) selectedItemIds.value.clear();
+  }
+
+  /**
+   * The footer's valid-only action set: status transitions and the cancel button from the
+   * validator, plus Add items while the order is open and Request transfer when the selection
+   * has items it applies to.
+   */
   const footerActions = computed(() => {
     if (!order.value) return [];
     const allowedTransitions = seed.allowedTransitions(order.value.statusId);
     const orderAllowedToStatusIds = new Set<string>(allowedTransitions.map((transition: any) => transition.toStatusId));
-    return OrderActionValidator.getOrderFooterActions(order.value, allowedTransitions, selectedItems.value, { orderAllowedToStatusIds });
+    const actions = OrderActionValidator.getOrderFooterActions(order.value, allowedTransitions, selectedItems.value, { orderAllowedToStatusIds });
+    const additions: FooterActionView[] = [];
+    if (order.value.shipGroups.length && !OrderActionValidator.isOrderTerminal(order.value)) {
+      additions.push({ id: 'ADD_ITEMS', kind: 'footer', label: 'Add items', fill: 'outline' });
+    }
+    if (transferableSelectedItems.value.length) {
+      additions.push({ id: 'REQUEST_TRANSFER', kind: 'footer', label: 'Request transfer', fill: 'outline' });
+    }
+    // Ahead of the cancel button, so the destructive action stays at the far end.
+    const firstEnd = actions.findIndex((action) => action.kind === 'footer');
+    actions.splice(firstEnd === -1 ? actions.length : firstEnd, 0, ...additions);
+    return actions;
   });
 
   function runFooterAction(action: any) {
-    // Dispatch by id (not kind) — the cancel button rides on the start as kind 'status' in both
-    // modes, but CANCEL_ITEMS has its own handler.
-    return action.id === 'CANCEL_ITEMS' ? cancelOrderItems() : runOrderStatusAction(action);
+    // Dispatch by id (not kind): the item actions have their own handlers, everything else is a status change.
+    if (action.id === 'CANCEL_ITEMS') return cancelOrderItems();
+    if (action.id === 'REQUEST_TRANSFER') return requestTransferForSelectedItems();
+    if (action.id === 'ADD_ITEMS') return openAddItemFromItemsSegment();
+    return runOrderStatusAction(action);
   }
 
-  /** The morphing cancel shows its live selection count; everything else is a static label. */
+  /** Item actions show how many selected items they apply to; everything else is a static label. */
   function footerActionLabel(action: any): string {
-    if (action.id === 'CANCEL_ITEMS') return translate('Cancel {count} items').replace('{count}', String(selectedItems.value.length));
+    if (action.id === 'CANCEL_ITEMS') return translate('Cancel {count} items', { count: selectedItems.value.length });
+    if (action.id === 'REQUEST_TRANSFER') return translate('Request transfer for {count} items', { count: transferableSelectedItems.value.length });
     return translate(action.label);
   }
 
@@ -700,8 +712,6 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     // gating
     isShipGroupActionDisabled,
     isItemFacilityActionDisabled: (item: EnrichedOrderItem) => !itemFacilityActionValidation(item).allowed,
-    isItemCancelAllowed: (item: EnrichedOrderItem) => itemCancelValidation(item).allowed,
-    isInventoryTransferRequestEligible,
     inventoryTransferItemsForShipGroup,
     // ship group
     brokerShipGroup,
@@ -720,10 +730,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     saveShippingAddress,
     // items
     rejectAndReleaseItem,
-    requestInventoryTransferForItem,
-    cancelSingleItem,
     openItemAttributesModal,
-    openAddItemFromItemsSegment,
     // footer
     footerActions,
     runFooterAction,

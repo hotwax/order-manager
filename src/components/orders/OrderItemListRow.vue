@@ -1,12 +1,8 @@
 <template>
   <div class="list-item order-item-list-row">
-    <ion-item
-      class="order-item-list-key"
-      lines="none"
-      :button="rowSelects"
-      :detail="false"
-      @click="rowSelects && emit('update:selected', !selected)"
-    >
+    <ion-item class="order-item-list-key" lines="none">
+      <!-- The checkbox is the only selection target. Its click and keys stay with it, since a
+           group header row sits in an accordion header that toggles on click. -->
       <ion-checkbox
         v-if="selectable"
         slot="start"
@@ -33,14 +29,11 @@
         <p v-if="features" class="order-item-features" :title="features">{{ features }}</p>
         <p v-if="secondary">{{ secondary }}</p>
       </ion-label>
-    </ion-item>
-
-    <ion-label class="tablet order-item-quantity">
-      <template v-if="showQuantity">
+      <ion-label v-if="showQuantity" slot="end" class="order-item-quantity">
         {{ quantity }}
         <p>{{ quantityLabel }}</p>
-      </template>
-    </ion-label>
+      </ion-label>
+    </ion-item>
 
     <div class="tablet order-item-details">
       <ion-chip
@@ -74,25 +67,26 @@
 
     <ion-label class="ion-text-end order-item-amount">
       {{ amount }}
-      <ion-note class="ion-display-block" v-for="adjustment in adjustments" :key="adjustment.label">
-        {{ adjustment.label }}: {{ adjustment.amount }}
+      <ion-note
+        v-for="adjustment in adjustments"
+        :key="adjustment.label"
+        class="order-item-adjustment"
+        :title="`${adjustment.label}: ${adjustment.amount}`"
+      >
+        <span class="order-item-adjustment-label">{{ adjustment.label }}:</span>
+        <span class="order-item-adjustment-amount">{{ adjustment.amount }}</span>
       </ion-note>
     </ion-label>
-
-    <div>
-      <slot name="actions" />
-    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
 import { IonBadge, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonNote, IonThumbnail } from '@ionic/vue';
 import { businessOutline, listOutline } from 'ionicons/icons';
 import { DxpShopifyImg, translate } from '@common';
 import type { ItemStatusBadge } from '@/utils/itemStatusBadges';
 
-const props = withDefaults(defineProps<{
+withDefaults(defineProps<{
   primary: string;
   secondary?: string;
   badgeLabel?: string;
@@ -102,7 +96,6 @@ const props = withDefaults(defineProps<{
   previewProduct?: any;
   selectable?: boolean;
   selected?: boolean;
-  selectOnRowClick?: boolean;
   quantity: string | number;
   quantityLabel: string;
   showQuantity?: boolean;
@@ -122,7 +115,6 @@ const props = withDefaults(defineProps<{
   previewProduct: undefined,
   selectable: true,
   selected: false,
-  selectOnRowClick: true,
   showQuantity: true,
   facilityLabel: '',
   facilityDisabled: false,
@@ -132,14 +124,6 @@ const props = withDefaults(defineProps<{
   statusDetail: '',
   adjustments: () => [],
 });
-
-/**
- * Ionic does not forward an `ion-item` tap to a control in its `slot="start"`,
- * so the row drives selection from its own click and the checkbox is only the
- * indicator. Rows whose click already belongs to something else — an
- * `ion-accordion` header toggles the group — opt out with `selectOnRowClick`.
- */
-const rowSelects = computed(() => props.selectable && props.selectOnRowClick);
 
 function statusBadgeLabel(status: ItemStatusBadge): string {
   return status.count == undefined ? status.label : `${status.count} ${status.label}`;
@@ -153,22 +137,33 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
+/* Every row has the same four columns: product (with the quantity in its end slot), details,
+   status and amount. Item actions live in the page footer and act on the selected rows.
+   The shared list-item grid sizes its last column to fit a row's call to action; these rows end
+   with the amount, whose adjustment lines would stretch that column, so the columns share the width. */
 .order-item-list-row {
-  --columns-desktop: 6;
-  --columns-tablet: 5;
+  --columns-desktop: 4;
+  --columns-tablet: 4;
+  grid-template-columns: repeat(var(--col-calc), minmax(0, 1fr));
   min-height: 6rem;
   border-block-start: var(--border-medium);
   padding-inline-end: var(--spacer-xs);
 }
 
-.order-item-list-row.order-item-rollup-entry {
-  --columns-desktop: 4;
-  --columns-tablet: 4;
+/* From tablet up the four columns are weighted by what they hold: the product takes the room the
+   narrow status badge leaves. The weights never depend on a row's content, so every row gets the
+   same columns and they line up. */
+@media (min-width: 700px) {
+  .order-item-list-row {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr) minmax(0, 1fr) minmax(0, 2fr);
+  }
 }
 
-.order-item-list-row.order-item-detail-entry {
-  --columns-desktop: 5;
-  --columns-tablet: 5;
+/* Only a group header expands when clicked, so every other row opts out of the shared list-item
+   hover: unsetting the hover variable keeps its resting background, and it gets no pointer. */
+.order-item-list-row:not([slot="header"]):hover {
+  --list-item-bg-hover: initial;
+  cursor: auto;
 }
 
 .order-item-list-key {
@@ -197,6 +192,27 @@ const emit = defineEmits<{
 
 .order-item-amount {
   min-width: 7rem;
+  /* One-line adjustments would otherwise widen the cell past its column. */
+  max-width: 100%;
+}
+
+/* Tax and discount names run long, so each line keeps to one line: the name is cut with an
+   ellipsis and the amount always shows. The full line is on hover. */
+.order-item-adjustment {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacer-2xs);
+}
+
+.order-item-adjustment-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.order-item-adjustment-amount {
+  flex: none;
 }
 
 /* A variant can carry many feature values — an e-gift card lists every denomination — and the
