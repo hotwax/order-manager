@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>Relationship History</ion-title>
+      <ion-title>{{ translate('Relationship History') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -23,7 +23,7 @@
               {{ entry.typeLabel }}
             </ion-chip>
             <ion-badge :color="entry.active ? 'primary' : 'medium'">
-              {{ entry.active ? 'Active' : 'Expired' }}
+              {{ entry.active ? translate('Active') : translate('Expired') }}
             </ion-badge>
           </div>
           <h3>{{ entry.partyName }}</h3>
@@ -31,14 +31,14 @@
           <p class="date-range">
             {{ formatDate(entry.fromDate) }}
             <span v-if="entry.thruDate"> → {{ formatDate(entry.thruDate) }}</span>
-            <span v-else> → Active</span>
+            <span v-else> → {{ translate('Active') }}</span>
           </p>
         </ion-label>
       </ion-item>
     </ion-list>
 
     <div v-else class="ion-padding ion-text-center">
-      <p>No relationship history for this customer.</p>
+      <p>{{ translate('No relationship history for this customer.') }}</p>
     </div>
   </ion-content>
 </template>
