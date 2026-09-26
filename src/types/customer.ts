@@ -84,6 +84,8 @@ export interface CustomerOrderSummary {
   unitCount: number;
   progressLabel: string;
   progressValue: number;
+  /** Set once the fulfillment progress has been computed from item statuses; the view words it. */
+  progressPercent?: number;
   progressColor?: string;
   isUnfillable: boolean;
   items: Array<{

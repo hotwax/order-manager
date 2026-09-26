@@ -2,11 +2,11 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')">
+        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ isEditMode ? 'Edit' : 'Add' }} {{ sectionLabel }}</ion-title>
+      <ion-title>{{ translate(isEditMode ? 'Edit {section}' : 'Add {section}', { section: sectionLabel }) }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -16,7 +16,7 @@
       <template v-if="contactMechTypeId === 'EMAIL_ADDRESS'">
         <ion-item>
           <ion-input
-            label="Email address"
+            :label="translate('Email address')"
             label-placement="stacked"
             type="email"
             placeholder="name@example.com"
@@ -30,7 +30,7 @@
       <template v-else-if="contactMechTypeId === 'TELECOM_NUMBER'">
         <ion-item>
           <ion-input
-            label="Country code"
+            :label="translate('Country code')"
             label-placement="stacked"
             type="tel"
             placeholder="1"
@@ -40,7 +40,7 @@
         </ion-item>
         <ion-item>
           <ion-input
-            label="Area code"
+            :label="translate('Area code')"
             label-placement="stacked"
             type="tel"
             placeholder="415"
@@ -50,7 +50,7 @@
         </ion-item>
         <ion-item>
           <ion-input
-            label="Phone number"
+            :label="translate('Phone number')"
             label-placement="stacked"
             type="tel"
             placeholder="5550100"
@@ -64,7 +64,7 @@
       <template v-else-if="contactMechTypeId === 'POSTAL_ADDRESS'">
         <ion-item>
           <ion-input
-            label="Address line 1"
+            :label="translate('Address line 1')"
             label-placement="stacked"
             placeholder="123 Main St"
             v-model="form.address1"
@@ -72,15 +72,15 @@
         </ion-item>
         <ion-item>
           <ion-input
-            label="Address line 2"
+            :label="translate('Address line 2')"
             label-placement="stacked"
-            placeholder="Apt, suite, unit…"
+            :placeholder="translate('Apt, suite, unit…')"
             v-model="form.address2"
           />
         </ion-item>
         <ion-item>
           <ion-input
-            label="City"
+            :label="translate('City')"
             label-placement="stacked"
             placeholder="New York"
             v-model="form.city"
@@ -88,10 +88,10 @@
         </ion-item>
         <ion-item>
           <ion-select
-            label="Country"
+            :label="translate('Country')"
             label-placement="stacked"
             interface="popover"
-            placeholder="Select country"
+            :placeholder="translate('Select country')"
             v-model="form.countryGeoId"
             @ion-change="onCountryChange"
           >
@@ -107,19 +107,19 @@
         <ion-item>
           <template v-if="!form.countryGeoId">
             <ion-select
-              label="State / Province"
+              :label="translate('State / Province')"
               label-placement="stacked"
               interface="popover"
-              placeholder="Select country first"
+              :placeholder="translate('Select country first')"
               disabled
             />
           </template>
           <template v-else-if="stateOptions.length">
             <ion-select
-              label="State / Province"
+              :label="translate('State / Province')"
               label-placement="stacked"
               interface="popover"
-              placeholder="Select state"
+              :placeholder="translate('Select state')"
               v-model="form.stateProvinceGeoId"
             >
               <ion-select-option
@@ -133,16 +133,16 @@
           </template>
           <template v-else-if="isLoadingStates">
             <ion-select
-              label="State / Province"
+              :label="translate('State / Province')"
               label-placement="stacked"
               interface="popover"
-              placeholder="Loading states"
+              :placeholder="translate('Loading states')"
               disabled
             />
           </template>
           <template v-else>
             <ion-input
-              label="State / Province"
+              :label="translate('State / Province')"
               label-placement="stacked"
               placeholder="e.g. NY"
               v-model="form.stateProvinceGeoId"
@@ -151,7 +151,7 @@
         </ion-item>
         <ion-item>
           <ion-input
-            label="Postal code"
+            :label="translate('Postal code')"
             label-placement="stacked"
             placeholder="10001"
             v-model="form.postalCode"
@@ -208,10 +208,10 @@ const seed = useSeedStore();
 const isEditMode = computed(() => !!props.existingContact);
 
 const sectionLabel = computed(() => {
-  if (props.contactMechTypeId === 'EMAIL_ADDRESS') return 'Email';
-  if (props.contactMechTypeId === 'TELECOM_NUMBER') return 'Phone';
-  if (props.contactMechTypeId === 'POSTAL_ADDRESS') return 'Address';
-  return 'Contact';
+  if (props.contactMechTypeId === 'EMAIL_ADDRESS') return translate('Email');
+  if (props.contactMechTypeId === 'TELECOM_NUMBER') return translate('Phone');
+  if (props.contactMechTypeId === 'POSTAL_ADDRESS') return translate('Address');
+  return translate('Contact');
 });
 
 const purposeTypeId = computed(() => {

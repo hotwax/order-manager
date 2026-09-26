@@ -61,6 +61,7 @@
           color="medium"
           @click.stop="openSuggestedProductActionsPopover($event, orderedSwapActionItem(item), task)"
           :aria-label="translate('Options')"
+          :title="translate('Options')"
         >
           <ion-icon slot="icon-only" :icon="chevronForwardOutline" />
         </ion-button>
@@ -89,20 +90,20 @@
 
         <template v-if="suggested._cancel">
           <ion-badge slot="end" color="danger">{{ translate('Cancel') }}</ion-badge>
-          <ion-button slot="end" fill="clear" color="medium" @click="revertCancel(task, suggested)" :aria-label="translate('Undo')">
+          <ion-button slot="end" fill="clear" color="medium" @click="revertCancel(task, suggested)" :aria-label="translate('Undo')" :title="translate('Undo')">
             <ion-icon slot="icon-only" :icon="arrowUndoOutline" />
           </ion-button>
         </template>
         <template v-else-if="suggested._isSubstitute">
           <ion-badge slot="end" color="success">{{ availableBadgeLabel(suggested, task) }}</ion-badge>
-          <ion-button slot="end" fill="clear" color="danger" @click="removeSuggestedSubstitute(task, suggested)" :aria-label="translate('Close')">
+          <ion-button slot="end" fill="clear" color="danger" @click="removeSuggestedSubstitute(task, suggested)" :aria-label="translate('Close')" :title="translate('Close')">
             <ion-icon slot="icon-only" :icon="closeCircleOutline" />
           </ion-button>
         </template>
         <ion-badge v-else-if="!suggested._noReplacement" slot="end" color="success">{{ availableBadgeLabel(suggested, task) }}</ion-badge>
         <ion-badge v-else slot="end" color="danger">{{ translate('Cancel') }}</ion-badge>
 
-        <ion-button slot="end" fill="clear" color="medium" @click="openSuggestedProductActionsPopover($event, suggested, task)" :aria-label="translate('Options')">
+        <ion-button slot="end" fill="clear" color="medium" @click="openSuggestedProductActionsPopover($event, suggested, task)" :aria-label="translate('Options')" :title="translate('Options')">
           <ion-icon slot="icon-only" :icon="ellipsisVerticalOutline" />
         </ion-button>
       </ion-item>

@@ -6,9 +6,9 @@
           <ion-back-button default-href="/customers" />
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>Customer Detail</ion-title>
+        <ion-title>{{ translate('Customer Detail') }}</ion-title>
         <ion-buttons slot="end">
-          <ion-button @click="onDeleteCustomer" :disabled="deleting || customer?.statusId === 'PARTY_DISABLED'" :aria-label="translate('Delete customer')">
+          <ion-button @click="onDeleteCustomer" :disabled="deleting || customer?.statusId === 'PARTY_DISABLED'" :aria-label="translate('Delete customer')" :title="translate('Delete customer')">
             <ion-spinner v-if="deleting" name="crescent" slot="icon-only" />
             <ion-icon v-else slot="icon-only" :icon="trashOutline" />
           </ion-button>
@@ -26,10 +26,10 @@
             <ion-item lines="none">
               <ion-label>
                 <h1>{{ customer.name || 'First Last' }}</h1>
-                <p v-if="customerSince">Customer since {{ customerSince }}</p>
+                <p v-if="customerSince">{{ translate('Customer since {date}', { date: customerSince }) }}</p>
               </ion-label>
               <div slot="end" class="lifetime-value ion-text-right">
-                <p class="overline">Lifetime value</p>
+                <p class="overline">{{ translate('Lifetime value') }}</p>
                 <h2>{{ lifetimeValue }}</h2>
               </div>
             </ion-item>
@@ -44,7 +44,7 @@
               <ion-list lines="full">
                 <template v-for="section in contactSections" :key="section.key">
                   <ion-item class="contact-section" lines="none">
-                    <ion-label color="medium">{{ section.label }}</ion-label>
+                    <ion-label color="medium">{{ translate(section.label) }}</ion-label>
                     <ion-button v-if="!section.values.length" slot="end" fill="clear" size="small" @click="onAddContact(section.contactMechTypeId)">
                       {{ translate('Add') }}
                       <ion-icon slot="end" :icon="addCircleOutline" />
@@ -102,7 +102,7 @@
                   <template v-for="duplicate in duplicateRelationships" :key="duplicate.key">
                     <ion-item v-if="duplicate.active">
                       <ion-label>
-                        <p class="overline">{{ duplicate.isCanonical ? 'Duplicate' : 'Canonical' }}</p>
+                        <p class="overline">{{ duplicate.isCanonical ? translate('Duplicate') : translate('Canonical') }}</p>
                         <h3>{{ duplicate.isCanonical ? duplicate.duplicatePartyName : duplicate.canonicalPartyName }}</h3>
                         <p>{{ duplicate.isCanonical ? duplicate.duplicatePartyId : duplicate.canonicalPartyId }}</p>
                       </ion-label>
@@ -114,12 +114,12 @@
                   <!-- Unmerged candidates with the same Shopify ID -->
                   <ion-item v-for="candidate in mergableDuplicates" :key="candidate.partyId">
                     <ion-label>
-                      <p class="overline">Duplicate candidate</p>
+                      <p class="overline">{{ translate('Duplicate candidate') }}</p>
                       <h3>{{ candidate.name }}</h3>
                       <p>{{ candidate.partyId }}</p>
                     </ion-label>
-                    <ion-button slot="end" fill="clear" size="small" :router-link="`/customers/${candidate.partyId}`" :aria-label="translate('Open customer profile')">
-                      <ion-icon slot="icon-only" :icon="openOutline" />
+                    <ion-button slot="end" fill="clear" size="small" :router-link="`/customers/${candidate.partyId}`">
+                      {{ translate('View customer') }}
                     </ion-button>
                     <ion-button slot="end" fill="solid" size="small" color="primary" :disabled="mergingIds.includes(candidate.partyId)" @click="onMergeCandidate(candidate.partyId)" :aria-label="translate('Merge customer')">
                       <ion-spinner v-if="mergingIds.includes(candidate.partyId)" name="crescent" slot="icon-only" />
@@ -142,16 +142,16 @@
         <div class="customer-detail-timeline">
           <ion-list>
             <ion-list-header class="timeline-header">
-              <ion-label>Timeline</ion-label>
+              <ion-label>{{ translate('Timeline') }}</ion-label>
               <ion-note>{{ createdAtLabel }}</ion-note>
             </ion-list-header>
             <ion-item v-for="event in timeline" :key="event.id" lines="full">
               <ion-icon slot="start" :icon="pricetagOutline" color="medium" />
-              <ion-label>{{ event.label }}</ion-label>
+              <ion-label>{{ timelineLabel(event) }}</ion-label>
             </ion-item>
             <ion-item v-if="!timeline.length" lines="full">
               <ion-icon slot="start" :icon="pricetagOutline" color="medium" />
-              <ion-label>Created by {{ customer.createdByUserLogin }}</ion-label>
+              <ion-label>{{ translate('Created by {user}', { user: customer.createdByUserLogin }) }}</ion-label>
               <ion-icon slot="end" :icon="informationCircleOutline" color="medium" />
             </ion-item>
           </ion-list>
@@ -161,22 +161,22 @@
       <!-- ===== Segment ===== -->
       <ion-segment v-model="selectedSegment" scrollable>
         <ion-segment-button value="dashboard">
-          <ion-label>Dashboard</ion-label>
+          <ion-label>{{ translate('Dashboard') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="tasks">
-          <ion-label>Tasks</ion-label>
+          <ion-label>{{ translate('Tasks') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="unfillable">
-          <ion-label>Unfillable</ion-label>
+          <ion-label>{{ translate('Unfillable') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="orders">
-          <ion-label>Orders</ion-label>
+          <ion-label>{{ translate('Orders') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button v-if="canViewReturns" value="returns">
-          <ion-label>Returns</ion-label>
+          <ion-label>{{ translate('Returns') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="comms">
-          <ion-label>Comms</ion-label>
+          <ion-label>{{ translate('Comms') }}</ion-label>
         </ion-segment-button>
       </ion-segment>
 
@@ -216,41 +216,41 @@
         </div>
         <EmptyState
           v-else-if="ordersStatus === 'loaded'"
-          title="No recent orders"
-          message="This customer has no orders on file."
+          :title="translate('No recent orders')"
+          :message="translate('This customer has no orders on file.')"
         />
       </div>
 
       <!-- ===== Orders segment ===== -->
       <div v-else-if="selectedSegment === 'orders'">
         <div class="section-header">
-          <h2>All orders</h2>
+          <h2>{{ translate('All orders') }}</h2>
         </div>
         <div class="ion-padding-horizontal">
-          <ion-searchbar placeholder="Search" :value="allOrdersQuery" @ion-input="allOrdersQuery = ($event.target as any).value ?? ''" />
+          <ion-searchbar :placeholder="translate('Search')" :value="allOrdersQuery" @ion-input="allOrdersQuery = ($event.target as any).value ?? ''" />
         </div>
         <div v-if="allOrders.length" class="recent-orders-grid">
           <CustomerOrderCard v-for="order in allOrders" :key="order.id" :order="order" />
         </div>
         <EmptyState
           v-else-if="ordersStatus === 'loaded'"
-          title="No orders"
-          message="This customer has no orders on file."
+          :title="translate('No orders')"
+          :message="translate('This customer has no orders on file.')"
         />
       </div>
 
       <!-- ===== Unfillable segment ===== -->
       <div v-else-if="selectedSegment === 'unfillable'">
         <div class="section-header">
-          <h2>Unfillable orders</h2>
+          <h2>{{ translate('Unfillable orders') }}</h2>
         </div>
         <div v-if="unfillableOrders.length" class="recent-orders-grid">
           <CustomerOrderCard v-for="order in unfillableOrders" :key="order.id" :order="order" />
         </div>
         <EmptyState
           v-else-if="ordersStatus === 'loaded'"
-          title="No unfillable orders"
-          message="No orders are currently parked at the unfillable facility."
+          :title="translate('No unfillable orders')"
+          :message="translate('No orders are currently parked at the unfillable facility.')"
         />
       </div>
 
@@ -309,13 +309,13 @@
         </ion-list>
         <ErrorState
           v-else-if="returnsStatus === 'error'"
-          title="Returns failed to load"
+          :title="translate('Returns failed to load')"
           :message="returnsError"
         />
         <EmptyState
           v-else-if="returnsStatus === 'loaded'"
-          title="No returns"
-          message="This customer has no returns on file."
+          :title="translate('No returns')"
+          :message="translate('This customer has no returns on file.')"
         />
         <div v-else class="ion-padding ion-text-center">
           <ion-spinner name="crescent" />
@@ -325,13 +325,13 @@
       <!-- ===== Comms segment ===== -->
       <div v-else-if="selectedSegment === 'comms'">
         <div class="section-header">
-          <h2>Communications</h2>
+          <h2>{{ translate('Communications') }}</h2>
         </div>
         <div v-if="customerCommunications.length" class="recent-orders-grid">
           <ion-card v-for="comm in customerCommunications" :key="comm.communicationEventId">
             <ion-item lines="full">
               <ion-label>
-                <h2>{{ comm.subject || '(No subject)' }}</h2>
+                <h2>{{ comm.subject || translate('(No subject)') }}</h2>
                 <p>{{ seedDescribe(comm.communicationEventTypeId) || comm.communicationEventTypeId }}</p>
               </ion-label>
               <ion-chip slot="end" :color="commStatusColor(comm.statusId)" outline>
@@ -341,29 +341,29 @@
 
             <ion-item lines="full">
               <ion-label>
-                <p class="overline">Date</p>
+                <p class="overline">{{ translate('Date') }}</p>
                 {{ formatLongDate(comm.datetimeStarted || comm.entryDate) }}
               </ion-label>
               <ion-label slot="end" v-if="comm.datetimeEnded">
-                <p class="overline">Ended</p>
+                <p class="overline">{{ translate('Ended') }}</p>
                 {{ formatLongDate(comm.datetimeEnded) }}
               </ion-label>
             </ion-item>
 
             <ion-item lines="full">
               <ion-label>
-                <p class="overline">From</p>
+                <p class="overline">{{ translate('From') }}</p>
                 {{ comm.partyIdFrom || '—' }}
               </ion-label>
               <ion-label slot="end">
-                <p class="overline">To</p>
+                <p class="overline">{{ translate('To') }}</p>
                 {{ comm.partyIdTo || '—' }}
               </ion-label>
             </ion-item>
 
             <ion-item v-if="comm.content || comm.note" lines="none">
               <ion-label class="ion-text-wrap">
-                <p class="overline">Message</p>
+                <p class="overline">{{ translate('Message') }}</p>
                 <p>{{ comm.content || comm.note }}</p>
               </ion-label>
             </ion-item>
@@ -371,12 +371,12 @@
         </div>
         <EmptyState
           v-else-if="commsStatus === 'loaded'"
-          title="No communications"
-          message="No communication events found for this customer."
+          :title="translate('No communications')"
+          :message="translate('No communication events found for this customer.')"
         />
         <ErrorState
           v-else-if="commsStatus === 'error'"
-          title="Communications failed to load"
+          :title="translate('Communications failed to load')"
           :message="commsError"
         />
         <div v-else class="ion-padding ion-text-center">
@@ -409,35 +409,27 @@
           </ion-button>
         </div>
       </div>
-
-      <!-- ===== Other segments (placeholder) ===== -->
-      <div v-else class="segment-placeholder">
-        <EmptyState
-          :title="`${segmentLabel} coming soon`"
-          :message="`The ${segmentLabel.toLowerCase()} view for this customer isn't wired up yet.`"
-        />
-      </div>
     </ion-content>
 
     <ion-content v-else-if="loading">
       <ion-list>
         <ion-item lines="none">
-          <ion-label>Loading customer...</ion-label>
+          <ion-label>{{ translate('Loading customer...') }}</ion-label>
         </ion-item>
       </ion-list>
     </ion-content>
 
     <ion-content v-else-if="error">
       <ErrorState
-        title="Customer failed to load"
+        :title="translate('Customer failed to load')"
         :message="error"
       />
     </ion-content>
 
     <ion-content v-else>
       <EmptyState
-        title="Customer not found"
-        message="The selected customer is not available in this workspace."
+        :title="translate('Customer not found')"
+        :message="translate('The selected customer is not available in this workspace.')"
       />
     </ion-content>
 </ion-page>
@@ -476,7 +468,6 @@ import {
 import {
   addCircleOutline,
   informationCircleOutline,
-  openOutline,
   pencilOutline,
   pricetagOutline,
   trashOutline
@@ -561,12 +552,18 @@ const customerSince = computed(() => formatMonthYear(customerSinceRaw.value));
 const createdAtLabel = computed(() => (timeline.value[0]?.at ? formatTimestamp(timeline.value[0].at) : ''));
 const lifetimeValue = computed(() => money(lifetimeValueRaw.value, lifetimeCurrency.value));
 
+/** The store's timeline rows carry English labels; the created row is re-worded here so it can be translated. */
+const timelineLabel = (event: { type: string; label: string }) =>
+  event.type === 'created' ? translate('Created by {user}', { user: customer.value?.createdByUserLogin }) : event.label;
+
 function mapOrder(order: CustomerOrderSummary): CustomerOrderCardData {
   return {
     id: order.orderId,
     name: order.orderName || order.orderId,
-    subtitle: `${order.itemCount} ${order.itemCount === 1 ? 'item' : 'items'} · ${order.unitCount} ${order.unitCount === 1 ? 'unit' : 'units'}`,
-    progressLabel: order.progressLabel || order.statusDesc || 'In progress',
+    subtitle: `${order.itemCount} ${order.itemCount === 1 ? translate('item') : translate('items')}, ${order.unitCount} ${order.unitCount === 1 ? translate('unit') : translate('units')}`,
+    progressLabel: order.progressPercent != null
+      ? translate('{percent}% complete', { percent: order.progressPercent })
+      : order.progressLabel || order.statusDesc || translate('In progress'),
     progressValue: order.progressValue ?? 0.5,
     progressColor: order.progressColor || 'primary',
     orderDate: formatLongDate(order.orderDate),
@@ -652,25 +649,14 @@ function nameParts(name: string): { firstName: string; lastName: string } {
   };
 }
 
-const segmentLabel = computed(() => {
-  const labels: Record<string, string> = {
-    tasks: 'Tasks',
-    unfillable: 'Unfillable',
-    orders: 'Orders',
-    returns: 'Returns',
-    comms: 'Comms'
-  };
-  return labels[selectedSegment.value] || 'Dashboard';
-});
-
 async function onDeleteCustomer() {
   const alert = await alertController.create({
-    header: 'Anonymize customer data',
-    message: `This will permanently anonymize all PII for ${customer.value?.name || 'this customer'}. This cannot be undone.`,
+    header: translate('Anonymize customer data'),
+    message: translate('This will permanently anonymize all PII for {name}. This cannot be undone.', { name: customer.value?.name || translate('this customer') }),
     buttons: [
-      { text: 'Cancel', role: 'cancel' },
+      { text: translate('Cancel'), role: 'cancel' },
       {
-        text: 'Anonymize',
+        text: translate('Anonymize'),
         role: 'confirm',
         handler: () => {
           void (async () => {
@@ -678,10 +664,10 @@ async function onDeleteCustomer() {
             try {
               await deleteCustomerDetails(props.customerId);
               await indexCustomer(props.customerId);
-              await commonUtil.showToast('Customer data has been anonymized.');
+              await commonUtil.showToast(translate('Customer data has been anonymized.'));
               router.replace('/customers');
             } catch {
-              await commonUtil.showToast('Failed to anonymize customer data. Please try again.');
+              await commonUtil.showToast(translate('Failed to anonymize customer data. Please try again.'));
             } finally {
               deleting.value = false;
             }
@@ -717,9 +703,9 @@ async function onMergeCandidate(candidatePartyId: string) {
   mergingIds.value = [...mergingIds.value, candidatePartyId];
   try {
     await mergeContact(candidatePartyId);
-    await commonUtil.showToast('Contact merged successfully.');
+    await commonUtil.showToast(translate('Contact merged successfully.'));
   } catch {
-    await commonUtil.showToast('Failed to merge contact. Please try again.');
+    await commonUtil.showToast(translate('Failed to merge contact. Please try again.'));
   } finally {
     mergingIds.value = mergingIds.value.filter((id) => id !== candidatePartyId);
   }
@@ -989,10 +975,6 @@ ion-card-header ion-card-title {
 
 .return-result-row > ion-label {
   width: 100%;
-}
-
-.segment-placeholder {
-  padding: 8px;
 }
 
 @media (min-width: 992px) {

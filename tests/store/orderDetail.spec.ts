@@ -10,11 +10,14 @@ const orderDetailApi = vi.hoisted(() => ({
 vi.mock('@common', () => ({
   api: vi.fn(),
   commonUtil: {
-    hasError: () => false
+    hasError: () => false,
+    getStatusColor: () => 'medium',
+    parseDateTimeValue: (value: any) => ({ toMillis: () => Number(value) })
   },
   cookieHelper: () => ({
     get: () => ''
   }),
+  translate: (key: string) => key,
   logger: {
     debug: vi.fn(),
     error: vi.fn(),
@@ -46,7 +49,6 @@ describe('order detail store', () => {
 
   it('groups item-scoped tax adjustments by comment in order totals', () => {
     const store = useOrderDetailStore();
-    store.currentOrderId = 'M100821';
     store.byOrderId.M100821 = {
       payload: {
         orderId: 'M100821',
@@ -75,7 +77,7 @@ describe('order detail store', () => {
       error: ''
     };
 
-    expect(store.totals).toEqual({
+    expect(store.orderTotalsByOrderId('M100821')).toEqual({
       subtotal: 59,
       adjustments: {
         'Salt Lake County Tax': 1.53,
@@ -85,7 +87,7 @@ describe('order detail store', () => {
       total: 63.98,
       includedAdjustments: {}
     });
-    expect(store.adjustmentsByExternalId['15617773142165']).toEqual([
+    expect(store.adjustmentsByExternalIdByOrderId('M100821')['15617773142165']).toEqual([
       { label: 'Salt Lake County Tax', amount: 1.53, isIncluded: false },
       { label: 'Salt Lake City City Tax', amount: 0.59, isIncluded: false },
       { label: 'Utah State Tax', amount: 2.86, isIncluded: false }
@@ -94,7 +96,6 @@ describe('order detail store', () => {
 
   it('falls back to adjustment type labels and sums repeated comments', () => {
     const store = useOrderDetailStore();
-    store.currentOrderId = 'M100822';
     store.byOrderId.M100822 = {
       payload: {
         orderId: 'M100822',
@@ -115,7 +116,7 @@ describe('order detail store', () => {
       error: ''
     };
 
-    expect(store.totals).toEqual({
+    expect(store.orderTotalsByOrderId('M100822')).toEqual({
       subtotal: 69,
       adjustments: {
         'Utah State Tax': 3,
@@ -128,7 +129,6 @@ describe('order detail store', () => {
 
   it('tracks included tax adjustments without adding them to order total', () => {
     const store = useOrderDetailStore();
-    store.currentOrderId = 'M100823';
     store.byOrderId.M100823 = {
       payload: {
         orderId: 'M100823',
@@ -166,7 +166,7 @@ describe('order detail store', () => {
       error: ''
     };
 
-    expect(store.totals).toEqual({
+    expect(store.orderTotalsByOrderId('M100823')).toEqual({
       subtotal: 59,
       adjustments: {},
       total: 59,
@@ -174,14 +174,13 @@ describe('order detail store', () => {
         'State Tax': 4.5
       }
     });
-    expect(store.adjustmentsByExternalId['15617773142165']).toEqual([
+    expect(store.adjustmentsByExternalIdByOrderId('M100823')['15617773142165']).toEqual([
       { label: 'State Tax', amount: 4.5, isIncluded: true }
     ]);
   });
 
   it('keeps an included and an ordinary adjustment sharing a label in separate rows', () => {
     const store = useOrderDetailStore();
-    store.currentOrderId = 'M100824';
     store.byOrderId.M100824 = {
       payload: {
         orderId: 'M100824',
@@ -225,17 +224,17 @@ describe('order detail store', () => {
 
     // The ordinary $3 must stay out of the included bucket: it genuinely adds to the
     // grand total, so labelling it "included" would misstate what the customer paid.
-    expect(store.totals).toEqual({
+    expect(store.orderTotalsByOrderId('M100824')).toEqual({
       subtotal: 118,
       adjustments: { 'State Tax': 3 },
       total: 121,
       includedAdjustments: { 'State Tax': 4.5 }
     });
 
-    expect(store.adjustmentsByExternalId.EXT_INCLUDED).toEqual([
+    expect(store.adjustmentsByExternalIdByOrderId('M100824').EXT_INCLUDED).toEqual([
       { label: 'State Tax', amount: 4.5, isIncluded: true }
     ]);
-    expect(store.adjustmentsByExternalId.EXT_ORDINARY).toEqual([
+    expect(store.adjustmentsByExternalIdByOrderId('M100824').EXT_ORDINARY).toEqual([
       { label: 'State Tax', amount: 3, isIncluded: false }
     ]);
   });
@@ -328,6 +327,42 @@ describe('order detail store', () => {
       ]
     });
   });
+
+  it('builds the enriched order from the store getters it already has', () => {
+    const store = useOrderDetailStore();
+    store.byOrderId.M100821 = {
+      payload: {
+        orderId: 'M100821',
+        orderName: 'Order #100821',
+        statusId: 'ORDER_APPROVED',
+        currencyUom: 'USD',
+        grandTotal: 63.98,
+        adjustments: [taxAdjustment('M100510', '01', 'Utah State Tax', 2.86)],
+        statuses: [
+          { orderStatusId: 'S1', orderItemSeqId: '01', statusId: 'ITEM_CANCELLED', statusDatetime: 1_700_000_000_000, statusUserLogin: 'amy' }
+        ],
+        shipGroups: [{
+          shipGroupSeqId: '00001',
+          facilityId: 'BROADWAY',
+          items: [{ orderItemSeqId: '01', productId: 'P1001', externalId: '15617773142165', unitPrice: 59, quantity: 1, statusId: 'ITEM_APPROVED' }]
+        }]
+      },
+      status: 'loaded',
+      loadedAt: '',
+      error: ''
+    };
+    store.fulfillmentTimelineByOrderId.M100821 = [{ shipGroupSeqId: '00001', picklistDate: 1_700_000_100_000 }];
+
+    const enriched = store.enrichedOrderByOrderId('M100821')!;
+    // Totals come from orderTotalsByOrderId, so the page and the store agree on the numbers.
+    expect(enriched.totals).toEqual(expect.objectContaining({ subtotal: 59, total: 61.86 }));
+    expect(enriched.totals.adjustmentRows).toEqual([{ label: 'Utah State Tax', detail: '', amount: 2.86, isIncluded: false }]);
+    // Item status rows reach the header timeline through itemStatusEventsByOrderId.
+    expect(enriched.timeline.map((event) => event.label)).toContain('ITEM_CANCELLED');
+    // The ship group reads its lifecycle from timelineByShipGroupByOrderId.
+    expect(enriched.shipGroups[0].lifecycle.picklistDate).toBe(1_700_000_100_000);
+    expect(store.enrichedOrderByOrderId('unknown')).toBeNull();
+  });
 });
 
 function taxAdjustment(orderAdjustmentId: string, orderItemSeqId: string, comments: string, amount: number) {
@@ -340,3 +375,37 @@ function taxAdjustment(orderAdjustmentId: string, orderItemSeqId: string, commen
     amount
   };
 }
+
+describe('order detail read getters', () => {
+  beforeEach(() => setActivePinia(createPinia()));
+
+  it('counts an order as pending until it has an answer, including before the fetch starts', () => {
+    const store = useOrderDetailStore();
+    const entry = (status: string) => ({ payload: null, status, loadedAt: '', error: '' }) as any;
+    store.byOrderId.IDLE = entry('idle');
+    store.byOrderId.LOADING = entry('loading');
+    store.byOrderId.LOADED = entry('loaded');
+    store.byOrderId.FAILED = entry('error');
+    store.byOrderId.MISSING = entry('notfound');
+
+    expect(store.pendingById('NEVER_REQUESTED')).toBe(true);
+    expect(store.pendingById('IDLE')).toBe(true);
+    expect(store.pendingById('LOADING')).toBe(true);
+    expect(store.pendingById('LOADED')).toBe(false);
+    expect(store.pendingById('FAILED')).toBe(false);
+    expect(store.pendingById('MISSING')).toBe(false);
+    // loadingById stays the narrower "a request is in flight".
+    expect(store.loadingById('NEVER_REQUESTED')).toBe(false);
+  });
+
+  it('returns an empty list, not undefined, for comm events and risks not loaded yet', () => {
+    const store = useOrderDetailStore();
+    expect(store.commEventsForOrder('O1')).toEqual([]);
+    expect(store.riskAssessmentsForOrder('O1')).toEqual([]);
+
+    store.commEventsByOrderId.O1 = [{ communicationEventId: 'CE1' }];
+    store.riskAssessmentsByOrderId.O1 = [{ riskAssessmentId: 'R1' }];
+    expect(store.commEventsForOrder('O1')).toEqual([{ communicationEventId: 'CE1' }]);
+    expect(store.riskAssessmentsForOrder('O1')).toEqual([{ riskAssessmentId: 'R1' }]);
+  });
+});

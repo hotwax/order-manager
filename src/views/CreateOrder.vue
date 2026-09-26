@@ -245,7 +245,7 @@
                   :error-text="translate('Quantity must be greater than 0')"
                 />
               </ion-item>
-              <ion-button color="danger" fill="clear" @click="removeLineItem(index)" :aria-label="translate('Remove item')">
+              <ion-button color="danger" fill="clear" @click="removeLineItem(index)" :aria-label="translate('Remove item')" :title="translate('Remove item')">
                 <ion-icon slot="icon-only" :icon="trashOutline"/>
               </ion-button>
             </div>

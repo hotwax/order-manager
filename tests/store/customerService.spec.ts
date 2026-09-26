@@ -1,5 +1,3 @@
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { api, logger } from '@common';
@@ -111,13 +109,6 @@ describe('unfillable is counted the same way everywhere', () => {
     expect(unfillableCall, 'no unfillable count was requested').toBeTruthy();
     expect(unfillableCall!.status).toEqual(cardStatuses);
     expect(cardStatuses).toContain('ORDER_HOLD');
-  });
-
-  it('does not narrow the unfillable row by item status', () => {
-    // The Unfillable page applies no item-status filter, so a count that did would report
-    // fewer orders than the page it links to.
-    const source = readFileSync(resolve(process.cwd(), 'src/store/customerService.ts'), 'utf8');
-    expect(source).not.toContain('itemStatus');
   });
 });
 

@@ -27,11 +27,13 @@
       </ion-label>
     </ion-item>
 
-    <ion-popover :trigger="triggerId" trigger-action="click" :show-backdrop="false">
+    <ion-popover :trigger="triggerId" trigger-action="click" :show-backdrop="false" @willPresent="refreshToday">
       <ion-datetime
         presentation="date"
         :show-default-buttons="true"
         :value="modelValue || undefined"
+        :min="min || undefined"
+        :max="latestSelectable"
         @ionChange="emit('update:modelValue', normalizeDate($event.detail.value))"
       />
     </ion-popover>
@@ -43,7 +45,7 @@ let dateFilterSelectCounter = 0;
 </script>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { IonDatetime, IonIcon, IonInput, IonItem, IonLabel, IonPopover } from '@ionic/vue';
 import { chevronDownOutline } from 'ionicons/icons';
 import { DateTime } from 'luxon';
@@ -53,9 +55,13 @@ const props = withDefaults(defineProps<{
   modelValue: string;
   label: string;
   outlined?: boolean;
+  min?: string;
+  max?: string;
 }>(), {
   modelValue: '',
   outlined: false,
+  min: '',
+  max: '',
 });
 
 const emit = defineEmits<{
@@ -63,6 +69,15 @@ const emit = defineEmits<{
 }>();
 
 const triggerId = `date-filter-select-${(dateFilterSelectCounter += 1)}`;
+
+// Every filter this picks for describes something that already happened, so no date after today
+// can be chosen. Today is re-read when the calendar opens, so a page left open overnight moves on.
+const todayISO = () => DateTime.now().toISODate() as string;
+const today = ref(todayISO());
+const refreshToday = () => { today.value = todayISO(); };
+
+/** The caller's upper bound (e.g. the paired "through" date), but never later than today. */
+const latestSelectable = computed(() => (props.max && props.max < today.value ? props.max : today.value));
 
 const selectedDateLabel = computed(() => {
   if (!props.modelValue) return props.outlined ? '' : translate('Select date');

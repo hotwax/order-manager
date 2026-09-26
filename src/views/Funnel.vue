@@ -396,7 +396,7 @@
                 <ion-reorder-group :disabled="false" @ionItemReorder="handleReorder">
                   <ion-item v-for="rule in sortRules" :key="rule.id">
                     <ion-label>{{ rule.name }}</ion-label>
-                    <ion-button slot="end" fill="clear" color="danger" @click="removeSortRule(rule.id)" :aria-label="translate('Remove sort rule')">
+                    <ion-button slot="end" fill="clear" color="danger" @click="removeSortRule(rule.id)" :aria-label="translate('Remove sort rule')" :title="translate('Remove sort rule')">
                       <ion-icon slot="icon-only" :icon="closeOutline" />
                     </ion-button>
                     <ion-reorder slot="end" />
@@ -436,7 +436,7 @@
             <ion-header>
               <ion-toolbar>
                 <ion-buttons slot="start">
-                  <ion-button @click="closeScheduleModal" :aria-label="translate('Close')">
+                  <ion-button @click="closeScheduleModal" :aria-label="translate('Close')" :title="translate('Close')">
                     <ion-icon slot="icon-only" :icon="closeOutline" />
                   </ion-button>
                 </ion-buttons>

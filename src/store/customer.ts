@@ -378,7 +378,7 @@ export const useCustomerStore = defineStore('customerDetail', {
             const statusIds = await getOrderProgressStatuses(order.orderId);
             if (statusIds.length) {
               order.progressValue = computeProgress(statusIds, (statusId) => seed.statusAge(statusId));
-              order.progressLabel = `${Math.round(order.progressValue * 100)}% complete`;
+              order.progressPercent = Math.round(order.progressValue * 100);
               order.progressColor = progressStatusColor(statusIds, (statusId) => seed.statusAge(statusId));
             }
           } catch {

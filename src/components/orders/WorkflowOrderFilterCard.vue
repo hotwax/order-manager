@@ -60,12 +60,14 @@
       <DateFilterSelect
         :model-value="modelValue.dateFrom"
         :label="translate('Order date from')"
+        :max="modelValue.dateThru"
         outlined
         @update:modelValue="updateField('dateFrom', $event)"
       />
       <DateFilterSelect
         :model-value="modelValue.dateThru"
         :label="translate('Order date through')"
+        :min="modelValue.dateFrom"
         outlined
         @update:modelValue="updateField('dateThru', $event)"
       />

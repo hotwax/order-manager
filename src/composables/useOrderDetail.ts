@@ -1,4 +1,4 @@
-import { api } from "@common";
+import { api, commonUtil } from "@common";
 
 /**
  * OrderFacilityChange reason written for every failed brokering attempt. A single
@@ -18,6 +18,18 @@ export const UNFILLABLE_REASON_ID = "UNFILLABLE";
  * as "N+".
  */
 export const UNFILLABLE_SAMPLE_SIZE = 100;
+
+/** A product issued at a facility: one order line of a POS-completed ship group. */
+export interface IssuanceLine {
+  productId: string;
+  facilityId: string;
+}
+
+async function listOf(request: Promise<any>): Promise<any[]> {
+  const resp = await request;
+  if (commonUtil.hasError(resp)) throw resp.data;
+  return Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
+}
 
 /**
  * Order-domain API calls for the order detail page.
@@ -39,13 +51,6 @@ export function useOrderDetail() {
       url: "oms/orders",
       method: "GET",
       params: { orderId, dependentLevels: 1 }
-    });
-  }
-
-  async function getWorkEfforts(orderId: string): Promise<any> {
-    return api({
-      url: `oms/orders/${orderId}/workEfforts`,
-      method: "GET"
     });
   }
 
@@ -101,32 +106,47 @@ export function useOrderDetail() {
   }
 
   /**
-   * InventoryItemDetail rows for the order that record an inventory issuance.
+   * InventoryItemDetail rows that record an inventory issuance against the order.
    *
    * Issuing inventory writes a detail row carrying `itemIssuanceId` and a negative
    * `quantityOnHandDiff`; the reservation that precedes it writes a separate row with
    * `reasonEnumId` and no issuance id. `itemIssuanceId_op=empty` + `_not=Y` keeps only
    * the issuance rows, so the response is one row per issued line rather than two.
    *
-   * There is no REST resource for ItemIssuance itself — this view is the only exposed
-   * path to the same fact.
+   * There is no REST resource for ItemIssuance, and the order-wide `oms/inventoryItem/detail`
+   * list is not mounted (405), so the rows are read per inventory item: ProductFacility names
+   * the inventory item of each product at each facility, and `inventoryItem/{id}/detail`
+   * filters by order. A component issued for a marketing package is not an order line, so it
+   * is not found this way.
    */
-  async function getInventoryIssuance(orderId: string): Promise<any> {
-    return api({
-      url: "oms/inventoryItem/detail",
+  async function getInventoryIssuance(orderId: string, lines: IssuanceLine[]): Promise<any[]> {
+    const lineKeys = new Set(lines.map((line) => `${line.productId}|${line.facilityId}`));
+    if (!lineKeys.size) return [];
+    const productFacilities = await listOf(api({
+      url: "oms/productFacilities",
       method: "GET",
       params: {
-        orderId,
-        itemIssuanceId_op: "empty",
-        itemIssuanceId_not: "Y",
-        pageSize: 500
+        productId: [...new Set(lines.map((line) => line.productId))].join(","),
+        productId_op: "in",
+        facilityId: [...new Set(lines.map((line) => line.facilityId))].join(","),
+        facilityId_op: "in",
+        pageSize: 100
       }
-    });
+    }));
+    // The two `in` filters cross every product with every facility; keep only the real pairs.
+    const inventoryItemIds = [...new Set(productFacilities
+      .filter((row) => row.inventoryItemId && lineKeys.has(`${row.productId}|${row.facilityId}`))
+      .map((row) => row.inventoryItemId))];
+    const details = await Promise.all(inventoryItemIds.map((inventoryItemId) => listOf(api({
+      url: `oms/inventoryItem/${inventoryItemId}/detail`,
+      method: "GET",
+      params: { orderId, itemIssuanceId_op: "empty", itemIssuanceId_not: "Y", pageSize: 100 }
+    }))));
+    return details.flat();
   }
 
   return {
     getOrder,
-    getWorkEfforts,
     getCommunicationEvents,
     getRiskAssessments,
     getFacilityChanges,

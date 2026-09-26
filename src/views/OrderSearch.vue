@@ -98,11 +98,13 @@
           <DateFilterSelect
             v-model="searchFilters.dateFrom"
             :label="translate('Order date from')"
+            :max="searchFilters.dateThru"
             outlined
           />
           <DateFilterSelect
             v-model="searchFilters.dateThru"
             :label="translate('Order date through')"
+            :min="searchFilters.dateFrom"
             outlined
           />
         </UniformFilterLayout>

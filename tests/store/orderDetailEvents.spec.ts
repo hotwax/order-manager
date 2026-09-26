@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useOrderDetailStore } from '@/store/orderDetail';
+import { api } from '@common';
 import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from '@/composables/useOrderDetail';
 
 vi.mock('@common', async (importOriginal) => {
@@ -36,12 +37,11 @@ function orderEntryWithStatuses(statuses: any[]) {
 function mockOrderDetail(overrides: Record<string, any> = {}) {
   vi.mocked(useOrderDetail).mockReturnValue({
     getOrder: vi.fn(),
-    getWorkEfforts: vi.fn(),
     getCommunicationEvents: vi.fn(),
     getRiskAssessments: vi.fn(),
     getFacilityChanges: vi.fn().mockResolvedValue({ data: [] }),
     getUnfillableAttempts: vi.fn().mockResolvedValue({ data: [] }),
-    getInventoryIssuance: vi.fn().mockResolvedValue({ data: [] }),
+    getInventoryIssuance: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as any);
 }
@@ -189,12 +189,10 @@ describe('order detail event sources', () => {
     // Real shape from rails-uat order 118954: one issuance row per line. lastQuantityOnHand
     // is the balance before the row, so after = last + diff.
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
-          { orderItemSeqId: '01', inventoryItemId: '1008212', itemIssuanceId: '108495', quantityOnHandDiff: -1, lastQuantityOnHand: 12, effectiveDate: 1786895792358 },
-          { orderItemSeqId: '02', inventoryItemId: '1008213', itemIssuanceId: '108496', quantityOnHandDiff: -1, lastQuantityOnHand: -2, effectiveDate: 1786895792367 },
-        ],
-      }),
+      getInventoryIssuance: vi.fn().mockResolvedValue([
+        { orderItemSeqId: '01', inventoryItemId: '1008212', itemIssuanceId: '108495', quantityOnHandDiff: -1, lastQuantityOnHand: 12, effectiveDate: 1786895792358 },
+        { orderItemSeqId: '02', inventoryItemId: '1008213', itemIssuanceId: '108496', quantityOnHandDiff: -1, lastQuantityOnHand: -2, effectiveDate: 1786895792367 },
+      ]),
     });
     const store = useOrderDetailStore();
 
@@ -209,12 +207,10 @@ describe('order detail event sources', () => {
 
   it('adds the stock positions when one line issues from two inventory items', async () => {
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
-          { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '1', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 1 },
-          { orderItemSeqId: '01', inventoryItemId: 'B', itemIssuanceId: '2', quantityOnHandDiff: -2, lastQuantityOnHand: 5, effectiveDate: 2 },
-        ],
-      }),
+      getInventoryIssuance: vi.fn().mockResolvedValue([
+        { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '1', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 1 },
+        { orderItemSeqId: '01', inventoryItemId: 'B', itemIssuanceId: '2', quantityOnHandDiff: -2, lastQuantityOnHand: 5, effectiveDate: 2 },
+      ]),
     });
     const store = useOrderDetailStore();
 
@@ -229,12 +225,10 @@ describe('order detail event sources', () => {
     // The second row's lastQuantityOnHand already reflects the first, so summing both
     // opening balances would report a stock position that never existed.
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
-          { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '2', quantityOnHandDiff: -1, lastQuantityOnHand: 9, effectiveDate: 2 },
-          { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '1', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 1 },
-        ],
-      }),
+      getInventoryIssuance: vi.fn().mockResolvedValue([
+        { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '2', quantityOnHandDiff: -1, lastQuantityOnHand: 9, effectiveDate: 2 },
+        { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '1', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 1 },
+      ]),
     });
     const store = useOrderDetailStore();
 
@@ -247,12 +241,10 @@ describe('order detail event sources', () => {
 
   it('ignores reservation rows that carry no issuance id', async () => {
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
-          { orderItemSeqId: '01', inventoryItemId: 'A', reasonEnumId: 'INV_RES_CREATE', availableToPromiseDiff: -1, quantityOnHandDiff: 0, lastQuantityOnHand: 99 },
-          { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '108495', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 2 },
-        ],
-      }),
+      getInventoryIssuance: vi.fn().mockResolvedValue([
+        { orderItemSeqId: '01', inventoryItemId: 'A', reasonEnumId: 'INV_RES_CREATE', availableToPromiseDiff: -1, quantityOnHandDiff: 0, lastQuantityOnHand: 99 },
+        { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '108495', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 2 },
+      ]),
     });
     const store = useOrderDetailStore();
 
@@ -261,6 +253,25 @@ describe('order detail event sources', () => {
     expect(store.issuanceByItemSeqIdByOrderId(ORDER_ID)).toEqual({
       '01': { issued: 1, qohBefore: 10, qohAfter: 9 },
     });
+  });
+
+  it('asks for the product and facility of every POS-completed line, and no others', async () => {
+    const getInventoryIssuance = vi.fn().mockResolvedValue([]);
+    mockOrderDetail({ getInventoryIssuance });
+    const store = useOrderDetailStore();
+    store.byOrderId[ORDER_ID] = {
+      payload: {
+        shipGroups: [
+          { shipGroupSeqId: '00001', shipmentMethodTypeId: 'POS_COMPLETED', facilityId: 'FASHION_ISLAND', items: [{ orderItemSeqId: '01', productId: '151000' }] },
+          { shipGroupSeqId: '00002', shipmentMethodTypeId: 'STANDARD', facilityId: 'BROADWAY', items: [{ orderItemSeqId: '02', productId: '151001' }] },
+        ],
+      },
+      status: 'loaded', loadedAt: '', error: '',
+    } as any;
+
+    await store.fetchInventoryIssuance(ORDER_ID);
+
+    expect(getInventoryIssuance).toHaveBeenCalledWith(ORDER_ID, [{ productId: '151000', facilityId: 'FASHION_ISLAND' }]);
   });
 
   it('reports unknown rather than zero when the issuance call fails', async () => {
@@ -302,5 +313,39 @@ describe('order detail event sources', () => {
     expect(store.facilityChangeEventsByOrderId(ORDER_ID)).toEqual([]);
     expect(store.unfillableAttemptsByOrderId(ORDER_ID)).toMatchObject({ count: 1 });
     expect(store.orderEventsStatusByOrderId[ORDER_ID]).toBe('error');
+  });
+});
+
+describe('getInventoryIssuance', () => {
+  it('reads each line\'s inventory item from ProductFacility, then its issuance rows for the order', async () => {
+    const { useOrderDetail: realUseOrderDetail } = await vi.importActual<any>('@/composables/useOrderDetail');
+    vi.mocked(api).mockReset();
+    vi.mocked(api).mockImplementation(async ({ url }: any) => {
+      // The `in` filters cross both products with both facilities, so one row is not a line.
+      if (url === 'oms/productFacilities') return { data: [
+        { productId: 'P1', facilityId: 'F1', inventoryItemId: 'I1' },
+        { productId: 'P1', facilityId: 'F2', inventoryItemId: 'I_NOT_A_LINE' },
+        { productId: 'P2', facilityId: 'F2', inventoryItemId: 'I2' },
+      ] };
+      return { data: [{ inventoryItemId: url.split('/')[2], orderItemSeqId: '01', itemIssuanceId: 'X' }] };
+    });
+
+    const rows = await realUseOrderDetail().getInventoryIssuance(ORDER_ID, [
+      { productId: 'P1', facilityId: 'F1' },
+      { productId: 'P2', facilityId: 'F2' },
+    ]);
+
+    const urls = vi.mocked(api).mock.calls.map(([request]: any) => request.url);
+    expect(urls).toEqual(['oms/productFacilities', 'oms/inventoryItem/I1/detail', 'oms/inventoryItem/I2/detail']);
+    expect(vi.mocked(api).mock.calls[1][0]).toMatchObject({ params: { orderId: ORDER_ID, itemIssuanceId_op: 'empty', itemIssuanceId_not: 'Y' } });
+    expect(rows.map((row: any) => row.inventoryItemId)).toEqual(['I1', 'I2']);
+  });
+
+  it('makes no call for an order with no issued lines', async () => {
+    const { useOrderDetail: realUseOrderDetail } = await vi.importActual<any>('@/composables/useOrderDetail');
+    vi.mocked(api).mockReset();
+
+    expect(await realUseOrderDetail().getInventoryIssuance(ORDER_ID, [])).toEqual([]);
+    expect(api).not.toHaveBeenCalled();
   });
 });

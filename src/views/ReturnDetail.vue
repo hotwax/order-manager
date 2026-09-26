@@ -80,7 +80,6 @@
                 </ion-label>
                 <ion-button v-if="returnRecord.fromPartyId && canViewCustomers" slot="end" fill="clear" :router-link="`/customers/${returnRecord.fromPartyId}`">
                   {{ translate('View customer') }}
-                  <ion-icon slot="end" :icon="openOutline" />
                 </ion-button>
               </ion-item>
             </ion-list>
@@ -195,7 +194,6 @@
           <ion-label>{{ itemGroupLabel(group) }}</ion-label>
           <ion-button v-if="group.orderId && canViewOrders" fill="clear" :router-link="`/orders/${group.orderId}`">
             {{ translate('View order') }}
-            <ion-icon slot="end" :icon="openOutline" />
           </ion-button>
         </ion-list-header>
         <ion-accordion-group>
@@ -417,7 +415,6 @@ import {
   closeCircleOutline,
   cubeOutline,
   documentTextOutline,
-  openOutline,
   pulseOutline,
   timeOutline
 } from "ionicons/icons";
