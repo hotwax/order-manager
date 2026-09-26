@@ -113,7 +113,7 @@
                 <ion-card-title>{{ translate('Data Fetch Status') }}</ion-card-title>
                 <ion-card-subtitle v-if="syncSubtitle">{{ syncSubtitle }}</ion-card-subtitle>
               </div>
-              <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()" :aria-label="translate('Refresh all data')">
+              <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()" :aria-label="translate('Refresh all data')" :title="translate('Refresh all data')">
                 <ion-spinner v-if="refreshing === '*'" name="dots" slot="icon-only" />
                 <ion-icon v-else slot="icon-only" :icon="syncOutline" />
               </ion-button>
@@ -128,7 +128,7 @@
                 <p v-if="item.status === 'success' && item.count !== undefined">{{ translate("Fetched") }} {{ item.count }} {{ translate("records") }}</p>
                 <p v-else>{{ translate(getStatusLabel(item.status)) }}</p>
               </ion-label>
-              <ion-button slot="end" fill="clear" @click="item.refresh()" :aria-label="translate('Refresh {label}', { label: item.label })">
+              <ion-button slot="end" fill="clear" @click="item.refresh()" :aria-label="translate('Refresh {label}', { label: item.label })" :title="translate('Refresh {label}', { label: item.label })">
                 <ion-icon slot="icon-only" :icon="syncOutline" />
               </ion-button>
             </ion-item>
@@ -148,7 +148,7 @@
                   <template v-else> · {{ translate("not synced yet") }}</template>
                 </p>
               </ion-label>
-              <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)" :aria-label="translate('Refresh {label}', { label: translate(domain.label) })">
+              <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)" :aria-label="translate('Refresh {label}', { label: translate(domain.label) })" :title="translate('Refresh {label}', { label: translate(domain.label) })">
                 <ion-spinner v-if="refreshing === domain.name" name="dots" slot="icon-only" />
                 <ion-icon v-else slot="icon-only" :icon="syncOutline" />
               </ion-button>
@@ -161,7 +161,7 @@
         <ion-header>
           <ion-toolbar>
             <ion-buttons slot="start">
-              <ion-button @click="closeModal" :aria-label="translate('Close')">
+              <ion-button @click="closeModal" :aria-label="translate('Close')" :title="translate('Close')">
                 <ion-icon slot="icon-only" :icon="closeOutline" />
               </ion-button>
             </ion-buttons>

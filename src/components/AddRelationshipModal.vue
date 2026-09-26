@@ -2,10 +2,10 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button v-if="step === 'party'" @click="dismiss()" :aria-label="translate('Close')">
+        <ion-button v-if="step === 'party'" @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
-        <ion-button v-else @click="step = 'party'" :aria-label="translate('Back')">
+        <ion-button v-else @click="step = 'party'" :aria-label="translate('Back')" :title="translate('Back')">
           <ion-icon slot="icon-only" :icon="arrowBackOutline" />
         </ion-button>
       </ion-buttons>

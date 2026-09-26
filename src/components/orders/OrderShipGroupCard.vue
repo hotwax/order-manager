@@ -13,7 +13,7 @@
       <div class="ship-group-status-toggle">
         <p>{{ shipGroup.statusLabel }}</p>
         <!-- A counter sale has one state, so there is nothing to expand into. -->
-        <ion-button v-if="!shipGroup.isPosCompleted" fill="clear" color="medium" @click="emit('update:expanded', !expanded)" :aria-label="translate('Toggle ship group')">
+        <ion-button v-if="!shipGroup.isPosCompleted" fill="clear" color="medium" @click="emit('update:expanded', !expanded)" :aria-label="translate('Toggle ship group')" :title="translate('Toggle ship group')">
           <ion-icon slot="icon-only" :icon="expanded ? chevronUp : chevronDown" />
         </ion-button>
       </div>
@@ -69,6 +69,7 @@
             fill="clear"
             color="medium"
             :aria-label="translate('Clear gift message')"
+            :title="translate('Clear gift message')"
             @click.stop="clearGiftMessage"
           >
             <ion-icon slot="icon-only" :icon="trashOutline" />
@@ -195,7 +196,7 @@
               <!-- Inventory lookup answers "can we still fulfil this?"; the goods have
                    already left the store. What matters instead is whether the stock
                    they left with came off the books. -->
-              <ion-button v-if="!shipGroup.isPosCompleted" slot="end" fill="clear" color="medium" @click.stop="emit('view-inventory', item.productId)" :aria-label="translate('View inventory')">
+              <ion-button v-if="!shipGroup.isPosCompleted" slot="end" fill="clear" color="medium" @click.stop="emit('view-inventory', item.productId)" :aria-label="translate('View inventory')" :title="translate('View inventory')">
                 <ion-icon slot="icon-only" :icon="cubeOutline" />
               </ion-button>
               <div v-else-if="item.issuance" slot="end" class="ship-group-item-issuance">
@@ -255,7 +256,8 @@
               </p>
               <ion-button v-if="!disabledActions.EDIT_ADDRESS" slot="end" fill="clear"
                 color="medium" :id="'shipping-opt-trigger-' + shipGroup.id"
-                :aria-label="translate('Shipping options')">
+                :aria-label="translate('Shipping options')"
+                :title="translate('Shipping options')">
                 <ion-icon slot="icon-only" :icon="ellipsisVertical" />
               </ion-button>
               <ion-popover :trigger="'shipping-opt-trigger-' + shipGroup.id" dismiss-on-select
@@ -277,7 +279,7 @@
               <ion-header>
                 <ion-toolbar>
                   <ion-buttons slot="start">
-                    <ion-button @click="closeEditor('address')" :aria-label="translate('Close')"><ion-icon slot="icon-only"
+                    <ion-button @click="closeEditor('address')" :aria-label="translate('Close')" :title="translate('Close')"><ion-icon slot="icon-only"
                         :icon="closeOutline" /></ion-button>
                   </ion-buttons>
                   <ion-title>{{ translate('Edit Shipping Address') }}</ion-title>
@@ -360,7 +362,7 @@
     <ion-modal :is-open="editor === 'gift'" @didDismiss="closeEditor('gift')">
       <ion-header>
         <ion-toolbar>
-          <ion-buttons slot="start"><ion-button @click="closeEditor('gift')" :aria-label="translate('Close')"><ion-icon slot="icon-only"
+          <ion-buttons slot="start"><ion-button @click="closeEditor('gift')" :aria-label="translate('Close')" :title="translate('Close')"><ion-icon slot="icon-only"
                 :icon="closeOutline" /></ion-button></ion-buttons>
           <ion-title>{{ translate('Gift message') }}</ion-title>
         </ion-toolbar>
@@ -382,7 +384,7 @@
     <ion-modal :is-open="editor === 'shippingDates'" @didDismiss="closeEditor('shippingDates')">
       <ion-header>
         <ion-toolbar>
-          <ion-buttons slot="start"><ion-button @click="closeEditor('shippingDates')" :aria-label="translate('Close')"><ion-icon
+          <ion-buttons slot="start"><ion-button @click="closeEditor('shippingDates')" :aria-label="translate('Close')" :title="translate('Close')"><ion-icon
                 slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
           <ion-title>{{ translate('Shipping dates') }}</ion-title>
         </ion-toolbar>
@@ -408,7 +410,7 @@
     <ion-modal :is-open="editor === 'deliveryDates'" @didDismiss="closeEditor('deliveryDates')">
       <ion-header>
         <ion-toolbar>
-          <ion-buttons slot="start"><ion-button @click="closeEditor('deliveryDates')" :aria-label="translate('Close')"><ion-icon
+          <ion-buttons slot="start"><ion-button @click="closeEditor('deliveryDates')" :aria-label="translate('Close')" :title="translate('Close')"><ion-icon
                 slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
           <ion-title>{{ translate('Delivery dates') }}</ion-title>
         </ion-toolbar>
@@ -434,7 +436,7 @@
     <ion-modal :is-open="editor === 'instructions'" @didDismiss="closeEditor('instructions')">
       <ion-header>
         <ion-toolbar>
-          <ion-buttons slot="start"><ion-button @click="closeEditor('instructions')" :aria-label="translate('Close')"><ion-icon
+          <ion-buttons slot="start"><ion-button @click="closeEditor('instructions')" :aria-label="translate('Close')" :title="translate('Close')"><ion-icon
                 slot="icon-only" :icon="closeOutline" /></ion-button></ion-buttons>
           <ion-title>{{ translate('Shipping instructions') }}</ion-title>
         </ion-toolbar>

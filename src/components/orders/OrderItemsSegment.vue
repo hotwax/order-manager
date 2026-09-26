@@ -94,7 +94,6 @@
                   :router-link="`/returns/${returnId}`"
                   @click.stop
                 >
-                  <ion-icon slot="start" :icon="openOutline" />
                   {{ translate('Return') }} {{ returnId }}
                 </ion-button>
               </ion-label>
@@ -141,8 +140,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonIcon, IonItem, IonItemDivider, IonLabel, IonList } from '@ionic/vue';
-import { openOutline } from 'ionicons/icons';
+import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonItem, IonItemDivider, IonLabel, IonList } from '@ionic/vue';
 import { commonUtil, translate } from '@common';
 import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
 import { useProductIdentity } from '@/composables/useProductIdentity';

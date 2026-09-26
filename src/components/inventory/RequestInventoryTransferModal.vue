@@ -2,7 +2,7 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button :aria-label="translate('Close')" @click="modalController.dismiss()">
+        <ion-button :aria-label="translate('Close')" :title="translate('Close')" @click="modalController.dismiss()">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
