@@ -257,10 +257,12 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     actionId: 'PULL_BACK',
     eligible: isOpenItem,
     prompt: openRejectItemsModal,
+    // maySplit is per item and defaults to N, which makes the OMS reject every item in the ship
+    // group, not just the checked ones (#517). Pulling back a selection must split it off.
     apply: (orderId, items, { rejectionReasonId }) => api({
       url: `oms/orders/${orderId}/reject`,
       method: 'POST',
-      data: { orderId, items: items.map(({ orderItemSeqId }) => ({ orderItemSeqId, quantity: '1', rejectionReasonId })) },
+      data: { orderId, items: items.map(({ orderItemSeqId }) => ({ orderItemSeqId, quantity: '1', rejectionReasonId, maySplit: 'Y' })) },
     }),
     success: 'Items rejected successfully.',
     failure: 'Failed to reject items. Please try again.',

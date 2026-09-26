@@ -66,7 +66,7 @@ describe('ship group selection actions', () => {
     expect(loadOrder).toHaveBeenCalledWith('O1', true);
   });
 
-  it('pulls back the open items in one reject call with the chosen reason', async () => {
+  it('pulls back only the open items, split off from the rest of the ship group, with the chosen reason', async () => {
     const { actions, shipGroup } = setup(false, [item('01', 'ITEM_APPROVED'), item('02', 'ITEM_COMPLETED'), item('03', 'ITEM_APPROVED')]);
     dismissModalWith({ role: 'confirm', data: { rejectionReasonId: 'REJ_RSN_DAMAGED' } });
 
@@ -77,8 +77,8 @@ describe('ship group selection actions', () => {
       data: {
         orderId: 'O1',
         items: [
-          { orderItemSeqId: '01', quantity: '1', rejectionReasonId: 'REJ_RSN_DAMAGED' },
-          { orderItemSeqId: '03', quantity: '1', rejectionReasonId: 'REJ_RSN_DAMAGED' },
+          { orderItemSeqId: '01', quantity: '1', rejectionReasonId: 'REJ_RSN_DAMAGED', maySplit: 'Y' },
+          { orderItemSeqId: '03', quantity: '1', rejectionReasonId: 'REJ_RSN_DAMAGED', maySplit: 'Y' },
         ],
       },
     }]);
