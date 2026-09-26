@@ -174,9 +174,9 @@
               <ion-label>{{ translate('Items') }}</ion-label>
             </ion-list-header>
             <ion-item v-for="item in shipGroup.items" :key="item.orderItemSeqId">
-              <!-- Selection only feeds the pull back / release actions, which a counter
-                   sale does not have. -->
-              <ion-checkbox v-if="!shipGroup.isPosCompleted" slot="start" :checked="selectedItemIds.includes(item.orderItemSeqId)"
+              <!-- Selection only feeds the park / pull back / release actions, which a counter
+                   sale and a completed or cancelled order do not have. -->
+              <ion-checkbox v-if="!shipGroup.isPosCompleted && !orderIsTerminal" slot="start" :checked="selectedItemIds.includes(item.orderItemSeqId)"
                 @ionChange="toggleItem(item.orderItemSeqId, $event.detail.checked)" />
               <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="getProduct(item.productId)?.mainImageUrl">
                 <DxpShopifyImg :src="item.imageUrl" :key="getProduct(item.productId)?.mainImageUrl" size="small" />
@@ -354,7 +354,7 @@
         </template>
       </template>
       <ion-button fill="clear" :disabled="disabledActions.ADD_TASK" @click="emit('add-task')">{{ translate('Add Task') }}</ion-button>
-      <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(orderStatusId)" fill="clear"
+      <ion-button v-if="!orderIsTerminal" fill="clear"
         :disabled="disabledActions.ADD_ITEMS" @click="emit('add-items')">{{ translate('Add Items') }}</ion-button>
     </div>
 
@@ -473,7 +473,7 @@ import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { isKit } from '@/utils';
 import { findTimeDiff, formatDate, formatTime, toDateInputValue } from '@/utils/orderDetailDates';
-import type { ShipGroupActionId } from '@/utils/OrderActionValidator';
+import { OrderActionValidator, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import type { EnrichedShipGroup, ItemIssuance, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 
 const props = defineProps<{
@@ -533,6 +533,7 @@ const LIFECYCLE_STEPS = [
 
 /** Whether the item detail block is showing — always, for a counter sale with no toggle. */
 const detailsOpen = computed(() => props.shipGroup.isPosCompleted || props.expanded);
+const orderIsTerminal = computed(() => OrderActionValidator.isOrderTerminal({ statusId: props.orderStatusId }));
 
 /** A stopped group is read-only: its options describe a shipment that will no longer change. */
 const optionsOpen = computed(() => {

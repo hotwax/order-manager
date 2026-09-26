@@ -1,10 +1,10 @@
 <template>
   <div class="order-items">
     <ion-list lines="none" class="order-items-list">
-      <ion-item lines="full" class="order-items-toolbar">
+      <ion-item v-if="!isTerminal" lines="full" class="order-items-toolbar">
         <ion-checkbox :checked="areAllSelected" justify="start" label-placement="end"
           @ionChange="selectItems(allItems, $event.detail.checked)">{{ translate('Select all') }}</ion-checkbox>
-        <ion-button v-if="!['ORDER_CANCELLED', 'ORDER_COMPLETED'].includes(order.statusId)" slot="end" fill="outline" color="medium" @click="emit('add-item')">
+        <ion-button slot="end" fill="outline" color="medium" @click="emit('add-item')">
           {{ translate('Add items') }}
         </ion-button>
       </ion-item>
@@ -27,6 +27,7 @@
           <ion-accordion v-else :value="group.externalId">
             <OrderItemListRow
               slot="header"
+              :selectable="!isTerminal"
               :select-on-row-click="false"
               v-bind="productRowProps(group)"
               :selected="group.items.every(isSelected)"
@@ -146,6 +147,7 @@ import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { isKit } from '@/utils';
 import { formatDateTime } from '@/utils/orderDetailDates';
+import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import type { EnrichedItemGroup, EnrichedOrder, EnrichedOrderItem } from '@/types/orderDetail';
 
 const props = defineProps<{
@@ -169,6 +171,8 @@ const emit = defineEmits<{
 const { getProduct, primaryIdentifier, secondaryIdentifier, featureLabel } = useProductIdentity();
 
 const allItems = computed(() => props.order.groupedItems.flatMap((group) => group.items));
+/** A completed or cancelled order takes no item actions, so there is nothing to select or add. */
+const isTerminal = computed(() => OrderActionValidator.isOrderTerminal(props.order));
 const areAllSelected = computed(() => allItems.value.length > 0 && allItems.value.every(isSelected));
 
 function isSelected(item: EnrichedOrderItem) {
@@ -210,6 +214,7 @@ function itemRow(item: EnrichedOrderItem, identity: ReturnType<typeof productRow
   const attributeCount = Number(item.attributeCount) || 0;
   return {
     ...identity,
+    selectable: !isTerminal.value,
     selected: isSelected(item),
     quantity: item.quantity,
     quantityLabel: translate('qty'),
