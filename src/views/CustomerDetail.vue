@@ -311,6 +311,8 @@
           v-else-if="returnsStatus === 'error'"
           :title="translate('Could not load returns')"
           :message="returnsError"
+          retryable
+          @retry="loadReturns()"
         />
         <EmptyState
           v-else-if="returnsStatus === 'loaded'"
@@ -378,6 +380,8 @@
           v-else-if="commsStatus === 'error'"
           :title="translate('Could not load communications')"
           :message="commsError"
+          retryable
+          @retry="loadCommunications()"
         />
         <div v-else class="ion-padding ion-text-center">
           <ion-spinner name="crescent" />
@@ -423,6 +427,8 @@
       <ErrorState
         :title="translate('Could not load customer')"
         :message="error"
+        retryable
+        @retry="load()"
       />
     </ion-content>
 

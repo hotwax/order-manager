@@ -24,6 +24,8 @@
         v-if="error"
         :title="translate('Could not load customers')"
         :message="error"
+        retryable
+        @retry="runSearch()"
       />
 
       <ion-list v-else>

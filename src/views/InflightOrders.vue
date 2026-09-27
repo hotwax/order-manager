@@ -55,6 +55,13 @@
       <div v-if="isLoading && !orders.length" class="ion-text-center ion-padding">
         <ion-spinner name="crescent" />
       </div>
+      <ErrorState
+        v-else-if="loadError"
+        :title="translate('Could not load in flight orders')"
+        :message="loadError"
+        retryable
+        @retry="loadWorkflowOrders()"
+      />
       <EmptyState
         v-else-if="!isLoading && !orders.length"
         :title="translate('No inflight orders')"
@@ -116,6 +123,7 @@ import { useSeedStore } from '@/store/seed';
 import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
 import { WORKFLOW_ORDER_SORT_OPTIONS } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
+import ErrorState from '@/components/common/ErrorState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
@@ -166,6 +174,7 @@ const allCurrentPageSelected = computed(() => {
 });
 const someCurrentPageSelected = computed(() => currentPageOrderIds.value.some((orderId) => selectedIds.value.has(orderId)));
 const isLoading = computed(() => orderStore.workflowOrdersLoading[bucket]);
+const loadError = computed(() => orderStore.workflowOrdersError[bucket]);
 const orderTotal = computed(() => orderStore.workflowOrdersTotal[bucket]);
 const hasMore = computed(() => orderStore.workflowOrders[bucket].length < orderStore.workflowOrdersTotal[bucket]);
 const resultsSummary = computed(() =>

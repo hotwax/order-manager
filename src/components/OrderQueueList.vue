@@ -65,6 +65,8 @@
         v-if="error"
         :title="translate('Could not load orders')"
         :message="error"
+        retryable
+        @retry="runSearch()"
       />
 
       <ion-list v-else>
