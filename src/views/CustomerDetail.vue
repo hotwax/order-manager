@@ -878,10 +878,6 @@ ion-card-header ion-card-title {
   margin: 0 0 2px;
 }
 
-.muted {
-  color: var(--ion-color-medium, #92949c);
-}
-
 .card-actions {
   display: flex;
   gap: var(--spacer-2xs);
@@ -907,28 +903,6 @@ ion-card-header ion-card-title {
   font-size: 22px;
   font-weight: 400;
   margin: 0;
-}
-
-.task-contact {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-}
-
-.task-grid {
-  display: grid;
-  gap: var(--spacer-sm);
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  padding: 12px var(--spacer-sm);
-}
-
-.task-grid h3 {
-  font-size: 16px;
-  margin: 0 0 2px;
-}
-
-.task-grid p {
-  margin: 0 0 2px;
-  font-size: 14px;
 }
 
 .recent-orders-grid {

@@ -457,11 +457,4 @@ function statusDescription(statusId: string) {
 .bulk-action-buttons {
   overflow-x: auto;
 }
-
-
-.brokered-facility-chip {
-  margin-inline: 0;
-  max-width: 100%;
-}
-
 </style>

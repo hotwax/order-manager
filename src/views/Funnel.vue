@@ -1414,16 +1414,6 @@ function handleBatchSizeChange(event: any) {
   overflow: hidden;
 }
 
-.custom-progress-packed {
-  background: #1e8f42; /* Dark distinct green for packed */
-  height: 100%;
-}
-
-.custom-progress-picked {
-  background: var(--ion-color-success, #2dd36f); /* Vibrant base green for picked */
-  height: 100%;
-}
-
 @media (max-width: 767px) {
   .global-stat ion-card-content {
     grid-template-columns: 1fr;
@@ -1606,7 +1596,6 @@ function handleBatchSizeChange(event: any) {
 .progress-segment.allocated {
   background: var(--ion-color-primary);
 }
-
 
 /* Fulfillment Sync Styles */
 .fulfillment-sync {

@@ -310,17 +310,6 @@ onIonViewWillEnter(() => {
   padding: 0 var(--spacer-sm) var(--spacer-sm);
 }
 
-.order-results-header {
-  align-items: center;
-  display: flex;
-  gap: var(--spacer-xs);
-}
-
-.order-results-header-start {
-  display: flex;
-  min-width: 24px;
-}
-
 @media (max-width: 640px) {
   .fraud-orders {
     padding-inline: 0;
