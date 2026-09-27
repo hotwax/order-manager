@@ -71,7 +71,7 @@ describe('locale messages', () => {
     const english = render('en-US');
     const spanish = render('es-ES');
     const untranslated = Object.keys(enUS).filter((key) => !sameInBoth.has(key)
-      && spanish[key] === english[key] && /[a-z]{3}/.test(english[key].replace(/\{[^}]*\}/g, '')));
+      && spanish[key] === english[key] && /[a-z]{3}/.test((enUS as Record<string, string>)[key].replace(/@(?:\.\w+)?:\{'[^']*'\}|\{[^}]*\}/g, '')));
     expect(untranslated).toEqual([]);
   });
 

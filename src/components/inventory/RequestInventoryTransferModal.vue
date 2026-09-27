@@ -21,7 +21,7 @@
         </ion-thumbnail>
         <ion-label>
           <p class="overline">
-            {{ translate('Item') }} {{ item.orderItemSeqId }}
+            {{ translate('Item {id}', { id: item.orderItemSeqId }) }}
           </p>
           {{ primaryIdentifier(item.productId) || item.name }}
           <p v-if="featureLabel(item.productId)">

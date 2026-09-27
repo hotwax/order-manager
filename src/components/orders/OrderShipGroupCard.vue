@@ -209,7 +209,7 @@
                 <!-- Stock at the store as the sale was recorded, not stock now: later
                      movements against the same inventory item are not reflected here. -->
                 <ion-note v-if="item.issuance.kind === 'issued'">
-                  {{ translate('On hand at sale') }} {{ item.issuance.qohBefore }} → {{ item.issuance.qohAfter }}
+                  {{ translate('On hand at sale {before} → {after}', { before: item.issuance.qohBefore, after: item.issuance.qohAfter }) }}
                 </ion-note>
               </div>
             </ion-item>

@@ -234,7 +234,7 @@ function enrichShipGroup(
 
   // Cancelled items are routinely moved to a virtual facility such as REJECTED_ITM_PARKING, so the
   // brokering label comes after the terminal checks or a stopped card would read "Not brokered".
-  let statusLabel = `${Math.round(progress * 100)}% ${translate('Complete')}`;
+  let statusLabel = translate('{percent}% complete', { percent: Math.round(progress * 100) });
   if (isPosCompleted) statusLabel = translate('Sold in store');
   else if (settled && fulfilled === 0) statusLabel = translate('Cancelled');
   else if (settled && fulfilled < total) statusLabel = translate('Partially complete');

@@ -17,7 +17,7 @@
           <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(risk.riskLevelEnumId)" />
           <ion-label>
             {{ risk.providerName || risk.providerId || translate('Risk provider') }}
-            <p>{{ translate('Risk level') }}: {{ seedStore.enumDescription(risk.riskLevelEnumId) }}</p>
+            <p>{{ translate('Risk level: {level}', { level: seedStore.enumDescription(risk.riskLevelEnumId) }) }}</p>
           </ion-label>
           <ion-note v-if="risk.createdDate" slot="end">{{ formatDateTime(risk.createdDate) }}</ion-note>
         </ion-item>

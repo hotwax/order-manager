@@ -17,7 +17,7 @@
           <DxpShopifyImg :src="product.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
-          <p class="overline">{{ translate('Item') }} {{ item.orderItemSeqId }}</p>
+          <p class="overline">{{ translate('Item {id}', { id: item.orderItemSeqId }) }}</p>
           {{ primaryIdentifier(item.productId) || item.name }}
           <p v-if="featureLabel(item.productId)">{{ featureLabel(item.productId) }}</p>
           <p v-if="secondaryIdentifier(item.productId)">{{ secondaryIdentifier(item.productId) }}</p>

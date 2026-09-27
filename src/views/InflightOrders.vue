@@ -57,7 +57,7 @@
       <EmptyState
         v-else-if="!isLoading && !orders.length"
         :title="translate('No inflight orders')"
-        :message='translate("Orders that have arrived at a warehouse but aren&apos;t on a picklist yet will appear here.")'
+        :message="translate('Orders that have arrived at a warehouse but aren\'t on a picklist yet will appear here.')"
       />
 
       <ion-infinite-scroll

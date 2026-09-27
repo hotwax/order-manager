@@ -259,7 +259,7 @@
 
       <!-- Online Order Fulfillment Dashboard at selected Facility -->
       <div v-if="selectedFacilityId" class="fulfillment-dashboard-section ion-padding">
-        <h1 class="section-title">{{ translate("Fill rate at") }} {{ selectedFacilityName }}</h1>
+        <h1 class="section-title">{{ translate("Fill rate at {facility}", { facility: selectedFacilityName }) }}</h1>
 
         <!-- Error state: surface failure + retry instead of false zeros -->
         <div v-if="facilityProgressError" class="section-error ion-padding">
@@ -514,7 +514,7 @@
                     transition: 'all 0.2s ease',
                     cursor: 'pointer'
                   }" 
-                  :title="`${segment.label}: ${ordersLabel(segment.orderCount)} (${segment.estimatedTime})`"
+                  :title="translate('{segment}: {orders} ({time})', { segment: segment.label, orders: ordersLabel(segment.orderCount), time: segment.estimatedTime })"
                   @mouseenter="hoveredSegmentId = segment.id"
                   @mouseleave="hoveredSegmentId = null"
                 />
@@ -754,10 +754,10 @@ const queueSegments = computed(() => {
   }
 
   const formatEstimatedTime = (mins: number) => {
-    if (mins <= 0) return '0 MIN';
-    if (mins < 60) return `+${mins} MIN`;
+    if (mins <= 0) return translate("{count} MIN", { count: 0 });
+    if (mins < 60) return translate("+{count} MIN", { count: mins });
     const hrs = Math.round(mins / 60);
-    return `+${hrs} HR`;
+    return translate("+{count} HR", { count: hrs });
   };
 
   // 2. Queue segments based on the top sorting parameter

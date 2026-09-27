@@ -162,8 +162,8 @@
           <ion-label class="tablet" v-else>
             {{ translate('{shown} of {count} items', { shown: facility.coveredCount, count: facility.totalCount }) }}
             <p>{{ translate('Coverage') }}</p>
-            <p v-if="shortItemNames(facility)">{{ translate('Short:') }} {{ shortItemNames(facility) }}</p>
-            <p v-if="unrecordedItemNames(facility)">{{ translate('No record:') }} {{ unrecordedItemNames(facility) }}</p>
+            <p v-if="shortItemNames(facility)">{{ translate('Short: {items}', { items: shortItemNames(facility) }) }}</p>
+            <p v-if="unrecordedItemNames(facility)">{{ translate('No record: {items}', { items: unrecordedItemNames(facility) }) }}</p>
           </ion-label>
           <ion-label class="tablet">
             {{ facility.allowBrokering }}
@@ -172,7 +172,7 @@
           <ion-label class="ion-text-end">
             {{ formatQuantity(facility.consumedToday) }} / {{ formatOrderLimit(facility.orderLimit) }}
             <p>{{ translate('Consumed / Limit') }}</p>
-            <p>{{ translate('Remaining') }} {{ formatOrderLimit(facility.remainingCapacity) }}</p>
+            <p>{{ translate('Remaining {value}', { value: formatOrderLimit(facility.remainingCapacity) }) }}</p>
           </ion-label>
         </div>
       </ion-list>
@@ -266,7 +266,7 @@ function itemNameList(items: FacilityItemAvailability[]) {
   if (!items.length) return '';
   const names = items.slice(0, MAX_SHORT_NAMES).map((item) => item.name).join(', ');
   const remaining = items.length - MAX_SHORT_NAMES;
-  return remaining > 0 ? `${names} ${translate('+{count} more', { count: remaining })}` : names;
+  return remaining > 0 ? translate('{names} +{count} more', { names, count: remaining }) : names;
 }
 
 function shortItemNames(facility: FacilityCoverageRow) {
@@ -279,7 +279,7 @@ function unrecordedItemNames(facility: FacilityCoverageRow) {
 
 function itemAvailabilityLabel(item: FacilityItemAvailability) {
   if (!item.hasRecord) return translate('No inventory record');
-  if (item.shortBy) return `${formatQuantity(item.available)} (${translate('Short by {count}', { count: item.shortBy })})`;
+  if (item.shortBy) return translate('{quantity} (Short by {count})', { quantity: formatQuantity(item.available), count: item.shortBy });
   return formatQuantity(item.available);
 }
 

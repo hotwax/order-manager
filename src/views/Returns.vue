@@ -250,7 +250,7 @@ function statusLabel(statusId: string) {
 
 function returnCustomerLabel(returnRecord: any) {
   if(returnRecord.customerName) {return returnRecord.customerName;}
-  if(returnRecord.fromPartyId) {return `${translate("Customer")} ${returnRecord.fromPartyId}`;}
+  if(returnRecord.fromPartyId) {return translate("Customer {id}", { id: returnRecord.fromPartyId });}
 
   return translate("No customer");
 }

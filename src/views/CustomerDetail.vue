@@ -292,7 +292,7 @@
                 {{ translate('Exchange') }}
               </p>
               <p v-else-if="returnRecord.fromPartyId">
-                {{ returnRecord.customerName || `${translate('Customer')} ${returnRecord.fromPartyId}` }}
+                {{ returnRecord.customerName || translate('Customer {id}', { id: returnRecord.fromPartyId }) }}
               </p>
             </ion-label>
 

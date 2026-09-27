@@ -9,7 +9,8 @@ const translations: Record<string, string> = {
   'Active orders (rejections)': 'Pedidos activos (rechazos)',
 };
 
-const translate = (key: string) => translations[key] || key;
+const translate = (key: string, params: Record<string, unknown> = {}) =>
+  (translations[key] || key).replace(/\{(\w+)\}/g, (_, name) => String(params[name]));
 
 describe('Funnel facility progress accessible names', () => {
   it('names volume and normal velocity bars from the translated metric', () => {

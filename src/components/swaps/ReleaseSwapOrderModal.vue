@@ -24,7 +24,7 @@
         <ion-label>
           {{ productPrimary(item) }}
           <p>{{ productSecondary(item) }}</p>
-          <p v-if="item.quantity">{{ translate('Qty') }}: {{ item.quantity }}</p>
+          <p v-if="item.quantity">{{ translate('Qty: {count}', { count: item.quantity }) }}</p>
         </ion-label>
         <ion-note slot="end" color="danger">
           <p>{{ formatMoney(itemPrice(item), currency) }}</p>
@@ -46,7 +46,7 @@
         <ion-label>
           {{ productPrimary(item) }}
           <p>{{ productSecondary(item) }}</p>
-          <p v-if="item.quantity">{{ translate('Qty') }}: {{ item.quantity }}</p>
+          <p v-if="item.quantity">{{ translate('Qty: {count}', { count: item.quantity }) }}</p>
         </ion-label>
         <ion-note slot="end" color="success">
           <p>{{ formatMoney(itemPrice(item), currency) }}</p>

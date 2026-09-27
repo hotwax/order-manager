@@ -1,5 +1,5 @@
 type FacilityDimension = 'volume' | 'velocity' | 'rejections';
-type Translate = (key: string) => string;
+type Translate = (key: string, params?: Record<string, unknown>) => string;
 
 export function facilityProgressAccessibleName(
   facilityName: string,
@@ -8,13 +8,13 @@ export function facilityProgressAccessibleName(
   translate: Translate
 ) {
   if (dimension === 'volume') {
-    return `${facilityName}: ${translate('Order Volume')}`;
+    return translate('{facility}: {metric}', { facility: facilityName, metric: translate('Order Volume') });
   }
   if (dimension === 'velocity' && !activeFacilityFallback) {
-    return `${facilityName}: ${translate('Fulfillment Velocity')}`;
+    return translate('{facility}: {metric}', { facility: facilityName, metric: translate('Fulfillment Velocity') });
   }
   if (dimension === 'rejections') {
-    return `${facilityName}: ${translate('Active orders (rejections)')}`;
+    return translate('{facility}: {metric}', { facility: facilityName, metric: translate('Active orders (rejections)') });
   }
-  return `${facilityName}: ${translate('Active orders')}`;
+  return translate('{facility}: {metric}', { facility: facilityName, metric: translate('Active orders') });
 }

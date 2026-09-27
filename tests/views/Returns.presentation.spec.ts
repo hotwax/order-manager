@@ -98,7 +98,7 @@ describe("Find Returns integration surface", () => {
     expect(detail).toContain("Whole return");
     expect(detail).toContain("status.returnItemSeqId === \"_NA_\"");
     expect(detail).toContain("candidate.returnItemSeqId === status.returnItemSeqId");
-    expect(detail).toContain("`${translate(\"Item\")} · ${itemLabel}`");
+    expect(detail).toContain("translate(\"Item: {item}\", { item: itemLabel })");
   });
 
   it("builds a semantic timeline with event-specific icons and only confirms timed restocks from received item events", () => {

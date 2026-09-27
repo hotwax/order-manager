@@ -286,7 +286,7 @@
           <ion-card-header>
             <ion-card-title>{{ translate('Payment outcome') }}</ion-card-title>
             <ion-card-subtitle v-if="sourceOrderPayments.length">
-              {{ translate('Net refunded') }} {{ formatMoney(paymentNetRefundedAmount, returnRecord.currencyUomId) }}
+              {{ translate("Net refunded {amount}", { amount: formatMoney(paymentNetRefundedAmount, returnRecord.currencyUomId) }) }}
             </ion-card-subtitle>
           </ion-card-header>
           <ion-list lines="none">
@@ -308,7 +308,7 @@
                       {{ payment.paymentMethodTypeId || translate('Payment preference') }}
                     </p>
                     {{ payment.paymentMethodTypeDescription }}
-                    <p>{{ translate('From order') }} {{ payment.orderName }}</p>
+                    <p>{{ translate("From order {order}", { order: payment.orderName }) }}</p>
                     <p v-if="payment.createdDate">
                       {{ formatDateTime(payment.createdDate) }}
                     </p>
@@ -693,9 +693,9 @@ function itemSecondaryLabel(item: ReturnItemDetail) {
 
 function itemReferenceLabel(item: ReturnItemDetail) {
   return [
-    `${translate("Return item")} ${item.returnItemSeqId}`,
-    item.orderItemSeqId ? `${translate("Order item")} ${item.orderItemSeqId}` : "",
-    item.productId ? `${translate("Product")} ${item.productId}` : ""
+    translate("Return item {id}", { id: item.returnItemSeqId }),
+    item.orderItemSeqId ? translate("Order item {id}", { id: item.orderItemSeqId }) : "",
+    item.productId ? translate("Product {id}", { id: item.productId }) : ""
   ].filter(Boolean).join(" · ");
 }
 
@@ -743,7 +743,7 @@ function restockState(item: ReturnItemDetail) {
 function itemGroupLabel(group: { orderId?: string; orderName?: string }) {
   const orderLabel = group.orderName || group.orderId;
 
-  return orderLabel ? `${translate("Items from order")} ${orderLabel}` : translate("Items without linked order");
+  return orderLabel ? translate("Items from order {order}", { order: orderLabel }) : translate("Items without linked order");
 }
 
 function timelineScopeLabel(status: ReturnStatusHistory) {
@@ -751,7 +751,7 @@ function timelineScopeLabel(status: ReturnStatusHistory) {
   const item = returnRecord.value?.items.find((candidate) => candidate.returnItemSeqId === status.returnItemSeqId);
   const itemLabel = item?.productName || item?.description || item?.sku || item?.productId || status.returnItemSeqId;
 
-  return `${translate("Item")} · ${itemLabel}`;
+  return translate("Item: {item}", { item: itemLabel });
 }
 
 function statusItem(status: ReturnStatusHistory) {

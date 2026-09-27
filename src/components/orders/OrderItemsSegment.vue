@@ -52,7 +52,7 @@
         <ion-card-header>
           <ion-card-title>{{ translate('Payment') }}</ion-card-title>
           <ion-card-subtitle v-if="order.payments.list.length" :color="order.payments.netColor">
-            {{ translate('Net') }} {{ money(order.payments.netAmount) }}
+            {{ translate('Net {amount}', { amount: money(order.payments.netAmount) }) }}
           </ion-card-subtitle>
         </ion-card-header>
         <ion-list lines="none">
@@ -76,7 +76,7 @@
                   :router-link="`/returns/${returnId}`"
                   @click.stop
                 >
-                  {{ translate('Return') }} {{ returnId }}
+                  {{ translate('Return {id}', { id: returnId }) }}
                 </ion-button>
               </ion-label>
               <ion-label slot="end">{{ money(payment.amount) }}</ion-label>
@@ -183,8 +183,8 @@ function productRowProps(group: EnrichedItemGroup) {
 /** Inside a rolled up group the item row names the order item rather than the product. */
 function itemIdentity(item: EnrichedOrderItem) {
   return {
-    primary: `${translate('Item')} ${item.orderItemSeqId}`,
-    secondary: item.externalId && item.externalId !== 'null' ? `${translate('External ID')}: ${item.externalId}` : '',
+    primary: translate('Item {id}', { id: item.orderItemSeqId }),
+    secondary: item.externalId && item.externalId !== 'null' ? translate('External ID: {id}', { id: item.externalId }) : '',
     showQuantity: false,
   };
 }
@@ -202,7 +202,7 @@ function itemRow(item: EnrichedOrderItem, identity: ReturnType<typeof productRow
     facilityDisabled: props.itemActions[item.orderItemSeqId]?.facilityDisabled,
     attributesLabel: translate('{count} attributes', { count: attributeCount }),
     statuses: item.statuses,
-    statusDetail: item.shipGroupSeqId ? `${translate('#')}${item.shipGroupSeqId}` : '',
+    statusDetail: item.shipGroupSeqId ? translate('#{id}', { id: item.shipGroupSeqId }) : '',
     amount: money(item.unitPrice * item.quantity),
     adjustments: item.adjustments.map((adj) => ({ label: adj.comment, amount: money(adj.amount) })),
     'onUpdate:selected': (selected: boolean) => selectItems([item], selected),

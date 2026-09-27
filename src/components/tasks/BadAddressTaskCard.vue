@@ -19,8 +19,8 @@
     <template #content-start>
       <ion-item lines="full">
         <ion-label>
-          {{ translate('Facility') }}: {{ brokeredFacilityName(task) }}
-          <p>{{ translate('Shipping method') }}: {{ carrierShippingMethodLabel(task) }}</p>
+          {{ translate('Facility: {facility}', { facility: brokeredFacilityName(task) }) }}
+          <p>{{ translate('Shipping method: {method}', { method: carrierShippingMethodLabel(task) }) }}</p>
         </ion-label>
       </ion-item>
     </template>

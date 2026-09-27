@@ -184,7 +184,7 @@ function routingFacilityName(task: any): string {
 
 function routingMovementLabel(task: any): string {
   const facilityName = routingFacilityName(task);
-  return facilityName ? `${translate('Moved to')} ${facilityName}` : translate('Moved to parking');
+  return facilityName ? translate('Moved to {facility}', { facility: facilityName }) : translate('Moved to parking');
 }
 
 function routingPath(task: any): string {
@@ -321,7 +321,7 @@ function availableBadgeLabel(item: any, task: any): string {
     ?? item.computedAtp
     ?? 0;
 
-  return `${translate('Available')}: ${Number(quantity)}`;
+  return translate('Available: {count}', { count: Number(quantity) });
 }
 
 function getSuggestedItems(task: any): { list: any[]; newTotal: number; suggestedRefund: number } {
