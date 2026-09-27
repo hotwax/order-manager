@@ -82,8 +82,8 @@ import {
 } from '@ionic/vue';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { DxpModal, translate, useModalFlow } from '@common';
+import { useOrderDetail } from '@/composables/useOrderDetail';
 import { requiredLabel, showToast } from '@/utils';
-import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
 
@@ -163,7 +163,7 @@ const isDirty = computed(() => (taskNameEdited.value && !!form.workEffortName.tr
   || form.workEffortPurposeTypeId !== (props.defaultWorkEffortPurposeTypeId || '')
   || selectedShipGroupSeqIds.value.length !== (props.shipGroups?.length ?? 0));
 
-const orderDetailStore = useOrderDetailStore();
+const { createOrderTasks, bulkCreateOrderTasks } = useOrderDetail();
 
 useModalFlow({
   dirty: isDirty,
@@ -171,8 +171,8 @@ useModalFlow({
   async confirm() {
     const task = { ...form };
     try {
-      if (props.orderId) await orderDetailStore.createOrderTasks(props.orderId, selectedShipGroupSeqIds.value, task);
-      else await orderDetailStore.bulkCreateOrderTasks(props.orderIds ?? [], task);
+      if (props.orderId) await createOrderTasks(props.orderId, selectedShipGroupSeqIds.value, task);
+      else await bulkCreateOrderTasks(props.orderIds ?? [], task);
     } catch {
       throw new Error(translate('Failed to create tasks. Please try again.'));
     }

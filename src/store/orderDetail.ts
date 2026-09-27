@@ -683,34 +683,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         throw error;
       }
     },
-    /** One task per ship group of one order. */
-    async createOrderTasks(orderId: string, shipGroupSeqIds: string[], taskData: { workEffortTypeId: string; workEffortPurposeTypeId: string; workEffortName: string; description: string }) {
-      return api({
-        url: 'oms/orders/tasks',
-        method: 'POST',
-        data: shipGroupSeqIds.map((shipGroupSeqId) => ({ orderId, shipGroupSeqId, ...taskData, statusId: 'TASK_CREATED' })),
-      });
-    },
-    async bulkCreateOrderTasks(orderIds: string[], taskData: { workEffortTypeId: string; workEffortPurposeTypeId: string; workEffortName: string; description: string }) {
-      const shipGroupsByOrder = await Promise.all(
-        orderIds.map(async (orderId) => {
-          const resp = await api({ url: `oms/orders/${orderId}/shipGroups`, method: 'GET' });
-          const shipGroups: any[] = Array.isArray(resp.data) ? resp.data : (resp.data?.docs ?? []);
-          return {
-            orderId,
-            shipGroupSeqIds: shipGroups.map((shipGroup) => shipGroup.shipGroupSeqId).filter(Boolean)
-          };
-        })
-      );
-      const payload = shipGroupsByOrder
-        .flatMap(({ orderId, shipGroupSeqIds }) => shipGroupSeqIds.map((shipGroupSeqId) => ({
-          orderId,
-          shipGroupSeqId,
-          ...taskData,
-          statusId: 'TASK_CREATED'
-        })));
-      return api({ url: 'oms/orders/tasks', method: 'POST', data: payload });
-    },
     async bulkCancelOrders(orderIds: string[]) {
       const results = await Promise.all(orderIds.map(async (orderId) => {
         const orderResponse = await useOrderDetail().getOrder(orderId);
