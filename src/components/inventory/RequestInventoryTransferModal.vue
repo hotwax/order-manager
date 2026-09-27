@@ -95,7 +95,7 @@
 
       <!-- Step 2: review, laid out like an existing transfer. -->
       <template v-else>
-        <ion-item>
+        <ion-item lines="none">
           <ion-label>
             <p class="overline">
               {{ translate('New transfer') }}
@@ -108,7 +108,7 @@
           <ion-item-divider color="light">
             <ion-label>{{ side.title }}</ion-label>
           </ion-item-divider>
-          <ion-item>
+          <ion-item lines="none">
             <ion-label>
               {{ side.facilityName }}
               <p>{{ side.facilityId }}</p>
@@ -122,7 +122,7 @@
               <p>{{ translate('QOH') }}</p>
             </ion-label>
           </ion-item>
-          <ion-item>
+          <ion-item lines="none">
             <ion-label>
               <p>{{ translate('After transfer') }}</p>
             </ion-label>

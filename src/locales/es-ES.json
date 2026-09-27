@@ -932,6 +932,7 @@
   "Inventory issued": "Inventario emitido",
   "Inventory partly issued": "Inventario emitido parcialmente",
   "Inventory transfer": "Transferencia de inventario",
+  "Inventory transfer: {id}": "Transferencia de inventario: {id}",
   "Inventory not issued": "Inventario no emitido",
   "On hand at sale": "En existencia al momento de la venta",
   "{count} later date": "{count} fecha posterior",

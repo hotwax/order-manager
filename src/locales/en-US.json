@@ -956,6 +956,7 @@
   "Inventory issued": "Inventory issued",
   "Inventory partly issued": "Inventory partly issued",
   "Inventory transfer": "Inventory transfer",
+  "Inventory transfer: {id}": "Inventory transfer: {id}",
   "Inventory not issued": "Inventory not issued",
   "On hand at sale": "On hand at sale",
   "{count} later date": "{count} later date",
