@@ -57,26 +57,26 @@
 
           <ion-select
             v-model="searchFilters.allocationState"
-            label="Allocation state"
+            :label="translate('Allocation state')"
             label-placement="stacked"
             fill="outline"
             interface="popover"
           >
-            <ion-select-option value="All">All locations</ion-select-option>
-            <ion-select-option value="Allocated">Allocated</ion-select-option>
-            <ion-select-option value="AwaitingBrokering">Awaiting brokering</ion-select-option>
-            <ion-select-option value="Unfillable">Unfillable</ion-select-option>
-            <ion-select-option value="Archived">Archived</ion-select-option>
+            <ion-select-option value="All">{{ translate('All locations') }}</ion-select-option>
+            <ion-select-option value="Allocated">{{ translate('Allocated') }}</ion-select-option>
+            <ion-select-option value="AwaitingBrokering">{{ translate('Awaiting brokering') }}</ion-select-option>
+            <ion-select-option value="Unfillable">{{ translate('Unfillable') }}</ion-select-option>
+            <ion-select-option value="Archived">{{ translate('Archived') }}</ion-select-option>
           </ion-select>
 
           <ion-select
             v-model="searchFilters.channel"
-            label="Sales channel"
+            :label="translate('Sales channel')"
             label-placement="stacked"
             fill="outline"
             interface="popover"
           >
-            <ion-select-option value="All">All channels</ion-select-option>
+            <ion-select-option value="All">{{ translate('All channels') }}</ion-select-option>
             <ion-select-option v-for="option in salesChannels" :key="option.enumId" :value="option.enumId">
               {{ option.description || option.enumName || option.enumId }}
             </ion-select-option>
@@ -84,12 +84,12 @@
 
           <ion-select
             v-model="searchFilters.shipmentMethodTypeId"
-            label="Shipping method"
+            :label="translate('Shipping method')"
             label-placement="stacked"
             fill="outline"
             interface="popover"
           >
-            <ion-select-option value="All">All methods</ion-select-option>
+            <ion-select-option value="All">{{ translate('All methods') }}</ion-select-option>
             <ion-select-option v-for="option in shipmentMethodOptions" :key="option.id" :value="option.id">
               {{ option.label }}
             </ion-select-option>

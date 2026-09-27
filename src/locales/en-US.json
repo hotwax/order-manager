@@ -1069,5 +1069,10 @@
   "{count} records": "{count} record | {count} records",
   "{amount} each": "{amount} each",
   "First name": "First name",
-  "Last name": "Last name"
+  "Last name": "Last name",
+  "Allocation state": "Allocation state",
+  "All locations": "All locations",
+  "Archived": "Archived",
+  "High priority": "High priority",
+  "Normal or no priority": "Normal or no priority"
 }
