@@ -1297,7 +1297,8 @@ watch(cronExpressionInput, (newVal) => {
 
 
 function openScheduleModal() {
-  const currentCron = fulfillmentSyncData.value?.settings?.cronExpression || 'Paused';
+  // An unscheduled job starts empty so the input shows its example rather than an English word it can't parse.
+  const currentCron = fulfillmentSyncData.value?.settings?.cronExpression || '';
   cronExpressionInput.value = currentCron;
   const paused = fulfillmentSyncData.value?.settings?.paused || 'N';
   isJobActive.value = paused !== 'Y';
