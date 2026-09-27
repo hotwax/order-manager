@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { api, commonUtil, logger, useSolrSearch } from "@common";
+import { api, commonUtil, logger, translate, useSolrSearch } from "@common";
 import { FACILITY_CHANGE_PAGE_SIZE, UNFILLABLE_SAMPLE_SIZE, useOrderDetail, type IssuanceLine } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useSeedStore } from "./seed";
@@ -503,7 +503,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       } catch (error: any) {
         logger.error(`Failed to load order detail for [${orderId}]`, error);
         entry.status = "error";
-        entry.error = error?.message || "Failed to load order";
+        entry.error = error?.message || translate("Failed to load order");
       }
     },
     /** Run one of the order's history loads, counting it in the history status. It says whether it worked. */

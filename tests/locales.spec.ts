@@ -1,3 +1,5 @@
+import { readdirSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { i18n, translate } from '@common/core/i18n';
 import enUS from '@/locales/en-US.json';
@@ -33,6 +35,40 @@ describe('locale messages', () => {
     const mismatched = Object.keys(esES).filter((key) => key in enUS
       && placeholders((esES as Record<string, string>)[key]).join() !== placeholders((enUS as Record<string, string>)[key]).join());
     expect(mismatched).toEqual([]);
+  });
+
+  it('translate every key the app and common use, in both languages', () => {
+    // A key missing from en-US still shows its English text, so nothing looks wrong until a
+    // translator never sees it. Common's components read their text from this app's messages too.
+    const sources = [resolve(process.cwd(), 'src'), resolve(process.cwd(), '../../common')];
+    const files = sources.flatMap((dir) => readdirSync(dir, { recursive: true, encoding: 'utf8' })
+      .filter((file) => /\.(ts|vue)$/.test(file) && !/(^|\/)(tests|locales)\/|\.spec\.ts$/.test(file))
+      .map((file) => resolve(dir, file)));
+    const keys = new Set<string>();
+    const literal = `(["'])((?:(?!\\1)[^\\\\\\n]|\\\\.)*)\\1`;
+    for (const file of files) {
+      const source = readFileSync(file, 'utf8');
+      for (const match of source.matchAll(new RegExp(`(?:translate|requiredLabel)\\(\\s*${literal}`, 'g'))) keys.add(match[2].replace(/\\'/g, "'"));
+    }
+    expect(keys.size).toBeGreaterThan(800);
+    expect([...keys].filter((key) => !(key in enUS))).toEqual([]);
+    expect(Object.keys(esES).sort()).toEqual(Object.keys(enUS).sort());
+  });
+
+  it('give every message its own Spanish text', () => {
+    // Words that read the same in both languages; anything else rendering identically is untranslated.
+    const sameInBoth = new Set(['Error', 'ID', 'Launchpad', 'OMS', 'Shopify', 'SKU', 'Subtotal', 'Total', '{count} min']);
+    const params = { count: 2, shown: 1, total: 3, metric: 'Order Volume', query: 'q' };
+    const render = (locale: string) => {
+      i18n.global.setLocaleMessage('es-ES', esES);
+      i18n.global.locale.value = locale;
+      return Object.fromEntries(Object.keys(enUS).map((key) => [key, translate(key, params)]));
+    };
+    const english = render('en-US');
+    const spanish = render('es-ES');
+    const untranslated = Object.keys(enUS).filter((key) => !sameInBoth.has(key)
+      && spanish[key] === english[key] && /[a-z]{3}/.test(english[key].replace(/\{[^}]*\}/g, '')));
+    expect(untranslated).toEqual([]);
   });
 
   it('link only to keys that exist and have no period, which would render empty', () => {

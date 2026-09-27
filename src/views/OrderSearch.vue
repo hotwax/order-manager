@@ -114,7 +114,7 @@
 
       <ErrorState
         v-if="error"
-        title="Order search failed"
+        :title="translate('Order search failed')"
         :message="error"
       />
 

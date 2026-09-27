@@ -45,7 +45,7 @@ export function toSearchOrderRowViewModel(order: Order): OrderRowViewModel {
   return createOrderRowViewModel({
     orderId: order.id,
     orderName: order.orderName || order.id,
-    customerName: order.customerName || order.customerId || 'Unknown customer',
+    customerName: order.customerName || order.customerId || translate('Unknown customer'),
     status: order.status,
     allocationSummary: order.allocationSummary,
     carrier: order.carrierPartyId,
@@ -63,7 +63,7 @@ export function toWorkflowOrderRowViewModel(
   return createOrderRowViewModel({
     orderId: order.orderId,
     orderName: order.orderName || enrichment?.orderName || order.orderId,
-    customerName: enrichment?.customerPartyName || order.customerName?.trim() || order.customerPartyId || 'Unknown customer',
+    customerName: enrichment?.customerPartyName || order.customerName?.trim() || order.customerPartyId || translate('Unknown customer'),
     allocationSummary: workflowAllocationSummary(order, enrichment),
     carrier: usableCarrier(order.carrierPartyId) || usableCarrier(enrichment?.carrierPartyId),
     shippingMethod: order.shipmentMethodDesc || order.shippingMethodTypeId || enrichment?.shipmentMethodTypeId,

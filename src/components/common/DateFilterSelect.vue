@@ -31,6 +31,9 @@
       <ion-datetime
         presentation="date"
         :show-default-buttons="true"
+        :locale="locale"
+        :cancel-text="translate('Cancel')"
+        :done-text="translate('Done')"
         :value="modelValue || undefined"
         :min="min || undefined"
         :max="latestSelectable"
@@ -49,8 +52,10 @@ import { computed, ref } from 'vue';
 import { IonDatetime, IonIcon, IonInput, IonItem, IonLabel, IonPopover } from '@ionic/vue';
 import { chevronDownOutline } from 'ionicons/icons';
 import { DateTime } from 'luxon';
-import { formatDate } from '@/utils/format';
+import { locale as appLocale, formatDate } from '@/utils/format';
 import { translate } from '@common';
+
+const locale = computed(() => appLocale());
 
 const props = withDefaults(defineProps<{
   modelValue: string;

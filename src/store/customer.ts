@@ -24,7 +24,7 @@ import {
 import { listReturns } from '@/services/returns';
 import { useSeedStore } from '@/store/seed';
 import { useProductMaster } from '@/composables/useProductMaster';
-import { commonUtil } from '@common';
+import { commonUtil, translate } from '@common';
 import type {
   ContactSection,
   CustomerCommunicationSummary,
@@ -355,7 +355,7 @@ export const useCustomerStore = defineStore('customerDetail', {
           payload: null,
           status: 'error',
           loadedAt: '',
-          error: error?.message || 'Failed to load customer'
+          error: error?.message || translate('Failed to load customer')
         };
       }
     },
@@ -406,7 +406,7 @@ export const useCustomerStore = defineStore('customerDetail', {
           payload: [],
           status: 'error',
           loadedAt: '',
-          error: error?.message || 'Failed to load orders'
+          error: error?.message || translate('Failed to load orders')
         };
       }
     },
@@ -434,7 +434,7 @@ export const useCustomerStore = defineStore('customerDetail', {
           payload: [],
           status: 'error',
           loadedAt: '',
-          error: error?.message || 'Failed to load tasks'
+          error: error?.message || translate('Failed to load tasks')
         };
       }
     },
@@ -459,7 +459,7 @@ export const useCustomerStore = defineStore('customerDetail', {
           hasMore: more.length >= pageSize
         };
       } catch (error: any) {
-        this.tasksByPartyId[partyId] = { ...existing, status: 'error', error: error?.message || 'Failed to load more tasks' };
+        this.tasksByPartyId[partyId] = { ...existing, status: 'error', error: error?.message || translate('Failed to load more tasks') };
       }
     },
 
@@ -484,7 +484,7 @@ export const useCustomerStore = defineStore('customerDetail', {
           payload: [],
           status: 'error',
           loadedAt: '',
-          error: error?.message || 'Failed to load returns'
+          error: error?.message || translate('Failed to load returns')
         };
       }
     },
@@ -509,7 +509,7 @@ export const useCustomerStore = defineStore('customerDetail', {
           payload: [],
           status: 'error',
           loadedAt: '',
-          error: error?.message || 'Failed to load communications'
+          error: error?.message || translate('Failed to load communications')
         };
       }
     },
@@ -551,7 +551,7 @@ export const useCustomerStore = defineStore('customerDetail', {
           payload: [],
           status: 'error',
           loadedAt: '',
-          error: error?.message || 'Failed to load relationships'
+          error: error?.message || translate('Failed to load relationships')
         };
       }
     },

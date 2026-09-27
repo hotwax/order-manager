@@ -38,7 +38,7 @@
             <!-- Date Today -->
             <p class="overline">{{ translate("Today") }}</p>
             <!-- Order Count today -->
-            <h1 class="big-number">{{ (fulfillmentProgress.totalOrdersCount || 0).toLocaleString() }}</h1>
+            <h1 class="big-number">{{ formatNumber(fulfillmentProgress.totalOrdersCount) }}</h1>
             <!-- Time since day start -->
             <p class="time-elapsed">{{ translate("{count} hours since day start", { count: hoursSinceDayStart }) }}</p>
           </div>
@@ -631,7 +631,7 @@ import { useRouter, type RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 import { DateTime } from 'luxon';
-import { formatDate, formatRelative } from '@/utils/format';
+import { formatDate, formatNumber, formatRelative } from '@/utils/format';
 
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
@@ -790,7 +790,7 @@ const queueSegments = computed(() => {
     let runningMinutes = 0;
     segments = sortedCombinations.map((item, index) => {
       const shipmentMethod = seedStore.shipmentMethodTypes?.byId?.[item.shipmentMethodTypeId];
-      const label = `${item.deliveryDays}d - ${shipmentMethod?.description || item.shipmentMethodTypeId || 'None'}`;
+      const label = translate("{count}d - {method}", { count: item.deliveryDays, method: shipmentMethod?.description || item.shipmentMethodTypeId || translate("None") });
       const segmentMinutes = Math.ceil(item.count / batchSize) * cronIntervalMinutes;
       runningMinutes += segmentMinutes;
       return {
@@ -870,7 +870,7 @@ const queueSegments = computed(() => {
       runningMinutes += mins;
       return {
         id: c.id,
-        label: c.label,
+        label: translate(c.label),
         orderCount: count,
         estimatedTime: formatEstimatedTime(runningMinutes),
         color: c.color,
@@ -1034,7 +1034,7 @@ function percentValue(count: number, total: number) {
 }
 
 function formatCount(value: number) {
-  return countValue(value).toLocaleString();
+  return formatNumber(countValue(value));
 }
 
 /** "1 order", "1,204 orders". */

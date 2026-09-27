@@ -34,7 +34,7 @@
 
     <ion-label class="tablet">
       {{ model.orderedDateTime }}
-      <p v-if="model.orderedRelativeAge">Ordered {{ model.orderedRelativeAge }}</p>
+      <p v-if="model.orderedRelativeAge">{{ translate('Ordered {age}', { age: model.orderedRelativeAge }) }}</p>
     </ion-label>
 
     <ion-label :class="deadlineClass">
@@ -43,13 +43,14 @@
         <p v-if="model.estimatedDeliveryRelativeLabel">{{ model.estimatedDeliveryRelativeLabel }}</p>
       </template>
       <template v-else>
-        <ion-note>No estimated delivery date</ion-note>
+        <ion-note>{{ translate('No estimated delivery date') }}</ion-note>
       </template>
     </ion-label>
   </div>
 </template>
 
 <script setup lang="ts">
+import { translate } from '@common';
 import { IonCheckbox, IonItem, IonLabel, IonNote } from '@ionic/vue';
 import { computed } from 'vue';
 import OrderAllocationSummary from '@/components/orders/OrderAllocationSummary.vue';

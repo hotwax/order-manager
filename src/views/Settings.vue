@@ -142,10 +142,7 @@
               <ion-label>
                 {{ translate(domain.label) }}
                 <p>
-                  {{ translate('{count} records', { count: domain.count }) }}
-                  <template v-if="domain.syncedAt"> · {{ translate("synced") }} {{ formatSyncTime(domain.syncedAt) }}</template>
-                  <template v-else-if="domain.syncClass === 'A'"> · {{ translate("live while in use") }}</template>
-                  <template v-else> · {{ translate("not synced yet") }}</template>
+                  {{ domainSyncLabel(domain) }}
                 </p>
               </ion-label>
               <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)" :aria-label="translate('Refresh {label}', { label: translate(domain.label) })" :title="translate('Refresh {label}', { label: translate(domain.label) })">
@@ -247,7 +244,7 @@ const locale = computed(() => i18n.global.locale.value);
 
 function setLocale(newLocale: string) {
   i18n.global.locale.value = newLocale;
-  cookieHelper().set('locale', newLocale);
+  cookieHelper().set('locale', newLocale, 60 * 60 * 24 * 365);
 }
 
 const props = defineProps({
@@ -370,12 +367,18 @@ const formatSyncTime = (millis: number) => formatDateTime(millis);
 
 const syncSubtitle = computed(() => {
   if (!lastSyncedAt.value) return translate("Database not synced yet");
-  const parts = [`${translate("Last sync:")} ${formatSyncTime(lastSyncedAt.value)}`];
   if (oldestSyncedAt.value && oldestSyncedAt.value !== lastSyncedAt.value) {
-    parts.push(`${translate("oldest:")} ${formatSyncTime(oldestSyncedAt.value)}`);
+    return translate("Last sync: {time}, oldest: {oldest}", { time: formatSyncTime(lastSyncedAt.value), oldest: formatSyncTime(oldestSyncedAt.value) });
   }
-  return parts.join(" · ");
+  return translate("Last sync: {time}", { time: formatSyncTime(lastSyncedAt.value) });
 });
+
+/** "1,204 records, synced Sep 22, 2026, 2:33 PM", as one message so each language orders it. */
+function domainSyncLabel(domain: { count: number; syncedAt?: number | null; syncClass?: string }) {
+  if (domain.syncedAt) return translate("{count} records, synced {time}", { count: domain.count, time: formatSyncTime(domain.syncedAt) });
+  if (domain.syncClass === "A") return translate("{count} records, live while in use", { count: domain.count });
+  return translate("{count} records, not synced yet", { count: domain.count });
+}
 
 const userFetchStatus = computed(() => userStore.fetchStatus);
 

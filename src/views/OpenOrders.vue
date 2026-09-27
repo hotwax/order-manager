@@ -79,7 +79,7 @@
             :disabled="!selectedIds.size"
             @click="runAction(action)"
           >
-            {{ action.label }}
+            {{ translate(action.label) }}
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -349,8 +349,8 @@ async function runAction(action: BulkActionDefinition) {
 
   if (action.confirmText) {
     const alert = await alertController.create({
-      header: action.label,
-      message: action.confirmText,
+      header: translate(action.label),
+      message: translate(action.confirmText),
       buttons: [
         { text: translate('Cancel'), role: 'cancel' },
         { text: translate('Confirm'), role: 'confirm' }
@@ -364,7 +364,7 @@ async function runAction(action: BulkActionDefinition) {
   const count = selectedIds.value.size;
   try {
     await store.runBulkAction(bucket, action.id);
-    toastMessage.value = translate('{action}: {count} orders', { action: action.label, count });
+    toastMessage.value = translate('{action}: {count} orders', { action: translate(action.label), count });
   } catch {
     toastMessage.value = translate('Failed to complete bulk action. Please try again.');
   }

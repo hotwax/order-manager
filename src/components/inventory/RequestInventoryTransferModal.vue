@@ -73,7 +73,7 @@
                 {{ row.facilityName }}
                 <p>{{ row.facilityId }}</p>
                 <p v-if="row.miles !== undefined">
-                  {{ translate('{distance} miles', { distance: distanceFormat.format(row.miles), count: row.miles }) }}
+                  {{ translate('{distance} miles', { distance: formatNumber(row.miles, { maximumFractionDigits: 1 }), count: row.miles }) }}
                 </p>
               </ion-label>
               <ion-label slot="end" class="ion-text-end transfer-measure">
@@ -85,7 +85,7 @@
                 <p>{{ translate('QOH') }}</p>
               </ion-label>
               <ion-label slot="end" class="ion-text-end transfer-measure">
-                {{ shown(row.perDay, rateFormat) }}
+                {{ shown(row.perDay, { maximumFractionDigits: 2 }) }}
                 <p>{{ translate('Sales/day') }}</p>
               </ion-label>
             </ion-item>
@@ -171,6 +171,7 @@ import {
 import { useOrderDetailStore } from "@/store/orderDetail";
 import { useSeedStore } from "@/store/seed";
 import { showToast } from "@/utils";
+import { formatNumber } from "@/utils/format";
 
 const props = defineProps<{
   orderId: string;
@@ -261,9 +262,7 @@ const facilityGroups = computed(() => {
     .filter((group) => group.rows.length);
 });
 
-const distanceFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
-const rateFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
-const shown = (value?: number, format?: Intl.NumberFormat) => value === undefined ? "-" : (format ? format.format(value) : String(value));
+const shown = (value?: number, options?: Intl.NumberFormatOptions) => value === undefined ? "-" : formatNumber(value, options);
 
 async function load() {
   loading.value = true;
@@ -301,7 +300,6 @@ const sides = computed(() => source.value ? [
   { title: translate("Transfer to"), facilityId: props.destinationFacilityId, facilityName: seedStore.facilityName(props.destinationFacilityId), change: quantity.value },
 ] : []);
 
-const signed = new Intl.NumberFormat(undefined, { signDisplay: "always" });
 
 function stockNow(facilityId: string, measure: keyof Stock) {
   const current = stock.value?.[facilityId]?.[measure];
@@ -313,7 +311,7 @@ function stockNow(facilityId: string, measure: keyof Stock) {
 function stockAfter(facilityId: string, measure: keyof Stock, change: number) {
   const current = stock.value?.[facilityId]?.[measure];
 
-  return current === undefined ? "-" : `${current + change} (${signed.format(change)})`;
+  return current === undefined ? "-" : `${formatNumber(current + change)} (${formatNumber(change, { signDisplay: "always" })})`;
 }
 
 async function submit() {

@@ -268,7 +268,7 @@ function enrichShipGroup(
       statuses: status ? [{ label: status, color: statusColor }] : [],
       shipGroupSeqId: sg.shipGroupSeqId,
       facilityId: sg.facilityId || '',
-      facilityName: facilityName || 'Facility',
+      facilityName: facilityName || translate('Facility'),
       attributes,
       attributeCount: attributes.length,
       adjustments: itemAdjustmentSummaries(raw, item, seed),

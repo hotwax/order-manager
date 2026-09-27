@@ -63,7 +63,7 @@
 
       <ErrorState
         v-if="error"
-        title="Could not load orders"
+        :title="translate('Could not load orders')"
         :message="error"
       />
 

@@ -8,7 +8,7 @@ import { i18n, translate } from '@common/core/i18n';
  */
 
 /** The language the app is showing, so numbers and dates read like the text around them. */
-const locale = (): string | undefined => {
+export const locale = (): string | undefined => {
   const current = i18n?.global?.locale;
   return (typeof current === 'string' ? current : current?.value) || undefined;
 };
@@ -58,6 +58,13 @@ export function currencySymbol(currency?: string): string {
   }
 }
 
+/** A number in the user's language: "1,204", "1.204", "+3". */
+export function formatNumber(value: unknown, options?: Intl.NumberFormatOptions): string {
+  const number = Number(value ?? 0);
+
+  return new Intl.NumberFormat(locale(), options).format(Number.isFinite(number) ? number : 0);
+}
+
 function format(value: any, options: DateTimeFormatOptions): string {
   const millis = toMillis(value);
   if (millis === undefined) return '';
@@ -76,6 +83,9 @@ export const formatTime = (value: any, { seconds = false } = {}) =>
 /** "Sep 22, 2026, 2:33 PM", or "Sep 22, 2:33 PM" without the year where a list is dense. */
 export const formatDateTime = (value: any, { year = true } = {}) =>
   format(value, year ? DateTime.DATETIME_MED : { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
+/** "September 2026". */
+export const formatMonthYear = (value: any) => format(value, { month: 'long', year: 'numeric' });
 
 /** "3 days ago", "in 2 hours". */
 export function formatRelative(value: any): string {

@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/orders" />
+          <ion-back-button default-href="/orders" :aria-label="translate('Back')" />
           <ion-menu-button />
         </ion-buttons>
         <ion-title>{{ translate('Order details') }}</ion-title>

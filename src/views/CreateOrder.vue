@@ -723,7 +723,7 @@ async function submitOrder() {
 
     if (response?.data?.shopifyOrderName) {
       orderResponseData.value = {
-        shopifyOrderId: response.data.shopifyOrderId || 'Unknown ID',
+        shopifyOrderId: response.data.shopifyOrderId || translate('Unknown ID'),
         shopifyOrderName: response.data.shopifyOrderName
       };
       

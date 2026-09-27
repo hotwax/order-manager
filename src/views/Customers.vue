@@ -133,7 +133,7 @@ async function runSearch() {
     customers.value = result.customers;
     total.value = result.total;
   } catch (searchError: any) {
-    error.value = searchError?.message || 'Failed to search customers';
+    error.value = searchError?.message || translate('Failed to search customers');
     customers.value = [];
     total.value = 0;
   } finally {

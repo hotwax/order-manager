@@ -3,7 +3,7 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/customers" />
+          <ion-back-button default-href="/customers" :aria-label="translate('Back')" />
           <ion-menu-button />
         </ion-buttons>
         <ion-title>{{ translate('Customer Detail') }}</ion-title>
@@ -25,7 +25,7 @@
           <ion-card class="customer-header-card">
             <ion-item lines="none">
               <ion-label>
-                <h1>{{ customer.name || 'First Last' }}</h1>
+                <h1>{{ customer.name || translate('Unknown customer') }}</h1>
                 <p v-if="customerSince">{{ translate('Customer since {date}', { date: customerSince }) }}</p>
               </ion-label>
               <div slot="end" class="lifetime-value ion-text-right">
@@ -491,7 +491,7 @@ import { useUserStore } from '@/store/user';
 import Actions from '@/authorization/actions';
 import type { CustomerOrderCardData, CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
 import type { ReturnSummary } from '@/types/returns';
-import { formatDate, formatDateTime, formatMoney } from '@/utils/format';
+import { formatDate, formatDateTime, formatMoney, formatMonthYear } from '@/utils/format';
 
 const props = defineProps<{
   customerId: string;
@@ -789,21 +789,6 @@ function commStatusColor(statusId: string): string {
   return 'medium';
 }
 
-function parseDate(value?: string | number) {
-  if (!value) return undefined;
-  const stringValue = String(value);
-  const numeric = Number(value);
-  if (/^\d+$/.test(stringValue)) {
-    return DateTime.fromMillis(stringValue.length <= 10 ? numeric * 1000 : numeric);
-  }
-  const isoDate = DateTime.fromISO(stringValue);
-  return isoDate.isValid ? isoDate : DateTime.fromSQL(stringValue);
-}
-
-function formatMonthYear(value?: string | number) {
-  const date = parseDate(value);
-  return date?.isValid ? date.toFormat('LLLL yyyy') : '';
-}
 
 
 
