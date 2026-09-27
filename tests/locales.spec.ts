@@ -26,7 +26,7 @@ afterEach(() => {
 
 describe('locale messages', () => {
   it('compile in every language', () => {
-    expect(compileErrors('x-broken', { 'Write to support@hotwax.co': 'Write to support@hotwax.co' })).not.toEqual([]);
+    expect(compileErrors('en-x-broken', { 'Write to support@hotwax.co': 'Write to support@hotwax.co' })).not.toEqual([]);
     expect(compileErrors('en-US', enUS)).toEqual([]);
     expect(compileErrors('es-ES', esES)).toEqual([]);
   });
