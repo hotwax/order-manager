@@ -126,10 +126,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
   /* ── Modals shared by several actions ─────────────────────────────────── */
 
   async function openFacilityModal(): Promise<string | null> {
-    const modal = await modalController.create({ component: FacilityModal });
-    await modal.present();
-    const { data: facilityId } = await modal.onWillDismiss();
-    return facilityId || null;
+    return (await openModal<string>(FacilityModal)) ?? null;
   }
 
   /**

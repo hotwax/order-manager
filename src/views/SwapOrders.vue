@@ -141,6 +141,7 @@ import { useSeedStore } from '@/store/seed';
 import { fetchUnfillableProductCandidates, fetchUnfillableShipGroupsForProduct } from '@/services/order';
 import { fetchActiveSubstitutes } from '@/services/productAssociations';
 import { showToast } from '@/utils';
+import { openModal } from '@/utils/modal';
 import { countTaskTargets, runGroupedTaskMutation, shipGroupTaskTarget } from '@/utils/orderTaskBulk';
 import Actions from "@/authorization/actions";
 
@@ -294,9 +295,7 @@ async function bulkCancelOrders() {
 }
 
 async function bulkParkOrders() {
-  const modal = await modalController.create({ component: FacilityModal });
-  await modal.present();
-  const { data: facilityId } = await modal.onWillDismiss();
+  const facilityId = await openModal<string>(FacilityModal);
   if (facilityId) await runBulkAction('submitPark', facilityId);
 }
 

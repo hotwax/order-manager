@@ -127,6 +127,7 @@ import { chevronDownOutline } from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { confirmParkOrder, showToast } from '@/utils';
+import { openModal } from '@/utils/modal';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import GeoSelectModal from '@/components/common/GeoSelectModal.vue';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
@@ -352,9 +353,7 @@ async function parkOrder() {
   const confirmed = await confirmParkOrder();
   if (!confirmed) return;
 
-  const modal = await modalController.create({ component: FacilityModal });
-  await modal.present();
-  const { data: facilityId } = await modal.onWillDismiss();
+  const facilityId = await openModal<string>(FacilityModal);
   if (!facilityId) return;
 
   try {

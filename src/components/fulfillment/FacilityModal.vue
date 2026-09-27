@@ -1,14 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="closeModal()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ translate('Park order') }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <ModalHeader :title="translate('Park order')" />
 
   <ion-content>
     <ion-searchbar
@@ -42,19 +33,17 @@
       </ion-list>
     </ion-radio-group>
 
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedFacilityId" :aria-label="translate('Save')" @click="save">
-        <ion-icon :icon="saveOutline" />
-      </ion-fab-button>
-    </ion-fab>
+    <ModalConfirmFab />
   </ion-content>
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSearchbar, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
+import { IonContent, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSearchbar, IonSpinner } from '@ionic/vue';
 import { onMounted, ref } from 'vue';
 import { api, logger, translate } from '@common';
+import ModalConfirmFab from '@/components/common/ModalConfirmFab.vue';
+import ModalHeader from '@/components/common/ModalHeader.vue';
+import { useModalFlow } from '@/composables/useModalFlow';
 
 type Facility = {
   facilityId: string;
@@ -68,15 +57,11 @@ const isLoading = ref(false);
 const selectedFacilityId = ref('');
 const queryString = ref('');
 
-function closeModal(facilityId?: string) {
-  modalController.dismiss(facilityId);
-}
-
-function save() {
-  if (selectedFacilityId.value) {
-    closeModal(selectedFacilityId.value);
-  }
-}
+// Each screen that opens this parks in its own way, so the confirm path only hands back the pick.
+useModalFlow({
+  canConfirm: () => !!selectedFacilityId.value,
+  confirm: () => selectedFacilityId.value,
+});
 
 function findFacility() {
   const search = queryString.value.trim().toLowerCase();
