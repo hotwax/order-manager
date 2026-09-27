@@ -10,19 +10,19 @@
         </ion-item>
         <div class="tablet">
           <ion-label class="ion-text-center">
-            {{ ev.partyIdFrom || '-' }}
+            {{ ev.partyIdFrom || translate('Not available') }}
             <p>{{ translate("From") }}</p>
           </ion-label>
         </div>
         <div class="tablet">
           <ion-label class="ion-text-center">
-            {{ ev.partyIdTo || '-' }}
+            {{ ev.partyIdTo || translate('Not available') }}
             <p>{{ translate("To") }}</p>
           </ion-label>
         </div>
         <div class="tablet">
           <ion-label class="ion-text-center">
-            {{ ev.content || '-' }}
+            {{ ev.content || translate('Not available') }}
             <p>{{ translate("Content") }}</p>
           </ion-label>
         </div>
@@ -31,7 +31,10 @@
             {{ formatDateTime(ev.entryDate) }}
             <p>{{ translate("Entry date") }}</p>
           </ion-label>
-          <ion-label v-else>-</ion-label>
+          <ion-label v-else class="ion-text-center">
+            {{ translate('Date not available') }}
+            <p>{{ translate("Entry date") }}</p>
+          </ion-label>
         </div>
       </div>
     </div>

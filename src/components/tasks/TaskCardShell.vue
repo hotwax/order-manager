@@ -44,7 +44,7 @@
       <ion-item lines="none">
         <ion-icon slot="start" :icon="callOutline" />
         <ion-label>
-          {{ contactPhone || '-' }}
+          {{ contactPhone || translate('Phone not available') }}
         </ion-label>
         <ion-button v-if="contactPhone" slot="end" fill="outline" size="small" :aria-label="translate('Copy phone')" @click="copyContact(contactPhone)">
           {{ translate('Copy') }}
@@ -53,7 +53,7 @@
       <ion-item lines="none">
         <ion-icon slot="start" :icon="mailOutline" />
         <ion-label>
-          {{ contactEmail || '-' }}
+          {{ contactEmail || translate('Email not available') }}
         </ion-label>
         <ion-button v-if="contactEmail" slot="end" fill="outline" size="small" :aria-label="translate('Copy email')" @click="copyContact(contactEmail)">
           {{ translate('Copy') }}

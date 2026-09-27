@@ -199,14 +199,14 @@ function brokeredFacilityName(task: any): string {
   return task.facilityName
     || seedStore.facilityName(task.facilityId)
     || task.facilityId
-    || '-';
+    || translate('Facility not assigned');
 }
 
 function carrierShippingMethodLabel(task: any): string {
   const carrier = task.carrierPartyId ? seedStore.carrierName(task.carrierPartyId) : '';
   const methodId = task.shipmentMethodTypeId || task.shippingMethodTypeId;
   const method = methodId ? seedStore.shipmentMethodDescription(methodId) : '';
-  return [carrier, method].filter(Boolean).join(' - ') || '-';
+  return [carrier, method].filter(Boolean).join(' - ') || translate('Shipping method not set');
 }
 
 async function openCountryPicker(address: AddressState['original']) {

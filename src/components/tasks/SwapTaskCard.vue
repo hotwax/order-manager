@@ -31,7 +31,7 @@
             </ion-label>
             <ion-label>
               <p class="overline">{{ translate('Routing justification') }}</p>
-              {{ routingJustification(task) || '-' }}
+              {{ routingJustification(task) || translate('No routing justification') }}
             </ion-label>
           </div>
           <ion-note slot="end" v-if="routingTimestamp(task)">{{ formatRoutingTimestamp(task) }}</ion-note>

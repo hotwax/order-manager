@@ -354,11 +354,11 @@
             <ion-item lines="full">
               <ion-label>
                 <p class="overline">{{ translate('From') }}</p>
-                {{ comm.partyIdFrom || '—' }}
+                {{ comm.partyIdFrom || translate('Not available') }}
               </ion-label>
               <ion-label slot="end">
                 <p class="overline">{{ translate('To') }}</p>
-                {{ comm.partyIdTo || '—' }}
+                {{ comm.partyIdTo || translate('Not available') }}
               </ion-label>
             </ion-item>
 
