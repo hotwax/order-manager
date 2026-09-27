@@ -437,10 +437,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-
 .item-chips {
   display: flex;
   overflow-x: auto;

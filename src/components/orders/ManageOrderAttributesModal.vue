@@ -250,10 +250,6 @@ async function save() {
 </script>
 
 <style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-
 .attribute-form__pair {
   display: flex;
   flex-wrap: wrap;

@@ -305,10 +305,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-
 .empty-state {
   display: flex;
   justify-content: center;

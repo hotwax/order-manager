@@ -317,10 +317,6 @@ async function openCreateTypeModal() {
 </script>
 
 <style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-
 .identification-form__pair {
   display: flex;
   flex-wrap: wrap;

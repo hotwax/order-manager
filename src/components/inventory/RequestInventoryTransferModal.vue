@@ -346,10 +346,6 @@ async function submit() {
 </script>
 
 <style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-
 /* A fixed width keeps each measure in a column down the list, and "37 (-1)" as wide as "38". */
 .transfer-measure {
   min-width: 4.5rem;
