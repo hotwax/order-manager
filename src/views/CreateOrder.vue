@@ -221,7 +221,7 @@
           </div>
 
           <template v-if="orderForm.lineItems.length">
-            <div class="list-item ion-margin-horizontal" v-for="(lineItem, index) in orderForm.lineItems" :key="lineItem.productId">
+            <div class="list-item line-item-row ion-margin-horizontal" v-for="(lineItem, index) in orderForm.lineItems" :key="lineItem.productId">
               <ion-item lines="none">
                 <ion-thumbnail slot="start">
                   <DxpShopifyImg :src="lineItem.mainImageUrl" :key="lineItem.mainImageUrl" size="small" />
@@ -234,7 +234,7 @@
               <div class="tablet">
                 <ion-label>{{ formatMoney(lineItem.price) }}</ion-label>
               </div>
-              <ion-item>
+              <ion-item class="line-item-qty">
                 <ion-input
                   v-model="lineItem.quantity"
                   type="number"
@@ -788,6 +788,17 @@ ion-card-title {
 .list-item {
   --columns-desktop: 4;
   border-bottom: var(--border-medium);
+}
+
+/* The quantity is edited on every screen size, so it stays beside the product where the shared
+   row would hide a middle column: product, quantity and remove on phones, plus price from tablet. */
+.line-item-row {
+  --columns-mobile: 3;
+  --columns-tablet: 4;
+}
+
+.line-item-row > .line-item-qty {
+  display: unset;
 }
 
 /* A line item is edited in place and opens nothing, so it keeps the shared list-item hover off. */

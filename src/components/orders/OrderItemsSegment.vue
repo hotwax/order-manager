@@ -2,8 +2,9 @@
   <div class="order-items">
     <ion-list lines="none" class="order-items-list">
       <ion-item v-if="!isTerminal" lines="full" class="order-items-toolbar">
-        <ion-checkbox :checked="areAllSelected" justify="start" label-placement="end"
-          @ionChange="selectItems(allItems, $event.detail.checked)">{{ translate('Select all') }}</ion-checkbox>
+        <ion-checkbox slot="start" :checked="areAllSelected" :aria-label="translate('Select all')"
+          @ionChange="selectItems(allItems, $event.detail.checked)" />
+        <ion-label>{{ translate('Select all') }}</ion-label>
       </ion-item>
       <ion-accordion-group>
         <template v-for="group in order.groupedItems" :key="group.externalId">

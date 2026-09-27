@@ -257,7 +257,6 @@ export const useSeedStore = defineStore("seed", {
           return {
             ...transition,
             toStatusDescription,
-            toStatusColor: commonUtil.getStatusColor(toStatusDescription)
           };
         })
         .sort((left: any, right: any) => {

@@ -179,7 +179,7 @@
             <ion-item v-for="item in shipGroup.items" :key="item.orderItemSeqId">
               <!-- Selection only feeds the park / pull back / release actions, which a counter
                    sale and a completed or cancelled order do not have. -->
-              <ion-checkbox v-if="!shipGroup.isPosCompleted && !orderIsTerminal" slot="start" :checked="selectedItemIds.includes(item.orderItemSeqId)"
+              <ion-checkbox v-if="!shipGroup.isPosCompleted && !orderIsTerminal" slot="start" :aria-label="translate('Select item')" :checked="selectedItemIds.includes(item.orderItemSeqId)"
                 @ionChange="toggleItem(item.orderItemSeqId, $event.detail.checked)" />
               <ion-thumbnail slot="start" v-image-preview="imagePreview(item.productId)" :key="`${getProduct(item.productId)?.mainImageUrl} ${primaryIdentifier(item.productId)}`">
                 <DxpShopifyImg :src="item.imageUrl" :key="getProduct(item.productId)?.mainImageUrl" size="small" />

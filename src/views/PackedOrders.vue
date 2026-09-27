@@ -25,6 +25,7 @@
             v-if="selectMode"
             :checked="allCurrentPageSelected"
             :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
+            :aria-label="translate('Select all loaded orders')"
             @ion-change="toggleCurrentPageSelection($event.detail.checked)"
           />
           <ion-label>{{ resultsSummary }}</ion-label>

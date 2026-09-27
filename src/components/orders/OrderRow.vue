@@ -13,6 +13,7 @@
         v-if="selectMode"
         slot="start"
         :checked="selected"
+        :aria-label="translate('Select order')"
         @click.stop
         @keydown.stop
         @ion-change="emit('selectionChange', $event.detail.checked)"

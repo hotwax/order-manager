@@ -96,7 +96,7 @@
         </template>
         <template v-else-if="suggested._isSubstitute">
           <ion-badge slot="end" color="success">{{ availableBadgeLabel(suggested, task) }}</ion-badge>
-          <ion-button slot="end" fill="clear" color="danger" @click="removeSuggestedSubstitute(task, suggested)" :aria-label="translate('Close')" :title="translate('Close')">
+          <ion-button slot="end" fill="clear" color="danger" @click="removeSuggestedSubstitute(task, suggested)" :aria-label="translate('Remove substitute')" :title="translate('Remove substitute')">
             <ion-icon slot="icon-only" :icon="closeCircleOutline" />
           </ion-button>
         </template>

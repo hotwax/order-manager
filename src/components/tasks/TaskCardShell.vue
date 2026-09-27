@@ -5,6 +5,7 @@
         <ion-checkbox
           v-if="selectable"
           :checked="selected"
+          :aria-label="translate('Select task')"
           @ionChange="emit('update:selected', $event.detail.checked)"
         />
         <div>
