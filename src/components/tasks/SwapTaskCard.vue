@@ -136,7 +136,6 @@ import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, Ion
 import { arrowUndoOutline, chevronForwardOutline, closeCircleOutline, ellipsisVerticalOutline, gitBranchOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { confirmParkOrder, showToast } from '@/utils';
-import { openModal } from '@/utils/modal';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import ReleaseSwapOrderModal from '@/components/swaps/ReleaseSwapOrderModal.vue';
 import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductActionPopover.vue';
@@ -477,7 +476,9 @@ async function parkOrder() {
   const confirmed = await confirmParkOrder();
   if (!confirmed) return;
 
-  const facilityId = await openModal<string>(FacilityModal);
+  const modal = await modalController.create({ component: FacilityModal });
+  await modal.present();
+  const { data: facilityId } = await modal.onWillDismiss();
   if (!facilityId) return;
 
   try {

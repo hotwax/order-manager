@@ -1,8 +1,7 @@
 import { computed, ref, type Ref } from 'vue';
 import { alertController, modalController } from '@ionic/vue';
-import { api, translate } from '@common';
+import { api, openModal, translate } from '@common';
 import { showToast } from '@/utils';
-import { openModal } from '@/utils/modal';
 import { OrderActionValidator, type FooterActionView, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import { isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
 import { useProductIdentity } from '@/composables/useProductIdentity';
@@ -126,7 +125,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
   /* ── Modals shared by several actions ─────────────────────────────────── */
 
   async function openFacilityModal(): Promise<string | null> {
-    return (await openModal<string>(FacilityModal)) ?? null;
+    const modal = await modalController.create({ component: FacilityModal });
+    await modal.present();
+    const { data: facilityId } = await modal.onWillDismiss();
+    return facilityId || null;
   }
 
   /**

@@ -54,7 +54,7 @@ describe('ship group selection actions', () => {
 
   it('parks every open item of the checked selection, then clears it and reloads', async () => {
     const { actions, shipGroup, loadOrder, selectedShipGroupItems } = setup(true, [item('01', 'ITEM_APPROVED'), item('02', 'ITEM_CANCELLED'), item('03', 'ITEM_APPROVED')], ['01', '02']);
-    dismissModalWith({ data: 'PARKING_1', role: 'confirm' });
+    dismissModalWith({ data: 'PARKING_1' });
 
     await actions.parkSelectedItems(shipGroup);
 
@@ -111,7 +111,7 @@ describe('ship group selection actions', () => {
 
   it('keeps the selection and reports the failure when the call fails', async () => {
     const { actions, shipGroup, loadOrder, selectedShipGroupItems } = setup(true, [item('01', 'ITEM_APPROVED')], ['01']);
-    dismissModalWith({ data: 'PARKING_1', role: 'confirm' });
+    dismissModalWith({ data: 'PARKING_1' });
     vi.mocked(api).mockRejectedValue(new Error('boom'));
 
     await actions.parkSelectedItems(shipGroup);

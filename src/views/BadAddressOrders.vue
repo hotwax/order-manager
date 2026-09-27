@@ -98,10 +98,9 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onBeforeUpdate } from 'vue';
-import { IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonMenuButton, IonPage, IonSpinner, IonTitle, IonToolbar, alertController, onIonViewWillEnter } from '@ionic/vue';
+import { IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonMenuButton, IonPage, IonSpinner, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
 import { buildAppUrl, translate } from '@common';
 import { showToast } from '@/utils';
-import { openModal } from '@/utils/modal';
 import ErrorState from '@/components/common/ErrorState.vue';
 import OrderTaskFilterCard from '@/components/tasks/OrderTaskFilterCard.vue';
 import TaskQueueListHeader from '@/components/tasks/TaskQueueListHeader.vue';
@@ -295,7 +294,9 @@ async function bulkParkOrder() {
   const cards = getSelectedCards();
   if (!cards.length) return;
 
-  const facilityId = await openModal<string>(FacilityModal);
+  const modal = await modalController.create({ component: FacilityModal });
+  await modal.present();
+  const { data: facilityId } = await modal.onWillDismiss();
   if (!facilityId) return;
 
   await runGroupedBulkCards(cards, (card) => card.submitParkDomain(facilityId), 'TASK_COMPLETED');

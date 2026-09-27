@@ -1,7 +1,5 @@
 <template>
-  <DxpModalHeader :title="title || translate('Add task')" />
-
-  <ion-content>
+  <DxpModal :title="title || translate('Add task')">
     <ion-list>
       <ion-item v-if="props.shipGroups && props.shipGroups.length > 1">
         <ion-select
@@ -67,14 +65,11 @@
         />
       </ion-item>
     </ion-list>
-
-    <DxpModalConfirmFab />
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
 import {
-  IonContent,
   IonIcon,
   IonInput,
   IonItem,
@@ -86,10 +81,7 @@ import {
   IonTextarea,
 } from '@ionic/vue';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
-import { translate } from '@common';
-import DxpModalConfirmFab from '@/components/common/DxpModalConfirmFab.vue';
-import DxpModalHeader from '@/components/common/DxpModalHeader.vue';
-import { useModalFlow } from '@/composables/useModalFlow';
+import { DxpModal, translate, useModalFlow } from '@common';
 import { requiredLabel, showToast } from '@/utils';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';

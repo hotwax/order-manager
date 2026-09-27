@@ -149,7 +149,7 @@ import {
   modalController,
   useIonRouter,
 } from '@ionic/vue';
-import { api, translate } from '@common';
+import { api, openModal, translate } from '@common';
 import { computed, onMounted, ref, watch } from 'vue';
 import { searchOrders } from '@/services/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -170,7 +170,6 @@ import OrderRow from '@/components/orders/OrderRow.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { toSearchOrderRowViewModel } from '@/utils/orderRows';
 import { showToast } from '@/utils';
-import { openModal } from '@/utils/modal';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import Actions from '@/authorization/actions';
 import { useUserStore } from '@/store/user';

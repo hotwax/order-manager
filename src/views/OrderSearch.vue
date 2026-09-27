@@ -200,7 +200,7 @@ import {
   alertController,
   modalController,
 } from '@ionic/vue';
-import { translate } from '@common';
+import { openModal, translate } from '@common';
 import { chevronDownOutline } from 'ionicons/icons';
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
@@ -221,7 +221,6 @@ import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import { toSearchOrderRowViewModel } from '@/utils/orderRows';
 import { showToast } from '@/utils';
-import { openModal } from '@/utils/modal';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import Actions from "@/authorization/actions";
 
