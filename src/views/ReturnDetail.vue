@@ -111,7 +111,7 @@
               <ion-item v-if="returnRecord.shopifySync?.returnStatusId">
                 <ion-label>
                   <p>{{ translate('Shopify status') }}</p>
-                  <ion-badge :color="shopifyStatusColor(returnRecord.shopifySync.returnStatusId)">
+                  <ion-badge :color="shopifyReturnStatusColor(returnRecord.shopifySync.returnStatusId)">
                     {{ describe(returnRecord.shopifySync.returnStatusId) }}
                   </ion-badge>
                 </ion-label>
@@ -435,6 +435,7 @@ import { useSeedStore } from "@/store/seed";
 import { useUserStore } from "@/store/user";
 import type { ReturnItemDetail, ReturnStatusHistory, ReturnSyncState } from "@/types/returns";
 import { formatDateTime, formatMoney } from "@/utils/format";
+import { returnStatusColor, shopifyReturnStatusColor } from "@/utils/statusColors";
 
 const props = defineProps<{
   returnId: string;
@@ -577,27 +578,6 @@ const syncError = computed(() => {
     sync.pushErrorMessage ||
     "";
 });
-const returnStatusColorAliases: Record<string, string> = {
-  RETURN_REQUESTED: "ORDER_CREATED",
-  RETURN_APPROVED: "ORDER_APPROVED",
-  RETURN_ACCEPTED: "ORDER_APPROVED",
-  RETURN_AUTHORIZED: "PAYMENT_AUTHORIZED",
-  RETURN_RECEIVED: "SHIPMENT_SHIPPED",
-  RETURN_COMPLETED: "ORDER_COMPLETED",
-  RETURN_REJECTED: "ORDER_REJECTED",
-  RETURN_CANCELLED: "ORDER_CANCELLED"
-};
-const shopifyStatusColorAliases: Record<string, string> = {
-  OPEN: "ORDER_CREATED",
-  REQUESTED: "ORDER_CREATED",
-  APPROVED: "ORDER_APPROVED",
-  AUTHORIZED: "PAYMENT_AUTHORIZED",
-  COMPLETED: "ORDER_COMPLETED",
-  CLOSED: "ORDER_COMPLETED",
-  REJECTED: "ORDER_REJECTED",
-  CANCELED: "ORDER_CANCELLED",
-  CANCELLED: "ORDER_CANCELLED"
-};
 const returnTimelineEvents = computed(() => {
   const record = returnRecord.value;
   if(!record) {return [];}
@@ -712,14 +692,6 @@ function inventoryStatusLabel(statusId: string) {
   };
 
   return labels[statusId] ? translate(labels[statusId]) : describe(statusId);
-}
-
-function returnStatusColor(statusId: string) {
-  return commonUtil.getStatusColor(returnStatusColorAliases[statusId] || statusId);
-}
-
-function shopifyStatusColor(statusId: string) {
-  return commonUtil.getStatusColor(shopifyStatusColorAliases[statusId] || returnStatusColorAliases[statusId] || statusId);
 }
 
 function restockState(item: ReturnItemDetail) {

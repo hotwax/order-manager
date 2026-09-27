@@ -302,8 +302,7 @@
             </ion-label>
 
             <ion-label class="ion-text-end">
-              {{ returnStatusLabel(returnRecord.statusId) }}
-              <p>{{ translate('Status') }}</p>
+              <ion-badge :color="returnStatusColor(returnRecord.statusId)">{{ returnStatusLabel(returnRecord.statusId) }}</ion-badge>
             </ion-label>
           </div>
         </ion-list>
@@ -445,6 +444,7 @@
 import { commonUtil, translate } from '@common';
 import {
   IonBackButton,
+  IonBadge,
   IonButton,
   IonButtons,
   IonCard,
@@ -498,6 +498,7 @@ import Actions from '@/authorization/actions';
 import type { CustomerOrderCardData, CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
 import type { ReturnSummary } from '@/types/returns';
 import { confirmAction } from '@/utils';
+import { returnStatusColor } from '@/utils/statusColors';
 import { formatDate, formatDateTime, formatMoney, formatMonthYear } from '@/utils/format';
 
 const props = defineProps<{

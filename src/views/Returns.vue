@@ -145,8 +145,7 @@
           </ion-label>
 
           <ion-label class="ion-text-end">
-            {{ statusLabel(returnRecord.statusId) }}
-            <p>{{ translate('Status') }}</p>
+            <ion-badge :color="returnStatusColor(returnRecord.statusId)">{{ statusLabel(returnRecord.statusId) }}</ion-badge>
           </ion-label>
         </div>
       </ion-list>
@@ -168,6 +167,7 @@
 import { translate } from "@common";
 import {
   IonButtons,
+  IonBadge,
   IonContent,
   IonHeader,
   IonInfiniteScroll,
@@ -196,6 +196,7 @@ import router from "@/router";
 import { useReturnsStore } from "@/store/returns";
 import { useSeedStore } from "@/store/seed";
 import { formatDate } from "@/utils/format";
+import { returnStatusColor } from "@/utils/statusColors";
 
 const returnsStore = useReturnsStore();
 const seed = useSeedStore();
