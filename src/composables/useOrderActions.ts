@@ -167,11 +167,8 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     });
     await modal.present();
     const { role } = await modal.onWillDismiss();
-    if (role === 'confirm') {
-      await showToast(translate('Inventory transfer requested.'));
-      // So the new request shows on its item straight away.
-      orderDetailStore.fetchInventoryTransfers(order.value!.id);
-    }
+    // The modal reloads the order's transfers before it closes, so the new one is already on its item.
+    if (role === 'confirm') await showToast(translate('Inventory transfer requested.'));
     return role === 'confirm';
   }
 

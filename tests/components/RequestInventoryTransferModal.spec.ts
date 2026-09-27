@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   fetchDistancesFromFacility: vi.fn(),
   requestInventoryTransfers: vi.fn(),
   dismiss: vi.fn(),
+  fetchInventoryTransfers: vi.fn(),
   showToast: vi.fn(),
 }));
 
@@ -47,7 +48,10 @@ const facilities: Record<string, Record<string, string>> = {
 };
 
 vi.mock('@/store/orderDetail', () => ({
-  useOrderDetailStore: () => ({ enrichedOrderByOrderId: () => ({ shipGroups: [{ items: [mocks.item] }] }) }),
+  useOrderDetailStore: () => ({
+    enrichedOrderByOrderId: () => ({ shipGroups: [{ items: [mocks.item] }] }),
+    fetchInventoryTransfers: mocks.fetchInventoryTransfers,
+  }),
 }));
 vi.mock('@/store/seed', () => ({
   useSeedStore: () => ({
@@ -186,6 +190,9 @@ describe('request inventory transfer modal', () => {
       transfers: [{ productId: 'P1', quantity: 2, facilityId: 'WH_B', facilityIdTo: 'DEST_WH', orderId: 'O1', orderItemSeqId: '01', comments: 'Rush' }],
     });
     expect(mocks.dismiss).toHaveBeenCalledWith({ inventoryTransferIds: ['T9'] }, 'confirm');
+    // The order's transfers reload before the modal closes, so the item no longer offers a transfer.
+    expect(mocks.fetchInventoryTransfers).toHaveBeenCalledWith('O1');
+    expect(mocks.fetchInventoryTransfers.mock.invocationCallOrder[0]).toBeLessThan(mocks.dismiss.mock.invocationCallOrder[0]);
   });
 
   it('goes back to the list without saving', async () => {
@@ -210,6 +217,7 @@ describe('request inventory transfer modal', () => {
 
     expect(mocks.showToast).toHaveBeenCalledWith('Failed to request inventory transfer. Please try again.');
     expect(mocks.dismiss).not.toHaveBeenCalled();
+    expect(mocks.fetchInventoryTransfers).not.toHaveBeenCalled();
     expect(wrapper.find('.fab').attributes('disabled')).toBeUndefined();
   });
 });

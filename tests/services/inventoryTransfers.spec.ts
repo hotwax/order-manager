@@ -57,7 +57,7 @@ describe('inventory transfers service', () => {
   });
 
   it('loads every page of an order\'s transfers, not just the first', async () => {
-    const page = (size: number, from: number) => Array.from({ length: size }, (_, index) => ({ inventoryTransferId: String(from + index) }));
+    const page = (size: number, from: number) => Array.from({ length: size }, (_, index) => ({ inventoryTransferId: String(from + index), orderId: 'O1' }));
     vi.mocked(api)
       .mockResolvedValueOnce({ data: page(250, 0) } as any)
       .mockResolvedValueOnce({ data: page(3, 250) } as any);
@@ -68,6 +68,16 @@ describe('inventory transfers service', () => {
       url: 'oms/inventoryTransfers', method: 'GET',
       params: { orderId: 'O1', orderByField: '-createdStamp', pageIndex: 1, pageSize: 250 },
     });
+  });
+
+  it('keeps only the order\'s own transfers, in case the orderId filter is ever ignored', async () => {
+    // Moqui returns every row when it doesn't know a filter field.
+    vi.mocked(api).mockResolvedValue({ data: [
+      { inventoryTransferId: '1', orderId: 'O1', orderItemSeqId: '01' },
+      { inventoryTransferId: '2', orderId: 'OTHER', orderItemSeqId: '01' },
+    ] } as any);
+
+    await expect(fetchOrderInventoryTransfers('O1')).resolves.toEqual([{ inventoryTransferId: '1', orderId: 'O1', orderItemSeqId: '01' }]);
   });
 
   it('sums stock per facility across its inventory items, with zero where there is none', async () => {

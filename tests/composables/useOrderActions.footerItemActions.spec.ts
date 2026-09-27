@@ -67,12 +67,9 @@ const destinations = () => vi.mocked(modalController.create).mock.calls.map(([op
 }));
 
 describe('footer item actions', () => {
-  let refreshTransfers: ReturnType<typeof vi.spyOn>;
-
   beforeEach(() => {
     setActivePinia(createPinia());
     vi.mocked(modalController.create).mockReset();
-    refreshTransfers = vi.spyOn(useOrderDetailStore(), 'fetchInventoryTransfers').mockResolvedValue(undefined);
   });
 
   it('offers no transfer until items are selected', () => {
@@ -128,9 +125,6 @@ describe('footer item actions', () => {
       { destination: 'STORE_A', item: '03' },
     ]);
     expect(selectedItemIds.value.size).toBe(0);
-    // Each request reloads the order's transfers, so the new ones show on their items.
-    expect(refreshTransfers).toHaveBeenCalledTimes(3);
-    expect(refreshTransfers).toHaveBeenCalledWith('O1');
   });
 
   it('offers Add items on an open order, first on the end ahead of the item actions', () => {

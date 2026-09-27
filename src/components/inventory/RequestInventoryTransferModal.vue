@@ -332,6 +332,9 @@ async function submit() {
         comments: comments.value.trim() || undefined,
       }],
     });
+    // Reload the order's transfers while the modal still covers the page, so the item stops offering a
+    // transfer before anything behind it can be tapped again.
+    await orderDetailStore.fetchInventoryTransfers(props.orderId);
     // canDismiss refuses while submitting, including this dismiss.
     submitting.value = false;
     await modalController.dismiss({ inventoryTransferIds }, "confirm");

@@ -55,8 +55,12 @@ async function fetchAllRows(url: string, params: Record<string, unknown>, pageSi
 }
 
 /** Every inventory transfer requested for an order's items, newest first. */
-export function fetchOrderInventoryTransfers(orderId: string): Promise<any[]> {
-  return fetchAllRows("oms/inventoryTransfers", { orderId, orderByField: "-createdStamp" });
+export async function fetchOrderInventoryTransfers(orderId: string): Promise<any[]> {
+  const rows = await fetchAllRows("oms/inventoryTransfers", { orderId, orderByField: "-createdStamp" });
+
+  // Moqui drops a filter on a field it doesn't know and returns every order's transfers, and items
+  // match their transfers by sequence id alone ("01"), so keep only this order's.
+  return rows.filter((row) => row.orderId === orderId);
 }
 
 /** A product's available to promise and quantity on hand at each of the given facilities. */
