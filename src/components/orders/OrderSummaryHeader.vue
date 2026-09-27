@@ -136,8 +136,8 @@
           </ion-item>
           <ion-item>
             <ion-label>
-              <p>{{ translate('Order Name') }}</p>
-              {{ order.orderName || translate('Order Name') }}
+              <p>{{ translate('Order name') }}</p>
+              {{ order.orderName || translate('Order name') }}
             </ion-label>
           </ion-item>
           <ion-item v-for="id in order.identifications" :key="id.orderIdentificationTypeId">

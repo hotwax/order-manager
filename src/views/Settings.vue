@@ -48,7 +48,7 @@
 
         <ion-card>
           <ion-card-header>
-            <ion-card-subtitle>{{ translate("Product Store") }}</ion-card-subtitle>
+            <ion-card-subtitle>{{ translate("Product store") }}</ion-card-subtitle>
             <ion-card-title>{{ translate("Store") }}</ion-card-title>
           </ion-card-header>
           <ion-card-content>

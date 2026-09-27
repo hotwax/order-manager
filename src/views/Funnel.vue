@@ -369,7 +369,7 @@
               <ion-item-divider>
                 <ion-label>{{ translate("Sort") }}</ion-label>
                 <ion-button id="add-sort-rule-trigger" fill="outline" size="small" slot="end" :disabled="availableSortOptions.length === 0">
-                  {{ translate("ADD") }}
+                  {{ translate("Add") }}
                   <ion-icon slot="end" :icon="addCircleOutline" />
                 </ion-button>
               </ion-item-divider>

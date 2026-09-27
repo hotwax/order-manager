@@ -465,7 +465,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       header: translate('Select ship group'),
       buttons: [
         ...shipGroups.map((shipGroup) => ({
-          text: `${shipGroup.id} ${shipGroup.facilityName || translate('Facility Name')}`,
+          text: `${shipGroup.id} ${shipGroup.facilityName || translate('Facility name')}`,
           handler: () => { selectedShipGroup = shipGroup; }
         })),
         { text: translate('Cancel'), role: 'cancel' }

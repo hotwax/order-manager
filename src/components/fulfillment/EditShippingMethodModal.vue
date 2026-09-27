@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Edit Shipping Method') }}</ion-title>
+      <ion-title>{{ translate('Edit shipping method') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 

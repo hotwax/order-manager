@@ -18,7 +18,7 @@
             </ion-card-header>
             <ion-item>
               <ion-icon :icon="globeOutline" slot="start" />
-              <ion-select v-model="orderForm.shopId" :label="translate('Shopify Shop')" :placeholder="translate('Select')" interface="popover">
+              <ion-select v-model="orderForm.shopId" :label="translate('Shopify shop')" :placeholder="translate('Select')" interface="popover">
                 <ion-select-option v-for="shop in shopsList" :value="shop.shopId" :key="shop.shopId">{{ shop.name ? shop.name : shop.shopId }}</ion-select-option>
               </ion-select>
             </ion-item>
@@ -76,7 +76,7 @@
           <ion-card>
             <ion-card-header>
               <ion-card-title>
-                {{ translate("Shipping Address") }}
+                {{ translate("Shipping address") }}
                 <ion-button size="small" fill="outline" @click="openShippingAddressModal">
                   <ion-icon :icon="addCircleOutline" slot="start"/>
                   {{ orderForm.shippingAddress.zip ? translate("Edit") : translate("Add") }}

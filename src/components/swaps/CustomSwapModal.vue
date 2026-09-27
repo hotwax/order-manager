@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Custom Swap') }}</ion-title>
+      <ion-title>{{ translate('Custom swap') }}</ion-title>
     </ion-toolbar>
     <ion-toolbar>
       <ion-segment v-model="selectedSegment">

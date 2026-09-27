@@ -3,7 +3,7 @@
     <div class="ship-group-header-wrapper">
       <ion-card-header>
         <ion-card-title>
-          {{ shipGroup.id }} {{ shipGroup.facilityName || translate('Facility Name') }}
+          {{ shipGroup.id }} {{ shipGroup.facilityName || translate('Facility name') }}
         </ion-card-title>
         <ion-card-subtitle>
           {{ shipGroup.itemSummary }}
@@ -285,7 +285,7 @@
                     <ion-button @click="closeEditor('address')" :aria-label="translate('Close')" :title="translate('Close')"><ion-icon slot="icon-only"
                         :icon="closeOutline" /></ion-button>
                   </ion-buttons>
-                  <ion-title>{{ translate('Edit Shipping Address') }}</ion-title>
+                  <ion-title>{{ translate('Edit shipping address') }}</ion-title>
                   <ion-buttons slot="end">
                   </ion-buttons>
                 </ion-toolbar>
@@ -310,7 +310,7 @@
                   </ion-item>
                   <ion-item>
                     <ion-select :label="translate('Country')" label-placement="stacked" interface="popover"
-                      :placeholder="translate('Select Country')" v-model="shippingAddressForm.countryGeoId"
+                      :placeholder="translate('Select country')" v-model="shippingAddressForm.countryGeoId"
                       @ionChange="shippingAddressForm.stateProvinceGeoId = ''">
                       <ion-select-option v-for="country in seed.getCountries" :key="country.geoId" :value="country.geoId">
                         {{ country.geoName }}
@@ -356,9 +356,9 @@
             @click="emit('request-transfer')">{{ translate('Request transfer') }}</ion-button>
         </template>
       </template>
-      <ion-button fill="clear" :disabled="disabledActions.ADD_TASK" @click="emit('add-task')">{{ translate('Add Task') }}</ion-button>
+      <ion-button fill="clear" :disabled="disabledActions.ADD_TASK" @click="emit('add-task')">{{ translate('Add task') }}</ion-button>
       <ion-button v-if="!orderIsTerminal" fill="clear"
-        :disabled="disabledActions.ADD_ITEMS" @click="emit('add-items')">{{ translate('Add Items') }}</ion-button>
+        :disabled="disabledActions.ADD_ITEMS" @click="emit('add-items')">{{ translate('Add items') }}</ion-button>
     </div>
 
     <!-- Gift message modal -->

@@ -245,7 +245,7 @@ function isVirtualFacility(task: any): boolean {
 }
 
 function brokerageLabel(task: any): string {
-  return isVirtualFacility(task) ? translate('Not Brokered') : translate('Brokered');
+  return isVirtualFacility(task) ? translate('Not brokered') : translate('Brokered');
 }
 
 function taskProgressValue(task: any): number | undefined {

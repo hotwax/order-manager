@@ -97,7 +97,7 @@ describe('enrichOrder', () => {
     // A parked group's facility changes record parking and rejections, never a brokering.
     expect(parked.lifecycle.firstBrokeredDate).toBeUndefined();
     expect(parked.isBrokered).toBe(false);
-    expect(parked.statusLabel).toBe('Not Brokered');
+    expect(parked.statusLabel).toBe('Not brokered');
   });
 
   it('reports issuance on counter-sale lines only, with a kind the card translates', () => {

@@ -29,8 +29,8 @@ const router = useRouter();
 
 const knownPurposeLabels: Record<string, string> = {
   NEG_RES_REVIEW: 'Substitute',
-  INVALID_ADDRESS: 'Bad Address',
-  REVIEW_RISK_ORDER: 'Fraud Risk'
+  INVALID_ADDRESS: 'Bad address',
+  REVIEW_RISK_ORDER: 'Fraud risk'
 };
 
 function holdTaskLabel(holdTask: HoldTaskCount) {

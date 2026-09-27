@@ -35,6 +35,13 @@ describe('locale messages', () => {
     expect(mismatched).toEqual([]);
   });
 
+  it('link only to keys that exist and have no period, which would render empty', () => {
+    const broken = [enUS, esES].flatMap((messages: Record<string, string>) => Object.values(messages)
+      .flatMap((message) => [...message.matchAll(/@(?:\.\w+)?:\{'([^']+)'\}/g)].map((match) => match[1]))
+      .filter((key) => !(key in messages) || key.includes('.')));
+    expect(broken).toEqual([]);
+  });
+
   it('resolve links, plurals through links, and escaped parameters', () => {
     expect(translate('Top 10 facilities by {metric}', { metric: 'Order Volume' })).toBe('Top 10 facilities by order volume');
     expect(translate('{count} items by order date', { count: 1 })).toBe('1 item by order date');

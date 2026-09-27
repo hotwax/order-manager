@@ -233,12 +233,12 @@ function enrichShipGroup(
   else progress = [isBrokered, lifecycle.picklistDate, lifecycle.packedDate, lifecycle.shippedDate].filter(Boolean).length * 0.25;
 
   // Cancelled items are routinely moved to a virtual facility such as REJECTED_ITM_PARKING, so the
-  // brokering label comes after the terminal checks or a stopped card would read "Not Brokered".
+  // brokering label comes after the terminal checks or a stopped card would read "Not brokered".
   let statusLabel = `${Math.round(progress * 100)}% ${translate('Complete')}`;
   if (isPosCompleted) statusLabel = translate('Sold in store');
   else if (settled && fulfilled === 0) statusLabel = translate('Cancelled');
   else if (settled && fulfilled < total) statusLabel = translate('Partially complete');
-  else if (!settled && isVirtual) statusLabel = translate('Not Brokered');
+  else if (!settled && isVirtual) statusLabel = translate('Not brokered');
 
   const facilityName = seed.facilityName(sg.facilityId);
   const rawItems: any[] = sg.items || [];

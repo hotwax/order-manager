@@ -29,7 +29,7 @@
           {{ orderedItemPrimary(item) }}
           <p>{{ orderedItemSecondary(item) }}</p>
         </ion-label>
-        <ion-note slot="end">{{ item.quantity }} {{ translate('Qty') }}</ion-note>
+        <ion-note slot="end">{{ translate('{count} qty', { count: Number(item.quantity) }) }}</ion-note>
       </ion-item>
     </ion-list>
 

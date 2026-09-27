@@ -59,9 +59,9 @@ describe('Funnel hold task rows', () => {
     expect(rows).toHaveLength(6);
     // Rows are sorted by their rendered label, not by the order the API returned them.
     expect(rows.map((row) => row.text().replace(/\d+ tasks$/, '').trim())).toEqual([
-      'Bad Address',
+      'Bad address',
       'Customer Requested Hold',
-      'Fraud Risk',
+      'Fraud risk',
       'Future Hold',
       'Manual Hold',
       'Substitute',
@@ -75,8 +75,8 @@ describe('Funnel hold task rows', () => {
       '/swap',
     ]);
     expect(wrapper.text()).toContain('Substitute4 tasks');
-    expect(wrapper.text()).toContain('Bad Address3 tasks');
-    expect(wrapper.text()).toContain('Fraud Risk2 tasks');
+    expect(wrapper.text()).toContain('Bad address3 tasks');
+    expect(wrapper.text()).toContain('Fraud risk2 tasks');
     expect(wrapper.text()).toContain('Manual Hold1 tasks');
     expect(wrapper.text()).toContain('Customer Requested Hold1 tasks');
     expect(wrapper.text()).toContain('Future Hold0 tasks');
