@@ -237,7 +237,7 @@ router.beforeEach((to, from) => {
     // If the user has navigated from Login page or if it is page load, redirect user to settings page without showing any toast
     if (redirectToPath == "/login" || redirectToPath == "/") redirectToPath = "/settings";
     else {
-      showToast(translate('You do not have permission to access this page'));
+      showToast(translate('You do not have permission to access this page.'));
     }
     return {
       path: redirectToPath,

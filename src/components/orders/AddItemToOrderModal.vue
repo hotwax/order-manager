@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Add Item') }}</ion-title>
+      <ion-title>{{ translate('Add item') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -15,7 +15,7 @@
       :placeholder="translate('Search products')"
       v-model="queryString"
       @ionInput="onSearch"
-      debounce="400"
+      :debounce="400"
     />
 
     <div v-if="isLoading" class="empty-state">
@@ -34,12 +34,12 @@
 
     <ion-list v-else lines="none">
       <ion-item v-for="product in products" :key="product.productId">
-        <ion-thumbnail slot="start" v-image-preview="product" :key="product?.mainImageUrl">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: product.mainImageUrl, productName: productPrimary(product) }" :key="product.mainImageUrl">
           <DxpShopifyImg :src="product.mainImageUrl" :key="product.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
-          <p class="overline">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) }}</p>
-          {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, product) ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, product) : product.productId }}
+          {{ productPrimary(product) }}
+          <p>{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) }}</p>
         </ion-label>
         <!-- Show success check if already added, spinner while adding, Add button otherwise -->
         <ion-icon v-if="addedProductIds.has(product.productId)" slot="end" color="success" :icon="checkmarkCircle" />
@@ -68,6 +68,11 @@ import { showToast } from '@/utils';
 import { useProductStore } from '@/store/productStore';
 
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+
+/** How a search result is named: its row's primary line and its image preview's title. */
+function productPrimary(product: any): string {
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, product) || product.productId;
+}
 
 const props = defineProps<{
   orderId: string;

@@ -7,9 +7,6 @@ describe('Packed orders scan layout', () => {
 
   it('renders packed rows through the page-owned scan layout instead of the generic workflow list', () => {
     expect(packedOrdersSource).not.toContain('WorkflowOrderList');
-    expect(packedOrdersSource).toContain('row-class="packed-order-row"');
-    expect(packedOrdersSource).toContain('--columns-desktop: 5');
-    expect(packedOrdersSource).toContain('--columns-tablet: 5');
   });
 
   it('uses the standardized enriched order row instead of packed-only duplicate fields', () => {

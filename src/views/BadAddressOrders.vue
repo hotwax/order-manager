@@ -24,12 +24,13 @@
         <ion-spinner name="crescent" />
       </div>
 
-      <template v-else-if="error">
-        <ErrorState :title="translate('Could not load bad address tasks')" :message="error" />
-        <div class="ion-text-center ion-padding">
-          <ion-button fill="outline" @click="fetchAddressValidationTasks()">{{ translate('Retry') }}</ion-button>
-        </div>
-      </template>
+      <ErrorState
+        v-else-if="error"
+        :title="translate('Could not load bad address tasks')"
+        :message="error"
+        retryable
+        @retry="fetchAddressValidationTasks()"
+      />
 
       <template v-else>
         <TaskQueueListHeader
@@ -84,7 +85,8 @@
 
     <ion-footer v-if="selectMode">
       <ion-toolbar>
-        <ion-buttons slot="start">
+        <ion-title size="small">{{ translate('{count} selected', { count: selectedTaskCount }) }}</ion-title>
+        <ion-buttons slot="end">
           <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkSaveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
           <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" fill="outline" color="danger" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkCancelOrder()">{{ translate('Cancel orders') }}</ion-button>
           <ion-button fill="outline" color="medium" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkParkOrder()">{{ translate('Park') }}</ion-button>
@@ -146,6 +148,7 @@ const addressValidationTasks = computed(() => orderTaskStore.getAddressValidatio
 const addressValidationTotal = computed(() => orderTaskStore.getAddressValidationTotal);
 const isScrollable = computed(() => orderTaskStore.isAddressValidationTasksScrollable);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
+const selectedTaskCount = computed(() => Object.values(selectedOrders.value).filter(Boolean).length);
 const hasFilters = computed(() => hasTaskFilters(filters.value));
 const currentPageTaskIds = computed(() => addressValidationTasks.value.map((task: any) => task.workEffortId));
 const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));
@@ -357,17 +360,6 @@ onIonViewWillEnter(async () => {
 <style scoped>
 .bad-address-list {
   padding: 0 var(--spacer-sm) var(--spacer-sm);
-}
-
-.order-results-header {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-
-.order-results-header-start {
-  display: flex;
-  min-width: 24px;
 }
 
 @media (max-width: 640px) {

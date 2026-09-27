@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Relationship History') }}</ion-title>
+      <ion-title>{{ translate('Relationship history') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -169,7 +169,7 @@ function dismiss() {
   flex: 1;
   width: 2px;
   background: var(--ion-color-step-150, #d9d9d9);
-  margin-top: 4px;
+  margin-top: var(--spacer-2xs);
 }
 
 .timeline-item:last-child .timeline-line {
@@ -177,14 +177,14 @@ function dismiss() {
 }
 
 .timeline-content {
-  padding: 12px 16px 16px 8px;
+  padding: 12px var(--spacer-sm) var(--spacer-sm) var(--spacer-xs);
 }
 
 .timeline-header-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--spacer-xs);
+  margin-bottom: var(--spacer-2xs);
 }
 
 .type-chip {

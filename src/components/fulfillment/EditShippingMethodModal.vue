@@ -16,7 +16,7 @@
         <ion-select
           :label="translate('Carrier')"
           interface="popover"
-          :placeholder="translate('Select Carrier')"
+          :placeholder="translate('Select carrier')"
           :value="selectedCarrierId"
           @ionChange="onCarrierChange($event.detail.value)"
         >
@@ -29,7 +29,7 @@
         <ion-select
           :label="translate('Shipping method')"
           interface="popover"
-          :placeholder="translate('Select Shipping Method')"
+          :placeholder="translate('Select shipping method')"
           :value="selectedMethodId || undefined"
           :disabled="!selectedCarrierId"
           @ionChange="selectedMethodId = $event.detail.value"
@@ -46,7 +46,7 @@
     </ion-list>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedCarrierId || !selectedMethodId" :aria-label="translate('Confirm')" @click="confirm()">
+      <ion-fab-button :disabled="!selectedCarrierId || !selectedMethodId" :aria-label="translate('Save')" @click="confirm()">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>

@@ -98,7 +98,7 @@
 
       <ErrorState
         v-if="error"
-        :title="translate('Return search failed')"
+        :title="translate('Could not load returns')"
         :message="error"
         retryable
         @retry="runSearch"
@@ -145,8 +145,7 @@
           </ion-label>
 
           <ion-label class="ion-text-end">
-            {{ statusLabel(returnRecord.statusId) }}
-            <p>{{ translate('Status') }}</p>
+            <ion-badge :color="returnStatusColor(returnRecord.statusId)">{{ statusLabel(returnRecord.statusId) }}</ion-badge>
           </ion-label>
         </div>
       </ion-list>
@@ -168,6 +167,7 @@
 import { translate } from "@common";
 import {
   IonButtons,
+  IonBadge,
   IonContent,
   IonHeader,
   IonInfiniteScroll,
@@ -196,6 +196,7 @@ import router from "@/router";
 import { useReturnsStore } from "@/store/returns";
 import { useSeedStore } from "@/store/seed";
 import { formatDate } from "@/utils/format";
+import { returnStatusColor } from "@/utils/statusColors";
 
 const returnsStore = useReturnsStore();
 const seed = useSeedStore();
@@ -278,12 +279,12 @@ function facilityLabel(destinationFacilityId?: string) {
   margin: calc(-1 * var(--spacer-xs)) var(--spacer-base) var(--spacer-sm);
 }
 
+/* Every column shows from tablet up, so tablet needs all five. */
 .return-result-row {
   --columns-desktop: 5;
-  --columns-tablet: 4;
+  --columns-tablet: 5;
   min-height: 4.75rem;
   border-block-start: var(--border-medium);
-  cursor: pointer;
   padding-inline: var(--spacer-sm);
 }
 

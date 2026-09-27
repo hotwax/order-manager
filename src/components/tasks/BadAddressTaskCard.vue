@@ -199,14 +199,14 @@ function brokeredFacilityName(task: any): string {
   return task.facilityName
     || seedStore.facilityName(task.facilityId)
     || task.facilityId
-    || '-';
+    || translate('Facility not assigned');
 }
 
 function carrierShippingMethodLabel(task: any): string {
   const carrier = task.carrierPartyId ? seedStore.carrierName(task.carrierPartyId) : '';
   const methodId = task.shipmentMethodTypeId || task.shippingMethodTypeId;
   const method = methodId ? seedStore.shipmentMethodDescription(methodId) : '';
-  return [carrier, method].filter(Boolean).join(' - ') || '-';
+  return [carrier, method].filter(Boolean).join(' - ') || translate('Shipping method not set');
 }
 
 async function openCountryPicker(address: AddressState['original']) {
@@ -398,7 +398,7 @@ defineExpose({
 .geo-picker-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacer-2xs);
 }
 
 .geo-picker-label {
@@ -416,8 +416,8 @@ defineExpose({
 }
 
 .bad-address-skeleton-item ion-label {
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-top: var(--spacer-xs);
+  margin-bottom: var(--spacer-xs);
 }
 
 .bad-address-skeleton-label {

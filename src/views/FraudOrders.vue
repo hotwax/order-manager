@@ -88,9 +88,10 @@
 
     <ion-footer v-if="selectMode">
       <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-button color="primary" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkResolve">{{ translate('Resolve') }}</ion-button>
-          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" color="danger" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkCancel">{{ translate('Cancel orders') }}</ion-button>
+        <ion-title size="small">{{ translate('{count} selected', { count: selectedTaskCount }) }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button fill="solid" color="primary" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkResolve">{{ translate('Resolve') }}</ion-button>
+          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" fill="outline" color="danger" :disabled="!selectedTaskCount || bulkActionRunning" @click="bulkCancel">{{ translate('Cancel orders') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
@@ -307,17 +308,6 @@ onIonViewWillEnter(() => {
 <style scoped>
 .fraud-orders {
   padding: 0 var(--spacer-sm) var(--spacer-sm);
-}
-
-.order-results-header {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-
-.order-results-header-start {
-  display: flex;
-  min-width: 24px;
 }
 
 @media (max-width: 640px) {

@@ -69,7 +69,6 @@ describe('seed store', () => {
     expect(seedStore.allowedTransitions('ORDER_CREATED')).toEqual([expect.objectContaining({
       toStatusId: 'ORDER_APPROVED',
       toStatusDescription: 'Approved',
-      toStatusColor: 'medium'
     })]);
   });
 

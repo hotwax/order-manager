@@ -140,6 +140,12 @@ export const useOrderStore = defineStore('orders', {
       inflight: false,
       packed: false
     },
+    // A failed first page, so the view shows the error rather than an empty queue.
+    workflowOrdersError: {
+      open: '',
+      inflight: '',
+      packed: ''
+    },
     workflowOrdersTotal: {
       open: 0,
       inflight: 0,
@@ -299,6 +305,7 @@ export const useOrderStore = defineStore('orders', {
     async fetchWorkflowOrders(bucket: 'open' | 'inflight' | 'packed', filters: WorkflowFilters) {
       if (this.workflowOrdersLoading[bucket]) return;
       this.workflowOrdersLoading[bucket] = true;
+      this.workflowOrdersError[bucket] = '';
       this.workflowOrders[bucket] = [];
       this.workflowOrdersTotal[bucket] = 0;
       this.workflowOrdersPageIndex[bucket] = 0;
@@ -312,6 +319,7 @@ export const useOrderStore = defineStore('orders', {
         this.setNavCount(bucket, total);
       } catch (error: any) {
         logger.error(`Failed to fetch ${bucket} orders`, error);
+        this.workflowOrdersError[bucket] = error?.message || translate('Failed to search orders');
       } finally {
         this.workflowOrdersLoading[bucket] = false;
       }

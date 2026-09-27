@@ -6,7 +6,7 @@
           <ion-back-button default-href="/customers" :aria-label="translate('Back')" />
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate('Customer Detail') }}</ion-title>
+        <ion-title>{{ translate('Customer details') }}</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="onDeleteCustomer" :disabled="deleting || customer?.statusId === 'PARTY_DISABLED'" :aria-label="translate('Delete customer')" :title="translate('Delete customer')">
             <ion-spinner v-if="deleting" name="crescent" slot="icon-only" />
@@ -51,7 +51,7 @@
                     </ion-button>
                     <ion-button v-else slot="end" fill="clear" size="small" @click="onEditContact(section)">
                       {{ translate('Edit') }}
-                      <ion-icon slot="end" :icon="pencilOutline" />
+                      <ion-icon slot="end" :icon="createOutline" />
                     </ion-button>
                   </ion-item>
                   <ion-item v-for="value in section.values" :key="value.contactMechId">
@@ -95,7 +95,7 @@
               <!-- Merged contacts -->
               <ion-card>
                 <ion-card-header>
-                  <ion-card-title>{{ translate('Merged Contacts') }}</ion-card-title>
+                  <ion-card-title>{{ translate('Merged contacts') }}</ion-card-title>
                 </ion-card-header>
                 <ion-list lines="none">
                   <!-- Already-merged duplicates (active only; expired ones are in View history) -->
@@ -127,7 +127,7 @@
                     </ion-button>
                   </ion-item>
                   <ion-item v-if="!hasActiveDuplicateRelationship && !mergableDuplicates.length" lines="none">
-                    <ion-label color="medium"><em>{{ translate('No Merged Contacts') }}</em></ion-label>
+                    <ion-label color="medium"><em>{{ translate('No merged contacts') }}</em></ion-label>
                   </ion-item>
                 </ion-list>
                 <div class="card-actions">
@@ -302,15 +302,16 @@
             </ion-label>
 
             <ion-label class="ion-text-end">
-              {{ returnStatusLabel(returnRecord.statusId) }}
-              <p>{{ translate('Status') }}</p>
+              <ion-badge :color="returnStatusColor(returnRecord.statusId)">{{ returnStatusLabel(returnRecord.statusId) }}</ion-badge>
             </ion-label>
           </div>
         </ion-list>
         <ErrorState
           v-else-if="returnsStatus === 'error'"
-          :title="translate('Returns failed to load')"
+          :title="translate('Could not load returns')"
           :message="returnsError"
+          retryable
+          @retry="loadReturns()"
         />
         <EmptyState
           v-else-if="returnsStatus === 'loaded'"
@@ -353,11 +354,11 @@
             <ion-item lines="full">
               <ion-label>
                 <p class="overline">{{ translate('From') }}</p>
-                {{ comm.partyIdFrom || '—' }}
+                {{ comm.partyIdFrom || translate('Not available') }}
               </ion-label>
               <ion-label slot="end">
                 <p class="overline">{{ translate('To') }}</p>
-                {{ comm.partyIdTo || '—' }}
+                {{ comm.partyIdTo || translate('Not available') }}
               </ion-label>
             </ion-item>
 
@@ -376,8 +377,10 @@
         />
         <ErrorState
           v-else-if="commsStatus === 'error'"
-          :title="translate('Communications failed to load')"
+          :title="translate('Could not load communications')"
           :message="commsError"
+          retryable
+          @retry="loadCommunications()"
         />
         <div v-else class="ion-padding ion-text-center">
           <ion-spinner name="crescent" />
@@ -421,8 +424,10 @@
 
     <ion-content v-else-if="error">
       <ErrorState
-        :title="translate('Customer failed to load')"
+        :title="translate('Could not load customer')"
         :message="error"
+        retryable
+        @retry="load()"
       />
     </ion-content>
 
@@ -439,6 +444,7 @@
 import { commonUtil, translate } from '@common';
 import {
   IonBackButton,
+  IonBadge,
   IonButton,
   IonButtons,
   IonCard,
@@ -466,11 +472,7 @@ import {
   modalController
 } from '@ionic/vue';
 import {
-  addCircleOutline,
-  informationCircleOutline,
-  pencilOutline,
-  pricetagOutline,
-  trashOutline
+  addCircleOutline, createOutline, informationCircleOutline, pricetagOutline, trashOutline,
 } from 'ionicons/icons';
 import { DateTime } from 'luxon';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -491,6 +493,8 @@ import { useUserStore } from '@/store/user';
 import Actions from '@/authorization/actions';
 import type { CustomerOrderCardData, CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
 import type { ReturnSummary } from '@/types/returns';
+import { confirmAction } from '@/utils';
+import { returnStatusColor } from '@/utils/statusColors';
 import { formatDate, formatDateTime, formatMoney, formatMonthYear } from '@/utils/format';
 
 const props = defineProps<{
@@ -716,6 +720,7 @@ async function onMergeCandidate(candidatePartyId: string) {
 }
 
 async function onExpireDuplicateRelationship(duplicate: { keyFields: { partyIdFrom: string; partyIdTo: string; roleTypeIdFrom: string; roleTypeIdTo: string; fromDate: string } }) {
+  if (!await confirmAction(translate('Expire relationship'), translate('The relationship ends now and stays in its history.'), translate('Expire'))) return;
   await expireRelationship(duplicate.keyFields, DateTime.now().toMillis());
 }
 
@@ -752,11 +757,13 @@ async function onEditContact(section: import('@/types/customer').ContactSection)
   if (role === 'confirm' && data && section.values[0]) {
     await updateContact(section.contactMechTypeId, section.values[0].contactMechId, data);
   } else if (role === 'expire' && section.values[0]) {
+    if (!await confirmAction(translate('Delete contact'), translate('This contact will be removed from the customer.'), translate('Delete'))) return;
     await expireContact(section.values[0].contactMechId);
   }
 }
 
 async function onExpireRelationship(relationship: { keyFields: { partyIdFrom: string; partyIdTo: string; roleTypeIdFrom: string; roleTypeIdTo: string; fromDate: string } }) {
+  if (!await confirmAction(translate('Expire relationship'), translate('The relationship ends now and stays in its history.'), translate('Expire'))) return;
   await expireRelationship(relationship.keyFields, DateTime.now().toMillis());
 }
 
@@ -831,27 +838,27 @@ ion-card-header ion-card-title {
 
 .customer-detail-header {
   display: grid;
-  gap: var(--spacer-base, 16px);
+  gap: var(--spacer-base);
   grid-template-columns: minmax(0, 1fr);
-  padding: 8px;
+  padding: var(--spacer-xs);
 }
 
 .customer-detail-main {
   display: grid;
-  gap: 16px;
+  gap: var(--spacer-sm);
   align-content: start;
 }
 
 .customer-detail-cards {
   display: grid;
-  gap: 16px;
+  gap: var(--spacer-sm);
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   align-items: start;
 }
 
 .customer-detail-secondary {
   display: grid;
-  gap: 16px;
+  gap: var(--spacer-sm);
   align-content: start;
 }
 
@@ -871,14 +878,10 @@ ion-card-header ion-card-title {
   margin: 0 0 2px;
 }
 
-.muted {
-  color: var(--ion-color-medium, #92949c);
-}
-
 .card-actions {
   display: flex;
-  gap: 4px;
-  padding: 4px 8px 8px;
+  gap: var(--spacer-2xs);
+  padding: var(--spacer-2xs) var(--spacer-xs) var(--spacer-xs);
   border-top: 1px solid var(--ion-color-step-100, #e6e6e6);
 }
 
@@ -893,7 +896,7 @@ ion-card-header ion-card-title {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 24px 16px 8px;
+  margin: var(--spacer-base) var(--spacer-sm) var(--spacer-xs);
 }
 
 .section-header h2 {
@@ -902,42 +905,20 @@ ion-card-header ion-card-title {
   margin: 0;
 }
 
-.task-contact {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-}
-
-.task-grid {
-  display: grid;
-  gap: 16px;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  padding: 12px 16px;
-}
-
-.task-grid h3 {
-  font-size: 16px;
-  margin: 0 0 2px;
-}
-
-.task-grid p {
-  margin: 0 0 2px;
-  font-size: 14px;
-}
-
 .recent-orders-grid {
   display: grid;
-  gap: 16px;
+  gap: var(--spacer-sm);
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  padding: 8px;
+  padding: var(--spacer-xs);
   align-items: start;
 }
 
+/* Every column shows from tablet up, so tablet needs all five. */
 .return-result-row {
   --columns-desktop: 5;
-  --columns-tablet: 4;
+  --columns-tablet: 5;
   min-height: 4.75rem;
   border-block-start: var(--border-medium);
-  cursor: pointer;
   padding-inline: var(--spacer-sm);
 }
 

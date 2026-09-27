@@ -16,8 +16,8 @@
   <ion-content ref="content">
     <ion-list v-if="item">
       <ion-item lines="full">
-        <ion-thumbnail v-if="product?.mainImageUrl" slot="start">
-          <DxpShopifyImg :src="product.mainImageUrl" size="small" />
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: product?.mainImageUrl, productName: primaryIdentifier(item.productId) || item.name }" :key="`${product?.mainImageUrl} ${primaryIdentifier(item.productId) || item.name}`">
+          <DxpShopifyImg :src="product?.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
           <p class="overline">
@@ -346,10 +346,6 @@ async function submit() {
 </script>
 
 <style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-
 /* A fixed width keeps each measure in a column down the list, and "37 (-1)" as wide as "38". */
 .transfer-measure {
   min-width: 4.5rem;

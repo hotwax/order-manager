@@ -6,7 +6,7 @@
           <ion-back-button default-href="/returns" :aria-label="translate('Back')" />
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate('Return detail') }}</ion-title>
+        <ion-title>{{ translate('Return details') }}</ion-title>
       </ion-toolbar>
       <ion-progress-bar v-if="detailLoading" type="indeterminate" />
     </ion-header>
@@ -111,7 +111,7 @@
               <ion-item v-if="returnRecord.shopifySync?.returnStatusId">
                 <ion-label>
                   <p>{{ translate('Shopify status') }}</p>
-                  <ion-badge :color="shopifyStatusColor(returnRecord.shopifySync.returnStatusId)">
+                  <ion-badge :color="shopifyReturnStatusColor(returnRecord.shopifySync.returnStatusId)">
                     {{ describe(returnRecord.shopifySync.returnStatusId) }}
                   </ion-badge>
                 </ion-label>
@@ -198,11 +198,17 @@
             <ion-item slot="header" lines="none" class="return-item-accordion-header">
               <div class="list-item return-item-row">
                 <div class="return-item-key">
-                  <ion-thumbnail v-if="item.productId">
+                  <!-- The row is an accordion header, so opening the preview must not also toggle it. -->
+                  <ion-thumbnail
+                    v-if="item.productId"
+                    v-image-preview="{ mainImageUrl: (productCache as any).getProduct(item.productId)?.mainImageUrl, productName: itemLabel(item) }"
+                    :key="`${(productCache as any).getProduct(item.productId)?.mainImageUrl} ${itemLabel(item)}`"
+                    @click.stop
+                  >
                     <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
                   </ion-thumbnail>
                   <ion-label class="ion-text-wrap">
-                    <h2>{{ itemLabel(item) }}</h2>
+                    {{ itemLabel(item) }}
                     <p v-if="itemSecondaryLabel(item)">
                       {{ itemSecondaryLabel(item) }}
                     </p>
@@ -358,7 +364,7 @@
 
     <ion-content v-else-if="detailError">
       <ErrorState
-        :title="translate('Return failed to load')"
+        :title="translate('Could not load return')"
         :message="detailError"
         retryable
         @retry="loadReturn"
@@ -429,6 +435,7 @@ import { useSeedStore } from "@/store/seed";
 import { useUserStore } from "@/store/user";
 import type { ReturnItemDetail, ReturnStatusHistory, ReturnSyncState } from "@/types/returns";
 import { formatDateTime, formatMoney } from "@/utils/format";
+import { returnStatusColor, shopifyReturnStatusColor } from "@/utils/statusColors";
 
 const props = defineProps<{
   returnId: string;
@@ -571,27 +578,6 @@ const syncError = computed(() => {
     sync.pushErrorMessage ||
     "";
 });
-const returnStatusColorAliases: Record<string, string> = {
-  RETURN_REQUESTED: "ORDER_CREATED",
-  RETURN_APPROVED: "ORDER_APPROVED",
-  RETURN_ACCEPTED: "ORDER_APPROVED",
-  RETURN_AUTHORIZED: "PAYMENT_AUTHORIZED",
-  RETURN_RECEIVED: "SHIPMENT_SHIPPED",
-  RETURN_COMPLETED: "ORDER_COMPLETED",
-  RETURN_REJECTED: "ORDER_REJECTED",
-  RETURN_CANCELLED: "ORDER_CANCELLED"
-};
-const shopifyStatusColorAliases: Record<string, string> = {
-  OPEN: "ORDER_CREATED",
-  REQUESTED: "ORDER_CREATED",
-  APPROVED: "ORDER_APPROVED",
-  AUTHORIZED: "PAYMENT_AUTHORIZED",
-  COMPLETED: "ORDER_COMPLETED",
-  CLOSED: "ORDER_COMPLETED",
-  REJECTED: "ORDER_REJECTED",
-  CANCELED: "ORDER_CANCELLED",
-  CANCELLED: "ORDER_CANCELLED"
-};
 const returnTimelineEvents = computed(() => {
   const record = returnRecord.value;
   if(!record) {return [];}
@@ -696,7 +682,7 @@ function itemReferenceLabel(item: ReturnItemDetail) {
     translate("Return item {id}", { id: item.returnItemSeqId }),
     item.orderItemSeqId ? translate("Order item {id}", { id: item.orderItemSeqId }) : "",
     item.productId ? translate("Product {id}", { id: item.productId }) : ""
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean).join(", ");
 }
 
 function inventoryStatusLabel(statusId: string) {
@@ -706,14 +692,6 @@ function inventoryStatusLabel(statusId: string) {
   };
 
   return labels[statusId] ? translate(labels[statusId]) : describe(statusId);
-}
-
-function returnStatusColor(statusId: string) {
-  return commonUtil.getStatusColor(returnStatusColorAliases[statusId] || statusId);
-}
-
-function shopifyStatusColor(statusId: string) {
-  return commonUtil.getStatusColor(shopifyStatusColorAliases[statusId] || returnStatusColorAliases[statusId] || statusId);
 }
 
 function restockState(item: ReturnItemDetail) {
@@ -906,7 +884,7 @@ function syncLabel(state: ReturnSyncState) {
 
 .return-item-detail-label,
 .return-item-fact dt {
-  margin: 0 0 4px;
+  margin: 0 0 var(--spacer-2xs);
   color: var(--ion-color-medium, #92949c);
   font-size: 0.75rem;
   font-weight: 500;

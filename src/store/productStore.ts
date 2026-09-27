@@ -243,10 +243,10 @@ export const useProductStore = defineStore('productStore', {
       const productIdentificationOptions = [
         { goodIdentificationTypeId: "productId", description: translate("Product ID") },
         { goodIdentificationTypeId: "groupId", description: translate("Group ID") },
-        { goodIdentificationTypeId: "groupName", description: translate("Group Name") },
-        { goodIdentificationTypeId: "internalName", description: translate("Internal Name") },
-        { goodIdentificationTypeId: "parentProductName", description: translate("Parent Product Name") },
-        { goodIdentificationTypeId: "primaryProductCategoryName", description: translate("Primary Product Category Name") },
+        { goodIdentificationTypeId: "groupName", description: translate("Group name") },
+        { goodIdentificationTypeId: "internalName", description: translate("Internal name") },
+        { goodIdentificationTypeId: "parentProductName", description: translate("Parent product name") },
+        { goodIdentificationTypeId: "primaryProductCategoryName", description: translate("Primary product category name") },
         { goodIdentificationTypeId: "title", description: translate("Title") }
       ]
       //good identification types

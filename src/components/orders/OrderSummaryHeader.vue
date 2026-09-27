@@ -124,8 +124,8 @@
         <ion-list lines="none">
           <ion-item>
             <ion-label>
-              <p>{{ translate('Order Number') }}</p>
-              {{ order.externalId || translate('Order Number') }}
+              <p>{{ translate('Order number') }}</p>
+              {{ order.externalId || translate('Order number') }}
             </ion-label>
           </ion-item>
           <ion-item>

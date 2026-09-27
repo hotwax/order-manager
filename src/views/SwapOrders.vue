@@ -100,11 +100,12 @@
 
     <ion-footer v-if="selectMode">
       <ion-toolbar>
-        <ion-buttons slot="start">
-          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" color="danger" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkCancelOrders">
+        <ion-title size="small">{{ translate('{count} selected', { count: selectedTaskIds.length }) }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" fill="outline" color="danger" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkCancelOrders">
             {{ translate('Cancel orders') }}
           </ion-button>
-          <ion-button color="medium" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkParkOrders">
+          <ion-button fill="outline" color="medium" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkParkOrders">
             {{ translate('Park') }}
           </ion-button>
         </ion-buttons>

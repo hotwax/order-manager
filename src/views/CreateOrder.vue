@@ -23,7 +23,7 @@
               </ion-select>
             </ion-item>
             <ion-item>
-              <ion-icon :icon="storefrontOutline" slot="start" />
+              <ion-icon :icon="businessOutline" slot="start" />
               <ion-select v-model="orderForm.facilityId" :label="translate('Facility')" :placeholder="translate('Select')" interface="popover">
                 <ion-select-option v-for="facility in facilities" :value="facility.facilityId" :key="facility.facilityId">{{ facility.faciityName ? facility.faciityName : facility.facilityId }}</ion-select-option>
               </ion-select>
@@ -41,7 +41,7 @@
               <ion-card-title>
                 {{ translate("Customer") }}
                 <ion-button size="small" fill="outline" @click="openCustomerModal">
-                  <ion-icon :icon="addCircleOutline" slot="start"/>
+                  <ion-icon :icon="orderForm.customer.id ? createOutline : addCircleOutline" slot="start"/>
                   {{ orderForm.customer.id ? translate("Edit") : translate("Add") }}
                 </ion-button>
               </ion-card-title>
@@ -78,7 +78,7 @@
               <ion-card-title>
                 {{ translate("Shipping address") }}
                 <ion-button size="small" fill="outline" @click="openShippingAddressModal">
-                  <ion-icon :icon="addCircleOutline" slot="start"/>
+                  <ion-icon :icon="orderForm.shippingAddress.zip ? createOutline : addCircleOutline" slot="start"/>
                   {{ orderForm.shippingAddress.zip ? translate("Edit") : translate("Add") }}
                 </ion-button>
               </ion-card-title>
@@ -114,7 +114,7 @@
                 </div>
                 <ion-button class="ion-margin" fill="outline" size="small" @click="openCustomLineModal">
                   <ion-icon slot="start" :icon="addOutline"></ion-icon>
-                  {{ translate("Custom Line") }}
+                  {{ translate("Custom line") }}
                 </ion-button>
               </div>
               <div v-show="mode === 'scan'">
@@ -123,7 +123,7 @@
                 </ion-item>
                 <ion-item lines="none" v-if="searchedProduct.productId">
                   <ion-thumbnail slot="start">
-                    <DxpShopifyImg :src="getProduct(searchedProduct.productId)?.mainImageUrl || searchedProduct.mainImageUrl" :key="getProduct(searchedProduct.productId)?.mainImageUrl || searchedProduct.mainImageUrl" />
+                    <DxpShopifyImg :src="getProduct(searchedProduct.productId)?.mainImageUrl || searchedProduct.mainImageUrl" :key="getProduct(searchedProduct.productId)?.mainImageUrl || searchedProduct.mainImageUrl" size="small" />
                   </ion-thumbnail>
                   <ion-label>
                     {{ commonUtil.getProductIdentificationValue(barcodeIdentifier, getProduct(searchedProduct.productId)) }}
@@ -182,7 +182,7 @@
                 <ion-list lines="none" v-else-if="searchedProduct.productId">
                   <ion-item>
                     <ion-thumbnail slot="start">
-                      <DxpShopifyImg :src="searchedProduct.mainImageUrl" :key="searchedProduct.mainImageUrl" />
+                      <DxpShopifyImg :src="searchedProduct.mainImageUrl" :key="searchedProduct.mainImageUrl" size="small" />
                     </ion-thumbnail>
                     <ion-label>
                       {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(searchedProduct.productId)) }}
@@ -221,10 +221,10 @@
           </div>
 
           <template v-if="orderForm.lineItems.length">
-            <div class="list-item ion-margin-horizontal" v-for="(lineItem, index) in orderForm.lineItems" :key="lineItem.productId">
+            <div class="list-item line-item-row ion-margin-horizontal" v-for="(lineItem, index) in orderForm.lineItems" :key="lineItem.productId">
               <ion-item lines="none">
                 <ion-thumbnail slot="start">
-                  <DxpShopifyImg :src="lineItem.mainImageUrl" :key="lineItem.mainImageUrl"/>
+                  <DxpShopifyImg :src="lineItem.mainImageUrl" :key="lineItem.mainImageUrl" size="small" />
                 </ion-thumbnail>
                 <ion-label>
                   {{ lineItem.productId ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(lineItem.productId)) : lineItem.title }}
@@ -234,7 +234,7 @@
               <div class="tablet">
                 <ion-label>{{ formatMoney(lineItem.price) }}</ion-label>
               </div>
-              <ion-item>
+              <ion-item class="line-item-qty">
                 <ion-input
                   v-model="lineItem.quantity"
                   type="number"
@@ -283,7 +283,7 @@
       <ion-fab vertical="bottom" horizontal="end" slot="fixed">
         <ion-fab-button data-testid="create-order-submit-btn" @click="submitOrder" :aria-label="translate('Submit order')" :disabled="isSubmitting">
           <ion-spinner v-if="isSubmitting" name="crescent" />
-          <ion-icon v-else :icon="checkmarkDoneOutline" />
+          <ion-icon v-else :icon="saveOutline" />
         </ion-fab-button>
       </ion-fab>
     </ion-content>
@@ -294,7 +294,7 @@
 import { computed, ref, onMounted, nextTick, watch } from 'vue';
 import { formatMoney } from '@/utils/format';
 import { IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonMenuButton, IonPage, IonSearchbar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, IonSpinner, modalController } from '@ionic/vue';
-import { addOutline, storefrontOutline, searchOutline, checkmarkDoneOutline, barcodeOutline, cloudOfflineOutline, shirtOutline, checkmarkOutline, locateOutline, addCircleOutline, trashOutline, cashOutline, globeOutline } from 'ionicons/icons';
+import { addCircleOutline, addOutline, barcodeOutline, businessOutline, cashOutline, checkmarkDoneOutline, checkmarkOutline, cloudOfflineOutline, createOutline, globeOutline, locateOutline, saveOutline, searchOutline, shirtOutline, trashOutline } from 'ionicons/icons';
 import { api, commonUtil, DxpShopifyImg, emitter, logger, translate, useSolrSearch } from '@common';
 import { getShopifyShops } from '@/services/customer';
 import { useProductStore } from '@/store/productStore';
@@ -728,7 +728,7 @@ async function submitOrder() {
       };
       
       // Present success feedback
-      await commonUtil.showToast(translate("Shopify Order Created Successfully!"));
+      await commonUtil.showToast(translate("Shopify order created successfully."));
       resetForm();
     } else {
       throw new Error("Invalid response schema from order API");
@@ -788,6 +788,23 @@ ion-card-title {
 .list-item {
   --columns-desktop: 4;
   border-bottom: var(--border-medium);
+}
+
+/* The quantity is edited on every screen size, so it stays beside the product where the shared
+   row would hide a middle column: product, quantity and remove on phones, plus price from tablet. */
+.line-item-row {
+  --columns-mobile: 3;
+  --columns-tablet: 4;
+}
+
+.line-item-row > .line-item-qty {
+  display: unset;
+}
+
+/* A line item is edited in place and opens nothing, so it keeps the shared list-item hover off. */
+.list-item:hover {
+  --list-item-bg-hover: initial;
+  cursor: auto;
 }
 
 /* Added width property as after updating to ionic7 min-width is getting applied on ion-label inside ion-item

@@ -31,7 +31,7 @@
             </ion-label>
             <ion-label>
               <p class="overline">{{ translate('Routing justification') }}</p>
-              {{ routingJustification(task) || '-' }}
+              {{ routingJustification(task) || translate('No routing justification') }}
             </ion-label>
           </div>
           <ion-note slot="end" v-if="routingTimestamp(task)">{{ formatRoutingTimestamp(task) }}</ion-note>
@@ -44,7 +44,7 @@
         <ion-label>{{ translate('Ordered items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="item in task.items" :key="item.orderItemSeqId">
-        <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="productImageUrl(item.productId)">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: productImageUrl(item.productId), productName: productPrimary(item) }" :key="`${productImageUrl(item.productId)} ${productPrimary(item)}`">
           <DxpShopifyImg :src="productImageUrl(item.productId)" :key="productImageUrl(item.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>
@@ -73,7 +73,7 @@
         <ion-label>{{ translate('Suggested items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="(suggested, index) in getSuggestedItems(task).list" :key="`suggested-${index}`">
-        <ion-thumbnail slot="start" :key="productImageUrl(suggested.productId)">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: productImageUrl(suggested.productId), productName: productPrimary(suggested) }" :key="`${productImageUrl(suggested.productId)} ${productPrimary(suggested)}`">
           <DxpShopifyImg :src="productImageUrl(suggested.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>
@@ -96,7 +96,7 @@
         </template>
         <template v-else-if="suggested._isSubstitute">
           <ion-badge slot="end" color="success">{{ availableBadgeLabel(suggested, task) }}</ion-badge>
-          <ion-button slot="end" fill="clear" color="danger" @click="removeSuggestedSubstitute(task, suggested)" :aria-label="translate('Close')" :title="translate('Close')">
+          <ion-button slot="end" fill="clear" color="danger" @click="removeSuggestedSubstitute(task, suggested)" :aria-label="translate('Remove substitute')" :title="translate('Remove substitute')">
             <ion-icon slot="icon-only" :icon="closeCircleOutline" />
           </ion-button>
         </template>

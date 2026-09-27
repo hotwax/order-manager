@@ -14,7 +14,7 @@
         <p>{{ shipGroup.statusLabel }}</p>
         <!-- A counter sale has one state, so there is nothing to expand into. -->
         <ion-button v-if="!shipGroup.isPosCompleted" fill="clear" color="medium" @click="emit('update:expanded', !expanded)" :aria-label="translate('Toggle ship group')" :title="translate('Toggle ship group')">
-          <ion-icon slot="icon-only" :icon="expanded ? chevronUp : chevronDown" />
+          <ion-icon slot="icon-only" :icon="expanded ? chevronUpOutline : chevronDownOutline" />
         </ion-button>
       </div>
     </div>
@@ -67,7 +67,7 @@
             v-if="!shipGroup.isSettled"
             slot="end"
             fill="clear"
-            color="medium"
+            color="danger"
             :aria-label="translate('Clear gift message')"
             :title="translate('Clear gift message')"
             @click.stop="clearGiftMessage"
@@ -78,29 +78,29 @@
         <ion-item v-if="shipGroup.shipAfterDate || shipGroup.shipByDate" button :detail="false" lines="none"
           :disabled="shipGroup.isSettled" @click="openShippingDatesModal">
           <ion-label>
-            <p class="outline">{{ translate('Ship after') }}</p>
+            <p>{{ translate('Ship after') }}</p>
             {{ formatDateTime(shipGroup.shipAfterDate) }}
           </ion-label>
           <ion-label>
-            <p class="outline">{{ translate('Ship by') }}</p>
+            <p>{{ translate('Ship by') }}</p>
             {{ formatDateTime(shipGroup.shipByDate) }}
           </ion-label>
         </ion-item>
         <ion-item v-if="shipGroup.estimatedShipDate || shipGroup.estimatedDeliveryDate" button :detail="false"
           lines="none" :disabled="shipGroup.isSettled" @click="openDeliveryDatesModal">
           <ion-label>
-            <p class="outline">{{ translate('Estimated ship date') }}</p>
+            <p>{{ translate('Estimated ship date') }}</p>
             {{ formatDateTime(shipGroup.estimatedShipDate) }}
           </ion-label>
           <ion-label>
-            <p class="outline">{{ translate('Estimated delivery date') }}</p>
+            <p>{{ translate('Estimated delivery date') }}</p>
             {{ formatDateTime(shipGroup.estimatedDeliveryDate) }}
           </ion-label>
         </ion-item>
         <ion-item v-if="shipGroup.shippingInstructions" button :detail="false" lines="none"
           :disabled="shipGroup.isSettled" @click="openInstructionModal">
           <ion-label>
-            <p class="outline">{{ translate('Instructions') }}</p>
+            <p>{{ translate('Instructions') }}</p>
             {{ shipGroup.shippingInstructions }}
           </ion-label>
         </ion-item>
@@ -132,14 +132,17 @@
               <DxpShopifyImg :src="item.imageUrl" :key="getProduct(item.productId)?.mainImageUrl" size="small" />
             </ion-thumbnail>
             <ion-label>
-              <p class="overline">{{ secondaryIdentifier(item.productId) }}</p>
               <div>
                 {{ primaryIdentifier(item.productId) || item.productId }}
                 <ion-badge class="kit-badge" color="dark" v-if="isKit(item)">{{ translate("Kit") }}</ion-badge>
               </div>
+              <p>{{ secondaryIdentifier(item.productId) }}</p>
               <p v-if="featureLabel(item.productId)" class="ship-group-item-features" :title="featureLabel(item.productId)">{{ featureLabel(item.productId) }}</p>
             </ion-label>
-            <ion-note slot="end">{{ translate('{count} units', { count: Number(item.quantity) }) }}</ion-note>
+            <ion-label slot="end" class="ion-text-center">
+              {{ item.quantity }}
+              <p>{{ translate('qty') }}</p>
+            </ion-label>
           </ion-item>
           <ion-item v-if="hiddenItemCount" button :detail="false" @click="emit('update:expanded', true)">
             <ion-label color="medium">{{ translate('+{count} more', { count: hiddenItemCount }) }}</ion-label>
@@ -149,7 +152,7 @@
         <ion-list lines="none" :aria-label="translate('Fulfillment')">
           <ion-item lines="full">
             <ion-label>
-              {{ carrierName || translate('Carrier name') }} {{ methodLabel || translate('Shipping Method Name') }}
+              {{ carrierName || translate('Carrier name') }} {{ methodLabel || translate('Shipping method name') }}
             </ion-label>
           </ion-item>
           <ion-item>
@@ -179,7 +182,7 @@
             <ion-item v-for="item in shipGroup.items" :key="item.orderItemSeqId">
               <!-- Selection only feeds the park / pull back / release actions, which a counter
                    sale and a completed or cancelled order do not have. -->
-              <ion-checkbox v-if="!shipGroup.isPosCompleted && !orderIsTerminal" slot="start" :checked="selectedItemIds.includes(item.orderItemSeqId)"
+              <ion-checkbox v-if="!shipGroup.isPosCompleted && !orderIsTerminal" slot="start" :aria-label="translate('Select item')" :checked="selectedItemIds.includes(item.orderItemSeqId)"
                 @ionChange="toggleItem(item.orderItemSeqId, $event.detail.checked)" />
               <ion-thumbnail slot="start" v-image-preview="imagePreview(item.productId)" :key="`${getProduct(item.productId)?.mainImageUrl} ${primaryIdentifier(item.productId)}`">
                 <DxpShopifyImg :src="item.imageUrl" :key="getProduct(item.productId)?.mainImageUrl" size="small" />
@@ -224,7 +227,7 @@
             </ion-list-header>
             <ion-item lines="full">
               <ion-select :label="translate('Carrier')" interface="popover"
-                :placeholder="translate('Select Carrier')"
+                :placeholder="translate('Select carrier')"
                 :disabled="disabledActions.EDIT_CARRIER_METHOD"
                 :value="carrierId"
                 @ionChange="onCarrierChange($event.detail.value)">
@@ -236,7 +239,7 @@
 
             <ion-item lines="full">
               <ion-select :label="translate('Shipping method')" interface="popover"
-                :placeholder="translate('Select Shipping Method')"
+                :placeholder="translate('Select shipping method')"
                 :disabled="disabledActions.EDIT_CARRIER_METHOD"
                 :value="methodId || undefined"
                 @ionChange="onMethodChange($event.detail.value)">
@@ -254,23 +257,23 @@
                 </template>
                 <div v-else>{{ translate('Shipping address not available') }}</div>
               </ion-label>
-              <p slot="end" v-if="!shipGroup.isVirtual && distance">
-                {{ translate('{distance} miles', { distance, count: Number(distance) }) }}
-              </p>
+              <ion-note slot="end" v-if="!shipGroup.isVirtual && distance">
+                {{ translate('{distance} miles', { distance: formatNumber(distance, { maximumFractionDigits: 1 }), count: Number(distance) }) }}
+              </ion-note>
               <ion-button v-if="!disabledActions.EDIT_ADDRESS" slot="end" fill="clear"
                 color="medium" :id="'shipping-opt-trigger-' + shipGroup.id"
                 :aria-label="translate('Shipping options')"
                 :title="translate('Shipping options')">
-                <ion-icon slot="icon-only" :icon="ellipsisVertical" />
+                <ion-icon slot="icon-only" :icon="ellipsisVerticalOutline" />
               </ion-button>
               <ion-popover :trigger="'shipping-opt-trigger-' + shipGroup.id" dismiss-on-select
-                show-backdrop="false">
+                :show-backdrop="false">
                 <ion-content>
                   <ion-list>
-                    <ion-list-header>{{ translate("Shipping address") }}</ion-list-header>
+                    <ion-list-header><ion-label>{{ translate("Shipping address") }}</ion-label></ion-list-header>
                     <ion-item button :detail="false" :disabled="disabledActions.EDIT_ADDRESS" @click="openEditShippingAddress">
                       <ion-icon :icon="createOutline" slot="end" />
-                      {{ translate('Edit') }}
+                      <ion-label>{{ translate('Edit') }}</ion-label>
                     </ion-item>
                   </ion-list>
                 </ion-content>
@@ -467,16 +470,17 @@ import {
   IonProgressBar, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar,
 } from '@ionic/vue';
 import {
-  calendarOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline,
-  ellipsisVertical, giftOutline, mailOutline, saveOutline, sendOutline, trashOutline, warningOutline,
+  calendarOutline, chevronDownOutline, chevronUpOutline, closeOutline, compassOutline, createOutline, cubeOutline,
+  documentTextOutline, ellipsisVerticalOutline, giftOutline, mailOutline, saveOutline, sendOutline, trashOutline,
+  warningOutline,
 } from 'ionicons/icons';
 import { DxpShopifyImg, translate } from '@common';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
-import { isKit } from '@/utils';
+import { confirmAction, isKit } from '@/utils';
 import type { ShipGroupMilestones } from '@/utils/orderEvents';
-import { formatDateTime, formatElapsed, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
+import { formatDateTime, formatElapsed, formatNumber, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
 import { OrderActionValidator, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import type { EnrichedShipGroup, ItemIssuance, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 
@@ -641,7 +645,10 @@ function openGiftModal() {
   openEditor('gift');
 }
 const saveGiftMessage = () => saveFields({ giftMessage: giftMessageDraft.value }, 'Gift message saved.', 'Failed to save gift message.');
-const clearGiftMessage = () => saveFields({ giftMessage: null }, 'Gift message cleared.', 'Failed to clear gift message.');
+async function clearGiftMessage() {
+  if (!await confirmAction(translate('Clear gift message'), translate('The gift message will be removed from this ship group.'), translate('Clear'))) return;
+  await saveFields({ giftMessage: null }, 'Gift message cleared.', 'Failed to clear gift message.');
+}
 
 const shippingDatesDraft = ref({ shipAfterDate: '', shipByDate: '' });
 function openShippingDatesModal() {

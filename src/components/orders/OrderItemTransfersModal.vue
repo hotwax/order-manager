@@ -13,8 +13,8 @@
   <ion-content>
     <ion-list v-if="item">
       <ion-item lines="full">
-        <ion-thumbnail v-if="product?.mainImageUrl" slot="start">
-          <DxpShopifyImg :src="product.mainImageUrl" size="small" />
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: product?.mainImageUrl, productName: primaryIdentifier(item.productId) || item.name }" :key="`${product?.mainImageUrl} ${primaryIdentifier(item.productId) || item.name}`">
+          <DxpShopifyImg :src="product?.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
           <p class="overline">{{ translate('Item {id}', { id: item.orderItemSeqId }) }}</p>

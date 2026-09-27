@@ -5,7 +5,7 @@
         <ion-buttons slot="start">
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate("Order Funnel") }}</ion-title>
+        <ion-title>{{ translate("Funnel") }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
@@ -168,13 +168,13 @@
         </StatCard>
 
         <!-- Card 3: Order Hold Tasks -->
-        <StatCard v-if="!holdTasksError" :title="translate('Order Hold Tasks')" :stat="holdTasksLoading ? '' : (holdTasks.holdTasksTotalCount || 0)">
+        <StatCard v-if="!holdTasksError" :title="translate('Order hold tasks')" :stat="holdTasksLoading ? '' : (holdTasks.holdTasksTotalCount || 0)">
           <template v-if="holdTasksLoading" #stat>
             <ion-spinner name="crescent" />
           </template>
           <HoldTaskCountList v-if="!holdTasksLoading" :hold-task-counts="holdTasks.holdTaskCounts" />
         </StatCard>
-        <StatCard v-else :title="translate('Order Hold Tasks')">
+        <StatCard v-else :title="translate('Order hold tasks')">
           <template #stat>
             <ion-icon :icon="alertCircleOutline" color="danger" />
           </template>
@@ -206,10 +206,10 @@
         <!-- Segment selection -->
         <ion-segment v-model="selectedDimension">
           <ion-segment-button value="volume">
-            <ion-label>{{ translate("Order Volume") }}</ion-label>
+            <ion-label>{{ translate("Order volume") }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="velocity">
-            <ion-label>{{ translate("Fulfillment Velocity") }}</ion-label>
+            <ion-label>{{ translate("Fulfillment velocity") }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="rejections">
             <ion-label>{{ translate("Rejections") }}</ion-label>
@@ -280,7 +280,7 @@
           <!-- Fill Rate Card -->
           <ion-card class="fill-rate">
             <ion-item lines="none">
-              <p class="overline">{{ translate("Today's Fill Rate") }}</p>
+              <p class="overline">{{ translate("Today's fill rate") }}</p>
               <ion-icon slot="end" :icon="informationCircleOutline" />
             </ion-item>
             <ion-list lines="none">
@@ -304,7 +304,7 @@
           <ion-card class="orders">
             <ion-item lines="none" class="title">
               <ion-label>
-                <p class="overline">{{ translate("Orders Pending Fulfillment") }}</p>
+                <p class="overline">{{ translate("Orders pending fulfillment") }}</p>
               </ion-label>
             </ion-item>
             <div class="pending">
@@ -447,8 +447,7 @@
             <ion-content class="ion-padding">
               <!-- Expression Input -->
               <ion-item class="expression-input-item">
-                <ion-label position="stacked">{{ translate("Expression") }}</ion-label>
-                <ion-input v-model="cronExpressionInput" placeholder="0 */15 * ? * *"></ion-input>
+                <ion-input v-model="cronExpressionInput" :label="translate('Expression')" label-placement="stacked" placeholder="0 */15 * ? * *" />
                 <ion-icon :icon="informationCircleOutline" slot="end" class="info-icon" />
               </ion-item>
 
@@ -470,7 +469,7 @@
               </ion-list>
 
               <!-- Pre-made Options -->
-              <h3 class="options-header ion-margin-top">{{ translate("Schedule Options") }}</h3>
+              <h3 class="options-header ion-margin-top">{{ translate("Schedule options") }}</h3>
               <ion-radio-group v-model="selectedScheduleOption" @ionChange="handleScheduleOptionChange">
                 <ion-item v-for="option in scheduleOptions" :key="option.value">
                   <ion-radio slot="start" :value="option.value" />
@@ -492,8 +491,8 @@
             <template v-if="sortRules.length > 0">
               <!-- Queue Head/Tail Info Labels -->
               <div class="queue-header-labels">
-                <ion-note class="overline">{{ translate("Last to Process") }}</ion-note>
-                <ion-note class="overline">{{ translate("Next to Process") }} →</ion-note>
+                <ion-note class="overline">{{ translate("Last to process") }}</ion-note>
+                <ion-note class="overline">{{ translate("Next to process") }} →</ion-note>
               </div>
               <!-- Progress Bar -->
               <div class="queue-progress-bar-container">
@@ -522,7 +521,7 @@
 
               <!-- Segments Legend Grid Header -->
               <div class="queue-header-labels ion-margin-top">
-                <ion-note class="overline">{{ translate("Queue Breakdown") }}</ion-note>
+                <ion-note class="overline">{{ translate("Queue breakdown") }}</ion-note>
               </div>
 
               <!-- Segments Legend Grid -->
@@ -626,7 +625,7 @@ import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
 import { createLatestRequestScope } from '@/utils/latestRequestScope';
 import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
 import { reconcileSelectedFacilityId } from '@/utils/funnelFacilitySelection';
-import { facilityProgressAccessibleName } from '@/utils/funnelProgress';
+import { DIMENSION_LABELS, facilityProgressAccessibleName } from '@/utils/funnelProgress';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
@@ -887,7 +886,6 @@ const hoveredSegmentId = ref<string | null>(null);
 const searchQuery = ref('');
 const selectedDimension = ref<'volume' | 'velocity' | 'rejections'>('volume');
 // The header links to the segment's own label, so each language lowercases (or not) its own words.
-const DIMENSION_LABELS = { volume: "Order Volume", velocity: "Fulfillment Velocity", rejections: "Rejections" } as const;
 const facilityListHeader = computed(() => (searchQuery.value
   ? translate("Top 10 facilities by {metric} matching {query}", { metric: DIMENSION_LABELS[selectedDimension.value], query: searchQuery.value })
   : translate("Top 10 facilities by {metric}", { metric: DIMENSION_LABELS[selectedDimension.value] })));
@@ -1415,16 +1413,6 @@ function handleBatchSizeChange(event: any) {
   overflow: hidden;
 }
 
-.custom-progress-packed {
-  background: #1e8f42; /* Dark distinct green for packed */
-  height: 100%;
-}
-
-.custom-progress-picked {
-  background: var(--ion-color-success, #2dd36f); /* Vibrant base green for picked */
-  height: 100%;
-}
-
 @media (max-width: 767px) {
   .global-stat ion-card-content {
     grid-template-columns: 1fr;
@@ -1608,7 +1596,6 @@ function handleBatchSizeChange(event: any) {
   background: var(--ion-color-primary);
 }
 
-
 /* Fulfillment Sync Styles */
 .fulfillment-sync {
   display: flex;
@@ -1687,7 +1674,7 @@ function handleBatchSizeChange(event: any) {
   padding: 2px 6px;
   font-size: 11px;
   font-weight: 700;
-  margin-right: 8px;
+  margin-right: var(--spacer-xs);
   color: var(--ion-color-step-600, #666666);
 }
 
@@ -1700,7 +1687,7 @@ function handleBatchSizeChange(event: any) {
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacer-2xs);
   transition: all 0.2s ease;
   cursor: pointer;
 }
@@ -1753,7 +1740,7 @@ function handleBatchSizeChange(event: any) {
 }
 
 .schedule-info-list ion-icon {
-  margin-inline-end: 16px;
+  margin-inline-end: var(--spacer-sm);
   color: var(--ion-color-step-600, #666666);
 }
 
@@ -1761,7 +1748,7 @@ function handleBatchSizeChange(event: any) {
   font-size: 14px;
   font-weight: 500;
   color: var(--ion-color-step-600, #666666);
-  padding: 16px 16px 8px 16px;
+  padding: var(--spacer-sm) var(--spacer-sm) var(--spacer-xs) var(--spacer-sm);
   margin: 0;
 }
 

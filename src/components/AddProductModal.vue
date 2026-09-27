@@ -22,17 +22,17 @@
     <!-- Product list -->
     <template v-if="products.length">
       <ion-item v-for="product in products" :key="product.productId">
-        <ion-thumbnail slot="start">
-          <DxpShopifyImg :src="product.mainImageUrl" />
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: product.mainImageUrl, productName: productPrimary(product) }" :key="product.mainImageUrl">
+          <DxpShopifyImg :src="product.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
-          <h2>{{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, product) ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, product) : product?.internalName }}</h2>
+          {{ productPrimary(product) }}
           <p v-if="commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) !== 'null'">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) }}</p>
         </ion-label>
 
         <!-- Show Add button if product is NOT in order -->
         <ion-button data-testid="viewmore-add-to-order-btn" v-if="!isProductInOrder(product.productId)" slot="end" fill="outline" @click="addOrderItem(product)" :disabled="pendingProductIds.has(product.productId)">
-          {{ pendingProductIds.has(product.productId) ? translate("Adding...") : translate("Add to Order") }}
+          {{ pendingProductIds.has(product.productId) ? translate("Adding...") : translate("Add to order") }}
         </ion-button>
 
         <!-- Display checkmark only when product is actually in order -->
@@ -62,6 +62,11 @@ import { DxpShopifyImg } from '@common';
 
 const props = defineProps(["query", "addProductToQueue", "isProductInOrder", "pendingProductIds"]);
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+
+/** How a search result is named: its row's primary line and its image preview's title. */
+function productPrimary(product: any): string {
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, product) || product?.internalName;
+}
 
 const queryString = ref(props.query);
 const products = ref([]) as any;

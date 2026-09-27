@@ -22,7 +22,7 @@
         <ion-label>{{ translate('Items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="(item, itemIndex) in order.items" :key="itemIndex">
-        <ion-thumbnail slot="start">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: (productCache as any).getProduct(item.productId)?.mainImageUrl, productName: item.name }" :key="`${(productCache as any).getProduct(item.productId)?.mainImageUrl} ${item.name}`">
           <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
@@ -71,8 +71,8 @@ const productCache = useProductCacheStore();
 <style scoped>
 .card-actions {
   display: flex;
-  gap: 4px;
-  padding: 4px 8px 8px;
+  gap: var(--spacer-2xs);
+  padding: var(--spacer-2xs) var(--spacer-xs) var(--spacer-xs);
   border-top: 1px solid var(--ion-color-step-100);
 }
 </style>

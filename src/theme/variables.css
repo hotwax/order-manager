@@ -2,3 +2,10 @@
 .pointer {
   cursor: pointer;
 }
+
+/* A bottom floating action button covers the end of its content, so every screen with one lets
+   its last row scroll clear of it: the 56px button, its 16px offset and a little room. Vue sets
+   `vertical` as a property, so the fab's own class is the only thing in the DOM to match. */
+ion-content:has(> ion-fab.fab-vertical-bottom) {
+  --padding-bottom: var(--spacer-2xl);
+}

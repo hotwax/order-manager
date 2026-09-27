@@ -13,7 +13,7 @@
   <ion-content ref="content">
     <ion-list>
       <ion-list-header>
-        <ion-label>{{ translate('Add Attribute') }}</ion-label>
+        <ion-label>{{ translate('Add attribute') }}</ion-label>
       </ion-list-header>
       <div class="attribute-form__pair">
         <ion-item class="attribute-form__field">
@@ -250,10 +250,6 @@ async function save() {
 </script>
 
 <style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-
 .attribute-form__pair {
   display: flex;
   flex-wrap: wrap;

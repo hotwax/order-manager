@@ -4,13 +4,13 @@
       <ion-list-header>
         <ion-label>{{ popoverTitle }}</ion-label>
       </ion-list-header>
-      <ion-item button detail="false" @click="cancelItem()">
+      <ion-item button :detail="false" @click="cancelItem()">
         <ion-label>{{ translate("Cancel item") }}</ion-label>
       </ion-item>
-      <ion-item button detail="false" @click="customSwap()">
+      <ion-item button :detail="false" @click="customSwap()">
         <ion-label>{{ translate("Custom swap") }}</ion-label>
       </ion-item>
-      <ion-item button detail="false" @click="viewInventory()">
+      <ion-item button :detail="false" @click="viewInventory()">
         <ion-label>{{ translate("View inventory") }}</ion-label>
       </ion-item>
     </ion-list>

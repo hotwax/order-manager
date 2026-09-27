@@ -29,7 +29,7 @@
       </ion-item>
       <ion-item>
         <ion-input
-          :label="requiredLabel('Task Name')"
+          :label="requiredLabel('Task name')"
           label-placement="stacked"
           :placeholder="translate('Enter task name')"
           :value="form.workEffortName"
@@ -43,7 +43,7 @@
       <!-- Task purpose picker with workflow icons: ion-select-option can't render
            icons, so use an anchored popover list (icons centralized in taskPurposeIcons).
            #391 fixes the work-effort type to a constant, so no type selector is shown. -->
-      <ion-item button detail="false" id="task-purpose-trigger">
+      <ion-item button :detail="false" id="task-purpose-trigger">
         <ion-label>
           <p>{{ requiredLabel('Task purpose') }}</p>
           <span :class="{ 'task-purpose-placeholder': !form.workEffortPurposeTypeId }">{{ selectedPurposeLabel }}</span>
@@ -56,7 +56,7 @@
               v-for="option in taskPurposes"
               :key="option.enumId"
               button
-              detail="false"
+              :detail="false"
               @click="form.workEffortPurposeTypeId = option.enumId"
             >
               <ion-icon v-if="getTaskPurposeIcon(option.enumId)" slot="start" :icon="getTaskPurposeIcon(option.enumId)" />
@@ -78,7 +78,7 @@
     </ion-list>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!isValid" :aria-label="translate('Confirm')" @click="confirm()">
+      <ion-fab-button :disabled="!isValid" :aria-label="translate('Save')" @click="confirm()">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>
@@ -108,6 +108,7 @@ import {
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
+import { requiredLabel } from '@/utils';
 import { useSeedStore } from '@/store/seed';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
 
@@ -147,7 +148,7 @@ const selectedPurpose = computed(() => taskPurposes.value.find((option) => optio
 const selectedPurposeLabel = computed(() =>
   selectedPurpose.value
     ? (selectedPurpose.value.description || selectedPurpose.value.enumName || selectedPurpose.value.enumId)
-    : translate('Select Task Purpose')
+    : translate('Select task purpose')
 );
 const generatedTaskName = computed(() => {
   if (!props.autoGenerateTaskName) return '';
@@ -181,10 +182,6 @@ function dismiss() {
 function handleTaskNameInput(value: string | null | undefined) {
   taskNameEdited.value = true;
   form.workEffortName = value ?? '';
-}
-
-function requiredLabel(label: string) {
-  return `${translate(label)} *`;
 }
 
 function confirm() {

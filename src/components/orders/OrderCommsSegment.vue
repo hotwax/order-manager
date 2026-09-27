@@ -10,28 +10,31 @@
         </ion-item>
         <div class="tablet">
           <ion-label class="ion-text-center">
-            {{ ev.partyIdFrom || '-' }}
-            <p>{{ translate("from") }}</p>
+            {{ ev.partyIdFrom || translate('Not available') }}
+            <p>{{ translate("From") }}</p>
           </ion-label>
         </div>
         <div class="tablet">
           <ion-label class="ion-text-center">
-            {{ ev.partyIdTo || '-' }}
-            <p>{{ translate("to") }}</p>
+            {{ ev.partyIdTo || translate('Not available') }}
+            <p>{{ translate("To") }}</p>
           </ion-label>
         </div>
         <div class="tablet">
           <ion-label class="ion-text-center">
-            {{ ev.content || '-' }}
-            <p>{{ translate("content") }}</p>
+            {{ ev.content || translate('Not available') }}
+            <p>{{ translate("Content") }}</p>
           </ion-label>
         </div>
         <div class="tablet">
           <ion-label class="ion-text-center" v-if="ev.entryDate">
             {{ formatDateTime(ev.entryDate) }}
-            <p>{{ translate("entry date") }}</p>
+            <p>{{ translate("Entry date") }}</p>
           </ion-label>
-          <ion-label v-else>-</ion-label>
+          <ion-label v-else class="ion-text-center">
+            {{ translate('Date not available') }}
+            <p>{{ translate("Entry date") }}</p>
+          </ion-label>
         </div>
       </div>
     </div>
@@ -62,5 +65,11 @@ defineProps<{
 
 .comm-event-row>ion-item {
   width: 100%;
+}
+
+/* A communication row opens nothing, so it keeps the shared list-item hover off. */
+.comm-event-row:hover {
+  --list-item-bg-hover: initial;
+  cursor: auto;
 }
 </style>

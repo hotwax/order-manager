@@ -12,7 +12,7 @@ describe('OrderRow', () => {
     const orderedIndex = source.indexOf('{{ model.orderedDateTime }}');
     const deadlineIndex = source.indexOf('{{ model.estimatedDeliveryDateTime }}');
 
-    expect(source).toContain('class="list-item"');
+    expect(source).toContain('class="list-item order-row"');
     expect(itemIndex).toBeGreaterThan(0);
     expect(allocationIndex).toBeGreaterThan(itemIndex);
     expect(fulfillmentIndex).toBeGreaterThan(allocationIndex);

@@ -33,7 +33,7 @@
           <ion-label>{{ translate('Items') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="ship-groups">
-          <ion-label>{{ translate('Shipgroups') }}</ion-label>
+          <ion-label>{{ translate('Ship groups') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="holds">
           <ion-label>{{ translate('Holds') }}</ion-label>
@@ -115,7 +115,7 @@
     </ion-content>
 
     <ion-content v-slot:default v-else-if="error">
-      <ErrorState :title="translate('Order failed to load')" :message="error" />
+      <ErrorState :title="translate('Could not load order')" :message="error" retryable @retry="loadOrder(orderId, true)" />
     </ion-content>
 
     <ion-content v-else>

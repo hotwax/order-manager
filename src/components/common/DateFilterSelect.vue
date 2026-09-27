@@ -20,7 +20,7 @@
     >
       <ion-icon slot="end" :icon="chevronDownOutline" color="medium" aria-hidden="true" />
     </ion-input>
-    <ion-item v-else :id="triggerId" button detail="false" lines="none">
+    <ion-item v-else :id="triggerId" button :detail="false" lines="none">
       <ion-label>
         <p>{{ label }}</p>
         {{ selectedDateLabel }}

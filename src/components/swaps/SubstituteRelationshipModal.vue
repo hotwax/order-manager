@@ -18,7 +18,7 @@
       <div class="selected-chips-container">
         <ion-chip v-for="product in selectedProducts" :key="product.productId" @click="removeSelected(product.productId)">
           <ion-label>{{ productLabel(product) }}</ion-label>
-          <ion-icon :icon="closeCircle" />
+          <ion-icon :icon="closeCircleOutline" />
         </ion-chip>
       </div>
     </ion-list>
@@ -98,7 +98,7 @@ import {
   IonToolbar,
   modalController,
 } from '@ionic/vue';
-import { closeCircle, closeOutline, saveOutline } from 'ionicons/icons';
+import { closeCircleOutline, closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, ref } from 'vue';
 import { DxpShopifyImg, translate } from '@common';
 import { useSolrSearch } from '@common/composables/useSolrSearch';
@@ -283,7 +283,7 @@ ion-chip ion-label {
 
 ion-chip ion-icon {
   flex-shrink: 0;
-  margin-inline-start: 4px;
+  margin-inline-start: var(--spacer-2xs);
   font-size: 18px;
   cursor: pointer;
 }

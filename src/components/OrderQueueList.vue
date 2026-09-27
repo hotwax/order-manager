@@ -65,15 +65,19 @@
         v-if="error"
         :title="translate('Could not load orders')"
         :message="error"
+        retryable
+        @retry="runSearch()"
       />
 
       <ion-list v-else>
-        <ion-list-header class="order-results-header">
+        <!-- Hidden at zero, where the empty state says it better than "0 of 0". -->
+        <ion-list-header v-if="searchResults.length" class="order-results-header">
           <span class="order-results-header-start">
             <ion-checkbox
               v-if="selectMode"
               :checked="allCurrentPageSelected"
               :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
+              :aria-label="translate('Select all loaded orders')"
               @ionChange="toggleCurrentPageSelection($event.detail.checked)"
             />
           </span>
@@ -87,8 +91,6 @@
           v-for="order in searchResults"
           :key="order.id"
           :model="toSearchOrderRowViewModel(order)"
-          row-class="queue-order-row"
-          deadline-class="queue-delivery ion-text-end"
           :select-mode="selectMode"
           :selected="selectedOrderIds.includes(order.id)"
           @activate="handleOrderRowClick(order)"
@@ -111,12 +113,12 @@
       <ion-toolbar>
         <ion-title size="small">{{ translate('{count} selected', { count: selectedOrderIds.length }) }}</ion-title>
         <ion-buttons slot="end" class="bulk-action-buttons">
-          <ion-button v-if="hasGlobalAction('brokerSelected')" :disabled="!selectedOrderIds.length" @click="openBrokerSelectedModal">
+          <ion-button v-if="hasGlobalAction('brokerSelected')" fill="solid" :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openBrokerSelectedModal">
             {{ translate('Broker selected') }}
           </ion-button>
-          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" :disabled="!selectedOrderIds.length" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
-          <ion-button :disabled="!selectedOrderIds.length" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
-          <ion-button :disabled="!selectedOrderIds.length" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
+          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" fill="outline" color="danger" :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
+          <ion-button fill="outline" :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
+          <ion-button fill="outline" :disabled="!selectedOrderIds.length || !canCreateOrderTasks" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
@@ -169,6 +171,8 @@ import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { toSearchOrderRowViewModel } from '@/utils/orderRows';
 import { showToast } from '@/utils';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
+import Actions from '@/authorization/actions';
+import { useUserStore } from '@/store/user';
 
 type QueueGlobalAction = 'brokerSelected';
 
@@ -206,6 +210,11 @@ const orderStore = useOrderStore();
 const orderTaskStore = useOrderTaskStore();
 const productStore = useProductStore();
 const seedStore = useSeedStore();
+const userStore = useUserStore();
+// The same permissions Find orders checks for each bulk action.
+const canCancelOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_CANCEL));
+const canUpdateOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_UPDATE));
+const canCreateOrderTasks = computed(() => userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE));
 const ionRouter = useIonRouter();
 
 const PAGE_SIZE = 50;
@@ -336,9 +345,10 @@ async function confirmCancelOrders() {
     header: translate('Cancel open items'),
     message: translate('This will cancel all open items for the {count} selected orders. This action cannot be undone.', { count: orderIds.length }),
     buttons: [
-      { text: translate('Dismiss'), role: 'cancel' },
+      { text: translate('Keep items'), role: 'cancel' },
       {
-        text: translate('Confirm'),
+        text: translate('Cancel open items'),
+        role: 'confirm',
         handler: async () => {
           try {
             await orderDetailStore.bulkCancelOrders(orderIds);
@@ -539,7 +549,7 @@ function orderDetailLink(order: Order) {
 .order-results-header {
   align-items: center;
   display: flex;
-  gap: 8px;
+  gap: var(--spacer-xs);
 }
 
 .order-results-header-start {
@@ -551,23 +561,4 @@ function orderDetailLink(order: Order) {
   overflow-x: auto;
 }
 
-.queue-order-row {
-  --columns-desktop: 5;
-  --columns-tablet: 5;
-  min-height: 5rem;
-  border-block-start: var(--border-medium);
-  padding-inline-end: var(--spacer-sm);
-}
-
-.queue-order-row > ion-label {
-  width: 100%;
-}
-
-.queue-order-row > ion-label.queue-delivery {
-  display: block;
-  justify-self: end;
-  max-width: 10rem;
-  min-width: 10rem;
-  width: 10rem;
-}
 </style>

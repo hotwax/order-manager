@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ title || translate('Select Facility') }}</ion-title>
+      <ion-title>{{ title || translate('Select facility') }}</ion-title>
     </ion-toolbar>
     <!-- The strip names every item being placed. With more than one it also picks which item the
          list details, so the operator can go from "can this facility cover all three" to the full
@@ -171,7 +171,7 @@
           </ion-label>
           <ion-label class="ion-text-end">
             {{ formatQuantity(facility.consumedToday) }} / {{ formatOrderLimit(facility.orderLimit) }}
-            <p>{{ translate('Consumed / Limit') }}</p>
+            <p>{{ translate('Consumed / limit') }}</p>
             <p>{{ translate('Remaining {value}', { value: formatOrderLimit(facility.remainingCapacity) }) }}</p>
           </ion-label>
         </div>
@@ -191,6 +191,7 @@ import { IonAccordion, IonAccordionGroup, IonAvatar, IonButton, IonButtons, IonC
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api, DxpShopifyImg, logger, translate } from '@common';
+import { formatNumber } from '@/utils/format';
 import { useSeedStore } from '@/store/seed';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
 import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
@@ -284,8 +285,8 @@ function itemAvailabilityLabel(item: FacilityItemAvailability) {
 }
 
 function formatQuantity(value: number | null | undefined) {
-  if (value === null || value === undefined) return '-';
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  if (value === null || value === undefined) return translate('Not available');
+  return formatNumber(value, { maximumFractionDigits: 2 });
 }
 
 function formatOrderLimit(value: number | null | undefined) {
@@ -437,10 +438,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-
 .item-chips {
   display: flex;
   overflow-x: auto;

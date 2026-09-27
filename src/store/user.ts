@@ -69,7 +69,7 @@ export const useUserStore = defineStore("user", {
         }
         this.fetchStatus.profile = "success";
       } catch (error: any) {
-        await showToast(translate("Failed to fetch user profile information"));
+        await showToast(translate("Failed to fetch user profile information. Please try again."));
         logger.error("Failed to fetch user profile information", error);
         useAuth().clearAuth();
         this.fetchStatus.profile = "error";
@@ -137,11 +137,11 @@ export const useUserStore = defineStore("user", {
 
         this.current.timeZone = tzId;
         Settings.defaultZone = tzId;
-        await showToast(translate("Time zone updated successfully"));
+        await showToast(translate("Time zone updated successfully."));
         return tzId;
       } catch (error) {
         logger.error("Failed to update time zone", error);
-        await showToast(translate("Failed to update time zone"));
+        await showToast(translate("Failed to update time zone. Please try again."));
         return Promise.reject(error);
       }
     },

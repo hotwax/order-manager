@@ -6,14 +6,14 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Item Attributes') }}</ion-title>
+      <ion-title>{{ translate('Item attributes') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
   <ion-content>
     <ion-list>
       <ion-list-header>
-        <ion-label>{{ translate('Add Attribute') }}</ion-label>
+        <ion-label>{{ translate('Add attribute') }}</ion-label>
       </ion-list-header>
       <!--
         Name and Value sit side by side when the viewport has room so the
@@ -78,7 +78,7 @@
     />
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!form.attrName.trim() || saving" :aria-label="translate('Add Attribute')" @click="addAttribute">
+      <ion-fab-button :disabled="!form.attrName.trim() || saving" :aria-label="translate('Add attribute')" @click="addAttribute">
         <ion-spinner v-if="saving" name="crescent" />
         <ion-icon v-else :icon="addOutline" />
       </ion-fab-button>
@@ -93,7 +93,7 @@ import { reactive, ref } from 'vue';
 import { api, translate } from '@common';
 import EmptyState from '@/components/common/EmptyState.vue';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
-import { showToast } from '@/utils';
+import { confirmAction, showToast } from '@/utils';
 
 type Attribute = { attrName: string; attrValue?: string; attrDescription?: string };
 
@@ -139,6 +139,7 @@ async function addAttribute() {
 }
 
 async function deleteAttribute(attr: Attribute) {
+  if (!await confirmAction(translate('Delete attribute'), translate('{name} will be deleted from this item.', { name: attr.attrName }), translate('Delete'))) return;
   deletingAttr.value = attr.attrName;
   try {
     await api({
@@ -156,10 +157,6 @@ async function deleteAttribute(attr: Attribute) {
 </script>
 
 <style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-
 .attribute-form__pair {
   display: flex;
   flex-wrap: wrap;

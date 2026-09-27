@@ -2,7 +2,9 @@
   <ion-page class="settings">
     <ion-header>
       <ion-toolbar>
-        <ion-menu-button slot="start" />
+        <ion-buttons slot="start">
+          <ion-menu-button />
+        </ion-buttons>
         <ion-title>{{ translate("Settings") }}</ion-title>
       </ion-toolbar>
     </ion-header>
@@ -77,14 +79,14 @@
           </ion-card-content>
           <ion-item v-if="showBrowserTimeZone">
             <ion-label>
-              <p class="overline">{{ translate("Browser TimeZone") }}</p>
+              <p class="overline">{{ translate("Browser time zone") }}</p>
               {{ browserTimeZone.id }}
               <p v-if="showDateTime">{{ commonUtil.getCurrentTime(browserTimeZone.id, dateTimeFormat) }}</p>
             </ion-label>
           </ion-item>
           <ion-item lines="none">
             <ion-label>
-              <p class="overline">{{ translate("Selected TimeZone") }}</p>
+              <p class="overline">{{ translate("Selected time zone") }}</p>
               {{ currentTimeZone }}
               <p v-if="showDateTime">{{ commonUtil.getCurrentTime(currentTimeZone, dateTimeFormat) }}</p>
             </ion-label>
@@ -110,7 +112,7 @@
           <ion-card-header>
             <div class="card-header">
               <div>
-                <ion-card-title>{{ translate('Data Fetch Status') }}</ion-card-title>
+                <ion-card-title>{{ translate('Data fetch status') }}</ion-card-title>
                 <ion-card-subtitle v-if="syncSubtitle">{{ syncSubtitle }}</ion-card-subtitle>
               </div>
               <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()" :aria-label="translate('Refresh all data')" :title="translate('Refresh all data')">
@@ -172,7 +174,7 @@
         <ion-content>
           <ion-radio-group v-model="timeZoneId">
             <ion-list v-if="showBrowserTimeZone">
-              <ion-list-header>{{ translate("Browser time zone") }}</ion-list-header>
+              <ion-list-header><ion-label>{{ translate("Browser time zone") }}</ion-label></ion-list-header>
               <ion-item>
                 <ion-radio label-placement="end" justify="start" :value="browserTimeZone.id">
                   <ion-label>
@@ -184,7 +186,7 @@
             </ion-list>
 
             <ion-list>
-              <ion-list-header v-if="showBrowserTimeZone">{{ translate("Select a different time zone") }}</ion-list-header>
+              <ion-list-header v-if="showBrowserTimeZone"><ion-label>{{ translate("Select a different time zone") }}</ion-label></ion-list-header>
               <ion-item v-if="isLoading" lines="none">
                 <ion-spinner color="secondary" name="crescent" slot="start" />
                 <ion-label>{{ translate("Fetching time zones") }}</ion-label>
@@ -384,7 +386,7 @@ const userFetchStatus = computed(() => userStore.fetchStatus);
 
 const sessionFetchStatus = computed(() => [
   {
-    label: translate("User Profile"),
+    label: translate("User profile"),
     status: userFetchStatus.value.profile,
     count: userProfile.value ? 1 : 0,
     refresh: () => userStore.fetchUserProfile()
@@ -439,7 +441,7 @@ section {
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
 }
 hr {
-  border-top: 1px solid var(--border-medium);
+  border-top: var(--border-medium);
 }
 .section-header {
   display: flex;
