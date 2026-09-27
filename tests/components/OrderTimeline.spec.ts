@@ -15,9 +15,11 @@ vi.mock('@common', () => ({
 vi.mock('@ionic/vue', () => {
   const box = (tag: string, className: string) => ({ template: `<${tag} class="${className}"><slot /></${tag}>` });
   return {
+    IonAccordion: box('section', 'accordion'),
+    IonAccordionGroup: box('div', 'accordion-group'),
     IonButton: { emits: ['click'], template: '<button @click="$emit(\'click\')"><slot /></button>' },
     IonIcon: { template: '<i />' },
-    IonItem: { props: ['routerLink'], emits: ['click'], template: '<div class="item" :data-route="routerLink" @click="$emit(\'click\')"><slot /></div>' },
+    IonItem: { props: ['routerLink'], template: '<div class="item" :data-route="routerLink"><slot /></div>' },
     IonItemDivider: box('div', 'divider'),
     IonLabel: box('div', 'label'),
     IonList: box('div', 'list'),
@@ -74,15 +76,14 @@ beforeAll(() => {
 });
 
 describe('OrderTimeline', () => {
-  it('shows one line per transaction under its day, and opens it onto its records', async () => {
+  it('shows one line per transaction under its day, opening onto its records', () => {
     const wrapper = mountTimeline();
 
     expect(wrapper.findAll('.divider').map((divider) => divider.text())).toEqual(['Tuesday, Sep 22, 2026', 'Wednesday, Sep 23, 2026']);
-    const cancelled = wrapper.findAll('.item').find((item) => item.text().includes('Imported, already cancelled in Shopify'))!;
+    const cancelled = wrapper.findAll('.accordion').find((accordion) => accordion.text().includes('Imported, already cancelled in Shopify'))!;
     expect(cancelled.text()).toContain('TEE-M from Main Warehouse');
-    await cancelled.trigger('click');
-    expect(wrapper.text()).toContain('Moved to parking');
-    expect(wrapper.text()).toContain('Created in HotWax');
+    expect(cancelled.text()).toContain('Moved to parking');
+    expect(cancelled.text()).toContain('Created in HotWax');
   });
 
   it('links a return straight to its page instead of opening it', () => {
