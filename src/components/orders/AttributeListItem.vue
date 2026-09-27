@@ -34,9 +34,9 @@ const hasValue = computed(() => {
 .attribute-kv {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--spacer-sm);
   min-height: 48px;
-  padding: 8px 16px;
+  padding: var(--spacer-xs) var(--spacer-sm);
 }
 
 .attribute-kv__terms {
@@ -44,7 +44,7 @@ const hasValue = computed(() => {
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: 2px 16px;
+  gap: 2px var(--spacer-sm);
   flex: 1 1 auto;
   min-width: 0;
   margin: 0;
@@ -57,7 +57,7 @@ const hasValue = computed(() => {
 
 .attribute-kv__description {
   flex: 1 0 100%;
-  margin: 4px 0 0;
+  margin: var(--spacer-2xs) 0 0;
 }
 
 .attribute-kv > :slotted(*) {

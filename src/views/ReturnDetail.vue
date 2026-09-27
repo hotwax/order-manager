@@ -358,7 +358,7 @@
 
     <ion-content v-else-if="detailError">
       <ErrorState
-        :title="translate('Return failed to load')"
+        :title="translate('Could not load return')"
         :message="detailError"
         retryable
         @retry="loadReturn"
@@ -696,7 +696,7 @@ function itemReferenceLabel(item: ReturnItemDetail) {
     translate("Return item {id}", { id: item.returnItemSeqId }),
     item.orderItemSeqId ? translate("Order item {id}", { id: item.orderItemSeqId }) : "",
     item.productId ? translate("Product {id}", { id: item.productId }) : ""
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean).join(", ");
 }
 
 function inventoryStatusLabel(statusId: string) {
@@ -906,7 +906,7 @@ function syncLabel(state: ReturnSyncState) {
 
 .return-item-detail-label,
 .return-item-fact dt {
-  margin: 0 0 4px;
+  margin: 0 0 var(--spacer-2xs);
   color: var(--ion-color-medium, #92949c);
   font-size: 0.75rem;
   font-weight: 500;

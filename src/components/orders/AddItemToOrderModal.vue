@@ -15,7 +15,7 @@
       :placeholder="translate('Search products')"
       v-model="queryString"
       @ionInput="onSearch"
-      debounce="400"
+      :debounce="400"
     />
 
     <div v-if="isLoading" class="empty-state">

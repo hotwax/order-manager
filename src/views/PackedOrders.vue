@@ -84,14 +84,6 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
-
-    <ion-toast
-      :is-open="!!toastMessage"
-      :message="toastMessage"
-      :duration="2000"
-      position="top"
-      @did-dismiss="toastMessage = ''"
-    />
   </ion-page>
 </template>
 
@@ -112,7 +104,6 @@ import {
   IonPage,
   IonSpinner,
   IonTitle,
-  IonToast,
   IonToolbar,
   alertController,
   useIonRouter
@@ -131,6 +122,7 @@ import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, translate } from '@common';
 import router from '@/router';
+import { showToast } from '@/utils';
 
 const bucket = 'packed';
 const VIRTUAL_FACILITY_TYPE_ID = 'VIRTUAL_FACILITY';
@@ -139,7 +131,6 @@ const orderStore = useOrderStore();
 const productStore = useProductStore();
 const seedStore = useSeedStore();
 const ionRouter = useIonRouter();
-const toastMessage = ref('');
 
 const filters = computed({
   get: () => store.filters[bucket],
@@ -365,9 +356,9 @@ async function runAction(action: BulkActionDefinition) {
   try {
     await store.runBulkAction(bucket, action.id);
     await loadWorkflowOrders();
-    toastMessage.value = translate('{action}: {count} orders', { action: translate(action.label), count });
+    await showToast(translate('{action}: {count} orders', { action: translate(action.label), count }));
   } catch {
-    toastMessage.value = translate('Failed to complete bulk action. Please try again.');
+    await showToast(translate('Failed to complete bulk action. Please try again.'));
   }
 }
 

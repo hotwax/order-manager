@@ -71,8 +71,8 @@ const productCache = useProductCacheStore();
 <style scoped>
 .card-actions {
   display: flex;
-  gap: 4px;
-  padding: 4px 8px 8px;
+  gap: var(--spacer-2xs);
+  padding: var(--spacer-2xs) var(--spacer-xs) var(--spacer-xs);
   border-top: 1px solid var(--ion-color-step-100);
 }
 </style>

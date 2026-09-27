@@ -22,7 +22,7 @@
 
       <ErrorState
         v-if="error"
-        :title="translate('Customer search failed')"
+        :title="translate('Could not load customers')"
         :message="error"
       />
 

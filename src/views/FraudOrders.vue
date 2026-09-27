@@ -312,7 +312,7 @@ onIonViewWillEnter(() => {
 .order-results-header {
   align-items: center;
   display: flex;
-  gap: 8px;
+  gap: var(--spacer-xs);
 }
 
 .order-results-header-start {

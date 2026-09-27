@@ -283,7 +283,7 @@ ion-chip ion-label {
 
 ion-chip ion-icon {
   flex-shrink: 0;
-  margin-inline-start: 4px;
+  margin-inline-start: var(--spacer-2xs);
   font-size: 18px;
   cursor: pointer;
 }

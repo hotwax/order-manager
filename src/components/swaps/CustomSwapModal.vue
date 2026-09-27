@@ -309,7 +309,7 @@ onMounted(async () => {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 32px 16px;
+  padding: var(--spacer-lg) var(--spacer-sm);
   text-align: center;
   color: var(--ion-color-medium);
 }

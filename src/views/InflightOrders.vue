@@ -84,14 +84,6 @@
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
-
-    <ion-toast
-      :is-open="!!toastMessage"
-      :message="toastMessage"
-      :duration="2000"
-      position="top"
-      @did-dismiss="toastMessage = ''"
-    />
   </ion-page>
 </template>
 
@@ -112,7 +104,6 @@ import {
   IonPage,
   IonSpinner,
   IonTitle,
-  IonToast,
   IonToolbar,
   alertController,
   useIonRouter
@@ -130,6 +121,7 @@ import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, translate } from '@common';
 import router from '@/router';
+import { showToast } from '@/utils';
 
 const bucket = 'inflight';
 const VIRTUAL_FACILITY_TYPE_ID = 'VIRTUAL_FACILITY';
@@ -137,7 +129,6 @@ const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const seedStore = useSeedStore();
 const ionRouter = useIonRouter();
-const toastMessage = ref('');
 
 const filters = computed({
   get: () => store.filters[bucket],
@@ -356,7 +347,7 @@ async function runAction(action: BulkActionDefinition) {
 
   const count = selectedIds.value.size;
   store.runBulkAction(bucket, action.id);
-  toastMessage.value = translate('{action}: {count} orders', { action: translate(action.label), count });
+  await showToast(translate('{action}: {count} orders', { action: translate(action.label), count }));
 }
 
 function formatChannel(channel: string) {

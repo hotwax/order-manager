@@ -98,7 +98,7 @@
 
       <ErrorState
         v-if="error"
-        :title="translate('Return search failed')"
+        :title="translate('Could not load returns')"
         :message="error"
         retryable
         @retry="runSearch"

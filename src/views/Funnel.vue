@@ -1687,7 +1687,7 @@ function handleBatchSizeChange(event: any) {
   padding: 2px 6px;
   font-size: 11px;
   font-weight: 700;
-  margin-right: 8px;
+  margin-right: var(--spacer-xs);
   color: var(--ion-color-step-600, #666666);
 }
 
@@ -1700,7 +1700,7 @@ function handleBatchSizeChange(event: any) {
   padding: 10px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacer-2xs);
   transition: all 0.2s ease;
   cursor: pointer;
 }
@@ -1753,7 +1753,7 @@ function handleBatchSizeChange(event: any) {
 }
 
 .schedule-info-list ion-icon {
-  margin-inline-end: 16px;
+  margin-inline-end: var(--spacer-sm);
   color: var(--ion-color-step-600, #666666);
 }
 
@@ -1761,7 +1761,7 @@ function handleBatchSizeChange(event: any) {
   font-size: 14px;
   font-weight: 500;
   color: var(--ion-color-step-600, #666666);
-  padding: 16px 16px 8px 16px;
+  padding: var(--spacer-sm) var(--spacer-sm) var(--spacer-xs) var(--spacer-sm);
   margin: 0;
 }
 

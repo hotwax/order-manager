@@ -48,13 +48,13 @@ const hasValue = computed(() => {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 2px 16px;
+  gap: 2px var(--spacer-sm);
 }
 
 .identification-kv__type {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--spacer-2xs);
   flex: 1 1 10rem;
   color: var(--ion-color-medium);
 }

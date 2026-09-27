@@ -309,7 +309,7 @@
         </ion-list>
         <ErrorState
           v-else-if="returnsStatus === 'error'"
-          :title="translate('Returns failed to load')"
+          :title="translate('Could not load returns')"
           :message="returnsError"
         />
         <EmptyState
@@ -376,7 +376,7 @@
         />
         <ErrorState
           v-else-if="commsStatus === 'error'"
-          :title="translate('Communications failed to load')"
+          :title="translate('Could not load communications')"
           :message="commsError"
         />
         <div v-else class="ion-padding ion-text-center">
@@ -421,7 +421,7 @@
 
     <ion-content v-else-if="error">
       <ErrorState
-        :title="translate('Customer failed to load')"
+        :title="translate('Could not load customer')"
         :message="error"
       />
     </ion-content>
@@ -831,27 +831,27 @@ ion-card-header ion-card-title {
 
 .customer-detail-header {
   display: grid;
-  gap: var(--spacer-base, 16px);
+  gap: var(--spacer-base);
   grid-template-columns: minmax(0, 1fr);
-  padding: 8px;
+  padding: var(--spacer-xs);
 }
 
 .customer-detail-main {
   display: grid;
-  gap: 16px;
+  gap: var(--spacer-sm);
   align-content: start;
 }
 
 .customer-detail-cards {
   display: grid;
-  gap: 16px;
+  gap: var(--spacer-sm);
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   align-items: start;
 }
 
 .customer-detail-secondary {
   display: grid;
-  gap: 16px;
+  gap: var(--spacer-sm);
   align-content: start;
 }
 
@@ -877,8 +877,8 @@ ion-card-header ion-card-title {
 
 .card-actions {
   display: flex;
-  gap: 4px;
-  padding: 4px 8px 8px;
+  gap: var(--spacer-2xs);
+  padding: var(--spacer-2xs) var(--spacer-xs) var(--spacer-xs);
   border-top: 1px solid var(--ion-color-step-100, #e6e6e6);
 }
 
@@ -893,7 +893,7 @@ ion-card-header ion-card-title {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin: 24px 16px 8px;
+  margin: var(--spacer-base) var(--spacer-sm) var(--spacer-xs);
 }
 
 .section-header h2 {
@@ -909,9 +909,9 @@ ion-card-header ion-card-title {
 
 .task-grid {
   display: grid;
-  gap: 16px;
+  gap: var(--spacer-sm);
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  padding: 12px 16px;
+  padding: 12px var(--spacer-sm);
 }
 
 .task-grid h3 {
@@ -926,9 +926,9 @@ ion-card-header ion-card-title {
 
 .recent-orders-grid {
   display: grid;
-  gap: 16px;
+  gap: var(--spacer-sm);
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  padding: 8px;
+  padding: var(--spacer-xs);
   align-items: start;
 }
 

@@ -264,13 +264,13 @@
                 <ion-icon slot="icon-only" :icon="ellipsisVertical" />
               </ion-button>
               <ion-popover :trigger="'shipping-opt-trigger-' + shipGroup.id" dismiss-on-select
-                show-backdrop="false">
+                :show-backdrop="false">
                 <ion-content>
                   <ion-list>
-                    <ion-list-header>{{ translate("Shipping address") }}</ion-list-header>
+                    <ion-list-header><ion-label>{{ translate("Shipping address") }}</ion-label></ion-list-header>
                     <ion-item button :detail="false" :disabled="disabledActions.EDIT_ADDRESS" @click="openEditShippingAddress">
                       <ion-icon :icon="createOutline" slot="end" />
-                      {{ translate('Edit') }}
+                      <ion-label>{{ translate('Edit') }}</ion-label>
                     </ion-item>
                   </ion-list>
                 </ion-content>

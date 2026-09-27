@@ -58,7 +58,7 @@
 
         <ErrorState
           v-else-if="isError"
-          :title="translate('Unable to load hold tasks')"
+          :title="translate('Could not load hold tasks')"
           :message="translate(holdError)"
           retryable
           @retry="fetchHoldTasks()"
@@ -323,7 +323,7 @@ onIonViewWillEnter(() => {
 .order-results-header {
   align-items: center;
   display: flex;
-  gap: 8px;
+  gap: var(--spacer-xs);
 }
 
 .order-results-header-start {

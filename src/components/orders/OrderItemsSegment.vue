@@ -232,7 +232,7 @@ function itemRow(item: EnrichedOrderItem, identity: ReturnType<typeof productRow
   display: grid;
   align-items: start;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: var(--spacer-sm);
 }
 
 @media (max-width: 699px) {

@@ -115,7 +115,7 @@
     </ion-content>
 
     <ion-content v-slot:default v-else-if="error">
-      <ErrorState :title="translate('Order failed to load')" :message="error" />
+      <ErrorState :title="translate('Could not load order')" :message="error" />
     </ion-content>
 
     <ion-content v-else>

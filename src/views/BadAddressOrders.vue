@@ -24,12 +24,13 @@
         <ion-spinner name="crescent" />
       </div>
 
-      <template v-else-if="error">
-        <ErrorState :title="translate('Could not load bad address tasks')" :message="error" />
-        <div class="ion-text-center ion-padding">
-          <ion-button fill="outline" @click="fetchAddressValidationTasks()">{{ translate('Retry') }}</ion-button>
-        </div>
-      </template>
+      <ErrorState
+        v-else-if="error"
+        :title="translate('Could not load bad address tasks')"
+        :message="error"
+        retryable
+        @retry="fetchAddressValidationTasks()"
+      />
 
       <template v-else>
         <TaskQueueListHeader
@@ -362,7 +363,7 @@ onIonViewWillEnter(async () => {
 .order-results-header {
   align-items: center;
   display: flex;
-  gap: 8px;
+  gap: var(--spacer-xs);
 }
 
 .order-results-header-start {

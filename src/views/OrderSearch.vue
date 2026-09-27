@@ -114,7 +114,7 @@
 
       <ErrorState
         v-if="error"
-        :title="translate('Order search failed')"
+        :title="translate('Could not load orders')"
         :message="error"
       />
 
@@ -443,7 +443,7 @@ function statusDescription(statusId: string) {
 .order-results-header {
   align-items: center;
   display: flex;
-  gap: 8px;
+  gap: var(--spacer-xs);
 }
 
 .order-results-header-start {

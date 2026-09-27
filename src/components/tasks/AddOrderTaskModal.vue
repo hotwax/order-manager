@@ -43,7 +43,7 @@
       <!-- Task purpose picker with workflow icons: ion-select-option can't render
            icons, so use an anchored popover list (icons centralized in taskPurposeIcons).
            #391 fixes the work-effort type to a constant, so no type selector is shown. -->
-      <ion-item button detail="false" id="task-purpose-trigger">
+      <ion-item button :detail="false" id="task-purpose-trigger">
         <ion-label>
           <p>{{ requiredLabel('Task purpose') }}</p>
           <span :class="{ 'task-purpose-placeholder': !form.workEffortPurposeTypeId }">{{ selectedPurposeLabel }}</span>
@@ -56,7 +56,7 @@
               v-for="option in taskPurposes"
               :key="option.enumId"
               button
-              detail="false"
+              :detail="false"
               @click="form.workEffortPurposeTypeId = option.enumId"
             >
               <ion-icon v-if="getTaskPurposeIcon(option.enumId)" slot="start" :icon="getTaskPurposeIcon(option.enumId)" />

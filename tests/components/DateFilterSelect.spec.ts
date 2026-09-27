@@ -27,7 +27,7 @@ describe('date filter select', () => {
     expect(source).toContain('<ion-input');
     expect(source).toContain('v-if="outlined"');
     expect(source).toContain('fill="outline"');
-    expect(source).toContain('<ion-item v-else :id="triggerId" button detail="false" lines="none">');
+    expect(source).toContain('<ion-item v-else :id="triggerId" button :detail="false" lines="none">');
     expect(source).toContain("{{ selectedDateLabel }}");
     expect(source).toContain('<ion-popover :trigger="triggerId" trigger-action="click" :show-backdrop="false"');
     expect(source).toContain('<ion-datetime');

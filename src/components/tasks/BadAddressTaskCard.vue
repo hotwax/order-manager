@@ -398,7 +398,7 @@ defineExpose({
 .geo-picker-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacer-2xs);
 }
 
 .geo-picker-label {
@@ -416,8 +416,8 @@ defineExpose({
 }
 
 .bad-address-skeleton-item ion-label {
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-top: var(--spacer-xs);
+  margin-bottom: var(--spacer-xs);
 }
 
 .bad-address-skeleton-label {
