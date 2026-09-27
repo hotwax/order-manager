@@ -1,5 +1,4 @@
 import { DateTime } from 'luxon';
-import { translate } from '@common';
 
 /**
  * Epoch millis for the date shapes the order document mixes: epoch millis, 10-digit epoch
@@ -19,21 +18,6 @@ export function timelineMillis(value: any): number | undefined {
 
   const isoDate = DateTime.fromISO(stringValue);
   return isoDate.isValid ? isoDate.toMillis() : undefined;
-}
-
-const TIME_DIFF_UNITS = ['years', 'months', 'days', 'hours', 'minutes'] as const;
-
-/** Elapsed time between two dates as "+ 2 days 3 hours", or '' when either date is missing. */
-export function findTimeDiff(startTime: any, endTime: any): string {
-  const startMillis = timelineMillis(startTime);
-  const endMillis = timelineMillis(endTime);
-  if (!startMillis || !endMillis) return '';
-
-  const timeDiff = DateTime.fromMillis(endMillis).diff(DateTime.fromMillis(startMillis), [...TIME_DIFF_UNITS]);
-  const parts = TIME_DIFF_UNITS
-    .filter((unit) => timeDiff[unit])
-    .map((unit) => `${Math.round(timeDiff[unit])} ${translate(unit)}`);
-  return parts.length ? `+ ${parts.join(' ')}` : '';
 }
 
 export function formatDateTime(value: any): string {

@@ -1,0 +1,2074 @@
+{
+  "capturedAt": "2026-09-26",
+  "instance": "rails-uat",
+  "facilities": {
+    "100002": {
+      "name": "CAN WH - Ponyride",
+      "virtual": false
+    },
+    "100009": {
+      "name": "UK Ecomm",
+      "virtual": false
+    },
+    "_NA_": {
+      "name": "Brokering Queue",
+      "virtual": true
+    },
+    "WH_51ST_ST": {
+      "name": "2301 E. 51st St.",
+      "virtual": false
+    },
+    "REJECTED_ITM_PARKING": {
+      "name": "Rejected Item Parking",
+      "virtual": true
+    },
+    "AUSTIN": {
+      "name": "Austin",
+      "virtual": false
+    },
+    "GENERAL_OPS_PARKING": {
+      "name": "General Ops Parking",
+      "virtual": true
+    },
+    "BOSTON": {
+      "name": "Boston",
+      "virtual": false
+    },
+    "FASHION_ISLAND": {
+      "name": "Fashion Island",
+      "virtual": false
+    },
+    "SCOTTSDALE_QTR": {
+      "name": "SCOTTSDALE - QTR",
+      "virtual": false
+    },
+    "NYC_GREENE_ST": {
+      "name": "NYC - Greene St.",
+      "virtual": false
+    },
+    "NASHVILLE": {
+      "name": "Nashville",
+      "virtual": false
+    },
+    "GEORGETOWN": {
+      "name": "Georgetown",
+      "virtual": false
+    }
+  },
+  "orders": {
+    "101934": {
+      "order": {
+        "orderId": "101934",
+        "orderName": "#992308",
+        "orderDate": 1788328075000,
+        "entryDate": 1788429524846,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_APPROVED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "107989",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1788328075000
+          },
+          {
+            "orderStatusId": "107990",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1788429524892
+          },
+          {
+            "orderStatusId": "107987",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788328075000
+          },
+          {
+            "orderStatusId": "107991",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788429524893
+          },
+          {
+            "orderStatusId": "351801",
+            "statusId": "ITEM_COMPLETED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1789637157786
+          },
+          {
+            "orderStatusId": "107988",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788328075000
+          },
+          {
+            "orderStatusId": "107992",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788429524897
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "GENERAL_OPS_PARKING",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00002",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00003",
+            "facilityId": "GENERAL_OPS_PARKING",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "02",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00004",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_COMPLETED",
+                "quantity": 1
+              }
+            ]
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00004",
+          "changeReasonEnumId": "ALLOCATED",
+          "changeDatetime": 1789637157688,
+          "comments": "Shopify fulfillment sync: fulfilled at this location",
+          "fromFacilityId": "GENERAL_OPS_PARKING",
+          "facilityId": "WH_51ST_ST"
+        },
+        {
+          "orderItemSeqId": "02",
+          "shipGroupSeqId": "00003",
+          "changeDatetime": 1788429524918,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "WH_51ST_ST"
+        }
+      ],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00004",
+          "shippedDate": 1789637157732
+        },
+        {
+          "shipGroupSeqId": "00003"
+        }
+      ],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "104494": {
+      "order": {
+        "orderId": "104494",
+        "orderName": "#991503",
+        "orderDate": 1788276844000,
+        "entryDate": 1788431469587,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_CANCELLED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "119109",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1788276844000
+          },
+          {
+            "orderStatusId": "119110",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1788431469639
+          },
+          {
+            "orderStatusId": "344186",
+            "statusId": "ORDER_CANCELLED",
+            "statusDatetime": 1789549107332,
+            "changeReason": "SHOPIFY_CANCELLATION"
+          },
+          {
+            "orderStatusId": "119107",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788276844000
+          },
+          {
+            "orderStatusId": "119111",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788431469064
+          },
+          {
+            "orderStatusId": "217772",
+            "statusId": "ITEM_CANCELLED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1789040663128,
+            "changeReason": "SHOPIFY_CANCELLATION"
+          },
+          {
+            "orderStatusId": "119108",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788276844000
+          },
+          {
+            "orderStatusId": "119112",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788431469644
+          },
+          {
+            "orderStatusId": "344185",
+            "statusId": "ITEM_CANCELLED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1789549107318,
+            "changeReason": "SHOPIFY_CANCELLATION"
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "AUSTIN",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00002",
+            "facilityId": "GENERAL_OPS_PARKING",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "02",
+                "statusId": "ITEM_CANCELLED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00003",
+            "facilityId": "GENERAL_OPS_PARKING",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_CANCELLED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00004",
+            "facilityId": "REJECTED_ITM_PARKING",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [
+        {
+          "orderItemSeqId": "02",
+          "shipGroupSeqId": "00004",
+          "changeReasonEnumId": "SHOPIFY_CANCELLATION",
+          "changeDatetime": 1789549107309,
+          "fromFacilityId": "GENERAL_OPS_PARKING",
+          "facilityId": "REJECTED_ITM_PARKING"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00004",
+          "changeReasonEnumId": "SHOPIFY_CANCELLATION",
+          "changeDatetime": 1789040663018,
+          "fromFacilityId": "GENERAL_OPS_PARKING",
+          "facilityId": "REJECTED_ITM_PARKING"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00003",
+          "changeDatetime": 1788431469665,
+          "fromFacilityId": "AUSTIN",
+          "facilityId": "AUSTIN"
+        }
+      ],
+      "unfillable": null,
+      "fulfillment": [],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "104821": {
+      "order": {
+        "orderId": "104821",
+        "orderName": "#991239",
+        "orderDate": 1788247585000,
+        "entryDate": 1788431684901,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_APPROVED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "120824",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1788247585000
+          },
+          {
+            "orderStatusId": "120825",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1788431684949
+          },
+          {
+            "orderStatusId": "120821",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788247585000
+          },
+          {
+            "orderStatusId": "120826",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788431684095
+          },
+          {
+            "orderStatusId": "120829",
+            "statusId": "ITEM_COMPLETED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788431685043
+          },
+          {
+            "orderStatusId": "120822",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788247585000
+          },
+          {
+            "orderStatusId": "120827",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788431684954
+          },
+          {
+            "orderStatusId": "120823",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "03",
+            "statusDatetime": 1788247585000
+          },
+          {
+            "orderStatusId": "120828",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "03",
+            "statusDatetime": 1788431684957
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00002",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_COMPLETED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00003",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "02",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00004",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "03",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [
+        {
+          "orderItemSeqId": "03",
+          "shipGroupSeqId": "00004",
+          "changeDatetime": 1788431685001,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "WH_51ST_ST"
+        },
+        {
+          "orderItemSeqId": "02",
+          "shipGroupSeqId": "00003",
+          "changeDatetime": 1788431684989,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "WH_51ST_ST"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00002",
+          "changeDatetime": 1788431684977,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "WH_51ST_ST"
+        }
+      ],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00002"
+        },
+        {
+          "shipGroupSeqId": "00003"
+        },
+        {
+          "shipGroupSeqId": "00004"
+        }
+      ],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "107038": {
+      "order": {
+        "orderId": "107038",
+        "orderName": "#993310",
+        "orderDate": 1788431582000,
+        "entryDate": 1788433373904,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_COMPLETED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "NETSUITE_ORDER_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "131392",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1788431582000
+          },
+          {
+            "orderStatusId": "131393",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1788433373945
+          },
+          {
+            "orderStatusId": "343028",
+            "statusId": "ORDER_COMPLETED",
+            "statusDatetime": 1789548868833,
+            "changeReason": "SHOPIFY_CANCELLATION"
+          },
+          {
+            "orderStatusId": "131390",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788431582000
+          },
+          {
+            "orderStatusId": "131394",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788433373946
+          },
+          {
+            "orderStatusId": "170441",
+            "statusId": "ITEM_COMPLETED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788547866580
+          },
+          {
+            "orderStatusId": "131391",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788431582000
+          },
+          {
+            "orderStatusId": "131395",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788433373949
+          },
+          {
+            "orderStatusId": "343027",
+            "statusId": "ITEM_CANCELLED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1789548868703,
+            "changeReason": "SHOPIFY_CANCELLATION"
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00002",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_COMPLETED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00003",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "02",
+                "statusId": "ITEM_CANCELLED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00004",
+            "facilityId": "REJECTED_ITM_PARKING",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [
+        {
+          "orderItemSeqId": "02",
+          "shipGroupSeqId": "00004",
+          "changeReasonEnumId": "SHOPIFY_CANCELLATION",
+          "changeDatetime": 1789548868641,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "REJECTED_ITM_PARKING"
+        },
+        {
+          "orderItemSeqId": "02",
+          "shipGroupSeqId": "00003",
+          "changeDatetime": 1788433373992,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "WH_51ST_ST"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00002",
+          "changeDatetime": 1788433373968,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "WH_51ST_ST"
+        }
+      ],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00002"
+        }
+      ],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "115548": {
+      "order": {
+        "orderId": "115548",
+        "orderName": "#961358",
+        "orderDate": 1783570961000,
+        "entryDate": 1788539584841,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_COMPLETED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "166726",
+            "statusId": "ORDER_COMPLETED",
+            "statusDatetime": 1783570961000
+          },
+          {
+            "orderStatusId": "166724",
+            "statusId": "ITEM_COMPLETED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1783570961000
+          },
+          {
+            "orderStatusId": "166725",
+            "statusId": "ITEM_COMPLETED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1783570961000
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_COMPLETED",
+                "quantity": 1
+              },
+              {
+                "orderItemSeqId": "02",
+                "statusId": "ITEM_COMPLETED",
+                "quantity": 1
+              }
+            ]
+          }
+        ],
+        "returnItems": [
+          {
+            "returnId": "108661",
+            "orderItemSeqId": "01",
+            "returnQuantity": 1,
+            "createdStamp": 1788539584822,
+            "statusId": "RETURN_COMPLETED"
+          }
+        ],
+        "itemAssocs": []
+      },
+      "facilityChanges": [],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00001"
+        }
+      ],
+      "returnHeadersById": {
+        "108661": {
+          "returnDate": "1786484888000",
+          "entryDate": "1788539584923",
+          "destinationFacilityId": "_NA_"
+        }
+      },
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded",
+        "returns": "loaded"
+      }
+    },
+    "116143": {
+      "order": {
+        "orderId": "116143",
+        "orderName": "#994597",
+        "orderDate": 1788545353000,
+        "entryDate": 1788546005556,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_APPROVED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "NETSUITE_ORDER_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "170220",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1788545353000
+          },
+          {
+            "orderStatusId": "170221",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1788546005613
+          },
+          {
+            "orderStatusId": "170217",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788545353000
+          },
+          {
+            "orderStatusId": "170222",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788546005615
+          },
+          {
+            "orderStatusId": "170218",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788545353000
+          },
+          {
+            "orderStatusId": "170223",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788546005618
+          },
+          {
+            "orderStatusId": "213411",
+            "statusId": "ITEM_COMPLETED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788907178610
+          },
+          {
+            "orderStatusId": "170219",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "03",
+            "statusDatetime": 1788545353000
+          },
+          {
+            "orderStatusId": "170224",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "03",
+            "statusDatetime": 1788546005621
+          },
+          {
+            "orderStatusId": "213412",
+            "statusId": "ITEM_COMPLETED",
+            "orderItemSeqId": "03",
+            "statusDatetime": 1788907178616
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "GENERAL_OPS_PARKING",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00002",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "02",
+                "statusId": "ITEM_COMPLETED",
+                "quantity": 1
+              },
+              {
+                "orderItemSeqId": "03",
+                "statusId": "ITEM_COMPLETED",
+                "quantity": 1
+              }
+            ]
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [
+        {
+          "orderItemSeqId": "03",
+          "shipGroupSeqId": "00002",
+          "changeReasonEnumId": "ALLOCATED",
+          "changeDatetime": 1788547924299,
+          "comments": "Shopify inbound location sync: moved to facility WH_51ST_ST",
+          "fromFacilityId": "GENERAL_OPS_PARKING",
+          "facilityId": "WH_51ST_ST"
+        },
+        {
+          "orderItemSeqId": "02",
+          "shipGroupSeqId": "00002",
+          "changeReasonEnumId": "ALLOCATED",
+          "changeDatetime": 1788547924280,
+          "comments": "Shopify inbound location sync: moved to facility WH_51ST_ST",
+          "fromFacilityId": "GENERAL_OPS_PARKING",
+          "facilityId": "WH_51ST_ST"
+        }
+      ],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00001"
+        },
+        {
+          "shipGroupSeqId": "00002",
+          "shippedDate": 1788907178593
+        }
+      ],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "123768": {
+      "order": {
+        "orderId": "123768",
+        "orderName": "#62208UK",
+        "orderDate": 1788950334000,
+        "entryDate": 1788958352278,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_APPROVED",
+        "originFacilityId": "100009",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "NETSUITE_ORDER_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "217678",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1788950334000
+          },
+          {
+            "orderStatusId": "217679",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1788958352316
+          },
+          {
+            "orderStatusId": "217677",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788950334000
+          },
+          {
+            "orderStatusId": "217680",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788958352317
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "_NA_",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00002",
+            "facilityId": "100009",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00003",
+            "facilityId": "REJECTED_ITM_PARKING",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00004",
+            "facilityId": "100009",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00005",
+            "facilityId": "100009",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00006",
+            "facilityId": "BOSTON",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00006",
+          "changeReasonEnumId": "RELEASED",
+          "changeDatetime": 1790480716222,
+          "fromFacilityId": "REJECTED_ITM_PARKING",
+          "facilityId": "BOSTON",
+          "changeUserLogin": "user.1"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00003",
+          "changeReasonEnumId": "NOT_IN_STOCK",
+          "changeDatetime": 1789155684910,
+          "fromFacilityId": "100009",
+          "facilityId": "REJECTED_ITM_PARKING",
+          "changeUserLogin": "user.2"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00005",
+          "changeReasonEnumId": "RELEASED",
+          "changeDatetime": 1789155660388,
+          "fromFacilityId": "REJECTED_ITM_PARKING",
+          "facilityId": "100009",
+          "changeUserLogin": "user.2"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00003",
+          "changeReasonEnumId": "NOT_IN_STOCK",
+          "changeDatetime": 1789155612503,
+          "fromFacilityId": "100009",
+          "facilityId": "REJECTED_ITM_PARKING",
+          "changeUserLogin": "user.2"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00004",
+          "changeReasonEnumId": "RELEASED",
+          "changeDatetime": 1789155581267,
+          "fromFacilityId": "REJECTED_ITM_PARKING",
+          "facilityId": "100009",
+          "changeUserLogin": "user.2"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00003",
+          "changeReasonEnumId": "NO_VARIANCE_LOG",
+          "changeDatetime": 1789155148311,
+          "fromFacilityId": "100009",
+          "facilityId": "REJECTED_ITM_PARKING",
+          "changeUserLogin": "user.2"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00002",
+          "changeReasonEnumId": "RELEASED",
+          "changeDatetime": 1788961595058,
+          "fromFacilityId": "_NA_",
+          "facilityId": "100009",
+          "changeUserLogin": "user.2"
+        }
+      ],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00006",
+          "firstReleasedDate": 1790480716222,
+          "lastReleasedDate": 1790480716222
+        }
+      ],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "157579": {
+      "order": {
+        "orderId": "157579",
+        "orderName": "#7793CAN",
+        "orderDate": 1788457003000,
+        "entryDate": 1789976591434,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_APPROVED",
+        "originFacilityId": "100002",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "376983",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1788457003000
+          },
+          {
+            "orderStatusId": "376984",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1789976594745
+          },
+          {
+            "orderStatusId": "376981",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1788457003000
+          },
+          {
+            "orderStatusId": "376985",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1789976594751
+          },
+          {
+            "orderStatusId": "376982",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1788457003000
+          },
+          {
+            "orderStatusId": "376986",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1789976594829
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD_CA",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00002",
+            "facilityId": "100002",
+            "shipmentMethodTypeId": "STANDARD_CA",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              },
+              {
+                "orderItemSeqId": "02",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [
+        {
+          "orderItemSeqId": "02",
+          "shipGroupSeqId": "00002",
+          "changeReasonEnumId": "BROKERED",
+          "changeDatetime": 1789976594579,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "100002"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00002",
+          "changeReasonEnumId": "BROKERED",
+          "changeDatetime": 1789976594469,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "100002"
+        }
+      ],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00002",
+          "firstBrokeredDate": 1789976594469,
+          "lastBrokeredDate": 1789976594579
+        }
+      ],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "158477": {
+      "order": {
+        "orderId": "158477",
+        "orderName": "#1007242",
+        "orderDate": 1790101527000,
+        "entryDate": 1790103580828,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_APPROVED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "NETSUITE_ORDER_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "383989",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1790101527000
+          },
+          {
+            "orderStatusId": "383990",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1790103580879
+          },
+          {
+            "orderStatusId": "383987",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790101527000
+          },
+          {
+            "orderStatusId": "383991",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790103580088
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "SCOTTSDALE_QTR",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          },
+          {
+            "shipGroupSeqId": "00002",
+            "facilityId": "_NA_",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00002",
+          "changeReasonEnumId": "ALLOCATED",
+          "changeDatetime": 1790467285540,
+          "comments": "Shopify inbound location sync: moved to facility _NA_",
+          "fromFacilityId": "SCOTTSDALE_QTR",
+          "facilityId": "_NA_"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00001",
+          "changeReasonEnumId": "ALLOCATED",
+          "changeDatetime": 1790369485198,
+          "comments": "Shopify inbound location sync: moved to facility SCOTTSDALE_QTR",
+          "fromFacilityId": "_NA_",
+          "facilityId": "SCOTTSDALE_QTR"
+        },
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00002",
+          "changeReasonEnumId": "ALLOCATED",
+          "changeDatetime": 1790367627626,
+          "comments": "Shopify inbound location sync: moved to facility _NA_",
+          "fromFacilityId": "SCOTTSDALE_QTR",
+          "facilityId": "_NA_"
+        }
+      ],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00002"
+        }
+      ],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "158647": {
+      "order": {
+        "orderId": "158647",
+        "orderName": "#1007376",
+        "orderDate": 1790112801000,
+        "entryDate": 1790115220782,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_CANCELLED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "NETSUITE_ORDER_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "385866",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1790112801000
+          },
+          {
+            "orderStatusId": "385867",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1790115220837
+          },
+          {
+            "orderStatusId": "385870",
+            "statusId": "ORDER_CANCELLED",
+            "statusDatetime": 1790115220921,
+            "changeReason": "SHOPIFY_CANCELLATION"
+          },
+          {
+            "orderStatusId": "385865",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790112801000
+          },
+          {
+            "orderStatusId": "385868",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790115220839
+          },
+          {
+            "orderStatusId": "385869",
+            "statusId": "ITEM_CANCELLED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790115220912,
+            "changeReason": "SHOPIFY_CANCELLATION"
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_CANCELLED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00002",
+            "facilityId": "REJECTED_ITM_PARKING",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00002",
+          "changeReasonEnumId": "SHOPIFY_CANCELLATION",
+          "changeDatetime": 1790115220904,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "REJECTED_ITM_PARKING"
+        }
+      ],
+      "unfillable": null,
+      "fulfillment": [],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "159995": {
+      "order": {
+        "orderId": "159995",
+        "orderName": "#1008522",
+        "orderDate": 1790301645000,
+        "entryDate": 1790329916825,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_CANCELLED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "NETSUITE_ORDER_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "397229",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1790301645000
+          },
+          {
+            "orderStatusId": "397230",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1790329916912
+          },
+          {
+            "orderStatusId": "400957",
+            "statusId": "ORDER_CANCELLED",
+            "statusDatetime": 1790350284985,
+            "changeReason": "SHOPIFY_CANCELLATION"
+          },
+          {
+            "orderStatusId": "397228",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790301645000
+          },
+          {
+            "orderStatusId": "397231",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790329916914
+          },
+          {
+            "orderStatusId": "400956",
+            "statusId": "ITEM_CANCELLED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790350284097,
+            "changeReason": "SHOPIFY_CANCELLATION"
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_CANCELLED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00002",
+            "facilityId": "REJECTED_ITM_PARKING",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": []
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00002",
+          "changeReasonEnumId": "SHOPIFY_CANCELLATION",
+          "changeDatetime": 1790350284957,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "REJECTED_ITM_PARKING"
+        }
+      ],
+      "unfillable": null,
+      "fulfillment": [],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "160638": {
+      "order": {
+        "orderId": "160638",
+        "orderName": "#1008868",
+        "orderDate": 1790365075000,
+        "entryDate": 1790367626838,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_APPROVED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "NETSUITE_ORDER_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "403512",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1790365075000
+          },
+          {
+            "orderStatusId": "403513",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1790367627523
+          },
+          {
+            "orderStatusId": "403504",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790365075000
+          },
+          {
+            "orderStatusId": "403514",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790367627532
+          },
+          {
+            "orderStatusId": "403505",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1790365075000
+          },
+          {
+            "orderStatusId": "403515",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1790367627546
+          },
+          {
+            "orderStatusId": "403506",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "03",
+            "statusDatetime": 1790365075000
+          },
+          {
+            "orderStatusId": "403516",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "03",
+            "statusDatetime": 1790367627554
+          },
+          {
+            "orderStatusId": "403507",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "04",
+            "statusDatetime": 1790365075000
+          },
+          {
+            "orderStatusId": "403517",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "04",
+            "statusDatetime": 1790367627057
+          },
+          {
+            "orderStatusId": "403508",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "05",
+            "statusDatetime": 1790365075000
+          },
+          {
+            "orderStatusId": "403518",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "05",
+            "statusDatetime": 1790367627576
+          },
+          {
+            "orderStatusId": "403509",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "06",
+            "statusDatetime": 1790365075000
+          },
+          {
+            "orderStatusId": "403519",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "06",
+            "statusDatetime": 1790367627583
+          },
+          {
+            "orderStatusId": "403510",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "07",
+            "statusDatetime": 1790365075000
+          },
+          {
+            "orderStatusId": "403520",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "07",
+            "statusDatetime": 1790367627589
+          },
+          {
+            "orderStatusId": "403511",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "08",
+            "statusDatetime": 1790365075000
+          },
+          {
+            "orderStatusId": "403521",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "08",
+            "statusDatetime": 1790367627595
+          },
+          {
+            "orderStatusId": "404099",
+            "statusId": "ITEM_COMPLETED",
+            "orderItemSeqId": "08",
+            "statusDatetime": 1790369491638
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "02",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              },
+              {
+                "orderItemSeqId": "03",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              },
+              {
+                "orderItemSeqId": "04",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              },
+              {
+                "orderItemSeqId": "05",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00002",
+            "facilityId": "NYC_GREENE_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "06",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00003",
+            "facilityId": "NASHVILLE",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "07",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00004",
+            "facilityId": "GEORGETOWN",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "08",
+                "statusId": "ITEM_COMPLETED",
+                "quantity": 1
+              }
+            ]
+          },
+          {
+            "shipGroupSeqId": "00005",
+            "facilityId": "REJECTED_ITM_PARKING",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [
+        {
+          "orderItemSeqId": "01",
+          "shipGroupSeqId": "00005",
+          "changeReasonEnumId": "REJ_RSN_DAMAGED",
+          "changeDatetime": 1790398519039,
+          "fromFacilityId": "WH_51ST_ST",
+          "facilityId": "REJECTED_ITM_PARKING",
+          "changeUserLogin": "user.1"
+        }
+      ],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00005"
+        },
+        {
+          "shipGroupSeqId": "00001"
+        },
+        {
+          "shipGroupSeqId": "00002"
+        },
+        {
+          "shipGroupSeqId": "00003"
+        },
+        {
+          "shipGroupSeqId": "00004",
+          "shippedDate": 1790369491611
+        }
+      ],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "161352": {
+      "order": {
+        "orderId": "161352",
+        "orderName": "#1009262",
+        "orderDate": 1790436044000,
+        "entryDate": 1790438430862,
+        "salesChannelEnumId": "WEB_SALES_CHANNEL",
+        "statusId": "ORDER_COMPLETED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "NETSUITE_ORDER_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "409263",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1790436044000
+          },
+          {
+            "orderStatusId": "409264",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1790438430928
+          },
+          {
+            "orderStatusId": "410765",
+            "statusId": "ORDER_COMPLETED",
+            "statusDatetime": 1790449285028
+          },
+          {
+            "orderStatusId": "409262",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790436044000
+          },
+          {
+            "orderStatusId": "409265",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790438430939
+          },
+          {
+            "orderStatusId": "410762",
+            "statusId": "ITEM_COMPLETED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790449285020
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "BOSTON",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_COMPLETED",
+                "quantity": 1
+              }
+            ]
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00001",
+          "shippedDate": 1790449284992
+        }
+      ],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "162012": {
+      "order": {
+        "orderId": "162012",
+        "orderName": "EXC-1005374-1",
+        "orderDate": 1790468887000,
+        "entryDate": 1790470828628,
+        "salesChannelEnumId": "LOOP_EXCH",
+        "statusId": "ORDER_APPROVED",
+        "originFacilityId": "_NA_",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "NETSUITE_ORDER_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "414440",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1790468887000
+          },
+          {
+            "orderStatusId": "414441",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1790470828845
+          },
+          {
+            "orderStatusId": "414438",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790468887000
+          },
+          {
+            "orderStatusId": "414442",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790470828852
+          },
+          {
+            "orderStatusId": "414439",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1790468887000
+          },
+          {
+            "orderStatusId": "414443",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "02",
+            "statusDatetime": 1790470828859
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "WH_51ST_ST",
+            "shipmentMethodTypeId": "STANDARD",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              },
+              {
+                "orderItemSeqId": "02",
+                "statusId": "ITEM_APPROVED",
+                "quantity": 1
+              }
+            ]
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00001"
+        }
+      ],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    },
+    "162079": {
+      "order": {
+        "orderId": "162079",
+        "orderName": "#1009795",
+        "orderDate": 1790476257000,
+        "entryDate": 1790478026103,
+        "salesChannelEnumId": "POS_SALES_CHANNEL",
+        "statusId": "ORDER_COMPLETED",
+        "originFacilityId": "FASHION_ISLAND",
+        "identifications": [
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_ID"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NAME"
+          },
+          {
+            "orderIdentificationTypeId": "SHOPIFY_ORD_NO"
+          }
+        ],
+        "statuses": [
+          {
+            "orderStatusId": "414910",
+            "statusId": "ORDER_CREATED",
+            "statusDatetime": 1790476257000
+          },
+          {
+            "orderStatusId": "414911",
+            "statusId": "ORDER_APPROVED",
+            "statusDatetime": 1790478026281
+          },
+          {
+            "orderStatusId": "414914",
+            "statusId": "ORDER_COMPLETED",
+            "statusDatetime": 1790478026436
+          },
+          {
+            "orderStatusId": "414909",
+            "statusId": "ITEM_CREATED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790476257000
+          },
+          {
+            "orderStatusId": "414912",
+            "statusId": "ITEM_APPROVED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790478026284
+          },
+          {
+            "orderStatusId": "414913",
+            "statusId": "ITEM_COMPLETED",
+            "orderItemSeqId": "01",
+            "statusDatetime": 1790478026421
+          }
+        ],
+        "shipGroups": [
+          {
+            "shipGroupSeqId": "00001",
+            "facilityId": "FASHION_ISLAND",
+            "shipmentMethodTypeId": "POS_COMPLETED",
+            "items": [
+              {
+                "orderItemSeqId": "01",
+                "statusId": "ITEM_COMPLETED",
+                "quantity": 1
+              }
+            ]
+          }
+        ],
+        "returnItems": [],
+        "itemAssocs": []
+      },
+      "facilityChanges": [],
+      "unfillable": null,
+      "fulfillment": [
+        {
+          "shipGroupSeqId": "00001"
+        }
+      ],
+      "returnHeadersById": {},
+      "exchangeChildren": [],
+      "sourceStatus": {
+        "fulfillment": "loaded",
+        "facilityChanges": "loaded",
+        "unfillable": "loaded",
+        "exchanges": "loaded"
+      }
+    }
+  }
+}

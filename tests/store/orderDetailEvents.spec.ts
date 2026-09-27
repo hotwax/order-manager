@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { api } from '@common';
-import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from '@/composables/useOrderDetail';
+import { FACILITY_CHANGE_PAGE_SIZE, UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from '@/composables/useOrderDetail';
 
 vi.mock('@common', async (importOriginal) => {
   const actual = await importOriginal<any>();
@@ -53,8 +53,11 @@ describe('order detail event sources', () => {
     mockOrderDetail();
   });
 
-  it('collapses the per-item rows of one facility move into a single event', () => {
+  it('builds the order events from the document statuses and the loaded facility changes', () => {
     const store = useOrderDetailStore();
+    store.byOrderId[ORDER_ID] = orderEntryWithStatuses([
+      { statusId: 'ORDER_APPROVED', statusDatetime: '2026-06-26 14:00:00.000', statusUserLogin: 'ops.user' },
+    ]);
     // OMS writes one OrderFacilityChange row per order item; these three are one release.
     store.facilityChangesByOrderId[ORDER_ID] = [
       { orderItemSeqId: '01', changeReasonEnumId: 'RELEASED', fromFacilityId: '_NA_', facilityId: 'BROADWAY', changeDatetime: '2026-06-26 14:17:51.892', changeUserLogin: 'swati.pandey' },
@@ -62,61 +65,16 @@ describe('order detail event sources', () => {
       { orderItemSeqId: '03', changeReasonEnumId: 'RELEASED', fromFacilityId: '_NA_', facilityId: 'BROADWAY', changeDatetime: '2026-06-26 14:17:51.901' },
     ];
 
-    const events = store.facilityChangeEventsByOrderId(ORDER_ID);
+    const events = store.orderEventsByOrderId(ORDER_ID);
 
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ changeReasonEnumId: 'RELEASED', facilityId: 'BROADWAY', itemCount: 3 });
-    // The actor is on one row only; the cluster still reports it.
-    expect(events[0].changeUserLogin).toBe('swati.pandey');
+    expect(events.map((event) => event.kind)).toEqual(['orderStatus', 'move']);
+    expect(events[1]).toMatchObject({ move: 'released', orderItemSeqIds: ['01', '02', '03'], isFirst: true });
   });
 
-  it('keeps a repeated move to the same facility as separate events', () => {
-    const store = useOrderDetailStore();
-    store.facilityChangesByOrderId[ORDER_ID] = [
-      { orderItemSeqId: '01', changeReasonEnumId: 'RELEASED', fromFacilityId: '_NA_', facilityId: 'BROADWAY', changeDatetime: '2026-06-26 14:17:51.892' },
-      { orderItemSeqId: '01', changeReasonEnumId: 'RELEASED', fromFacilityId: '_NA_', facilityId: 'BROADWAY', changeDatetime: '2026-06-26 15:02:11.100' },
-    ];
-
-    expect(store.facilityChangeEventsByOrderId(ORDER_ID)).toHaveLength(2);
-  });
-
-  it('groups item cancellations by reason and ignores routine item statuses', () => {
-    const store = useOrderDetailStore();
-    store.byOrderId[ORDER_ID] = orderEntryWithStatuses([
-      { orderItemSeqId: '01', statusId: 'ITEM_CREATED', statusDatetime: '2026-07-08 12:00:00.000' },
-      { orderItemSeqId: '01', statusId: 'ITEM_CANCELLED', changeReason: 'AUTO_CANCEL', statusDatetime: '2026-07-08 12:55:14.164', statusUserLogin: 'system' },
-      { orderItemSeqId: '02', statusId: 'ITEM_CANCELLED', changeReason: 'AUTO_CANCEL', statusDatetime: '2026-07-08 12:55:14.201' },
-      { orderItemSeqId: '03', statusId: 'ITEM_CANCELLED', changeReason: 'BAD_REVIEW', statusDatetime: '2026-07-08 12:55:14.205' },
-    ]);
-
-    const events = store.itemStatusEventsByOrderId(ORDER_ID);
-
-    expect(events).toHaveLength(2);
-    expect(events.map((event) => [event.changeReason, event.itemCount])).toEqual(
-      expect.arrayContaining([['AUTO_CANCEL', 2], ['BAD_REVIEW', 1]])
-    );
-  });
-
-  it('takes header statuses from the order document, newest first, with actor and reason', () => {
-    const store = useOrderDetailStore();
-    store.byOrderId[ORDER_ID] = orderEntryWithStatuses([
-      { statusId: 'ORDER_APPROVED', statusDatetime: '2026-07-08 10:00:00.000', statusUserLogin: 'ops.user' },
-      { statusId: 'ORDER_HOLD', statusDatetime: '2026-07-08 11:00:00.000', statusUserLogin: 'ops.user', changeReason: 'Manual' },
-      { orderItemSeqId: '01', statusId: 'ITEM_CANCELLED', statusDatetime: '2026-07-08 12:00:00.000' },
-    ]);
-
-    const headerStatuses = store.headerStatusesByOrderId(ORDER_ID);
-
-    // Item-scoped rows are excluded here; they drive the item events instead.
-    expect(headerStatuses.map((status: any) => status.statusId)).toEqual(['ORDER_HOLD', 'ORDER_APPROVED']);
-    expect(headerStatuses[0].statusUserLogin).toBe('ops.user');
-    expect(headerStatuses[0].changeReason).toBe('Manual');
-  });
-
-  it('reports no statuses when the order document has not loaded', () => {
+  it('has no events when the order document has not loaded', () => {
     const store = useOrderDetailStore();
 
-    expect(store.headerStatusesByOrderId(ORDER_ID)).toEqual([]);
+    expect(store.orderEventsByOrderId(ORDER_ID)).toEqual([]);
   });
 
   it('counts one failed brokering run as one attempt however many items it touched', async () => {
@@ -309,10 +267,72 @@ describe('order detail event sources', () => {
     await store.fetchOrderEvents(ORDER_ID);
 
     // Statuses come off the document, so a failed sibling call cannot take them out.
-    expect(store.headerStatusesByOrderId(ORDER_ID)).toHaveLength(1);
-    expect(store.facilityChangeEventsByOrderId(ORDER_ID)).toEqual([]);
+    const events = store.orderEventsByOrderId(ORDER_ID);
+    expect(events.filter((event) => event.kind === 'orderStatus')).toHaveLength(1);
+    expect(events.filter((event) => event.kind === 'move')).toEqual([]);
     expect(store.unfillableAttemptsByOrderId(ORDER_ID)).toMatchObject({ count: 1 });
-    expect(store.orderEventsStatusByOrderId[ORDER_ID]).toBe('error');
+    // The timeline says which source failed, and only that one.
+    expect(store.orderEventSourceStatus(ORDER_ID)).toEqual({ loading: [], failed: ['facilityChanges'], facilityChangesTruncated: false });
+  });
+
+  it('flags the facility changes as cut off when they fill their page', async () => {
+    mockOrderDetail({
+      getFacilityChanges: vi.fn().mockResolvedValue({
+        data: Array.from({ length: FACILITY_CHANGE_PAGE_SIZE }, (_, index) => ({ orderItemSeqId: '01', changeReasonEnumId: 'PARKED', changeDatetime: 1_790_000_000_000 + index * 120_000 })),
+      }),
+    });
+    const store = useOrderDetailStore();
+
+    await store.fetchOrderEvents(ORDER_ID);
+
+    expect(store.orderEventSourceStatus(ORDER_ID).facilityChangesTruncated).toBe(true);
+  });
+
+  it('fetches again after a load that was already running when a forced reload arrives', async () => {
+    // An action reloads the order while the first load is still in flight: the reload must not
+    // return the rows fetched before the action.
+    let release!: () => void;
+    const firstLoad = new Promise<{ data: any[] }>((resolve) => { release = () => resolve({ data: [] }); });
+    const getFacilityChanges = vi.fn()
+      .mockReturnValueOnce(firstLoad)
+      .mockResolvedValueOnce({ data: [{ orderItemSeqId: '01', changeReasonEnumId: 'NOT_IN_STOCK', fromFacilityId: 'BROADWAY', facilityId: 'PARKING', changeDatetime: 1_790_000_000_000 }] });
+    mockOrderDetail({ getFacilityChanges });
+    const store = useOrderDetailStore();
+
+    const initial = store.fetchOrderEvents(ORDER_ID);
+    const reload = store.fetchOrderEvents(ORDER_ID, true);
+    release();
+    await Promise.all([initial, reload]);
+
+    expect(getFacilityChanges).toHaveBeenCalledTimes(2);
+    expect(store.facilityChangesByOrderId[ORDER_ID]).toHaveLength(1);
+  });
+
+  it('retries only the sources that failed', async () => {
+    const getFacilityChanges = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({ data: [] });
+    mockOrderDetail({ getFacilityChanges });
+    const store = useOrderDetailStore();
+    await store.fetchOrderEvents(ORDER_ID);
+    vi.mocked(api).mockClear();
+
+    await store.retryOrderEventSources(ORDER_ID);
+
+    expect(getFacilityChanges).toHaveBeenCalledTimes(2);
+    // The fulfillment timeline never failed, so the retry does not refetch it.
+    expect(api).not.toHaveBeenCalled();
+    expect(store.orderEventSourceStatus(ORDER_ID).failed).toEqual([]);
+  });
+});
+
+describe('getFacilityChanges', () => {
+  it('reads the newest moves first, so a full page drops the oldest', async () => {
+    const { useOrderDetail: realUseOrderDetail } = await vi.importActual<any>('@/composables/useOrderDetail');
+    vi.mocked(api).mockReset();
+    vi.mocked(api).mockResolvedValue({ data: [] });
+
+    await realUseOrderDetail().getFacilityChanges(ORDER_ID);
+
+    expect(vi.mocked(api).mock.calls[0][0]).toMatchObject({ params: { orderByField: '-changeDatetime', pageSize: FACILITY_CHANGE_PAGE_SIZE } });
   });
 });
 

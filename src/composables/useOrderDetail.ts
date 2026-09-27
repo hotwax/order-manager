@@ -19,6 +19,12 @@ export const UNFILLABLE_REASON_ID = "UNFILLABLE";
  */
 export const UNFILLABLE_SAMPLE_SIZE = 100;
 
+/**
+ * How many facility-change rows to read per order, newest first. A page that fills means older
+ * moves exist beyond it; the count header that would say how many is hidden from the browser.
+ */
+export const FACILITY_CHANGE_PAGE_SIZE = 200;
+
 /** A product issued at a facility: one order line of a POS-completed ship group. */
 export interface IssuanceLine {
   productId: string;
@@ -72,7 +78,8 @@ export function useOrderDetail() {
   /**
    * OrderFacilityChange rows (brokered, released, parked, rejected) for the order,
    * excluding UNFILLABLE. `_op=in` plus `_not=Y` builds `NOT IN ('UNFILLABLE') OR
-   * changeReasonEnumId IS NULL`, so the reason-less rows are still returned.
+   * changeReasonEnumId IS NULL`, so the reason-less rows are still returned. Newest first,
+   * so an order with more moves than one page loses its oldest rows, not its latest.
    */
   async function getFacilityChanges(orderId: string): Promise<any> {
     return api({
@@ -82,8 +89,8 @@ export function useOrderDetail() {
         changeReasonEnumId: UNFILLABLE_REASON_ID,
         changeReasonEnumId_op: "in",
         changeReasonEnumId_not: "Y",
-        orderByField: "changeDatetime",
-        pageSize: 200
+        orderByField: "-changeDatetime",
+        pageSize: FACILITY_CHANGE_PAGE_SIZE
       }
     });
   }
