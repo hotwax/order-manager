@@ -38,7 +38,7 @@
         </ion-accordion-group>
       </template>
 
-      <ion-item v-if="sourceStatus.loading.length" lines="none">
+      <ion-item v-if="loading" lines="none">
         <ion-label>
           <ion-skeleton-text animated style="width: 60%" />
           <p><ion-skeleton-text animated style="width: 40%" /></p>
@@ -57,7 +57,7 @@
           <p>{{ translate('Showing the latest {count} facility moves', { count: FACILITY_CHANGE_PAGE_SIZE }) }}</p>
         </ion-label>
       </ion-item>
-      <ion-item v-if="!days.length && !sourceStatus.loading.length" lines="none">
+      <ion-item v-if="!days.length && !loading" lines="none">
         <ion-label>{{ translate('No history recorded') }}</ion-label>
       </ion-item>
     </ion-list>
@@ -132,7 +132,12 @@ const context = computed<TimelineContext>(() => {
   };
 });
 
-const days = computed(() => timelineDays(groupTransactions(props.events, context.value), context.value));
+// Whether a facility is parking decides how a move reads — the move a cancellation makes into
+// Rejected Item Parking, or a rejection — so the rows wait for the facility list on a cold load.
+const facilitiesReady = computed(() => seed.facilities.ids.length > 0 || ['loaded', 'error'].includes(seed.facilities.status));
+const loading = computed(() => props.sourceStatus.loading.length > 0 || !facilitiesReady.value);
+
+const days = computed(() => (facilitiesReady.value ? timelineDays(groupTransactions(props.events, context.value), context.value) : []));
 
 const failedSourcesLabel = computed(() => props.sourceStatus.failed.map((key) => translate(SOURCE_LABELS[key])).join(', '));
 

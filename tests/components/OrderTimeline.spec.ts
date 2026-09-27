@@ -37,8 +37,11 @@ vi.mock('@/store/orderDetail', () => ({
   useOrderDetailStore: () => ({ orderById: (orderId: string) => RAILS_UAT.orders[orderId]?.order ?? null }),
 }));
 
+const seedFacilities = vi.hoisted(() => ({ ids: ['100002'], status: 'loaded' }));
+
 vi.mock('@/store/seed', () => ({
   useSeedStore: () => ({
+    facilities: seedFacilities,
     facilityName: (facilityId: string) => RAILS_UAT.facilities[facilityId]?.name ?? facilityId,
     statusDescription: (statusId: string) => statusId,
     describe: (value: string) => value,
@@ -130,6 +133,19 @@ describe('OrderTimeline', () => {
 
   it('says when older facility moves are not shown', () => {
     expect(mountTimeline('158647', { ...idle, facilityChangesTruncated: true }).text()).toContain('Showing the latest 200 facility moves');
+  });
+
+  it('waits for the facility list before reading any move', () => {
+    seedFacilities.ids = [];
+    seedFacilities.status = 'loading';
+    try {
+      const wrapper = mountTimeline('158647');
+      expect(wrapper.find('.skeleton').exists()).toBe(true);
+      expect(wrapper.findAll('.divider')).toHaveLength(0);
+    } finally {
+      seedFacilities.ids = ['100002'];
+      seedFacilities.status = 'loaded';
+    }
   });
 
   it('says there is no history rather than showing placeholder rows', () => {

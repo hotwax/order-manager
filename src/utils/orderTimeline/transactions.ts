@@ -138,6 +138,19 @@ function moveLine(move: OrderEventOf<'move'>, ctx: TimelineContext, released = f
   return facilityLine('{items} to {facility}', items, move.toFacilityId, ctx);
 }
 
+/**
+ * One line per place: moves that land in the same facility (a BROKERED row and an import
+ * assignment, say) read once, with their items together.
+ */
+function moveLines(moves: OrderEventOf<'move'>[], ctx: TimelineContext, released: (group: OrderEventOf<'move'>[]) => boolean = () => false): string[] {
+  const groups = new Map<string, OrderEventOf<'move'>[]>();
+  moves.forEach((move) => {
+    const key = move.move === 'rejected' ? `from|${move.fromFacilityId}` : `${move.move === 'moved' ? move.fromFacilityId : ''}|${move.toFacilityId}`;
+    groups.set(key, [...(groups.get(key) || []), move]);
+  });
+  return [...groups.values()].map((group) => moveLine({ ...group[0], orderItemSeqIds: itemIds(group) }, ctx, released(group)));
+}
+
 const describeReason = (reason: string | undefined, ctx: TimelineContext) => (reason ? ctx.describe(reason) : '');
 
 const isShopifyCancellation = (event: OrderEvent) =>
@@ -230,7 +243,15 @@ function recordTitle(record: OrderEventRecord, event: OrderEvent, ctx: TimelineC
 const recordMove = (record: OrderEventRecord) =>
   moveKind({ changeReasonEnumId: record.type, fromFacilityId: record.fromFacilityId, facilityId: record.facilityId });
 
-function recordView(record: OrderEventRecord, event: OrderEvent, index: number, ctx: TimelineContext): TimelineRecordView {
+/** What a transaction's row already shows, so its records need not repeat it on every line. */
+interface RowFacts {
+  actor: string;
+  reason: string;
+  /** Moves that are how a cancellation happened. */
+  cancelMoves: OrderEvent[];
+}
+
+function recordView(record: OrderEventRecord, event: OrderEvent, index: number, ctx: TimelineContext, row: RowFacts): TimelineRecordView {
   const { translate } = ctx;
   const item = record.orderItemSeqId
     ? ctx.itemLabel(record.orderItemSeqId) || translate('Item {id}', { id: record.orderItemSeqId })
@@ -245,12 +266,12 @@ function recordView(record: OrderEventRecord, event: OrderEvent, index: number, 
 
   return {
     id: `${record.source}-${record.type}-${index}`,
-    title: recordTitle(record, event, ctx),
+    title: row.cancelMoves.includes(event) ? translate('Moved to parking') : recordTitle(record, event, ctx),
     lines: [
       item,
       place,
-      reason,
-      record.userLogin ? translate('By {actor}', { actor: record.userLogin }) : '',
+      reason === row.reason ? '' : reason,
+      record.userLogin && record.userLogin !== row.actor ? translate('By {actor}', { actor: record.userLogin }) : '',
       record.comments || '',
     ].filter(Boolean),
     at: record.at,
@@ -294,12 +315,21 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
 
   const orderCancelled = orderStatus('ORDER_CANCELLED');
   const itemCancels = itemStatuses('ITEM_CANCELLED');
-  const cancelMoves = moves.filter((move) => move.move === 'cancelled');
+
+  // Cancelling items at a facility first moves them into parking: under the Shopify reason for a
+  // Shopify cancellation, under the cancellation's own reason (NO_VARIANCE_LOG, say) otherwise.
+  // That move is how the cancellation happened, not a rejection by the store.
+  const isCancellation = !!orderCancelled || itemCancels.length > 0;
+  const cancelMoves = moves.filter((move) => move.move === 'cancelled'
+    || (isCancellation && move.move === 'rejected' && !!move.toFacilityId && ctx.isVirtualFacility(move.toFacilityId)));
+  const cancelledFrom = [...new Set(cancelMoves.map((move) => move.fromFacilityId)
+    .filter((facilityId): facilityId is string => !!facilityId && !ctx.isVirtualFacility(facilityId)))];
+  const fromFacility = (items: string) => facilityLine('{items} from {facility}', items, cancelledFrom.length === 1 ? cancelledFrom[0] : undefined, ctx);
   const shipped = find('fulfillment', (event) => event.step === 'shipped');
   const completed = orderStatus('ORDER_COMPLETED');
   const completedItems = itemStatuses('ITEM_COMPLETED');
   const brokering = moves.filter((move) => isBrokeringMove(move, ctx.isVirtualFacility));
-  const rejections = moves.filter((move) => move.move === 'rejected');
+  const rejections = moves.filter((move) => move.move === 'rejected' && !cancelMoves.includes(move));
 
   if (orderCancelled) {
     const inShopify = [orderCancelled, ...itemCancels, ...cancelMoves].some(isShopifyCancellation);
@@ -309,7 +339,7 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
       headline: translate(imported
         ? (inShopify ? 'Imported, already cancelled in Shopify' : 'Imported, already cancelled')
         : (inShopify ? 'Order cancelled in Shopify' : 'Order cancelled')),
-      details: ids.length ? [ids.length < ctx.itemTotal && !imported ? remainingPhrase(ids, ctx) : itemsPhrase(ids, ctx)] : [],
+      details: ids.length ? [fromFacility(ids.length < ctx.itemTotal && !imported ? remainingPhrase(ids, ctx) : itemsPhrase(ids, ctx))] : [],
       reason: inShopify ? '' : describeReason(orderCancelled.reason || itemCancels[0]?.reason, ctx),
     };
     consume(orderCancelled, ...itemCancels, ...cancelMoves);
@@ -322,7 +352,7 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
       headline: translate(inShopify
         ? (ids.length === 1 ? 'Item cancelled in Shopify' : 'Items cancelled in Shopify')
         : (ids.length === 1 ? 'Item cancelled' : 'Items cancelled')),
-      details: [itemsPhrase(ids, ctx, ctx.itemTotal)],
+      details: [fromFacility(itemsPhrase(ids, ctx, ctx.itemTotal))],
       reason: inShopify ? '' : describeReason(itemCancels[0].reason, ctx),
     };
     consume(...itemCancels, ...cancelMoves);
@@ -386,7 +416,7 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
     draft = {
       kind: released && !first ? 'released' : 'brokered',
       headline: translate(atImport ? 'Imported and brokered' : first ? 'First brokered' : released ? 'Released' : 'Brokered'),
-      details: brokering.map((move) => moveLine(move, ctx, !!first && !atImport && move.move === 'released')),
+      details: moveLines(brokering, ctx, (group) => !!first && !atImport && group.every((move) => move.move === 'released')),
       foldFamily: first || atImport ? undefined : 'rebroker',
     };
     consume(...brokering);
@@ -395,7 +425,7 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
     draft = {
       kind: 'rejected',
       headline: translate('Rejected'),
-      details: rejections.map((move) => moveLine(move, ctx)),
+      details: moveLines(rejections, ctx),
       reason: [...new Set(rejections.map((move) => move.reasonEnumId).filter(Boolean) as string[])].map(ctx.enumDescription).join(', '),
       foldFamily: 'rebroker',
     };
@@ -407,7 +437,7 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
     draft = {
       kind: parked ? 'parked' : 'moved',
       headline: translate(locationSync ? 'Location changed in Shopify' : parked ? 'Parked' : other.every((move) => move.move === 'allocated') ? 'Allocated' : 'Moved'),
-      details: other.map((move) => moveLine(move, ctx)),
+      details: moveLines(other, ctx),
       reason: other.map((move) => (move.move === 'moved' || move.move === 'assigned') && move.reasonEnumId ? ctx.enumDescription(move.reasonEnumId) : '').filter(Boolean).join(', '),
       foldFamily: locationSync ? 'location' : undefined,
     };
@@ -496,7 +526,7 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
   const dated = events.filter((event) => event.at !== undefined);
   const records = events.flatMap((event) => event.records.map((record) => ({ record, event })))
     .sort((left, right) => (left.record.at ?? Infinity) - (right.record.at ?? Infinity))
-    .map(({ record, event }, index) => recordView(record, event, index, ctx));
+    .map(({ record, event }, index) => recordView(record, event, index, ctx, { actor: actors.length === 1 ? actors[0] : '', reason: draft.reason || '', cancelMoves }));
 
   return {
     id: events.map((event) => event.id).join('+'),

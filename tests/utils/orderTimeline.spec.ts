@@ -32,7 +32,7 @@ describe('groupTransactions on rails-uat orders', () => {
     // 158647 wrote six rows at import: approval, a move into Rejected Item Parking, and the cancellations.
     const [, imported] = transactions('158647');
 
-    expect(imported.details).toEqual(['861B-398E-12130:XL']);
+    expect(imported.details).toEqual(['861B-398E-12130:XL from 2301 E. 51st St.']);
     expect(imported.notes).toEqual([]);
     expect(imported.records.map((record) => record.title)).toEqual(['Created in HotWax', 'Approved', 'Approved', 'Moved to parking', 'Cancelled', 'Cancelled']);
   });
@@ -55,10 +55,11 @@ describe('groupTransactions on rails-uat orders', () => {
       ['Approved', '848C-357C-0027617:XS'],
       ['Assigned', '848C-357C-001001:XS', 'Austin'],
     ]);
-    // A rejection keeps its reason under the title; a release says it all in the title.
+    // A record leaves out the reason and the person its row already shows.
     const [rejected, released] = transactions('123768').find((tx) => tx.kind === 'run')!.children!;
-    expect([rejected.records[0].title, ...rejected.records[0].lines]).toEqual(['Rejected', '201085-124H-5076:M', 'UK Ecomm to Rejected Item Parking', 'No variance', 'By user.2']);
-    expect([released.records[0].title, ...released.records[0].lines]).toEqual(['Released', '201085-124H-5076:M', 'Rejected Item Parking to UK Ecomm', 'By user.2']);
+    expect(rejected).toMatchObject({ reason: 'No variance', actor: 'user.2' });
+    expect([rejected.records[0].title, ...rejected.records[0].lines]).toEqual(['Rejected', '201085-124H-5076:M', 'UK Ecomm to Rejected Item Parking']);
+    expect([released.records[0].title, ...released.records[0].lines]).toEqual(['Released', '201085-124H-5076:M', 'Rejected Item Parking to UK Ecomm']);
   });
 
   it('keeps First brokered, with the facility and the approval that came with it', () => {
@@ -78,7 +79,7 @@ describe('groupTransactions on rails-uat orders', () => {
   });
 
   it('notes that the last item\'s cancellation completed the order', () => {
-    expect(transactions('107038')[3]).toMatchObject({ details: ['546-282D-7977:2'], notes: ['Order completed'] });
+    expect(transactions('107038')[3]).toMatchObject({ details: ['546-282D-7977:2 from 2301 E. 51st St.'], notes: ['Order completed'] });
   });
 
   it('shows a counter sale as sold at the store it was sold in', () => {
@@ -101,6 +102,52 @@ describe('groupTransactions on rails-uat orders', () => {
   it('tells the 11 reference orders in 34 lines', () => {
     const ids = ['158647', '104494', '157579', '101934', '107038', '115548', '161352', '162079', '104821', '123768', '158477'];
     expect(ids.reduce((sum, id) => sum + transactions(id).length, 0)).toBe(34);
+  });
+});
+
+describe('groupTransactions on an operator cancellation', () => {
+  // The shape of rails-uat order 119403: imported with a BROKERED row and an assignment row per
+  // item to the same warehouse, then cancelled by an operator, which first moves each item into
+  // Rejected Item Parking under the cancellation's reason.
+  const T = (seconds: number) => 1_790_000_000_000 + seconds * 1_000;
+  const items = ['01', '02', '03'];
+  const order = {
+    orderId: 'O1', orderDate: T(0), entryDate: T(600),
+    shipGroups: [{ shipGroupSeqId: '00001', facilityId: '100002', items: items.map((orderItemSeqId) => ({ orderItemSeqId, productId: `P${orderItemSeqId}` })) }],
+    statuses: [
+      { statusId: 'ORDER_APPROVED', statusDatetime: T(600.5) },
+      { statusId: 'ORDER_CANCELLED', changeReason: 'NO_VARIANCE_LOG', statusUserLogin: 'ops.user', statusDatetime: T(9000.4) },
+      ...items.map((orderItemSeqId) => ({ orderItemSeqId, statusId: 'ITEM_CANCELLED', changeReason: 'NO_VARIANCE_LOG', statusUserLogin: 'ops.user', statusDatetime: T(9000.2) })),
+    ],
+  };
+  const facilityChanges = items.flatMap((orderItemSeqId) => [
+    { orderItemSeqId, shipGroupSeqId: '00001', changeReasonEnumId: 'BROKERED', fromFacilityId: '_NA_', facilityId: '100002', changeDatetime: T(600.1) },
+    { orderItemSeqId, shipGroupSeqId: '00001', fromFacilityId: '100002', facilityId: '100002', changeDatetime: T(600.3) },
+    { orderItemSeqId, shipGroupSeqId: '00002', changeReasonEnumId: 'NO_VARIANCE_LOG', fromFacilityId: '100002', facilityId: 'REJECTED_ITM_PARKING', changeUserLogin: 'ops.user', changeDatetime: T(9000.1) },
+  ]);
+  const ctx = {
+    ...fixtureContext('158647'),
+    itemTotal: 3,
+    shipGroupOfItem: { '01': '00001', '02': '00001', '03': '00001' },
+    itemLabel: (seqId: string) => `SKU-${seqId}`,
+  };
+  const txs = () => groupTransactions(buildOrderEvents({
+    order, facilityChanges, facilityChangesLoaded: true, unfillable: null, fulfillment: [],
+    returnHeadersById: {}, exchangeChildren: [], isVirtualFacility: fixtureIsVirtual,
+  }), ctx);
+
+  it('says where the items went once, when two rows moved them to the same place', () => {
+    expect(txs()[1]).toMatchObject({ headline: 'Imported and brokered', details: ['3 items to CAN WH - Ponyride'] });
+  });
+
+  it('reads the move into parking as part of the cancellation, not a rejection', () => {
+    const cancelled = txs()[2];
+
+    expect(cancelled).toMatchObject({ headline: 'Order cancelled', details: ['3 items from CAN WH - Ponyride'], notes: [], reason: 'No variance', actor: 'ops.user' });
+    expect(cancelled.records.filter((record) => record.title === 'Moved to parking')).toHaveLength(3);
+    expect(cancelled.records.some((record) => record.title === 'Rejected')).toBe(false);
+    // Every record was by the same person for the same reason, so no record repeats either.
+    expect(cancelled.records.flatMap((record) => record.lines).some((line) => line.includes('ops.user') || line === 'No variance')).toBe(false);
   });
 });
 
