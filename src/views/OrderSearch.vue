@@ -221,6 +221,7 @@ import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import { toSearchOrderRowViewModel } from '@/utils/orderRows';
 import { showToast } from '@/utils';
+import { openModal } from '@/utils/modal';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import Actions from "@/authorization/actions";
 
@@ -328,18 +329,7 @@ async function confirmCancelOrders() {
 }
 
 async function openAddTaskModal() {
-  const orderIds = [...selectedOrderIds.value];
-  const modal = await modalController.create({ component: AddOrderTaskModal });
-  await modal.present();
-  const { data, role } = await modal.onWillDismiss();
-  if (role !== 'confirm' || !data) return;
-  try {
-    await orderDetailStore.bulkCreateOrderTasks(orderIds, data);
-    await showToast(translate('Tasks created successfully.'));
-    exitSelectMode();
-  } catch {
-    await showToast(translate('Failed to create tasks. Please try again.'));
-  }
+  if (await openModal(AddOrderTaskModal, { orderIds: [...selectedOrderIds.value] })) exitSelectMode();
 }
 
 async function openEditShippingMethodModal() {

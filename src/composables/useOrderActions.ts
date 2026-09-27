@@ -2,6 +2,7 @@ import { computed, ref, type Ref } from 'vue';
 import { alertController, modalController } from '@ionic/vue';
 import { api, translate } from '@common';
 import { showToast } from '@/utils';
+import { openModal } from '@/utils/modal';
 import { OrderActionValidator, type FooterActionView, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import { isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
 import { useProductIdentity } from '@/composables/useProductIdentity';
@@ -283,32 +284,8 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     await requestInventoryTransfersForItems(shipGroup, inventoryTransferItemsForShipGroup(shipGroup));
   }
 
-  /** One task per ship group, from what AddOrderTaskModal returns. */
-  const createTasks = (orderId: string, shipGroupSeqIds: string[], task: any) => api({
-    url: 'oms/orders/tasks',
-    method: 'POST',
-    data: shipGroupSeqIds.map((shipGroupSeqId) => ({
-      orderId,
-      shipGroupSeqId,
-      workEffortName: task.workEffortName,
-      workEffortTypeId: task.workEffortTypeId,
-      workEffortPurposeTypeId: task.workEffortPurposeTypeId,
-      description: task.description,
-      statusId: 'TASK_CREATED',
-    })),
-  });
-
   async function openAddTaskModal(shipGroup: EnrichedShipGroup) {
-    const modal = await modalController.create({ component: AddOrderTaskModal });
-    await modal.present();
-    const { data, role } = await modal.onWillDismiss();
-    if (role !== 'confirm' || !data) return;
-    try {
-      await createTasks(order.value!.id, [shipGroup.id], data);
-      await showToast(translate('Tasks created successfully.'));
-    } catch {
-      await showToast(translate('Failed to create tasks. Please try again.'));
-    }
+    await openModal(AddOrderTaskModal, { orderId: order.value!.id, shipGroups: [{ id: shipGroup.id }] });
   }
 
   async function openAddItemModal(shipGroup: EnrichedShipGroup) {
@@ -704,23 +681,15 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     }));
     if (!shipGroups.length) return showToast(translate('This order has no ship groups to add a task to.'));
 
-    const modal = await modalController.create({
-      component: AddOrderTaskModal,
-      componentProps: { shipGroups, title: translate('Create hold task'), defaultWorkEffortPurposeTypeId: 'ORD_HOLD_MANUAL' },
+    const created = await openModal(AddOrderTaskModal, {
+      orderId: currentOrder.id,
+      shipGroups,
+      title: translate('Create hold task'),
+      defaultWorkEffortPurposeTypeId: 'ORD_HOLD_MANUAL',
     });
-    await modal.present();
-    const { data, role } = await modal.onWillDismiss();
-    if (role !== 'confirm' || !data) return;
-
-    const shipGroupSeqIds: string[] = data.shipGroupSeqIds?.length ? data.shipGroupSeqIds : shipGroups.map((shipGroup) => shipGroup.id);
-    try {
-      await createTasks(currentOrder.id, shipGroupSeqIds, data);
-      await showToast(translate('Tasks created successfully.'));
-      selectedSegment.value = 'holds';
-      await reloadHoldTasks();
-    } catch {
-      await showToast(translate('Failed to create tasks. Please try again.'));
-    }
+    if (!created) return;
+    selectedSegment.value = 'holds';
+    await reloadHoldTasks();
   }
 
   return {

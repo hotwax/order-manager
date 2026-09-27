@@ -1,14 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ title || translate('Add task') }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
+  <ModalHeader :title="title || translate('Add task')" />
 
   <ion-content>
     <ion-list>
@@ -77,46 +68,40 @@
       </ion-item>
     </ion-list>
 
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!isValid" :aria-label="translate('Save')" @click="confirm()">
-        <ion-icon :icon="saveOutline" />
-      </ion-fab-button>
-    </ion-fab>
+    <ModalConfirmFab />
   </ion-content>
 </template>
 
 <script setup lang="ts">
 import {
-  IonButton,
-  IonButtons,
   IonContent,
-  IonFab,
-  IonFabButton,
-  IonHeader,
   IonIcon,
   IonInput,
   IonItem,
+  IonLabel,
   IonList,
   IonPopover,
   IonSelect,
   IonSelectOption,
   IonTextarea,
-  IonTitle,
-  IonToolbar,
-  modalController,
 } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
-import { requiredLabel } from '@/utils';
+import ModalConfirmFab from '@/components/common/ModalConfirmFab.vue';
+import ModalHeader from '@/components/common/ModalHeader.vue';
+import { useModalFlow } from '@/composables/useModalFlow';
+import { requiredLabel, showToast } from '@/utils';
+import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
 
 const props = defineProps<{
   // Optional modal title (already localized by the caller); defaults to "Add task".
   title?: string;
-  // When provided, the user can scope the task to one or more ship groups of an
-  // order. Omitted for the generic bulk "Add task" flow, which keeps its old shape.
+  // Tasks go on every ship group of these orders. The bulk "Add task" flow.
+  orderIds?: string[];
+  // Or on this order's ship groups, which the user picks from when there is more than one.
+  orderId?: string;
   shipGroups?: Array<{ id: string; label?: string }>;
   autoGenerateTaskName?: boolean;
   defaultOrderName?: string;
@@ -175,20 +160,33 @@ watch(generatedTaskName, (taskName) => {
   if (!taskNameEdited.value) form.workEffortName = taskName;
 }, { immediate: true });
 
-function dismiss() {
-  modalController.dismiss(null, 'cancel');
-}
-
 function handleTaskNameInput(value: string | null | undefined) {
   taskNameEdited.value = true;
   form.workEffortName = value ?? '';
 }
 
-function confirm() {
-  const payload: Record<string, any> = { ...form };
-  if (props.shipGroups) payload.shipGroupSeqIds = [...selectedShipGroupSeqIds.value];
-  modalController.dismiss(payload, 'confirm');
-}
+// Anything the operator typed or picked. A name the modal generated itself isn't theirs to lose.
+const isDirty = computed(() => (taskNameEdited.value && !!form.workEffortName.trim())
+  || !!form.description.trim()
+  || form.workEffortPurposeTypeId !== (props.defaultWorkEffortPurposeTypeId || '')
+  || selectedShipGroupSeqIds.value.length !== (props.shipGroups?.length ?? 0));
+
+const orderDetailStore = useOrderDetailStore();
+
+useModalFlow({
+  dirty: isDirty,
+  canConfirm: isValid,
+  async confirm() {
+    const task = { ...form };
+    try {
+      if (props.orderId) await orderDetailStore.createOrderTasks(props.orderId, selectedShipGroupSeqIds.value, task);
+      else await orderDetailStore.bulkCreateOrderTasks(props.orderIds ?? [], task);
+    } catch {
+      throw new Error(translate('Failed to create tasks. Please try again.'));
+    }
+    await showToast(translate('Tasks created successfully.'));
+  },
+});
 </script>
 
 <style scoped>
