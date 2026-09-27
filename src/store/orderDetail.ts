@@ -8,6 +8,7 @@ import { useUserStore } from "./user";
 import Actions from "@/authorization/actions";
 import { escapeSolrValue } from "@/services/order";
 import { getReturn } from "@/services/returns";
+import { fetchOrderInventoryTransfers } from "@/services/inventoryTransfers";
 import { enrichOrder, isPosCompletedShipGroup, type ExchangeChild } from "@/utils/orderDetailEnrichment";
 import { timelineMillis } from "@/utils/orderDetailDates";
 import { adjustmentAmount, adjustmentKey, adjustmentLabel } from "@/utils/orderAdjustments";
@@ -333,6 +334,9 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     issuanceStatusByOrderId: {} as Record<string, LoadStatus>,
     exchangeChildrenByOrderId: {} as Record<string, ExchangeChild[]>,
     returnHeadersById: {} as Record<string, any | null>,
+    // Inventory transfers requested for the order's items, by Order Manager, the Transfers app
+    // or the regional broker.
+    inventoryTransfersByOrderId: {} as Record<string, any[]>,
   }),
   getters: {
     /**
@@ -363,6 +367,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
           returnedQtyBySeqId: this.returnedQtyByItemSeqIdByOrderId(orderId),
           exchangeChildren: this.exchangeChildrenByOrderId[orderId] || [],
           returnHeadersById: this.returnHeadersById,
+          inventoryTransfers: this.inventoryTransfersByOrderId[orderId] || [],
         }, { seed: useSeedStore(), productCache: useProductCacheStore() });
       };
     },
@@ -717,6 +722,15 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       }
     },
 
+    async fetchInventoryTransfers(orderId: string) {
+      if (!orderId) return;
+      try {
+        this.inventoryTransfersByOrderId[orderId] = await fetchOrderInventoryTransfers(orderId);
+      } catch (error: any) {
+        logger.error(`Failed to load inventory transfers for [${orderId}]`, error);
+      }
+    },
+
     async fetchShippingMethods() {
       try {
         const resp = await api({ url: 'oms/shippingGateways/carrierShipmentMethods', method: 'GET' });
@@ -879,6 +893,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       if (raw?.riskRecommendationEnumId || raw?.riskLevelEnumId) this.fetchRiskAssessments(orderId);
       this.fetchExchangeChildren(orderId);
       this.fetchReturnHeaders(orderId);
+      this.fetchInventoryTransfers(orderId);
     },
     reset() {
       this.$reset();

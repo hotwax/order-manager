@@ -48,6 +48,7 @@
         :payment-return-ids="paymentReturnIds"
         @reject-and-release="rejectAndReleaseItem"
         @open-item-attributes="openItemAttributesModal"
+        @open-item-transfers="openItemTransfersModal"
       />
 
       <div v-if="selectedSegment === 'ship-groups'" class="ion-padding">
@@ -229,7 +230,7 @@ const {
   inventoryTransferItemsForShipGroup, brokerShipGroup, parkSelectedItems, rejectSelectedItems, releaseSelectedItems,
   requestInventoryTransfersForShipGroup, openAddTaskModal, openAddItemModal, viewInventory, saveCarrierAndMethod,
   shipGroupEditor, setShipGroupEditor, savingShipGroupId, saveShipGroupFields, saveShippingAddress,
-  rejectAndReleaseItem, openItemAttributesModal,
+  rejectAndReleaseItem, openItemAttributesModal, openItemTransfersModal,
   footerActions, runFooterAction, footerActionLabel, openCustomerContactModal, openLocalePrompt, openManageIdentificationsModal,
   openManageAttributesModal, openRiskDetails, openCreateHoldTaskModal, reloadHoldTasks,
 } = useOrderActions({ order, loadOrder, selectedItemIds, selectedShipGroupItems, selectedSegment, canRequestInventoryTransfer });

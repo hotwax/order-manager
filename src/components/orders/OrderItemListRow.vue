@@ -45,6 +45,8 @@
         <ion-icon :icon="businessOutline" />
         <ion-label>{{ facilityLabel }}</ion-label>
       </ion-chip>
+      <!-- Chips about where the item's stock comes from, such as its inventory transfers, sit under the facility. -->
+      <slot name="details" />
       <ion-chip
         v-if="attributesLabel"
         outline

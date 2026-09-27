@@ -85,6 +85,33 @@ export function fetchFacilityOrigin(facilityId: string): Promise<FacilityOrigin>
   return facilityOriginRequests.get(facilityId)!;
 }
 
+const KM_TO_MILES = 0.621371;
+
+/**
+ * Miles from a facility to every other facility in the store index, keyed by facility id, from one
+ * store lookup around the facility. The facility is placed by its postal address, or by its zip when
+ * the address isn't geocoded; without either there are no distances. A facility the index doesn't
+ * know, or knows without a location (Solr's geodist() gives "Infinity"), gets no distance.
+ */
+export async function fetchDistancesFromFacility(facilityId: string): Promise<Record<string, number>> {
+  const origin = await fetchFacilityOrigin(facilityId);
+  const point = origin?.lat !== undefined && origin?.lon !== undefined
+    ? { lat: origin.lat, lon: origin.lon }
+    : (origin?.zip ? (await lookupPostalCoordinates([origin.zip]))[origin.zip] : undefined);
+  if (!point) return {};
+
+  const resp: any = await api({
+    url: 'api/stores',
+    method: 'POST',
+    data: { point: `${point.lat},${point.lon}`, viewSize: 500, fieldsToSelect: ['storeCode', 'dist:geodist()'] }
+  });
+  const docs: any[] = resp?.data?.docs ?? [];
+  return Object.fromEntries(docs
+    .map((doc) => [doc.storeCode, Number(doc.dist)] as const)
+    .filter(([storeCode, km]) => storeCode && Number.isFinite(km))
+    .map(([storeCode, km]) => [storeCode, km * KM_TO_MILES]));
+}
+
 /**
  * Distance (miles) between each BROKERED ship group's origin facility and its ship-to address,
  * keyed by ship group id. Recomputed only when a group's facility or destination changes.

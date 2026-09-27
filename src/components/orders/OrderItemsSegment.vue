@@ -9,7 +9,11 @@
         <template v-for="group in order.groupedItems" :key="group.externalId">
           <!-- Nothing to roll up when the group is a single order item, so the item row is
                rendered directly with the product identity the rolled up header would carry. -->
-          <OrderItemListRow v-if="group.items.length === 1" v-bind="itemRow(group.items[0], productRowProps(group))" />
+          <OrderItemListRow v-if="group.items.length === 1" v-bind="itemRow(group.items[0], productRowProps(group))">
+            <template #details>
+              <OrderItemTransferChip :transfers="group.items[0].transfers" @click="emit('open-item-transfers', group.items[0])" />
+            </template>
+          </OrderItemListRow>
           <ion-accordion v-else :value="group.externalId">
             <OrderItemListRow
               slot="header"
@@ -31,7 +35,11 @@
                   v-for="item in group.items"
                   :key="item.orderItemSeqId"
                   v-bind="itemRow(item, itemIdentity(item))"
-                />
+                >
+                  <template #details>
+                    <OrderItemTransferChip :transfers="item.transfers" @click="emit('open-item-transfers', item)" />
+                  </template>
+                </OrderItemListRow>
               </ion-list>
             </div>
           </ion-accordion>
@@ -117,6 +125,7 @@ import { computed } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonItem, IonItemDivider, IonLabel, IonList } from '@ionic/vue';
 import { commonUtil, translate } from '@common';
 import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
+import OrderItemTransferChip from '@/components/orders/OrderItemTransferChip.vue';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { isKit } from '@/utils';
 import { formatDateTime } from '@/utils/orderDetailDates';
@@ -136,6 +145,7 @@ const emit = defineEmits<{
   'update:selectedItemIds': [ids: Set<string>];
   'reject-and-release': [item: EnrichedOrderItem];
   'open-item-attributes': [item: EnrichedOrderItem];
+  'open-item-transfers': [item: EnrichedOrderItem];
 }>();
 
 const { getProduct, primaryIdentifier, secondaryIdentifier, featureLabel } = useProductIdentity();

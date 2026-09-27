@@ -30,6 +30,28 @@ export interface EnrichedOrderItem {
   adjustments: Array<{ comment: string; amount: number }>;
   /** Only on counter-sale lines, once the issuance rows have loaded. */
   issuance?: ItemIssuance;
+  /** Inventory transfers requested for this item, newest first. */
+  transfers: EnrichedTransfer[];
+}
+
+/** One InventoryTransfer row for an order item, with its names and labels resolved. */
+export interface EnrichedTransfer {
+  id: string;
+  statusId: string;
+  status: string;
+  /** Still waiting to move: requested, scheduled or en route. */
+  isOpen: boolean;
+  fromFacilityId: string;
+  fromFacilityName: string;
+  toFacilityId: string;
+  toFacilityName: string;
+  quantity: number;
+  requestedDate?: number;
+  /** Who asked for it: the regional broker, Order Manager or the Transfers app. */
+  sourceLabel: string;
+  comments: string;
+  /** Why it was cancelled, when it was. */
+  reason: string;
 }
 
 /** Order items rolled up by external id, so a product split across ship groups reads as one row. */
