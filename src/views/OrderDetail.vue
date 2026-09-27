@@ -15,7 +15,7 @@
       <OrderSummaryHeader
         :order="order"
         :events="orderEvents"
-        :event-source-status="eventSourceStatus"
+        :history-status="historyStatus"
         :link-route="timelineRoute"
         :exchange-sources="exchangeSources"
         :can-view-returns="canViewReturns"
@@ -25,7 +25,7 @@
         @open-manage-identifications="openManageIdentificationsModal"
         @open-manage-attributes="openManageAttributesModal"
         @open-risk-details="openRiskDetails"
-        @retry-events="orderDetailStore.retryOrderEventSources(props.orderId)"
+        @retry-history="orderDetailStore.retryOrderHistory(props.orderId)"
       />
 
       <ion-segment v-model="selectedSegment">
@@ -282,7 +282,7 @@ function timelineRoute(link: OrderEventLink): string | undefined {
 }
 
 const orderEvents = computed(() => orderDetailStore.orderEventsByOrderId(props.orderId));
-const eventSourceStatus = computed(() => orderDetailStore.orderEventSourceStatus(props.orderId));
+const historyStatus = computed(() => orderDetailStore.orderHistoryStatus(props.orderId));
 
 // Orders this one was exchanged from (OrderItemAssoc rows of type EXCHANGE, pointing at the
 // original via toOrderId). Distinct, and never the order itself.

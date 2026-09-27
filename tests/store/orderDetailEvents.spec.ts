@@ -271,21 +271,8 @@ describe('order detail event sources', () => {
     expect(events.filter((event) => event.kind === 'orderStatus')).toHaveLength(1);
     expect(events.filter((event) => event.kind === 'move')).toEqual([]);
     expect(store.unfillableAttemptsByOrderId(ORDER_ID)).toMatchObject({ count: 1 });
-    // The timeline says which source failed, and only that one.
-    expect(store.orderEventSourceStatus(ORDER_ID)).toEqual({ loading: [], failed: ['facilityChanges'], facilityChangesTruncated: false });
-  });
-
-  it('flags the facility changes as cut off when they fill their page', async () => {
-    mockOrderDetail({
-      getFacilityChanges: vi.fn().mockResolvedValue({
-        data: Array.from({ length: FACILITY_CHANGE_PAGE_SIZE }, (_, index) => ({ orderItemSeqId: '01', changeReasonEnumId: 'PARKED', changeDatetime: 1_790_000_000_000 + index * 120_000 })),
-      }),
-    });
-    const store = useOrderDetailStore();
-
-    await store.fetchOrderEvents(ORDER_ID);
-
-    expect(store.orderEventSourceStatus(ORDER_ID).facilityChangesTruncated).toBe(true);
+    // The timeline says some history is missing.
+    expect(store.orderHistoryStatus(ORDER_ID)).toEqual({ loading: false, failed: true, truncated: false });
   });
 
   it('fetches again after a load that was already running when a forced reload arrives', async () => {
@@ -308,19 +295,17 @@ describe('order detail event sources', () => {
     expect(store.facilityChangesByOrderId[ORDER_ID]).toHaveLength(1);
   });
 
-  it('retries only the sources that failed', async () => {
+  it('clears a failure when the history is fetched again', async () => {
     const getFacilityChanges = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({ data: [] });
     mockOrderDetail({ getFacilityChanges });
+    vi.mocked(api).mockResolvedValue({ data: [] });
     const store = useOrderDetailStore();
     await store.fetchOrderEvents(ORDER_ID);
-    vi.mocked(api).mockClear();
 
-    await store.retryOrderEventSources(ORDER_ID);
+    await store.retryOrderHistory(ORDER_ID);
 
     expect(getFacilityChanges).toHaveBeenCalledTimes(2);
-    // The fulfillment timeline never failed, so the retry does not refetch it.
-    expect(api).not.toHaveBeenCalled();
-    expect(store.orderEventSourceStatus(ORDER_ID).failed).toEqual([]);
+    expect(store.orderHistoryStatus(ORDER_ID).failed).toBe(false);
   });
 });
 

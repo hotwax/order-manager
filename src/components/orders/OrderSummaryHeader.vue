@@ -11,7 +11,7 @@
       </ion-badge>
     </ion-item>
 
-    <OrderTimeline :order="order" :events="events" :source-status="eventSourceStatus" :link-route="linkRoute" @retry="emit('retry-events')" />
+    <OrderTimeline :order="order" :events="events" :status="historyStatus" :link-route="linkRoute" @retry="emit('retry-history')" />
 
     <div class="order-detail-header-details">
       <ion-card class="customer-summary-card">
@@ -217,7 +217,7 @@ import { commonUtil, translate } from '@common';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import OrderTimeline from '@/components/orders/OrderTimeline.vue';
 import { riskLevelColor } from '@/utils';
-import type { OrderEventSourceStatus } from '@/store/orderDetail';
+import type { OrderHistoryStatus } from '@/store/orderDetail';
 import type { EnrichedOrder } from '@/types/orderDetail';
 import type { OrderEvent, OrderEventLink } from '@/utils/orderEvents';
 
@@ -225,7 +225,7 @@ defineProps<{
   order: EnrichedOrder;
   /** The order's history; the timeline groups it into business transactions. */
   events: OrderEvent[];
-  eventSourceStatus: OrderEventSourceStatus;
+  historyStatus: OrderHistoryStatus;
   /** Where a timeline row links to, resolved against the current route and permissions. */
   linkRoute: (link: OrderEventLink) => string | undefined;
   /** The orders this one was exchanged from, hydrated as they load. */
@@ -240,7 +240,7 @@ const emit = defineEmits<{
   'open-manage-identifications': [];
   'open-manage-attributes': [];
   'open-risk-details': [];
-  'retry-events': [];
+  'retry-history': [];
 }>();
 </script>
 

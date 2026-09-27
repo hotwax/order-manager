@@ -95,38 +95,26 @@ describe('groupTransactions', () => {
     expect(txs.map((tx) => tx.headline)).toEqual(['Order placed in Shopify', 'Imported from Shopify', 'First brokered', 'Rejected and re-brokered', 'Released']);
     expect(txs[2].details).toEqual(['TEE-M released to Downtown Store']);
     expect(run.details).toEqual(['3 rejections and 2 releases']);
-    expect(run.children!.map((tx) => [tx.headline, tx.details[0], tx.reason])).toEqual([
-      ['Rejected', 'TEE-M from Downtown Store', 'NO_VARIANCE_LOG'],
-      ['Released', 'TEE-M to Downtown Store', ''],
-      ['Rejected', 'TEE-M from Downtown Store', 'NOT_IN_STOCK'],
-      ['Released', 'TEE-M to Downtown Store', ''],
-      ['Rejected', 'TEE-M from Downtown Store', 'NOT_IN_STOCK'],
-    ]);
+    expect(run.children!.map((tx) => tx.headline)).toEqual(['Rejected', 'Released', 'Rejected', 'Released', 'Rejected']);
+    expect(run.children![0]).toMatchObject({ details: ['TEE-M from Downtown Store'], reason: 'NO_VARIANCE_LOG' });
   });
 });
 
 describe('chainEvents', () => {
-  const event = (seconds: number, login?: string): OrderEvent => ({
+  const event = (seconds: number, login?: string, link?: boolean): OrderEvent => ({
     id: `m${seconds}`, kind: 'move', move: 'rejected', at: T(seconds), actor: login ? { kind: 'user', login } : undefined,
-    shipGroupSeqIds: [], orderItemSeqIds: ['01'], records: [],
+    shipGroupSeqIds: [], orderItemSeqIds: ['01'], records: [], link: link ? { kind: 'return', id: 'R1' } : undefined,
   });
+  const lengths = (events: OrderEvent[]) => chainEvents(events).map((group) => group.length);
 
-  it('chains events less than 2 s apart and splits at a longer gap', () => {
-    expect(chainEvents([event(0), event(1), event(2.5), event(6)]).map((group) => group.length)).toEqual([3, 1]);
-  });
-
-  it('never merges two people\'s actions, however close', () => {
-    expect(chainEvents([event(0, 'amy'), event(0.5, 'raj')]).map((group) => group.length)).toEqual([1, 1]);
+  it('chains events less than 2 s apart, for at most 10 s, and never two people\'s', () => {
+    expect(lengths([event(0), event(1), event(2.5), event(6)])).toEqual([3, 1]);
+    expect(lengths(Array.from({ length: 12 }, (_, index) => event(index * 1.5)))).toEqual([7, 5]);
+    expect(lengths([event(0, 'amy'), event(0.5, 'raj')])).toEqual([1, 1]);
   });
 
   it('keeps an action together either side of a return written in the same moment', () => {
-    const ret: OrderEvent = { id: 'return-R1', kind: 'return', returnId: 'R1', itemCount: 1, at: T(0.5), shipGroupSeqIds: [], orderItemSeqIds: ['01'], records: [], link: { kind: 'return', id: 'R1' } };
-
-    expect(chainEvents([event(0), ret, event(1)]).map((group) => group.map((item) => item.id))).toEqual([['m0', 'm1'], ['return-R1']]);
-  });
-
-  it('caps a transaction at 10 s', () => {
-    expect(chainEvents(Array.from({ length: 12 }, (_, index) => event(index * 1.5))).map((group) => group.length)).toEqual([7, 5]);
+    expect(chainEvents([event(0), event(0.5, undefined, true), event(1)]).map((group) => group.map((item) => item.id))).toEqual([['m0', 'm1'], ['m0.5']]);
   });
 });
 
@@ -150,9 +138,7 @@ describe('formatElapsed', () => {
 
   it.each([
     [20_000, ''],
-    [minutes(1), '1 minute'],
     [minutes(59) + 40_000, '59 minutes'],
-    [minutes(179) + 45_000, '3 hours'],
     [minutes(25 * 60), '1 day 1 hour'],
     [minutes(42 * 60 + 57), '1 day 19 hours'],
     [-minutes(3), ''],

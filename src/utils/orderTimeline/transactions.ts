@@ -164,39 +164,23 @@ const isLocationSync = (event: OrderEvent) =>
 const isFulfillmentSync = (event: OrderEvent) =>
   event.kind === 'move' && event.move === 'allocated' && event.actor?.kind === 'system' && /fulfil/i.test(event.actor.name);
 
+const ORDER_NOTES: Record<string, string> = { ORDER_APPROVED: 'Approved for fulfillment', ORDER_ACCEPTED: 'Approved for fulfillment', ORDER_COMPLETED: 'Order completed' };
+const STEP_TITLES = { picked: 'Picked', packed: 'Packed', shipped: 'Shipped' } as const;
+
 /** A leftover event, said in a few words under the headline. '' for rows that only restate it. */
 function notePhrase(event: OrderEvent, all: OrderEvent[], ctx: TimelineContext): string {
   const { translate } = ctx;
   switch (event.kind) {
     case 'placed': return translate('Order placed');
     case 'imported': return translate('Imported');
-    case 'orderStatus':
-      if (event.statusId === 'ORDER_APPROVED' || event.statusId === 'ORDER_ACCEPTED') return translate('Approved for fulfillment');
-      if (event.statusId === 'ORDER_COMPLETED') return translate('Order completed');
-      return ctx.statusDescription(event.statusId);
-    case 'itemStatus': {
-      const items = itemsPhrase(event.orderItemSeqIds, ctx);
-      if (event.statusId === 'ITEM_APPROVED') {
-        const routine = all.some((other) => other.kind === 'imported' || (other.kind === 'orderStatus' && other.statusId === 'ORDER_APPROVED'));
-        return routine ? '' : translate('{items} approved', { items });
-      }
-      if (event.statusId === 'ITEM_COMPLETED') {
-        const sold = event.orderItemSeqIds.length > 0 && event.orderItemSeqIds.every((id) => ctx.posShipGroupIds.has(ctx.shipGroupOfItem[id]));
-        return translate(sold ? '{items} sold in store' : '{items} completed', { items });
-      }
-      if (event.statusId === 'ITEM_CANCELLED') return translate('{items} cancelled', { items });
-      if (event.statusId === 'ITEM_CREATED') return translate('{items} added', { items });
-      return `${ctx.statusDescription(event.statusId)}: ${items}`;
-    }
+    case 'orderStatus': return ORDER_NOTES[event.statusId] ? translate(ORDER_NOTES[event.statusId]) : ctx.statusDescription(event.statusId);
+    case 'itemStatus':
+      // Item approvals only restate the order's approval or the import.
+      if (event.statusId === 'ITEM_APPROVED' && all.some((other) => other.kind === 'imported' || (other.kind === 'orderStatus' && other.statusId === 'ORDER_APPROVED'))) return '';
+      return translate('{status}: {items}', { status: ctx.statusDescription(event.statusId), items: itemsPhrase(event.orderItemSeqIds, ctx) });
     case 'move':
-      if (event.move === 'cancelled') return '';
-      if (isBrokeringMove(event, ctx.isVirtualFacility)) return translate('Brokered: {line}', { line: moveLine(event, ctx) });
-      if (event.move === 'rejected') return translate('Rejected: {line}', { line: moveLine(event, ctx) });
-      if (event.move === 'parked') return translate('Parked: {line}', { line: moveLine(event, ctx) });
-      if (event.move === 'assigned') return moveLine(event, ctx);
-      return translate('Moved: {line}', { line: moveLine(event, ctx) });
-    case 'fulfillment':
-      return translate(event.step === 'picked' ? 'Picked' : event.step === 'packed' ? 'Packed' : 'Shipped');
+      return event.move === 'cancelled' ? '' : translate('{status}: {items}', { status: translate(MOVE_RECORD_TITLES[event.move]), items: moveLine(event, ctx) });
+    case 'fulfillment': return translate(STEP_TITLES[event.step]);
     case 'unfillable': return translate('Brokering could not fill');
     default: return '';
   }
@@ -331,36 +315,23 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
   const completedItems = itemStatuses('ITEM_COMPLETED');
   const brokering = moves.filter((move) => isBrokeringMove(move, ctx.isVirtualFacility));
   const rejections = moves.filter((move) => move.move === 'rejected' && !cancelMoves.includes(move));
+  const otherStatus = find('orderStatus', (event) => !['ORDER_APPROVED', 'ORDER_ACCEPTED'].includes(event.statusId))[0];
 
-  if (orderCancelled) {
-    const inShopify = [orderCancelled, ...itemCancels, ...cancelMoves].some(isShopifyCancellation);
+  if (isCancellation) {
+    const inShopify = [orderCancelled, ...itemCancels, ...cancelMoves].some((event) => event && isShopifyCancellation(event));
     const ids = itemIds(itemCancels);
+    const headline = orderCancelled
+      ? (inShopify ? (imported ? 'Imported, already cancelled in Shopify' : 'Order cancelled in Shopify') : 'Order cancelled')
+      : ids.length === 1 ? (inShopify ? 'Item cancelled in Shopify' : 'Item cancelled') : (inShopify ? 'Items cancelled in Shopify' : 'Items cancelled');
+    const items = !orderCancelled ? itemsPhrase(ids, ctx, ctx.itemTotal) : ids.length < ctx.itemTotal && !imported ? remainingPhrase(ids, ctx) : itemsPhrase(ids, ctx);
     draft = {
       kind: 'cancelled',
-      headline: translate(imported
-        ? (inShopify ? 'Imported, already cancelled in Shopify' : 'Imported, already cancelled')
-        : (inShopify ? 'Order cancelled in Shopify' : 'Order cancelled')),
-      details: ids.length ? [fromFacility(ids.length < ctx.itemTotal && !imported ? remainingPhrase(ids, ctx) : itemsPhrase(ids, ctx))] : [],
-      reason: inShopify ? '' : describeReason(orderCancelled.reason || itemCancels[0]?.reason, ctx),
+      headline: translate(headline),
+      details: ids.length ? [fromFacility(items)] : [],
+      reason: inShopify ? '' : describeReason(orderCancelled?.reason || itemCancels[0]?.reason, ctx),
     };
     consume(orderCancelled, ...itemCancels, ...cancelMoves);
-    if (imported) consumeImport();
-  } else if (itemCancels.length) {
-    const inShopify = [...itemCancels, ...cancelMoves].some(isShopifyCancellation);
-    const ids = itemIds(itemCancels);
-    draft = {
-      kind: 'cancelled',
-      headline: translate(inShopify
-        ? (ids.length === 1 ? 'Item cancelled in Shopify' : 'Items cancelled in Shopify')
-        : (ids.length === 1 ? 'Item cancelled' : 'Items cancelled')),
-      details: [fromFacility(itemsPhrase(ids, ctx, ctx.itemTotal))],
-      reason: inShopify ? '' : describeReason(itemCancels[0].reason, ctx),
-    };
-    consume(...itemCancels, ...cancelMoves);
-  } else if (itemStatuses('ITEM_REQ_CANCELATN').length) {
-    const requests = itemStatuses('ITEM_REQ_CANCELATN');
-    draft = { kind: 'cancelled', headline: translate('Cancellation requested'), details: [itemsPhrase(itemIds(requests), ctx, ctx.itemTotal)], reason: describeReason(requests[0].reason, ctx) };
-    consume(...requests);
+    if (orderCancelled && imported) consumeImport();
   } else if (shipped.length) {
     const viaShopify = moves.filter(isFulfillmentSync);
     draft = {
@@ -393,23 +364,19 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
     } else if (placed && !imported) {
       draft = { kind: 'completed', headline: translate(placed.isShopify ? 'Placed and completed in Shopify' : 'Placed and completed'), details: [] };
       consume(placed);
-    } else if (imported) {
-      draft = { kind: 'completed', headline: translate('Imported, already completed'), details: ids.length ? [itemsPhrase(ids, ctx)] : [] };
-      consumeImport();
     } else {
       draft = { kind: 'completed', headline: translate('Order completed'), details: ids.length ? [itemsPhrase(ids, ctx)] : [] };
     }
     consume(completed, ...completedItems);
   } else if (find('fulfillment').length) {
-    const steps = find('fulfillment');
-    const packed = steps.some((event) => event.step === 'packed');
+    const step = find('fulfillment').some((event) => event.step === 'packed') ? 'packed' : 'picked';
+    const steps = find('fulfillment', (event) => event.step === step);
     draft = {
-      kind: packed ? 'packed' : 'picked',
-      headline: translate(packed ? 'Packed' : 'Picked'),
-      details: steps.filter((event) => event.step === (packed ? 'packed' : 'picked'))
-        .map((event) => facilityLine('{items} at {facility}', itemsPhrase(event.orderItemSeqIds, ctx), event.facilityId, ctx)),
+      kind: step,
+      headline: translate(STEP_TITLES[step]),
+      details: steps.map((event) => facilityLine('{items} at {facility}', itemsPhrase(event.orderItemSeqIds, ctx), event.facilityId, ctx)),
     };
-    consume(...steps.filter((event) => event.step === (packed ? 'packed' : 'picked')));
+    consume(...steps);
   } else if (brokering.length) {
     const first = brokering.find((move) => move.isFirst);
     const atImport = !!imported && brokering.some((move) => move.move === 'assigned');
@@ -434,12 +401,10 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
   } else if (moves.some((move) => move.move !== 'cancelled' && !assignedAtImport.includes(move))) {
     const other = moves.filter((move) => move.move !== 'cancelled' && !assignedAtImport.includes(move));
     const locationSync = other.every(isLocationSync);
-    const parked = other.every((move) => move.move === 'parked');
     draft = {
-      kind: parked ? 'parked' : 'moved',
-      headline: translate(locationSync ? 'Location changed in Shopify' : parked ? 'Parked' : other.every((move) => move.move === 'allocated') ? 'Allocated' : 'Moved'),
+      kind: other[0].move === 'parked' ? 'parked' : 'moved',
+      headline: translate(locationSync ? 'Location changed in Shopify' : MOVE_RECORD_TITLES[other[0].move]),
       details: moveLines(other, ctx),
-      reason: other.map((move) => (move.move === 'moved' || move.move === 'assigned') && move.reasonEnumId ? ctx.enumDescription(move.reasonEnumId) : '').filter(Boolean).join(', '),
       foldFamily: locationSync ? 'location' : undefined,
     };
     consume(...other);
@@ -478,8 +443,8 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
       };
     }
     consume(exchange);
-  } else if (find('orderStatus', (event) => !['ORDER_APPROVED', 'ORDER_ACCEPTED'].includes(event.statusId)).length) {
-    const status = find('orderStatus', (event) => !['ORDER_APPROVED', 'ORDER_ACCEPTED'].includes(event.statusId))[0];
+  } else if (otherStatus) {
+    const status = otherStatus;
     draft = { kind: 'status', headline: ctx.statusDescription(status.statusId), details: [], reason: describeReason(status.reason, ctx) };
     consume(status);
   } else if (approved) {
@@ -496,7 +461,6 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
     const ids = itemIds(same);
     const headlines: Record<string, string> = {
       ITEM_CREATED: ids.length === 1 ? 'Item added' : 'Items added',
-      ITEM_APPROVED: ids.length === 1 ? 'Item approved' : 'Items approved',
       ITEM_COMPLETED: ids.length === 1 ? 'Item completed' : 'Items completed',
     };
     draft = {

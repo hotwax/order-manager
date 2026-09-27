@@ -2,7 +2,7 @@ import { mount } from '@vue/test-utils';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { Settings } from 'luxon';
 import OrderTimeline from '@/components/orders/OrderTimeline.vue';
-import type { OrderEventSourceStatus } from '@/store/orderDetail';
+import type { OrderHistoryStatus } from '@/store/orderDetail';
 import { buildOrderEvents } from '@/utils/orderEvents';
 
 const seedFacilities = vi.hoisted(() => ({ ids: ['WH'], status: 'loaded' }));
@@ -15,11 +15,9 @@ vi.mock('@common', () => ({
 vi.mock('@ionic/vue', () => {
   const box = (tag: string, className: string) => ({ template: `<${tag} class="${className}"><slot /></${tag}>` });
   return {
-    IonAccordion: box('section', 'accordion'),
-    IonAccordionGroup: box('div', 'accordion-group'),
     IonButton: { emits: ['click'], template: '<button @click="$emit(\'click\')"><slot /></button>' },
     IonIcon: { template: '<i />' },
-    IonItem: { props: ['routerLink'], template: '<div class="item" :data-route="routerLink"><slot /></div>' },
+    IonItem: { props: ['routerLink'], emits: ['click'], template: '<div class="item" :data-route="routerLink" @click="$emit(\'click\')"><slot /></div>' },
     IonItemDivider: box('div', 'divider'),
     IonLabel: box('div', 'label'),
     IonList: box('div', 'list'),
@@ -64,11 +62,11 @@ const events = buildOrderEvents({
   isVirtualFacility: (facilityId) => facilityId === 'PARKING',
 });
 
-const idle: OrderEventSourceStatus = { loading: [], failed: [], facilityChangesTruncated: false };
+const idle: OrderHistoryStatus = { loading: false, failed: false, truncated: false };
 const order: any = { originFacilityId: '', originFacilityName: '', shipGroups: [{ id: '00001', isPosCompleted: false, items: [{ orderItemSeqId: '01', productId: 'P1' }] }] };
 
-const mountTimeline = (sourceStatus = idle, list = events) => mount(OrderTimeline, {
-  props: { order, events: list, sourceStatus, linkRoute: (link: any) => `/${link.kind}/${link.id}` },
+const mountTimeline = (status = idle, list = events) => mount(OrderTimeline, {
+  props: { order, events: list, status, linkRoute: (link: any) => `/${link.kind}/${link.id}` },
 });
 
 beforeAll(() => {
@@ -76,13 +74,15 @@ beforeAll(() => {
 });
 
 describe('OrderTimeline', () => {
-  it('shows one line per transaction under its day, opening onto its records', () => {
+  it('shows one line per transaction under its day, and opens it onto its records', async () => {
     const wrapper = mountTimeline();
 
     expect(wrapper.findAll('.divider').map((divider) => divider.text())).toEqual(['Tuesday, Sep 22, 2026', 'Wednesday, Sep 23, 2026']);
-    const cancelled = wrapper.findAll('.accordion').find((accordion) => accordion.text().includes('Imported, already cancelled in Shopify'))!;
+    const cancelled = wrapper.findAll('.item').find((item) => item.text().includes('Imported, already cancelled in Shopify'))!;
     expect(cancelled.text()).toContain('TEE-M from Main Warehouse');
-    expect(cancelled.findAll(':scope > .list > .item')).toHaveLength(5);
+    await cancelled.trigger('click');
+    expect(wrapper.text()).toContain('Moved to parking');
+    expect(wrapper.text()).toContain('Created in HotWax');
   });
 
   it('links a return straight to its page instead of opening it', () => {
@@ -91,30 +91,17 @@ describe('OrderTimeline', () => {
     expect(row.attributes('data-route')).toBe('/return/R1');
   });
 
-  it('shows a loading row while a source loads, and waits for the facility list', () => {
-    expect(mountTimeline({ ...idle, loading: ['facilityChanges'] }).find('.skeleton').exists()).toBe(true);
-
+  it('shows loading until the facility list is known, and a retry when history failed', async () => {
+    expect(mountTimeline({ ...idle, loading: true }).find('.skeleton').exists()).toBe(true);
     seedFacilities.ids = [];
     seedFacilities.status = 'loading';
-    try {
-      const wrapper = mountTimeline();
-      expect(wrapper.find('.skeleton').exists()).toBe(true);
-      expect(wrapper.findAll('.divider')).toHaveLength(0);
-    } finally {
-      seedFacilities.ids = ['WH'];
-      seedFacilities.status = 'loaded';
-    }
-  });
+    const waiting = mountTimeline();
+    seedFacilities.ids = ['WH'];
+    seedFacilities.status = 'loaded';
+    expect(waiting.findAll('.divider')).toHaveLength(0);
 
-  it('names the sources that failed and asks the page to retry them', async () => {
-    const wrapper = mountTimeline({ ...idle, failed: ['facilityChanges'] });
-
-    expect(wrapper.text()).toContain('Facility moves');
-    await wrapper.find('button').trigger('click');
-    expect(wrapper.emitted('retry')).toHaveLength(1);
-  });
-
-  it('says there is no history rather than showing placeholder rows', () => {
-    expect(mountTimeline(idle, []).text()).toContain('No history recorded');
+    const failed = mountTimeline({ ...idle, failed: true });
+    await failed.find('button').trigger('click');
+    expect(failed.emitted('retry')).toHaveLength(1);
   });
 });

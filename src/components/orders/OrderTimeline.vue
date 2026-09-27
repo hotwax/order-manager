@@ -10,32 +10,28 @@
         <ion-item-divider color="light">
           <ion-label>{{ day.label }}</ion-label>
         </ion-item-divider>
-        <ion-accordion-group :multiple="true">
-          <template v-for="entry in day.entries" :key="entry.id">
-            <ion-accordion v-if="isExpandable(entry)" :value="entry.id">
-              <ion-item slot="header">
-                <OrderTimelineEntry :entry="entry" />
-              </ion-item>
-              <ion-list v-if="entry.children" slot="content" lines="none">
-                <ion-item v-for="child in childEntries(entry)" :key="child.id">
-                  <OrderTimelineEntry :entry="child" />
-                </ion-item>
-              </ion-list>
-              <ion-list v-else slot="content" lines="none">
-                <ion-item v-for="record in entry.records" :key="record.id">
-                  <ion-label>
-                    {{ record.title }}
-                    <p v-for="(line, index) in record.lines" :key="index">{{ line }}</p>
-                  </ion-label>
-                  <ion-note v-if="record.at" slot="end">{{ formatClockWithSeconds(record.at) }}</ion-note>
-                </ion-item>
-              </ion-list>
-            </ion-accordion>
-            <ion-item v-else :router-link="routeOf(entry)" :button="!!routeOf(entry)" :detail="false">
-              <OrderTimelineEntry :entry="entry" />
+        <template v-for="entry in day.entries" :key="entry.id">
+          <ion-item :router-link="routeOf(entry)" :button="!!routeOf(entry) || opens(entry)" :detail="false" @click="toggle(entry)">
+            <ion-icon slot="start" :icon="ICONS[entry.kind]" />
+            <ion-label>
+              <p v-if="entry.elapsed" class="overline">{{ entry.elapsed }}</p>
+              {{ entry.headline }}
+              <p v-for="(line, index) in entryLines(entry)" :key="index">{{ line }}</p>
+            </ion-label>
+            <ion-note slot="end">{{ entry.time }}</ion-note>
+            <ion-icon v-if="opens(entry)" slot="end" :icon="opened.has(entry.id) ? chevronUpOutline : chevronDownOutline" />
+          </ion-item>
+          <!-- A folded run opens onto its transactions; any other row onto the records behind it. -->
+          <ion-list v-if="opened.has(entry.id)" lines="none">
+            <ion-item v-for="row in openedRows(entry)" :key="row.id">
+              <ion-label>
+                {{ row.title }}
+                <p v-for="(line, index) in row.lines" :key="index">{{ line }}</p>
+              </ion-label>
+              <ion-note slot="end">{{ row.time }}</ion-note>
             </ion-item>
-          </template>
-        </ion-accordion-group>
+          </ion-list>
+        </template>
       </template>
 
       <ion-item v-if="loading" lines="none">
@@ -44,15 +40,12 @@
           <p><ion-skeleton-text animated style="width: 40%" /></p>
         </ion-label>
       </ion-item>
-      <ion-item v-if="sourceStatus.failed.length" lines="none">
+      <ion-item v-if="status.failed" lines="none">
         <ion-icon slot="start" :icon="warningOutline" color="warning" />
-        <ion-label>
-          {{ translate("Some history couldn't load") }}
-          <p>{{ failedSourcesLabel }}</p>
-        </ion-label>
+        <ion-label>{{ translate("Some history couldn't load") }}</ion-label>
         <ion-button slot="end" fill="clear" size="small" @click="emit('retry')">{{ translate('Retry') }}</ion-button>
       </ion-item>
-      <ion-item v-if="sourceStatus.facilityChangesTruncated" lines="none">
+      <ion-item v-if="status.truncated" lines="none">
         <ion-label>
           <p>{{ translate('Showing the latest {count} facility moves', { count: FACILITY_CHANGE_PAGE_SIZE }) }}</p>
         </ion-label>
@@ -65,28 +58,30 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, reactive } from 'vue';
+import { IonButton, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonNote, IonSkeletonText } from '@ionic/vue';
 import {
-  IonAccordion, IonAccordionGroup, IonButton, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonNote, IonSkeletonText,
-} from '@ionic/vue';
-import { timeOutline, warningOutline } from 'ionicons/icons';
+  addCircleOutline, alertCircleOutline, arrowForwardCircleOutline, arrowUndoOutline, cartOutline, checkmarkCircleOutline,
+  checkmarkDoneOutline, chevronDownOutline, chevronUpOutline, closeCircleOutline, cloudDownloadOutline, compassOutline,
+  cubeOutline, mailOutline, navigateOutline, pauseCircleOutline, pulseOutline, repeatOutline, sendOutline, storefrontOutline,
+  swapHorizontalOutline, timeOutline, warningOutline,
+} from 'ionicons/icons';
 import { translate } from '@common';
-import OrderTimelineEntry from '@/components/orders/OrderTimelineEntry.vue';
 import { FACILITY_CHANGE_PAGE_SIZE } from '@/composables/useOrderDetail';
 import { useProductIdentity } from '@/composables/useProductIdentity';
-import { isVirtualFacilityId, useOrderDetailStore, type OrderEventSourceKey, type OrderEventSourceStatus } from '@/store/orderDetail';
+import { isVirtualFacilityId, useOrderDetailStore, type OrderHistoryStatus } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import type { EnrichedOrder } from '@/types/orderDetail';
 import type { OrderEvent, OrderEventLink } from '@/utils/orderEvents';
 import {
   formatClock, formatClockWithSeconds, groupTransactions, timelineDays,
-  type TimelineContext, type TimelineEntry, type TimelineTransaction,
+  type TimelineContext, type TimelineEntry, type TransactionKind,
 } from '@/utils/orderTimeline';
 
 const props = defineProps<{
   order: EnrichedOrder;
   events: OrderEvent[];
-  sourceStatus: OrderEventSourceStatus;
+  status: OrderHistoryStatus;
   /** Where a return or exchange row links to; the view knows the route and the user's permissions. */
   linkRoute: (link: OrderEventLink) => string | undefined;
 }>();
@@ -97,12 +92,13 @@ const seed = useSeedStore();
 const orderDetailStore = useOrderDetailStore();
 const { primaryIdentifier } = useProductIdentity();
 
-const SOURCE_LABELS: Record<OrderEventSourceKey, string> = {
-  facilityChanges: 'Facility moves',
-  unfillable: 'Brokering attempts',
-  fulfillment: 'Pick, pack and ship dates',
-  returns: 'Return details',
-  exchanges: 'Exchange orders',
+// The ship-group strip uses the same compass, mail, cube and send icons for its four steps.
+const ICONS: Record<TransactionKind, string> = {
+  placed: cartOutline, imported: cloudDownloadOutline, approved: checkmarkCircleOutline, status: pulseOutline,
+  cancelled: closeCircleOutline, shipped: sendOutline, packed: cubeOutline, picked: mailOutline,
+  completed: checkmarkDoneOutline, sold: storefrontOutline, brokered: compassOutline, released: arrowForwardCircleOutline,
+  rejected: alertCircleOutline, moved: navigateOutline, parked: pauseCircleOutline, unfillable: warningOutline,
+  return: arrowUndoOutline, exchange: swapHorizontalOutline, items: addCircleOutline, run: repeatOutline,
 };
 
 const context = computed<TimelineContext>(() => {
@@ -135,18 +131,37 @@ const context = computed<TimelineContext>(() => {
 // Whether a facility is parking decides how a move reads — the move a cancellation makes into
 // Rejected Item Parking, or a rejection — so the rows wait for the facility list on a cold load.
 const facilitiesReady = computed(() => seed.facilities.ids.length > 0 || ['loaded', 'error'].includes(seed.facilities.status));
-const loading = computed(() => props.sourceStatus.loading.length > 0 || !facilitiesReady.value);
+const loading = computed(() => props.status.loading || !facilitiesReady.value);
 
 const days = computed(() => (facilitiesReady.value ? timelineDays(groupTransactions(props.events, context.value), context.value) : []));
 
-const failedSourcesLabel = computed(() => props.sourceStatus.failed.map((key) => translate(SOURCE_LABELS[key])).join(', '));
-
-const isExpandable = (entry: TimelineEntry) => !entry.link && (!!entry.children?.length || entry.records.length > 1);
-
 const routeOf = (entry: TimelineEntry) => (entry.link ? props.linkRoute(entry.link) : undefined);
+const opens = (entry: TimelineEntry) => !entry.link && (!!entry.children?.length || entry.records.length > 1);
 
-/** A folded run's transactions, each timed on its own. */
-function childEntries(entry: TimelineEntry) {
-  return (entry.children || []).map((child: TimelineTransaction) => ({ ...child, time: child.at ? formatClock(child.at) : '', elapsed: '' }));
+const opened = reactive(new Set<string>());
+function toggle(entry: TimelineEntry) {
+  if (!opens(entry)) return;
+  if (opened.has(entry.id)) opened.delete(entry.id);
+  else opened.add(entry.id);
+}
+
+const entryLines = (entry: TimelineEntry) => [
+  ...entry.details,
+  ...entry.notes,
+  entry.reason,
+  entry.actor ? translate('By {actor}', { actor: entry.actor }) : '',
+  entry.atKind === 'recorded' ? translate('Dated when the return was recorded') : '',
+].filter(Boolean);
+
+function openedRows(entry: TimelineEntry) {
+  if (entry.children) {
+    return entry.children.map((child) => ({
+      id: child.id,
+      title: child.headline,
+      lines: [...child.details, child.reason].filter(Boolean),
+      time: child.at === undefined ? '' : formatClock(child.at),
+    }));
+  }
+  return entry.records.map((record) => ({ ...record, time: record.at === undefined ? '' : formatClockWithSeconds(record.at) }));
 }
 </script>

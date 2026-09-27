@@ -27,16 +27,12 @@ interface OrderEntry {
 
 const HEADER_SEQ_ID = "_NA_";
 
-/** The sources behind an order's history, each loaded and failing on its own. */
-export type OrderEventSourceKey = "facilityChanges" | "unfillable" | "fulfillment" | "returns" | "exchanges";
-
-export interface OrderEventSourceStatus {
-  /** Sources still being fetched. */
-  loading: OrderEventSourceKey[];
-  /** Sources whose last fetch failed. */
-  failed: OrderEventSourceKey[];
+/** Whether the sources behind an order's history are still loading, and whether one failed. */
+export interface OrderHistoryStatus {
+  loading: boolean;
+  failed: boolean;
   /** The facility changes filled their page, so older moves are not shown. */
-  facilityChangesTruncated: boolean;
+  truncated: boolean;
 }
 
 // Loads in flight, by source and order. A forced reload that arrives while one is running waits
@@ -252,7 +248,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     facilityChangesByOrderId: {} as Record<string, any[]>,
     facilityChangesTruncatedByOrderId: {} as Record<string, boolean>,
     unfillableByOrderId: {} as Record<string, UnfillableSummary>,
-    eventSourceStatusByOrderId: {} as Record<string, Partial<Record<OrderEventSourceKey, LoadStatus>>>,
+    historyStatusByOrderId: {} as Record<string, { loading: number; failed: boolean }>,
     // What inventory issuance did to each order item, keyed orderId -> orderItemSeqId.
     // Only loaded for orders that need it.
     issuanceByOrderId: {} as Record<string, Record<string, ItemIssuanceSummary>>,
@@ -351,16 +347,11 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       isVirtualFacility: isVirtualFacilityId,
     }),
 
-    /** Which of the order's history sources are still loading or failed. */
-    orderEventSourceStatus: (state) => (orderId: string): OrderEventSourceStatus => {
-      const statuses = state.eventSourceStatusByOrderId[orderId] || {};
-      const keys = Object.keys(statuses) as OrderEventSourceKey[];
-      return {
-        loading: keys.filter((key) => statuses[key] === "loading"),
-        failed: keys.filter((key) => statuses[key] === "error"),
-        facilityChangesTruncated: !!state.facilityChangesTruncatedByOrderId[orderId],
-      };
-    },
+    orderHistoryStatus: (state) => (orderId: string): OrderHistoryStatus => ({
+      loading: (state.historyStatusByOrderId[orderId]?.loading || 0) > 0,
+      failed: !!state.historyStatusByOrderId[orderId]?.failed,
+      truncated: !!state.facilityChangesTruncatedByOrderId[orderId],
+    }),
 
     /** Count and last date of the UNFILLABLE brokering attempts, or null when there were none. */
     unfillableAttemptsByOrderId: (state) => (orderId: string) =>
@@ -515,25 +506,32 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         entry.error = error?.message || "Failed to load order";
       }
     },
-    setEventSourceStatus(orderId: string, source: OrderEventSourceKey, status: LoadStatus) {
-      this.eventSourceStatusByOrderId[orderId] = { ...(this.eventSourceStatusByOrderId[orderId] || {}), [source]: status };
+    /** Run one of the order's history loads, counting it in the history status. It says whether it worked. */
+    async trackHistory(orderId: string, load: () => Promise<boolean>) {
+      if (!this.historyStatusByOrderId[orderId]) this.historyStatusByOrderId[orderId] = { loading: 0, failed: false };
+      const status = this.historyStatusByOrderId[orderId];
+      status.loading++;
+      try {
+        if (!(await load())) status.failed = true;
+      } finally {
+        status.loading--;
+      }
     },
 
     /** Picked, packed and shipped dates per ship group, from `get#OrderFulfillmentTimeline`. */
     async fetchFulfillmentTimeline(orderId: string, force = false) {
       if (!orderId) return;
-      return singleFlight(`fulfillment:${orderId}`, force, async () => {
-        this.setEventSourceStatus(orderId, "fulfillment", "loading");
+      return singleFlight(`fulfillment:${orderId}`, force, () => this.trackHistory(orderId, async () => {
         try {
           const resp = await api({ url: `oms/orders/${orderId}/fulfillmentTimeline`, method: 'GET' });
           if (commonUtil.hasError(resp)) throw resp.data;
           this.fulfillmentTimelineByOrderId[orderId] = Array.isArray(resp.data) ? resp.data : (resp.data?.timeline ?? resp.data?.docs ?? []);
-          this.setEventSourceStatus(orderId, "fulfillment", "loaded");
+          return true;
         } catch (error: any) {
           logger.error('Failed to load fulfillment timeline', error);
-          this.setEventSourceStatus(orderId, "fulfillment", "error");
+          return false;
         }
-      });
+      }));
     },
 
     /**
@@ -543,29 +541,26 @@ export const useOrderDetailStore = defineStore("orderDetail", {
      */
     async fetchOrderEvents(orderId: string, force = false) {
       if (!orderId) return;
-      const statuses = this.eventSourceStatusByOrderId[orderId] || {};
-      if (!force && statuses.facilityChanges === "loaded" && statuses.unfillable === "loaded") return;
+      if (!force && Array.isArray(this.facilityChangesByOrderId[orderId])) return;
 
-      return singleFlight(`events:${orderId}`, force, async () => {
-        this.setEventSourceStatus(orderId, "facilityChanges", "loading");
-        this.setEventSourceStatus(orderId, "unfillable", "loading");
+      return singleFlight(`events:${orderId}`, force, () => this.trackHistory(orderId, async () => {
         const orderDetail = useOrderDetail();
         const [facilityChanges, unfillable] = await Promise.allSettled([
           orderDetail.getFacilityChanges(orderId),
           orderDetail.getUnfillableAttempts(orderId)
         ]);
 
-        if (facilityChanges.status === "fulfilled" && !commonUtil.hasError(facilityChanges.value)) {
+        const changesLoaded = facilityChanges.status === "fulfilled" && !commonUtil.hasError(facilityChanges.value);
+        const unfillableLoaded = unfillable.status === "fulfilled" && !commonUtil.hasError(unfillable.value);
+        if (changesLoaded) {
           const rows = responseList(facilityChanges.value.data);
           this.facilityChangesByOrderId[orderId] = rows;
           this.facilityChangesTruncatedByOrderId[orderId] = rows.length >= FACILITY_CHANGE_PAGE_SIZE;
-          this.setEventSourceStatus(orderId, "facilityChanges", "loaded");
         } else {
           logger.error(`Failed to load order facility changes for [${orderId}]`, facilityChanges);
-          this.setEventSourceStatus(orderId, "facilityChanges", "error");
         }
 
-        if (unfillable.status === "fulfilled" && !commonUtil.hasError(unfillable.value)) {
+        if (unfillableLoaded) {
           const rows = responseList(unfillable.value.data);
           // rows[0] is the newest, so it dates the last attempt. The count is of runs, not
           // rows, and is a floor when the sample filled its page — X-Total-Count would not
@@ -580,22 +575,21 @@ export const useOrderDetailStore = defineStore("orderDetail", {
           } else {
             delete this.unfillableByOrderId[orderId];
           }
-          this.setEventSourceStatus(orderId, "unfillable", "loaded");
         } else {
           logger.error(`Failed to load unfillable brokering attempts for [${orderId}]`, unfillable);
-          this.setEventSourceStatus(orderId, "unfillable", "error");
         }
-      });
+        return changesLoaded && unfillableLoaded;
+      }));
     },
 
-    /** Fetch again every history source of the order whose last load failed. */
-    async retryOrderEventSources(orderId: string) {
-      const { failed } = this.orderEventSourceStatus(orderId);
+    /** Fetch the order's history again after a load failed. */
+    async retryOrderHistory(orderId: string) {
+      if (this.historyStatusByOrderId[orderId]) this.historyStatusByOrderId[orderId].failed = false;
       await Promise.all([
-        failed.includes("facilityChanges") || failed.includes("unfillable") ? this.fetchOrderEvents(orderId, true) : undefined,
-        failed.includes("fulfillment") ? this.fetchFulfillmentTimeline(orderId, true) : undefined,
-        failed.includes("returns") ? this.fetchReturnHeaders(orderId, true) : undefined,
-        failed.includes("exchanges") ? this.fetchExchangeChildren(orderId, true) : undefined,
+        this.fetchOrderEvents(orderId, true),
+        this.fetchFulfillmentTimeline(orderId, true),
+        this.fetchReturnHeaders(orderId, true),
+        this.fetchExchangeChildren(orderId, true),
       ]);
     },
 
@@ -746,8 +740,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       if (!raw?.orderName) return;
       if (!force && orderId in this.exchangeChildrenByOrderId) return;
 
-      return singleFlight(`exchanges:${orderId}`, force, async () => {
-        this.setEventSourceStatus(orderId, "exchanges", "loading");
+      return singleFlight(`exchanges:${orderId}`, force, () => this.trackHistory(orderId, async () => {
         try {
           const response = await useSolrSearch().runSolrQuery({
             json: {
@@ -782,12 +775,12 @@ export const useOrderDetailStore = defineStore("orderDetail", {
             });
           }));
           this.exchangeChildrenByOrderId[orderId] = children;
-          this.setEventSourceStatus(orderId, "exchanges", "loaded");
+          return true;
         } catch (error) {
           logger.error('Failed to discover exchange orders for timeline', error);
-          this.setEventSourceStatus(orderId, "exchanges", "error");
+          return false;
         }
-      });
+      }));
     },
     /**
      * Return headers carry the return's own date (returnDate) and the facility it was processed at
@@ -801,8 +794,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       const pending = returnIds.filter((returnId) => force ? this.returnHeadersById[returnId] == null : !(returnId in this.returnHeadersById));
       if (!pending.length) return;
 
-      return singleFlight(`returns:${orderId}`, force, async () => {
-        this.setEventSourceStatus(orderId, "returns", "loading");
+      return singleFlight(`returns:${orderId}`, force, () => this.trackHistory(orderId, async () => {
         let failed = false;
         await Promise.all(pending.map(async (returnId) => {
           this.returnHeadersById[returnId] = null;
@@ -814,8 +806,8 @@ export const useOrderDetailStore = defineStore("orderDetail", {
             logger.debug(`Return header ${returnId} unavailable for the timeline`, error);
           }
         }));
-        this.setEventSourceStatus(orderId, "returns", failed ? "error" : "loaded");
-      });
+        return !failed;
+      }));
     },
     /**
      * Load an order and the sources behind its page. Only the order document is awaited; the
@@ -827,6 +819,8 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       await this.fetchOrder(orderId, force);
       const raw = this.orderById(orderId);
 
+      // A forced reload starts the history over, so an earlier failure stops showing.
+      if (force && this.historyStatusByOrderId[orderId]) this.historyStatusByOrderId[orderId].failed = false;
       this.fetchFulfillmentTimeline(orderId, force);
       this.fetchOrderEvents(orderId, force);
       // A counter sale's only remaining question is whether inventory actually left the
