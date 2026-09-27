@@ -1,11 +1,15 @@
 <template>
   <div class="order-items">
     <ion-list lines="none" class="order-items-list">
-      <ion-item v-if="!isTerminal" lines="full" class="order-items-toolbar">
-        <ion-checkbox slot="start" :checked="areAllSelected" :aria-label="translate('Select all')"
+      <!-- Like each item row, only the checkbox selects, so it sits beside the item rather than in
+           it and lines up with the row checkboxes below. -->
+      <div v-if="!isTerminal" class="order-items-toolbar">
+        <ion-checkbox :checked="areAllSelected" :aria-label="translate('Select all')"
           @ionChange="selectItems(allItems, $event.detail.checked)" />
-        <ion-label>{{ translate('Select all') }}</ion-label>
-      </ion-item>
+        <ion-item lines="none">
+          <ion-label>{{ translate('Select all') }}</ion-label>
+        </ion-item>
+      </div>
       <ion-accordion-group>
         <template v-for="group in order.groupedItems" :key="group.externalId">
           <!-- Nothing to roll up when the group is a single order item, so the item row is
@@ -221,7 +225,18 @@ function itemRow(item: EnrichedOrderItem, identity: ReturnType<typeof productRow
 }
 
 .order-items-toolbar {
-  --min-height: 5rem;
+  display: flex;
+  align-items: center;
+  min-height: 5rem;
+}
+
+.order-items-toolbar > ion-checkbox {
+  flex: none;
+  margin-inline-start: var(--spacer-sm);
+}
+
+.order-items-toolbar > ion-item {
+  flex: 1;
 }
 
 .order-items .order-summary {

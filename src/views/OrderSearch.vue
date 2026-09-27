@@ -185,6 +185,7 @@ import {
   IonInfiniteScroll,
   IonInfiniteScrollContent,
   IonInput,
+  IonItem,
   IonLabel,
   IonList,
   IonListHeader,
