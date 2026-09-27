@@ -14,7 +14,9 @@
     <ion-content v-if="order">
       <OrderSummaryHeader
         :order="order"
-        :timeline="orderTimeline"
+        :events="orderEvents"
+        :history-status="historyStatus"
+        :link-route="timelineRoute"
         :exchange-sources="exchangeSources"
         :can-view-returns="canViewReturns"
         :shopify-admin-url="shopifyAdminUrl"
@@ -23,6 +25,7 @@
         @open-manage-identifications="openManageIdentificationsModal"
         @open-manage-attributes="openManageAttributesModal"
         @open-risk-details="openRiskDetails"
+        @retry-history="orderDetailStore.retryOrderHistory(props.orderId)"
       />
 
       <ion-segment v-model="selectedSegment">
@@ -175,7 +178,8 @@ import { useUserStore } from '@/store/user';
 import type { ShipGroupActionId } from '@/utils/OrderActionValidator';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
-import type { EnrichedOrderTimelineEvent, EnrichedPayment } from '@/types/orderDetail';
+import type { EnrichedPayment } from '@/types/orderDetail';
+import type { OrderEventLink } from '@/utils/orderEvents';
 
 const props = defineProps<{
   orderId: string;
@@ -271,14 +275,14 @@ const allHoldTasks = computed(() => [...addressValidationTasks.value, ...swapTas
 /* ── Header: timeline links and exchange lineage ──────────────────────── */
 
 /** Timeline links depend on where the page is mounted and on what the user may open. */
-function timelineRoute(link: EnrichedOrderTimelineEvent['link']): string | undefined {
-  if (!link) return undefined;
+function timelineRoute(link: OrderEventLink): string | undefined {
   if (link.kind === 'return') return canViewReturns.value ? `/returns/${link.id}` : undefined;
   if (link.kind === 'exchangeSource') return `/${router.currentRoute.value.path.split('/')[1] || 'orders'}/${link.id}`;
   return `/orders/${link.id}`;
 }
 
-const orderTimeline = computed(() => (order.value?.timeline || []).map((event) => ({ ...event, route: timelineRoute(event.link) })));
+const orderEvents = computed(() => orderDetailStore.orderEventsByOrderId(props.orderId));
+const historyStatus = computed(() => orderDetailStore.orderHistoryStatus(props.orderId));
 
 // Orders this one was exchanged from (OrderItemAssoc rows of type EXCHANGE, pointing at the
 // original via toOrderId). Distinct, and never the order itself.

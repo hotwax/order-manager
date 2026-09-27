@@ -475,7 +475,9 @@ import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { isKit } from '@/utils';
-import { findTimeDiff, formatDate, formatTime, toDateInputValue } from '@/utils/orderDetailDates';
+import { formatDate, formatTime, toDateInputValue } from '@/utils/orderDetailDates';
+import type { ShipGroupMilestones } from '@/utils/orderEvents';
+import { formatElapsed } from '@/utils/orderTimeline';
 import { OrderActionValidator, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import type { EnrichedShipGroup, ItemIssuance, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 
@@ -527,7 +529,7 @@ const ISSUANCE_LABELS: Record<ItemIssuance['kind'], string> = {
   issued: 'Inventory issued',
 };
 
-const LIFECYCLE_STEPS = [
+const LIFECYCLE_STEPS: Array<{ label: string; field: keyof ShipGroupMilestones; icon: string }> = [
   { label: 'Brokered', field: 'firstBrokeredDate', icon: compassOutline },
   { label: 'Pick', field: 'picklistDate', icon: mailOutline },
   { label: 'Pack', field: 'packedDate', icon: cubeOutline },
@@ -561,9 +563,14 @@ const hasSelectedOptions = computed(() => {
 /**
  * The brokered → pick → pack → ship strip. A completed step's overline shows its age from now
  * for the first one, and the time since the nearest earlier completed step after that, so the
- * strip reads as per-step durations (#350). A step without a date is either still to come
+ * strip reads as per-step durations (#350), worded as the order timeline words them. A step without a date is either still to come
  * ("Pending") or behind us and simply not recorded ("No date").
  */
+function elapsedLater(start: number, end: number) {
+  const duration = formatElapsed(start, end, translate);
+  return duration ? translate('{duration} later', { duration }) : '';
+}
+
 const lifecycleSteps = computed(() => {
   const { lifecycle, isBrokered, isSettled } = props.shipGroup;
   return LIFECYCLE_STEPS.map((step, index) => {
@@ -573,7 +580,7 @@ const lifecycleSteps = computed(() => {
     return {
       ...step,
       date,
-      overline: date ? (previous ? findTimeDiff(previous, date) : commonUtil.getRelativeTime(date)) : '',
+      overline: date ? (previous ? elapsedLater(previous, date) : commonUtil.getRelativeTime(date)) : '',
       note: formatTime(date) || (recorded ? translate('No date') : translate('Pending')),
     };
   });

@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { api, commonUtil, logger, useSolrSearch } from "@common";
-import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail, type IssuanceLine } from "@/composables/useOrderDetail";
+import { FACILITY_CHANGE_PAGE_SIZE, UNFILLABLE_SAMPLE_SIZE, useOrderDetail, type IssuanceLine } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useSeedStore } from "./seed";
 import { useCustomerStore } from "./customer";
@@ -9,8 +9,10 @@ import Actions from "@/authorization/actions";
 import { escapeSolrValue } from "@/services/order";
 import { getReturn } from "@/services/returns";
 import { fetchOrderInventoryTransfers } from "@/services/inventoryTransfers";
-import { enrichOrder, isPosCompletedShipGroup, type ExchangeChild } from "@/utils/orderDetailEnrichment";
+import { enrichOrder, isPosCompletedShipGroup } from "@/utils/orderDetailEnrichment";
 import { timelineMillis } from "@/utils/orderDetailDates";
+import { OrderActionValidator } from "@/utils/OrderActionValidator";
+import { buildOrderEvents, clusterEvents, type ExchangeChild, type OrderEvent, type UnfillableSummary } from "@/utils/orderEvents";
 import { adjustmentAmount, adjustmentKey, adjustmentLabel } from "@/utils/orderAdjustments";
 import type { EnrichedOrder } from "@/types/orderDetail";
 
@@ -24,6 +26,46 @@ interface OrderEntry {
 }
 
 const HEADER_SEQ_ID = "_NA_";
+
+/** Whether the sources behind an order's history are still loading, and whether one failed. */
+export interface OrderHistoryStatus {
+  loading: boolean;
+  failed: boolean;
+  /** The facility changes filled their page, so older moves are not shown. */
+  truncated: boolean;
+}
+
+// Loads in flight, by source and order. A forced reload that arrives while one is running waits
+// for it and then fetches again, so a reload right after an action never returns the stale rows.
+const inFlight = new Map<string, Promise<void>>();
+
+async function singleFlight(key: string, force: boolean, run: () => Promise<void>): Promise<void> {
+  const running = inFlight.get(key);
+  if (running) {
+    if (!force) return running;
+    await running.catch(() => undefined);
+    const next = inFlight.get(key);
+    if (next) return next;
+  }
+  const task = run().finally(() => inFlight.delete(key));
+  inFlight.set(key, task);
+  return task;
+}
+
+// The brokering queue: a ship group waiting to be brokered sits on this facility id.
+const QUEUE_FACILITY_ID = "_NA_";
+
+/** Parking and queue facilities, where an item waits rather than being fulfilled. */
+export function isVirtualFacilityId(facilityId: string): boolean {
+  if (!facilityId || facilityId === QUEUE_FACILITY_ID) return true;
+  const seed = useSeedStore();
+  const facilityTypeId = seed.facility(facilityId)?.facilityTypeId;
+  return OrderActionValidator.isVirtualFacility({
+    facilityId,
+    facilityTypeId,
+    facilityParentTypeId: seed.facilityType(facilityTypeId)?.parentTypeId,
+  });
+}
 
 const newEntry = (): OrderEntry => ({ payload: null, status: "idle", loadedAt: "", error: "" });
 
@@ -102,119 +144,6 @@ function eventMillis(value: any): number {
   return commonUtil.parseDateTimeValue(value)?.toMillis() ?? 0;
 }
 
-// OMS records order events one row per order item, so a single operator action on a
-// three-item ship group writes three rows milliseconds apart. Rows sharing a key
-// within this window are one event; anything further apart is a separate action,
-// even when it repeats an earlier move.
-const EVENT_CLUSTER_MS = 60_000;
-
-interface EventCluster {
-  id: string;
-  value: number;
-  rows: any[];
-}
-
-function clusterEvents(rows: any[], keyOf: (row: any) => string, millisOf: (row: any) => number): EventCluster[] {
-  const clusters: EventCluster[] = [];
-  const openByKey: Record<string, EventCluster> = {};
-
-  rows
-    .map((row) => ({ row, millis: millisOf(row) }))
-    .filter(({ millis }) => millis > 0)
-    .sort((left, right) => left.millis - right.millis)
-    .forEach(({ row, millis }) => {
-      const key = keyOf(row);
-      const open = openByKey[key];
-      if (open && millis - open.value <= EVENT_CLUSTER_MS) {
-        open.rows.push(row);
-        return;
-      }
-      const cluster: EventCluster = { id: `${key}|${millis}`, value: millis, rows: [row] };
-      openByKey[key] = cluster;
-      clusters.push(cluster);
-    });
-
-  return clusters;
-}
-
-/** Distinct order items touched by a cluster; falls back to the row count for header-scoped rows. */
-function clusterItemCount(cluster: EventCluster): number {
-  const itemSeqIds = new Set(cluster.rows.map((row: any) => row.orderItemSeqId).filter(Boolean));
-  return itemSeqIds.size || cluster.rows.length;
-}
-
-export interface FacilityChangeEvent {
-  id: string;
-  changeReasonEnumId: string;
-  fromFacilityId: string;
-  facilityId: string;
-  changeUserLogin: string;
-  comments: string;
-  routingRuleId: string;
-  itemCount: number;
-  value: number;
-}
-
-/**
- * Collapse OrderFacilityChange rows into one event per operation — "3 items
- * released to Broadway" rather than three separate lines.
- */
-function clusterFacilityChanges(rows: any[]): FacilityChangeEvent[] {
-  return clusterEvents(
-    rows,
-    (row) => [row.changeReasonEnumId || "", row.fromFacilityId || "", row.facilityId || ""].join("|"),
-    (row) => eventMillis(row.changeDatetime)
-  ).map((cluster) => {
-    const first = cluster.rows[0];
-    // Actor and comment are per row; system-written rows leave both null, so take
-    // whichever row in the cluster carried one.
-    return {
-      id: cluster.id,
-      changeReasonEnumId: first.changeReasonEnumId || "",
-      fromFacilityId: first.fromFacilityId || "",
-      facilityId: first.facilityId || "",
-      changeUserLogin: cluster.rows.find((row: any) => row.changeUserLogin)?.changeUserLogin || "",
-      comments: cluster.rows.find((row: any) => row.comments)?.comments || "",
-      routingRuleId: first.routingRuleId || "",
-      itemCount: clusterItemCount(cluster),
-      value: cluster.value
-    };
-  });
-}
-
-// Item statuses worth a header-timeline entry. ITEM_CREATED/ITEM_APPROVED and the
-// pending-fulfillment steps only restate what the header status rows and the ship
-// group timeline already show.
-const TIMELINE_ITEM_STATUSES = new Set(["ITEM_CANCELLED", "ITEM_REJECTED", "ITEM_REQ_CANCELATN"]);
-
-export interface ItemStatusEvent {
-  id: string;
-  statusId: string;
-  changeReason: string;
-  statusUserLogin: string;
-  itemCount: number;
-  value: number;
-}
-
-/** Collapse item cancel/reject status rows into one event per action. */
-function clusterItemStatuses(rows: any[]): ItemStatusEvent[] {
-  return clusterEvents(
-    rows.filter((row: any) => TIMELINE_ITEM_STATUSES.has(row.statusId)),
-    (row) => `${row.statusId}|${row.changeReason || ""}`,
-    (row) => eventMillis(row.statusDatetime)
-  ).map((cluster) => {
-    const first = cluster.rows[0];
-    return {
-      id: cluster.id,
-      statusId: first.statusId || "",
-      changeReason: first.changeReason || "",
-      statusUserLogin: cluster.rows.find((row: any) => row.statusUserLogin)?.statusUserLogin || "",
-      itemCount: clusterItemCount(cluster),
-      value: cluster.value
-    };
-  });
-}
-
 export interface ItemIssuanceSummary {
   /** Units taken off the books for this order item. */
   issued: number;
@@ -266,14 +195,6 @@ function summariseIssuance(rows: any[]): Record<string, ItemIssuanceSummary> {
   return summary;
 }
 
-export interface UnfillableSummary {
-  /** Brokering runs that failed, not rows: one run writes a row per unfillable item. */
-  count: number;
-  /** True when `count` is a floor — the sample filled its page, so older runs are unseen. */
-  atLeast: boolean;
-  lastAttemptDate: string;
-}
-
 /**
  * Count failed brokering attempts from UNFILLABLE rows.
  *
@@ -322,12 +243,12 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     shippingMethods: [] as any[],
     carrierParties: [] as any[],
     fulfillmentTimelineByOrderId: {} as Record<string, any[]>,
-    // Order event sources behind the header timeline. OrderStatus and
-    // OrderFacilityChange are the only places OMS records who changed what and why;
-    // the order master-detail document carries neither.
+    // Order event sources behind the timeline. OrderStatus rows arrive on the order document;
+    // OrderFacilityChange rows are the only other place OMS records who moved what and why.
     facilityChangesByOrderId: {} as Record<string, any[]>,
+    facilityChangesTruncatedByOrderId: {} as Record<string, boolean>,
     unfillableByOrderId: {} as Record<string, UnfillableSummary>,
-    orderEventsStatusByOrderId: {} as Record<string, LoadStatus>,
+    historyStatusByOrderId: {} as Record<string, { loading: number; failed: boolean }>,
     // What inventory issuance did to each order item, keyed orderId -> orderItemSeqId.
     // Only loaded for orders that need it.
     issuanceByOrderId: {} as Record<string, Record<string, ItemIssuanceSummary>>,
@@ -341,7 +262,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
   getters: {
     /**
      * The order page's view model: the raw order document joined with the loaded auxiliary
-     * sources (events, fulfillment timeline, issuance, risk, returns, exchanges) and the seed,
+     * sources (order events, issuance, risk, returns, transfers) and the seed,
      * product and customer caches. See utils/orderDetailEnrichment.
      */
     enrichedOrderByOrderId(): (orderId: string) => EnrichedOrder | null {
@@ -355,18 +276,10 @@ export const useOrderDetailStore = defineStore("orderDetail", {
           customerPartyId,
           customerName: this.customerNameByOrderId(orderId),
           customerProfile: customerPartyId ? useCustomerStore().getCustomer(customerPartyId) : null,
-          headerStatuses: this.headerStatusesByOrderId(orderId),
-          itemStatusEvents: this.itemStatusEventsByOrderId(orderId),
-          facilityChangeEvents: this.facilityChangeEventsByOrderId(orderId),
-          facilityChangeRows: this.facilityChangesByOrderId[orderId] || [],
-          unfillable: this.unfillableAttemptsByOrderId(orderId),
-          fulfillmentTimeline: this.fulfillmentTimelineByOrderId[orderId] || [],
-          timelineByShipGroup: this.timelineByShipGroupByOrderId(orderId),
+          events: this.orderEventsByOrderId(orderId),
           issuanceByItem: this.issuanceByItemSeqIdByOrderId(orderId),
           riskAssessments: this.riskAssessmentsForOrder(orderId),
           returnedQtyBySeqId: this.returnedQtyByItemSeqIdByOrderId(orderId),
-          exchangeChildren: this.exchangeChildrenByOrderId[orderId] || [],
-          returnHeadersById: this.returnHeadersById,
           inventoryTransfers: this.inventoryTransfersByOrderId[orderId] || [],
         }, { seed: useSeedStore(), productCache: useProductCacheStore() });
       };
@@ -418,38 +331,27 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     },
 
     /**
-     * Every OrderStatus row for the order, newest first — header and item level, with
-     * statusDatetime, statusUserLogin and changeReason.
-     *
-     * These come from the order document itself: the OrderHeader `default` master
-     * declares `<detail relationship="statuses"/>` with no field restriction, so the
-     * rows arrive complete. Verified against rails-uat — identical to what
-     * `GET oms/orders/{id}/status` returns, so there is nothing to fetch separately.
+     * The order's history as typed events, oldest first: the OrderStatus rows on the order
+     * document plus the facility changes, unfillable attempts, fulfillment dates, returns and
+     * exchanges loaded beside it. See utils/orderEvents.
      */
-    statusHistoryByOrderId: (state) => (orderId: string) =>
-      (state.byOrderId[orderId]?.payload?.statuses || [])
-        .slice()
-        .sort((left: any, right: any) => eventMillis(right.statusDatetime) - eventMillis(left.statusDatetime)),
+    orderEventsByOrderId: (state) => (orderId: string): OrderEvent[] => buildOrderEvents({
+      order: state.byOrderId[orderId]?.payload || null,
+      facilityChanges: state.facilityChangesByOrderId[orderId] || [],
+      facilityChangesLoaded: Array.isArray(state.facilityChangesByOrderId[orderId]),
+      facilityChangesTruncated: !!state.facilityChangesTruncatedByOrderId[orderId],
+      unfillable: state.unfillableByOrderId[orderId] || null,
+      fulfillment: state.fulfillmentTimelineByOrderId[orderId] || [],
+      returnHeadersById: state.returnHeadersById,
+      exchangeChildren: state.exchangeChildrenByOrderId[orderId] || [],
+      isVirtualFacility: isVirtualFacilityId,
+    }),
 
-    headerStatusesByOrderId(): (orderId: string) => any[] {
-      return (orderId: string) => this.statusHistoryByOrderId(orderId)
-        .filter((status: any) => (status.orderItemSeqId || HEADER_SEQ_ID) === HEADER_SEQ_ID);
-    },
-
-    /** Item-scoped status rows — the per-item cancel/reject history the header rows never show. */
-    itemStatusesByOrderId(): (orderId: string) => any[] {
-      return (orderId: string) => this.statusHistoryByOrderId(orderId)
-        .filter((status: any) => (status.orderItemSeqId || HEADER_SEQ_ID) !== HEADER_SEQ_ID);
-    },
-
-    /** Item cancel/reject status rows collapsed to one event per action, oldest first. */
-    itemStatusEventsByOrderId(): (orderId: string) => ItemStatusEvent[] {
-      return (orderId: string) => clusterItemStatuses(this.itemStatusesByOrderId(orderId));
-    },
-
-    /** OrderFacilityChange rows collapsed to one event per operation, oldest first. */
-    facilityChangeEventsByOrderId: (state) => (orderId: string) =>
-      clusterFacilityChanges(state.facilityChangesByOrderId[orderId] || []),
+    orderHistoryStatus: (state) => (orderId: string): OrderHistoryStatus => ({
+      loading: (state.historyStatusByOrderId[orderId]?.loading || 0) > 0,
+      failed: !!state.historyStatusByOrderId[orderId]?.failed,
+      truncated: !!state.facilityChangesTruncatedByOrderId[orderId],
+    }),
 
     /** Count and last date of the UNFILLABLE brokering attempts, or null when there were none. */
     unfillableAttemptsByOrderId: (state) => (orderId: string) =>
@@ -484,15 +386,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
           facilityId: shipGroup.facilityId
         }))
       );
-    },
-
-    timelineByShipGroupByOrderId: (state) => (orderId: string) => {
-      const index: Record<string, any> = {};
-      const timeline = state.fulfillmentTimelineByOrderId[orderId] || [];
-      timeline.forEach((entry: any) => {
-        if (entry.shipGroupSeqId) index[entry.shipGroupSeqId] = entry;
-      });
-      return index;
     },
 
     /** Maps orderItemSeqId to its orderItemExternalId. */
@@ -613,64 +506,91 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         entry.error = error?.message || "Failed to load order";
       }
     },
-    async fetchFulfillmentTimeline(orderId: string) {
-      if (!orderId) return;
+    /** Run one of the order's history loads, counting it in the history status. It says whether it worked. */
+    async trackHistory(orderId: string, load: () => Promise<boolean>) {
+      if (!this.historyStatusByOrderId[orderId]) this.historyStatusByOrderId[orderId] = { loading: 0, failed: false };
+      const status = this.historyStatusByOrderId[orderId];
+      status.loading++;
       try {
-        const resp = await api({ url: `oms/orders/${orderId}/fulfillmentTimeline`, method: 'GET' });
-        if (commonUtil.hasError(resp)) throw resp.data;
-        const docs = Array.isArray(resp.data) ? resp.data : (resp.data?.timeline ?? resp.data?.docs ?? []);
-        this.fulfillmentTimelineByOrderId[orderId] = docs;
-      } catch (error: any) {
-        logger.error('Failed to load fulfillment timeline', error);
+        if (!(await load())) status.failed = true;
+      } finally {
+        status.loading--;
       }
     },
 
+    /** Picked, packed and shipped dates per ship group, from `get#OrderFulfillmentTimeline`. */
+    async fetchFulfillmentTimeline(orderId: string, force = false) {
+      if (!orderId) return;
+      return singleFlight(`fulfillment:${orderId}`, force, () => this.trackHistory(orderId, async () => {
+        try {
+          const resp = await api({ url: `oms/orders/${orderId}/fulfillmentTimeline`, method: 'GET' });
+          if (commonUtil.hasError(resp)) throw resp.data;
+          this.fulfillmentTimelineByOrderId[orderId] = Array.isArray(resp.data) ? resp.data : (resp.data?.timeline ?? resp.data?.docs ?? []);
+          return true;
+        } catch (error: any) {
+          logger.error('Failed to load fulfillment timeline', error);
+          return false;
+        }
+      }));
+    },
+
     /**
-     * Load the order's event history: OrderStatus rows, OrderFacilityChange rows,
-     * and the UNFILLABLE attempt summary. Each call is settled independently so a
-     * failure in one source only costs the timeline that source's entries.
+     * Load the order's facility changes and the UNFILLABLE attempt summary. Each call is settled
+     * independently, so a failure in one source only costs the timeline that source's entries.
+     * OrderStatus rows are not fetched here — they arrive complete on the order document.
      */
     async fetchOrderEvents(orderId: string, force = false) {
       if (!orderId) return;
-      if (this.orderEventsStatusByOrderId[orderId] === "loaded" && !force) return;
-      if (this.orderEventsStatusByOrderId[orderId] === "loading") return;
+      if (!force && Array.isArray(this.facilityChangesByOrderId[orderId])) return;
 
-      this.orderEventsStatusByOrderId[orderId] = "loading";
-      const orderDetail = useOrderDetail();
+      return singleFlight(`events:${orderId}`, force, () => this.trackHistory(orderId, async () => {
+        const orderDetail = useOrderDetail();
+        const [facilityChanges, unfillable] = await Promise.allSettled([
+          orderDetail.getFacilityChanges(orderId),
+          orderDetail.getUnfillableAttempts(orderId)
+        ]);
 
-      // OrderStatus rows are not fetched here — they already arrive complete on the
-      // order document. See statusHistoryByOrderId.
-      const [facilityChanges, unfillable] = await Promise.allSettled([
-        orderDetail.getFacilityChanges(orderId),
-        orderDetail.getUnfillableAttempts(orderId)
-      ]);
-
-      if (facilityChanges.status === "fulfilled" && !commonUtil.hasError(facilityChanges.value)) {
-        this.facilityChangesByOrderId[orderId] = responseList(facilityChanges.value.data);
-      } else {
-        logger.error(`Failed to load order facility changes for [${orderId}]`, facilityChanges);
-      }
-
-      if (unfillable.status === "fulfilled" && !commonUtil.hasError(unfillable.value)) {
-        const rows = responseList(unfillable.value.data);
-        // rows[0] is the newest, so it dates the last attempt. The count is of runs, not
-        // rows, and is a floor when the sample filled its page — X-Total-Count would not
-        // help here even when readable, since it counts rows.
-        const count = countUnfillableAttempts(rows);
-        if (count > 0) {
-          this.unfillableByOrderId[orderId] = {
-            count,
-            atLeast: rows.length >= UNFILLABLE_SAMPLE_SIZE,
-            lastAttemptDate: rows[0].changeDatetime
-          };
+        const changesLoaded = facilityChanges.status === "fulfilled" && !commonUtil.hasError(facilityChanges.value);
+        const unfillableLoaded = unfillable.status === "fulfilled" && !commonUtil.hasError(unfillable.value);
+        if (changesLoaded) {
+          const rows = responseList(facilityChanges.value.data);
+          this.facilityChangesByOrderId[orderId] = rows;
+          this.facilityChangesTruncatedByOrderId[orderId] = rows.length >= FACILITY_CHANGE_PAGE_SIZE;
         } else {
-          delete this.unfillableByOrderId[orderId];
+          logger.error(`Failed to load order facility changes for [${orderId}]`, facilityChanges);
         }
-      } else {
-        logger.error(`Failed to load unfillable brokering attempts for [${orderId}]`, unfillable);
-      }
 
-      this.orderEventsStatusByOrderId[orderId] = facilityChanges.status === "fulfilled" ? "loaded" : "error";
+        if (unfillableLoaded) {
+          const rows = responseList(unfillable.value.data);
+          // rows[0] is the newest, so it dates the last attempt. The count is of runs, not
+          // rows, and is a floor when the sample filled its page — X-Total-Count would not
+          // help here even when readable, since it counts rows.
+          const count = countUnfillableAttempts(rows);
+          if (count > 0) {
+            this.unfillableByOrderId[orderId] = {
+              count,
+              atLeast: rows.length >= UNFILLABLE_SAMPLE_SIZE,
+              lastAttemptDate: rows[0].changeDatetime
+            };
+          } else {
+            delete this.unfillableByOrderId[orderId];
+          }
+        } else {
+          logger.error(`Failed to load unfillable brokering attempts for [${orderId}]`, unfillable);
+        }
+        return changesLoaded && unfillableLoaded;
+      }));
+    },
+
+    /** Fetch the order's history again after a load failed. */
+    async retryOrderHistory(orderId: string) {
+      if (this.historyStatusByOrderId[orderId]) this.historyStatusByOrderId[orderId].failed = false;
+      await Promise.all([
+        this.fetchOrderEvents(orderId, true),
+        this.fetchFulfillmentTimeline(orderId, true),
+        this.fetchReturnHeaders(orderId, true),
+        this.fetchExchangeChildren(orderId, true),
+      ]);
     },
 
     /**
@@ -814,68 +734,79 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         )
       );
     },
-    async fetchExchangeChildren(orderId: string) {
+    /** Exchange orders created from this one, found by the `EXC-{orderName}-` name OMS gives them. */
+    async fetchExchangeChildren(orderId: string, force = false) {
       const raw = this.orderById(orderId);
-      if (!raw?.orderName || orderId in this.exchangeChildrenByOrderId) return;
-      this.exchangeChildrenByOrderId[orderId] = [];
+      if (!raw?.orderName) return;
+      if (!force && orderId in this.exchangeChildrenByOrderId) return;
 
-      try {
-        const response = await useSolrSearch().runSolrQuery({
-          json: {
-            params: { rows: 50, q: '*:*' },
-            filter: ['docType: ORDER', `orderName: ${escapeSolrValue(`EXC-${raw.orderName}-`)}*`]
-          }
-        });
-        const candidateIds = [...new Set(
-          (response.data?.response?.docs || [])
-            .map((doc: any) => String(doc.orderId || ''))
-            .filter((candidateId: string) => candidateId && candidateId !== orderId)
-        )] as string[];
-
-        const seedStore = useSeedStore();
-        const children: ExchangeChild[] = [];
-        await Promise.all(candidateIds.map(async (candidateId) => {
-          await this.fetchOrder(candidateId);
-          const payload = this.byOrderId[candidateId]?.payload;
-          const assoc = (payload?.itemAssocs || []).find(
-            (row: any) => row.orderItemAssocTypeId === 'EXCHANGE' && row.toOrderId === orderId
-          );
-          if (!assoc) return;
-
-          const itemCount = (payload.shipGroups || [])
-            .flatMap((shipGroup: any) => shipGroup.items || [])
-            .reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
-          children.push({
-            orderId: candidateId,
-            itemCount,
-            facilityName: payload.originFacilityId && payload.originFacilityId !== '_NA_'
-              ? seedStore.facilityName(payload.originFacilityId)
-              : '',
-            value: timelineMillis(assoc.createdStamp) || timelineMillis(payload.orderDate) || 0
+      return singleFlight(`exchanges:${orderId}`, force, () => this.trackHistory(orderId, async () => {
+        try {
+          const response = await useSolrSearch().runSolrQuery({
+            json: {
+              params: { rows: 50, q: '*:*' },
+              filter: ['docType: ORDER', `orderName: ${escapeSolrValue(`EXC-${raw.orderName}-`)}*`]
+            }
           });
-        }));
-        this.exchangeChildrenByOrderId[orderId] = children;
-      } catch (error) {
-        logger.error('Failed to discover exchange orders for timeline', error);
-      }
+          if (commonUtil.hasError(response)) throw response.data;
+          const candidateIds = [...new Set(
+            (response.data?.response?.docs || [])
+              .map((doc: any) => String(doc.orderId || ''))
+              .filter((candidateId: string) => candidateId && candidateId !== orderId)
+          )] as string[];
+
+          const children: ExchangeChild[] = [];
+          await Promise.all(candidateIds.map(async (candidateId) => {
+            await this.fetchOrder(candidateId);
+            const payload = this.byOrderId[candidateId]?.payload;
+            const assoc = (payload?.itemAssocs || []).find(
+              (row: any) => row.orderItemAssocTypeId === 'EXCHANGE' && row.toOrderId === orderId
+            );
+            if (!assoc) return;
+
+            const itemCount = (payload.shipGroups || [])
+              .flatMap((shipGroup: any) => shipGroup.items || [])
+              .reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+            children.push({
+              orderId: candidateId,
+              itemCount,
+              facilityId: payload.originFacilityId && payload.originFacilityId !== QUEUE_FACILITY_ID ? payload.originFacilityId : '',
+              value: timelineMillis(assoc.createdStamp) || timelineMillis(payload.orderDate) || 0
+            });
+          }));
+          this.exchangeChildrenByOrderId[orderId] = children;
+          return true;
+        } catch (error) {
+          logger.error('Failed to discover exchange orders for timeline', error);
+          return false;
+        }
+      }));
     },
     /**
-     * Return headers name the facility a return was processed at
-     * (ReturnHeader.destinationFacilityId — the embedded ReturnItem rows don't carry it).
-     * null = header unavailable; the timeline wording then drops the location.
+     * Return headers carry the return's own date (returnDate) and the facility it was processed at
+     * (destinationFacilityId); the ReturnItem rows on the order document carry neither. null means
+     * the header could not be loaded, and the timeline falls back to when the return was recorded.
+     * Only users who may open the Returns pages (APP_ORDER_RETURN_VIEW) load them.
      */
-    async fetchReturnHeaders(orderId: string) {
+    async fetchReturnHeaders(orderId: string, force = false) {
       if (!useUserStore().hasPermission(Actions.APP_ORDER_RETURN_VIEW)) return;
       const returnIds = [...new Set((this.orderById(orderId)?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[];
-      await Promise.all(returnIds.map(async (returnId) => {
-        if (returnId in this.returnHeadersById) return;
-        this.returnHeadersById[returnId] = null;
-        try {
-          const header = await getReturn(returnId);
-          if (header) this.returnHeadersById[returnId] = header;
-        } catch (error) {
-          logger.debug(`Return header ${returnId} unavailable for timeline facility context`, error);
-        }
+      const pending = returnIds.filter((returnId) => force ? this.returnHeadersById[returnId] == null : !(returnId in this.returnHeadersById));
+      if (!pending.length) return;
+
+      return singleFlight(`returns:${orderId}`, force, () => this.trackHistory(orderId, async () => {
+        let failed = false;
+        await Promise.all(pending.map(async (returnId) => {
+          this.returnHeadersById[returnId] = null;
+          try {
+            const header = await getReturn(returnId);
+            if (header) this.returnHeadersById[returnId] = header;
+          } catch (error) {
+            failed = true;
+            logger.debug(`Return header ${returnId} unavailable for the timeline`, error);
+          }
+        }));
+        return !failed;
       }));
     },
     /**
@@ -888,7 +819,9 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       await this.fetchOrder(orderId, force);
       const raw = this.orderById(orderId);
 
-      this.fetchFulfillmentTimeline(orderId);
+      // A forced reload starts the history over, so an earlier failure stops showing.
+      if (force && this.historyStatusByOrderId[orderId]) this.historyStatusByOrderId[orderId].failed = false;
+      this.fetchFulfillmentTimeline(orderId, force);
       this.fetchOrderEvents(orderId, force);
       // A counter sale's only remaining question is whether inventory actually left the
       // books, so load the issuance rows for those orders and no others.

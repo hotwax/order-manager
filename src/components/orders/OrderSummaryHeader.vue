@@ -11,43 +11,7 @@
       </ion-badge>
     </ion-item>
 
-    <div class="timeline order-detail-timeline">
-      <ion-item lines="none">
-        <ion-icon slot="start" :icon="timeOutline" />
-        <h2>{{ translate('Timeline') }}</h2>
-      </ion-item>
-
-      <ion-list>
-        <ion-item v-for="event in timeline" :key="event.id" :router-link="event.route" :button="!!event.route" :detail="false">
-          <ion-icon :icon="event.icon" slot="start" />
-          <ion-label>
-            <p v-if="event.timeDiff">{{ event.timeDiff }}</p>
-            {{ translate(event.label) }}
-            <p v-if="event.metaData">{{ event.metaData }}</p>
-          </ion-label>
-          <ion-note slot="end" v-if="event.value">
-            {{ formatDateTime(event.value) }}
-          </ion-note>
-        </ion-item>
-
-        <template v-if="!timeline.length">
-          <ion-item>
-            <ion-icon :icon="pulseOutline" slot="start" />
-            <ion-label>
-              {{ translate('Order status') }}
-              <p>{{ translate('Initial status details') }}</p>
-            </ion-label>
-          </ion-item>
-          <ion-item>
-            <ion-icon :icon="compassOutline" slot="start" />
-            <ion-label>
-              {{ translate('Order facility change') }}
-              <p>{{ translate('Facility details') }}</p>
-            </ion-label>
-          </ion-item>
-        </template>
-      </ion-list>
-    </div>
+    <OrderTimeline :order="order" :events="events" :status="historyStatus" :link-route="linkRoute" @retry="emit('retry-history')" />
 
     <div class="order-detail-header-details">
       <ion-card class="customer-summary-card">
@@ -247,18 +211,23 @@
 </template>
 
 <script setup lang="ts">
-import { IonBadge, IonButton, IonCard, IonCardHeader, IonCardTitle, IonChip, IonIcon, IonItem, IonLabel, IonList, IonNote, IonSkeletonText } from '@ionic/vue';
-import { compassOutline, openOutline, pulseOutline, shieldOutline, ticketOutline, timeOutline } from 'ionicons/icons';
+import { IonBadge, IonButton, IonCard, IonCardHeader, IonCardTitle, IonChip, IonIcon, IonItem, IonLabel, IonList, IonSkeletonText } from '@ionic/vue';
+import { openOutline, shieldOutline, ticketOutline } from 'ionicons/icons';
 import { commonUtil, translate } from '@common';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
+import OrderTimeline from '@/components/orders/OrderTimeline.vue';
 import { riskLevelColor } from '@/utils';
-import { formatDateTime } from '@/utils/orderDetailDates';
-import type { EnrichedOrder, EnrichedOrderTimelineEvent } from '@/types/orderDetail';
+import type { OrderHistoryStatus } from '@/store/orderDetail';
+import type { EnrichedOrder } from '@/types/orderDetail';
+import type { OrderEvent, OrderEventLink } from '@/utils/orderEvents';
 
 defineProps<{
   order: EnrichedOrder;
-  /** Timeline entries with their links resolved against the current route and permissions. */
-  timeline: Array<EnrichedOrderTimelineEvent & { route?: string }>;
+  /** The order's history; the timeline groups it into business transactions. */
+  events: OrderEvent[];
+  historyStatus: OrderHistoryStatus;
+  /** Where a timeline row links to, resolved against the current route and permissions. */
+  linkRoute: (link: OrderEventLink) => string | undefined;
   /** The orders this one was exchanged from, hydrated as they load. */
   exchangeSources: Array<{ orderId: string; loading: boolean; orderName: string; returnIds: string[] }>;
   canViewReturns: boolean;
@@ -271,6 +240,7 @@ const emit = defineEmits<{
   'open-manage-identifications': [];
   'open-manage-attributes': [];
   'open-risk-details': [];
+  'retry-history': [];
 }>();
 </script>
 
@@ -283,11 +253,11 @@ const emit = defineEmits<{
   gap: var(--spacer-xs);
 }
 
+/* One column on phones and tablets, the timeline under the cards; beside them from 900px. */
 .order-detail-header {
   display: grid;
   gap: var(--spacer-base);
-  grid-template-columns: 1fr 357px;
-  grid-template-rows: auto 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .order-detail-header>ion-item {
@@ -308,20 +278,27 @@ const emit = defineEmits<{
 }
 
 .order-detail-timeline {
-  grid-column: 2;
-  grid-row: span 2;
-  border-left: var(--border-medium);
+  grid-row: 3;
+  border-top: var(--border-medium);
 }
 
 @media (min-width: 900px) {
   .order-detail-header {
     align-items: start;
     grid-template-columns: minmax(0, 1fr) minmax(360px, 420px);
+    grid-template-rows: auto 1fr;
   }
 
   .order-detail-header-details {
     align-items: start;
     grid-template-columns: 1fr;
+  }
+
+  .order-detail-timeline {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    border-top: none;
+    border-left: var(--border-medium);
   }
 }
 

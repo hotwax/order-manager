@@ -1,45 +1,25 @@
 import { commonUtil, translate } from '@common';
-import {
-  arrowUndoOutline,
-  checkmarkDoneOutline,
-  closeCircleOutline,
-  compassOutline,
-  downloadOutline,
-  pauseCircleOutline,
-  pulseOutline,
-  storefrontOutline,
-  sunnyOutline,
-  swapHorizontalOutline,
-  warningOutline,
-} from 'ionicons/icons';
 import { summarizeBrokeredFacilities } from '@/services/order';
 import { OrderActionValidator } from './OrderActionValidator';
 import { shipGroupItemStates } from './shipGroupItemStates';
 import { rollUpItemStatuses } from './itemStatusBadges';
 import { sentimentCounts } from './index';
-import { findTimeDiff, timelineMillis } from './orderDetailDates';
+import { timelineMillis } from './orderDetailDates';
+import { shipGroupMilestones, type OrderEvent } from './orderEvents';
 import { adjustmentAmount, adjustmentKey, adjustmentLabel } from './orderAdjustments';
 import type { useSeedStore } from '@/store/seed';
 import type { useProductCacheStore } from '@/store/productCache';
-import type { FacilityChangeEvent, ItemIssuanceSummary, ItemStatusEvent, UnfillableSummary } from '@/store/orderDetail';
+import type { ItemIssuanceSummary } from '@/store/orderDetail';
 import type {
   EnrichedItemGroup,
   EnrichedOrder,
   EnrichedOrderItem,
   EnrichedOrderPayments,
-  EnrichedOrderTimelineEvent,
   EnrichedShipGroup,
   EnrichedShippingAddress,
   EnrichedTransfer,
   ItemIssuance,
 } from '@/types/orderDetail';
-
-export interface ExchangeChild {
-  orderId: string;
-  itemCount: number;
-  facilityName: string;
-  value: number;
-}
 
 /** What the order store has already derived or loaded for the order; see enrichedOrderByOrderId. */
 export interface EnrichmentAuxiliaryData {
@@ -48,20 +28,11 @@ export interface EnrichmentAuxiliaryData {
   customerPartyId: string;
   customerName: string;
   customerProfile: any;
-  /** Header-level OrderStatus rows, newest first. */
-  headerStatuses: any[];
-  itemStatusEvents: ItemStatusEvent[];
-  facilityChangeEvents: FacilityChangeEvent[];
-  /** The raw OrderFacilityChange rows; they carry the shipGroupSeqId the clustered events drop. */
-  facilityChangeRows: any[];
-  unfillable: UnfillableSummary | null;
-  fulfillmentTimeline: any[];
-  timelineByShipGroup: Record<string, any>;
+  /** The order's history as typed events (see utils/orderEvents); ship groups read their milestones here. */
+  events: OrderEvent[];
   issuanceByItem: Record<string, ItemIssuanceSummary> | null;
   riskAssessments: any[];
   returnedQtyBySeqId: Record<string, number>;
-  exchangeChildren: ExchangeChild[];
-  returnHeadersById: Record<string, any | null>;
   /** Raw InventoryTransfer rows for the order's items, newest first. */
   inventoryTransfers: any[];
 }
@@ -73,23 +44,6 @@ export interface EnrichmentStores {
 
 const PAYMENT_COLLECTED_STATUSES = new Set(['PAYMENT_AUTHORIZED', 'PAYMENT_SETTLED', 'PAYMENT_RECEIVED']);
 
-// OrderFacilityChange reasons that describe where items went. Every other reason — the
-// REPORT_VAR/REPORT_NO_VAR rejection reasons, damaged, inventory-not-found — is a rejection,
-// and reads by where the items came from instead.
-const FACILITY_CHANGE_LABELS: Record<string, string> = {
-  BROKERED: 'Brokered',
-  ALLOCATED: 'Allocated',
-  RELEASED: 'Released',
-  PARKED: 'Parked',
-};
-
-const FACILITY_CHANGE_ICONS: Record<string, string> = {
-  BROKERED: compassOutline,
-  ALLOCATED: compassOutline,
-  RELEASED: storefrontOutline,
-  PARKED: pauseCircleOutline,
-};
-
 /**
  * A ship group sold over the counter. OMS treats POS_COMPLETED as needing no fulfillment at all
  * (`requiresFulfillment` in OrderServices get#SalesOrder), so the group has no carrier, no ship-to
@@ -97,11 +51,6 @@ const FACILITY_CHANGE_ICONS: Record<string, string> = {
  */
 export function isPosCompletedShipGroup(shipGroup: any): boolean {
   return shipGroup?.shipmentMethodTypeId === 'POS_COMPLETED';
-}
-
-function earliestMillis(values: any[]): number | undefined {
-  const millis = values.map(timelineMillis).filter((value): value is number => value != undefined);
-  return millis.length ? Math.min(...millis) : undefined;
 }
 
 function itemWord(count: number): string {
@@ -266,7 +215,7 @@ function enrichShipGroup(
   raw: any,
   aux: EnrichmentAuxiliaryData,
   stores: EnrichmentStores,
-  context: { contactMechsById: Record<string, any>; shippingLocation: any; facilityChangeDateByShipGroup: Record<string, number> }
+  context: { contactMechsById: Record<string, any>; shippingLocation: any }
 ): EnrichedShipGroup {
   const { seed, productCache } = stores;
   const facilityTypeId = seed.facility(sg.facilityId)?.facilityTypeId;
@@ -277,21 +226,15 @@ function enrichShipGroup(
   });
   const isPosCompleted = isPosCompletedShipGroup(sg);
   const { total, fulfilled, settled } = shipGroupItemStates(sg.items);
-  const timelineEntry = aux.timelineByShipGroup[sg.shipGroupSeqId];
-
-  // `get#OrderFulfillmentTimeline` dates brokering off rows carrying a BROKERED or RELEASED
-  // reason, which only the routing engine writes; a group allocated at order import has no
-  // date there, so its earliest OrderFacilityChange row dates it instead. On a virtual facility
-  // those rows record parking, rejections and cancellations, none of which is a brokering.
-  const brokeredDate = timelineEntry?.firstBrokeredDate || timelineEntry?.firstReleasedDate
-    || (isVirtual ? undefined : context.facilityChangeDateByShipGroup[sg.shipGroupSeqId]);
-  const isBrokered = !isVirtual || !!brokeredDate;
+  // The same events the timeline shows date this group's brokered → pick → pack → ship steps.
+  const lifecycle = shipGroupMilestones(aux.events, sg.shipGroupSeqId, isVirtual);
+  const isBrokered = !isVirtual || !!lifecycle.firstBrokeredDate;
 
   // Item status wins for a stopped group; the timeline only describes one still in motion.
   let progress = 0;
   if (isPosCompleted) progress = 1;
   else if (settled) progress = fulfilled / total;
-  else progress = [isBrokered, timelineEntry?.picklistDate, timelineEntry?.packedDate, timelineEntry?.shippedDate].filter(Boolean).length * 0.25;
+  else progress = [isBrokered, lifecycle.picklistDate, lifecycle.packedDate, lifecycle.shippedDate].filter(Boolean).length * 0.25;
 
   // Cancelled items are routinely moved to a virtual facility such as REJECTED_ITM_PARKING, so the
   // brokering label comes after the terminal checks or a stopped card would read "Not Brokered".
@@ -349,7 +292,7 @@ function enrichShipGroup(
     progress,
     statusLabel,
     itemSummary: `${rawItems.length} ${itemWord(rawItems.length)}, ${units} ${units === 1 ? translate('unit') : translate('units')}`,
-    lifecycle: { ...(timelineEntry || {}), firstBrokeredDate: brokeredDate },
+    lifecycle,
     shippingAddress: shippingAddress(sg.contactMechId ? context.contactMechsById[sg.contactMechId] : context.shippingLocation, seed),
     carrierPartyId: sg.carrierPartyId,
     shipmentMethodTypeId: sg.shipmentMethodTypeId,
@@ -416,7 +359,7 @@ function groupItems(shipGroups: EnrichedShipGroup[], aux: EnrichmentAuxiliaryDat
   }));
 }
 
-/* ── Payments, attributes, timeline ───────────────────────────────────────── */
+/* ── Payments and attributes ──────────────────────────────────────────────── */
 
 function paymentSummary(raw: any, aux: EnrichmentAuxiliaryData, seed: EnrichmentStores['seed']): EnrichedOrderPayments {
   const list = (raw.paymentPreferences || []).map((payment: any) => ({
@@ -490,165 +433,6 @@ function orderAttributeRows(raw: any) {
     .filter((attribute: any) => attribute.name || attribute.value || attribute.description);
 }
 
-export function buildOrderTimeline(raw: any, aux: EnrichmentAuxiliaryData, seed: EnrichmentStores['seed']): EnrichedOrderTimelineEvent[] {
-  const timeline: EnrichedOrderTimelineEvent[] = [];
-  const usedStatusIds = new Set<string>();
-  const orderDate = timelineMillis(raw.orderDate);
-  const entryDate = timelineMillis(raw.entryDate);
-  const statusDate = (statusIds: string[]) =>
-    earliestMillis(aux.headerStatuses.filter((status: any) => statusIds.includes(status.statusId)).map((status: any) => status.statusDatetime));
-  const fulfillmentDate = (field: string) => earliestMillis(aux.fulfillmentTimeline.map((entry: any) => entry?.[field]));
-  // Every entry after the first measures its age from the order date.
-  const add = (event: EnrichedOrderTimelineEvent) => timeline.push({ ...event, timeDiff: findTimeDiff(orderDate, event.value) });
-
-  if (orderDate) {
-    timeline.push({ id: 'orderDate', label: 'Created in Shopify', value: orderDate, icon: sunnyOutline });
-    usedStatusIds.add('ORDER_CREATED');
-  }
-
-  // Exchange lineage: OrderItemAssoc rows of type EXCHANGE on this order point at the order it
-  // was exchanged from (toOrderId). One entry per distinct source order.
-  const assocs = (raw.itemAssocs || []).filter((assoc: any) =>
-    assoc.orderItemAssocTypeId === 'EXCHANGE' && assoc.toOrderId && assoc.toOrderId !== raw.orderId);
-  [...new Set(assocs.map((assoc: any) => assoc.toOrderId as string))].forEach((toOrderId) => {
-    const assoc = (raw.itemAssocs || []).find((row: any) => row.toOrderId === toOrderId);
-    timeline.push({
-      id: `exchange-${toOrderId}`,
-      label: 'Exchanged from',
-      value: timelineMillis(assoc?.createdStamp) || orderDate,
-      icon: swapHorizontalOutline,
-      metaData: toOrderId as string,
-      link: { kind: 'exchangeSource', id: toOrderId as string },
-    });
-  });
-
-  // Returns raised against this order: one entry per distinct returnId. The processing facility
-  // comes from the lazily loaded return header; the wording drops the location until it lands.
-  const returnGroups: Record<string, { count: number; value: number }> = {};
-  (raw.returnItems || []).forEach((item: any) => {
-    if (!item.returnId) return;
-    const group = returnGroups[item.returnId] ||= { count: 0, value: 0 };
-    group.count += Number(item.returnQuantity || 0) || 1;
-    const created = timelineMillis(item.createdStamp);
-    if (created && (!group.value || created < group.value)) group.value = created;
-  });
-  Object.entries(returnGroups).forEach(([returnId, group]) => {
-    const facilityId = aux.returnHeadersById[returnId]?.destinationFacilityId;
-    const facilityName = facilityId ? seed.facilityName(facilityId) : '';
-    add({
-      id: `return-${returnId}`,
-      label: 'Return created',
-      value: group.value || orderDate,
-      icon: arrowUndoOutline,
-      metaData: facilityName
-        ? `${group.count} ${itemWord(group.count)} ${translate('returned at')} ${facilityName}`
-        : `${group.count} ${itemWord(group.count)} ${translate('returned')}`,
-      link: { kind: 'return', id: returnId },
-    });
-  });
-
-  // Exchange orders created from this order (reverse lineage discovered asynchronously).
-  aux.exchangeChildren.forEach((child) => {
-    add({
-      id: `exchange-child-${child.orderId}`,
-      label: 'Exchange created',
-      value: child.value || orderDate,
-      icon: swapHorizontalOutline,
-      metaData: child.facilityName
-        ? `${child.itemCount} ${itemWord(child.itemCount)} ${translate('purchased in exchange at')} ${child.facilityName}`
-        : `${child.itemCount} ${itemWord(child.itemCount)} ${translate('purchased in exchange')}`,
-      link: { kind: 'exchangeChild', id: child.orderId },
-    });
-  });
-
-  if (entryDate) add({ id: 'entryDate', label: 'Imported from Shopify', value: entryDate, icon: downloadOutline });
-
-  const approvedDate = statusDate(['ORDER_APPROVED', 'ORDER_ACCEPTED']);
-  if (approvedDate) {
-    add({ id: 'approvedDate', label: 'Approved for fulfillment', value: approvedDate, icon: checkmarkDoneOutline });
-    usedStatusIds.add('ORDER_APPROVED');
-    usedStatusIds.add('ORDER_ACCEPTED');
-  }
-
-  const firstBrokeredDate = fulfillmentDate('firstBrokeredDate') ?? fulfillmentDate('firstReleasedDate');
-  if (firstBrokeredDate) add({ id: 'firstBrokeredDate', label: 'First Brokered', value: firstBrokeredDate, icon: checkmarkDoneOutline });
-
-  const completedDate = statusDate(['ORDER_COMPLETED']);
-  if (completedDate) {
-    add({ id: 'completedDate', label: 'Order completed', value: completedDate, icon: pulseOutline });
-    usedStatusIds.add('ORDER_COMPLETED');
-  }
-
-  // Item cancellations and rejections, one entry per action rather than per item.
-  aux.itemStatusEvents.forEach((event) => {
-    add({
-      id: `item-status-${event.id}`,
-      label: seed.statusDescription(event.statusId),
-      value: event.value,
-      icon: closeCircleOutline,
-      metaData: [
-        `${event.itemCount} ${itemWord(event.itemCount)}`,
-        event.changeReason ? seed.describe(event.changeReason) : '',
-        event.statusUserLogin,
-      ].filter(Boolean).join(' - '),
-    });
-  });
-
-  // Brokering, release, park and reject moves. UNFILLABLE is summarised below instead, since a
-  // single order can carry thousands of those rows.
-  aux.facilityChangeEvents.forEach((event) => {
-    const knownMove = FACILITY_CHANGE_LABELS[event.changeReasonEnumId];
-    const isRejection = !knownMove && !!event.changeReasonEnumId;
-    const facilityId = isRejection ? event.fromFacilityId : event.facilityId;
-    const facilityName = facilityId ? seed.facilityName(facilityId) : '';
-    add({
-      id: `facility-change-${event.id}`,
-      label: knownMove || (isRejection ? 'Rejected' : 'Facility changed'),
-      value: event.value,
-      icon: FACILITY_CHANGE_ICONS[event.changeReasonEnumId] || (isRejection ? closeCircleOutline : compassOutline),
-      metaData: [
-        `${event.itemCount} ${itemWord(event.itemCount)}`,
-        facilityName ? `${isRejection ? translate('from') : translate('to')} ${facilityName}` : '',
-        isRejection ? seed.enumDescription(event.changeReasonEnumId) : '',
-        event.changeUserLogin,
-      ].filter(Boolean).join(' - '),
-    });
-  });
-
-  const lastUnfillableDate = timelineMillis(aux.unfillable?.lastAttemptDate);
-  if (aux.unfillable && lastUnfillableDate) {
-    const { count, atLeast } = aux.unfillable;
-    add({
-      id: 'unfillable-attempts',
-      label: 'Brokering could not fill',
-      value: lastUnfillableDate,
-      icon: warningOutline,
-      metaData: `${count}${atLeast ? '+' : ''} ${count === 1 ? translate('attempt') : translate('attempts')}`,
-    });
-  }
-
-  aux.headerStatuses
-    .filter((status: any) => status.statusId && !usedStatusIds.has(status.statusId))
-    .forEach((status: any) => {
-      const value = timelineMillis(status.statusDatetime);
-      if (!value) return;
-      add({
-        id: status.orderStatusId || `${status.statusId}-${status.statusDatetime}`,
-        label: seed.statusDescription(status.statusId),
-        value,
-        icon: pulseOutline,
-        metaData: [status.statusUserLogin, status.changeReason ? seed.describe(status.changeReason) : ''].filter(Boolean).join(' - '),
-      });
-    });
-
-  return timeline.sort((left, right) => {
-    if (left.value === right.value) return 0;
-    if (left.value == undefined) return 1;
-    if (right.value == undefined) return -1;
-    return left.value - right.value;
-  });
-}
-
 /* ── The view model ───────────────────────────────────────────────────────── */
 
 /**
@@ -664,16 +448,8 @@ export function enrichOrder(raw: any, aux: EnrichmentAuxiliaryData, stores: Enri
     if (mech.contactMechPurposeTypeId === 'SHIPPING_LOCATION') shippingLocation = mech;
   });
 
-  const facilityChangeDateByShipGroup: Record<string, number> = {};
-  aux.facilityChangeRows.forEach((change: any) => {
-    const millis = timelineMillis(change?.changeDatetime);
-    if (!change?.shipGroupSeqId || millis == undefined) return;
-    const current = facilityChangeDateByShipGroup[change.shipGroupSeqId];
-    if (current == undefined || millis < current) facilityChangeDateByShipGroup[change.shipGroupSeqId] = millis;
-  });
-
   const shipGroups = (raw.shipGroups || []).map((sg: any) =>
-    enrichShipGroup(sg, raw, aux, stores, { contactMechsById, shippingLocation, facilityChangeDateByShipGroup }));
+    enrichShipGroup(sg, raw, aux, stores, { contactMechsById, shippingLocation }));
 
   const emailContact = findContact(raw, aux.customerProfile, 'EMAIL_ADDRESS', ['ORDER_EMAIL'], ['ORDER_EMAIL', 'PRIMARY_EMAIL']);
   const phoneContact = findContact(raw, aux.customerProfile, 'TELECOM_NUMBER', PHONE_PURPOSES);
@@ -737,6 +513,5 @@ export function enrichOrder(raw: any, aux: EnrichmentAuxiliaryData, stores: Enri
     shipGroups,
     groupedItems: groupItems(shipGroups, aux, seed),
     totals: { subtotal: aux.totals.subtotal, total: aux.totals.total, adjustmentRows },
-    timeline: buildOrderTimeline(raw, aux, seed),
   };
 }

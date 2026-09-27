@@ -357,9 +357,9 @@ describe('order detail store', () => {
     // Totals come from orderTotalsByOrderId, so the page and the store agree on the numbers.
     expect(enriched.totals).toEqual(expect.objectContaining({ subtotal: 59, total: 61.86 }));
     expect(enriched.totals.adjustmentRows).toEqual([{ label: 'Utah State Tax', detail: '', amount: 2.86, isIncluded: false }]);
-    // Item status rows reach the header timeline through itemStatusEventsByOrderId.
-    expect(enriched.timeline.map((event) => event.label)).toContain('ITEM_CANCELLED');
-    // The ship group reads its lifecycle from timelineByShipGroupByOrderId.
+    // Item status rows on the order document reach the timeline as order events.
+    expect(store.orderEventsByOrderId('M100821').filter((event) => event.kind === 'itemStatus').map((event: any) => event.statusId)).toEqual(['ITEM_CANCELLED']);
+    // The ship group reads its lifecycle from the same events.
     expect(enriched.shipGroups[0].lifecycle.picklistDate).toBe(1_700_000_100_000);
     expect(store.enrichedOrderByOrderId('unknown')).toBeNull();
   });

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { enrichOrder, type EnrichmentAuxiliaryData } from '@/utils/orderDetailEnrichment';
+import { buildOrderEvents } from '@/utils/orderEvents';
 
 const T = (minutes: number) => 1_700_000_000_000 + minutes * 60_000;
 
@@ -33,18 +34,10 @@ function aux(overrides: Partial<EnrichmentAuxiliaryData> = {}): EnrichmentAuxili
     customerPartyId: '',
     customerName: '',
     customerProfile: null,
-    headerStatuses: [],
-    itemStatusEvents: [],
-    facilityChangeEvents: [],
-    facilityChangeRows: [],
-    unfillable: null,
-    fulfillmentTimeline: [],
-    timelineByShipGroup: {},
+    events: [],
     issuanceByItem: null,
     riskAssessments: [],
     returnedQtyBySeqId: {},
-    exchangeChildren: [],
-    returnHeadersById: {},
     inventoryTransfers: [],
     ...overrides,
   };
@@ -77,55 +70,34 @@ function rawOrder(overrides: Record<string, any> = {}) {
 describe('enrichOrder', () => {
   beforeEach(() => setActivePinia(createPinia()));
 
-  it('dates a physical group from its earliest facility change when the fulfillment timeline has none', () => {
-    const order = enrichOrder(rawOrder(), aux({
-      facilityChangeRows: [
-        { shipGroupSeqId: '00001', changeDatetime: T(20) },
-        { shipGroupSeqId: '00001', changeDatetime: T(10) },
-        { shipGroupSeqId: '00002', changeDatetime: T(5) },
+  it('dates a physical group from its earliest facility change when it has no brokered row', () => {
+    const raw = rawOrder();
+    const events = buildOrderEvents({
+      order: raw,
+      facilityChanges: [
+        { shipGroupSeqId: '00001', fromFacilityId: 'STORE_A', facilityId: 'STORE_A', changeDatetime: T(20) },
+        { shipGroupSeqId: '00001', changeReasonEnumId: 'ALLOCATED', fromFacilityId: 'PARKING', facilityId: 'STORE_A', changeDatetime: T(10) },
+        { shipGroupSeqId: '00002', changeReasonEnumId: 'PARKED', fromFacilityId: 'STORE_A', facilityId: 'PARKING', changeDatetime: T(5) },
       ],
-    }), stores);
+      facilityChangesLoaded: true,
+      unfillable: null,
+      fulfillment: [{ shipGroupSeqId: '00001', picklistDate: T(30) }],
+      returnHeadersById: {},
+      exchangeChildren: [],
+      isVirtualFacility: (facilityId) => facilityId === 'PARKING',
+    });
+    const order = enrichOrder(raw, aux({ events }), stores);
 
     const [physical, parked] = order.shipGroups;
     expect(physical.lifecycle.firstBrokeredDate).toBe(T(10));
     expect(physical.isBrokered).toBe(true);
+    // Picked is dated, packing and shipping are not: a quarter per step after brokering.
+    expect(physical.lifecycle.picklistDate).toBe(T(30));
+    expect(physical.progress).toBe(0.5);
     // A parked group's facility changes record parking and rejections, never a brokering.
     expect(parked.lifecycle.firstBrokeredDate).toBeUndefined();
     expect(parked.isBrokered).toBe(false);
     expect(parked.statusLabel).toBe('Not Brokered');
-  });
-
-  it('builds the header timeline with item cancellations, first brokered and the earliest approval', () => {
-    const order = enrichOrder(rawOrder(), aux({
-      headerStatuses: [
-        { statusId: 'ORDER_APPROVED', statusDatetime: T(90) },
-        { statusId: 'ORDER_APPROVED', statusDatetime: T(30) },
-      ],
-      itemStatusEvents: [{ id: 'c1', statusId: 'ITEM_CANCELLED', changeReason: 'OOS', statusUserLogin: 'amy', itemCount: 2, value: T(60) }],
-      fulfillmentTimeline: [{ shipGroupSeqId: '00001', firstBrokeredDate: T(50) }, { shipGroupSeqId: '00002', firstBrokeredDate: T(40) }],
-    }), stores);
-
-    const byId = Object.fromEntries(order.timeline.map((event) => [event.id, event]));
-    expect(byId.approvedDate.value).toBe(T(30));
-    expect(byId.firstBrokeredDate).toMatchObject({ label: 'First Brokered', value: T(40) });
-    expect(byId['item-status-c1']).toMatchObject({ label: 'desc:ITEM_CANCELLED', metaData: '2 items - describe:OOS - amy', value: T(60) });
-    // Approved is shown once, not again as a leftover header status.
-    expect(order.timeline.filter((event) => event.label === 'desc:ORDER_APPROVED')).toHaveLength(0);
-    expect(order.timeline.map((event) => event.value)).toEqual([...order.timeline.map((event) => event.value)].sort((a, b) => (a ?? 0) - (b ?? 0)));
-  });
-
-  it('leaves return and exchange links for the view to resolve against route and permissions', () => {
-    const order = enrichOrder(rawOrder({
-      returnItems: [{ returnId: 'R1', returnQuantity: 1, createdStamp: T(100) }],
-      itemAssocs: [{ orderItemAssocTypeId: 'EXCHANGE', toOrderId: 'O0', createdStamp: T(1) }],
-    }), aux({ exchangeChildren: [{ orderId: 'O2', itemCount: 1, facilityName: '', value: T(200) }] }), stores);
-
-    const links = Object.fromEntries(order.timeline.filter((event) => event.link).map((event) => [event.id, event.link]));
-    expect(links).toEqual({
-      'exchange-O0': { kind: 'exchangeSource', id: 'O0' },
-      'return-R1': { kind: 'return', id: 'R1' },
-      'exchange-child-O2': { kind: 'exchangeChild', id: 'O2' },
-    });
   });
 
   it('reports issuance on counter-sale lines only, with a kind the card translates', () => {

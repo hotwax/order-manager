@@ -1,3 +1,4 @@
+import type { ShipGroupMilestones } from '@/utils/orderEvents';
 import type { ItemStatusBadge } from '@/utils/itemStatusBadges';
 
 /** Whether a counter-sale line's inventory came off the books; `tone` is the Ionic colour name. */
@@ -90,8 +91,8 @@ export interface EnrichedShipGroup {
   progress: number;
   statusLabel: string;
   itemSummary: string;
-  /** Fulfillment timeline dates, with the brokered date resolved (see enrichShipGroup). */
-  lifecycle: Record<string, any>;
+  /** The group's brokered → pick → pack → ship dates, read from the order events. */
+  lifecycle: ShipGroupMilestones;
   shippingAddress: EnrichedShippingAddress | null;
   carrierPartyId?: string;
   shipmentMethodTypeId?: string;
@@ -153,20 +154,6 @@ export interface EnrichedOrderRisk {
   counts: { negative: number; positive: number; neutral: number };
 }
 
-/**
- * A header timeline entry. Links are resolved by the view, which knows the current route
- * and the user's permissions.
- */
-export interface EnrichedOrderTimelineEvent {
-  id: string;
-  label: string;
-  icon: string;
-  value?: number;
-  timeDiff?: string;
-  metaData?: string;
-  link?: { kind: 'exchangeSource' | 'exchangeChild' | 'return'; id: string };
-}
-
 export interface EnrichedOrder {
   id: string;
   orderName: string;
@@ -205,5 +192,4 @@ export interface EnrichedOrder {
     total: number;
     adjustmentRows: Array<{ label: string; detail: string; amount: number; isIncluded: boolean }>;
   };
-  timeline: EnrichedOrderTimelineEvent[];
 }
