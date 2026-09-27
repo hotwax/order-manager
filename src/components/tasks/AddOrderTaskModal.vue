@@ -1,5 +1,5 @@
 <template>
-  <DxpModal :title="title || translate('Add task')">
+  <DxpModal :state="taskModal" :title="title || translate('Add task')">
     <ion-list>
       <ion-item v-if="props.shipGroups && props.shipGroups.length > 1">
         <ion-select
@@ -161,7 +161,7 @@ const isDirty = computed(() => (taskNameEdited.value && !!form.workEffortName.tr
   || selectedShipGroupSeqIds.value.length !== (props.shipGroups?.length ?? 0));
 
 // Save hands the task back; the screen that opened the modal creates it, as before.
-useDxpModal({
+const taskModal = useDxpModal({
   dirty: isDirty,
   canConfirm: isValid,
   confirm() {
