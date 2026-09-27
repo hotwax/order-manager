@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ title || translate('Select Facility') }}</ion-title>
+      <ion-title>{{ title || translate('Select facility') }}</ion-title>
     </ion-toolbar>
     <!-- The strip names every item being placed. With more than one it also picks which item the
          list details, so the operator can go from "can this facility cover all three" to the full
@@ -171,7 +171,7 @@
           </ion-label>
           <ion-label class="ion-text-end">
             {{ formatQuantity(facility.consumedToday) }} / {{ formatOrderLimit(facility.orderLimit) }}
-            <p>{{ translate('Consumed / Limit') }}</p>
+            <p>{{ translate('Consumed / limit') }}</p>
             <p>{{ translate('Remaining {value}', { value: formatOrderLimit(facility.remainingCapacity) }) }}</p>
           </ion-label>
         </div>

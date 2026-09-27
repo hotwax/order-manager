@@ -6,7 +6,7 @@
           <ion-back-button default-href="/customers" :aria-label="translate('Back')" />
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate('Customer Detail') }}</ion-title>
+        <ion-title>{{ translate('Customer details') }}</ion-title>
         <ion-buttons slot="end">
           <ion-button @click="onDeleteCustomer" :disabled="deleting || customer?.statusId === 'PARTY_DISABLED'" :aria-label="translate('Delete customer')" :title="translate('Delete customer')">
             <ion-spinner v-if="deleting" name="crescent" slot="icon-only" />
@@ -95,7 +95,7 @@
               <!-- Merged contacts -->
               <ion-card>
                 <ion-card-header>
-                  <ion-card-title>{{ translate('Merged Contacts') }}</ion-card-title>
+                  <ion-card-title>{{ translate('Merged contacts') }}</ion-card-title>
                 </ion-card-header>
                 <ion-list lines="none">
                   <!-- Already-merged duplicates (active only; expired ones are in View history) -->
@@ -127,7 +127,7 @@
                     </ion-button>
                   </ion-item>
                   <ion-item v-if="!hasActiveDuplicateRelationship && !mergableDuplicates.length" lines="none">
-                    <ion-label color="medium"><em>{{ translate('No Merged Contacts') }}</em></ion-label>
+                    <ion-label color="medium"><em>{{ translate('No merged contacts') }}</em></ion-label>
                   </ion-item>
                 </ion-list>
                 <div class="card-actions">

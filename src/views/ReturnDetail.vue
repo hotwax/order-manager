@@ -6,7 +6,7 @@
           <ion-back-button default-href="/returns" :aria-label="translate('Back')" />
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate('Return detail') }}</ion-title>
+        <ion-title>{{ translate('Return details') }}</ion-title>
       </ion-toolbar>
       <ion-progress-bar v-if="detailLoading" type="indeterminate" />
     </ion-header>

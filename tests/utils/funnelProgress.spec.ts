@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { facilityProgressAccessibleName } from '@/utils/funnelProgress';
 
 const translations: Record<string, string> = {
-  'Order Volume': 'Volumen de pedidos',
-  'Fulfillment Velocity': 'Velocidad de cumplimiento',
+  'Order volume': 'Volumen de pedidos',
+  'Fulfillment velocity': 'Velocidad de cumplimiento',
   'Rejections': 'Rechazos',
   'Active orders': 'Pedidos activos',
   'Active orders (rejections)': 'Pedidos activos (rechazos)',

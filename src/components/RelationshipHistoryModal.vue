@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Relationship History') }}</ion-title>
+      <ion-title>{{ translate('Relationship history') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 

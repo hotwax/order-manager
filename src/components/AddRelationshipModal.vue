@@ -9,7 +9,7 @@
           <ion-icon slot="icon-only" :icon="arrowBackOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ step === 'party' ? translate("Find party") : translate("Add Relationship") }}</ion-title>
+      <ion-title>{{ step === 'party' ? translate("Find party") : translate("Add relationship") }}</ion-title>
     </ion-toolbar>
     <ion-toolbar v-if="step === 'party'">
       <ion-searchbar

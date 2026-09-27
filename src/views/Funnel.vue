@@ -5,7 +5,7 @@
         <ion-buttons slot="start">
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate("Order Funnel") }}</ion-title>
+        <ion-title>{{ translate("Order funnel") }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
@@ -168,13 +168,13 @@
         </StatCard>
 
         <!-- Card 3: Order Hold Tasks -->
-        <StatCard v-if="!holdTasksError" :title="translate('Order Hold Tasks')" :stat="holdTasksLoading ? '' : (holdTasks.holdTasksTotalCount || 0)">
+        <StatCard v-if="!holdTasksError" :title="translate('Order hold tasks')" :stat="holdTasksLoading ? '' : (holdTasks.holdTasksTotalCount || 0)">
           <template v-if="holdTasksLoading" #stat>
             <ion-spinner name="crescent" />
           </template>
           <HoldTaskCountList v-if="!holdTasksLoading" :hold-task-counts="holdTasks.holdTaskCounts" />
         </StatCard>
-        <StatCard v-else :title="translate('Order Hold Tasks')">
+        <StatCard v-else :title="translate('Order hold tasks')">
           <template #stat>
             <ion-icon :icon="alertCircleOutline" color="danger" />
           </template>
@@ -206,10 +206,10 @@
         <!-- Segment selection -->
         <ion-segment v-model="selectedDimension">
           <ion-segment-button value="volume">
-            <ion-label>{{ translate("Order Volume") }}</ion-label>
+            <ion-label>{{ translate("Order volume") }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="velocity">
-            <ion-label>{{ translate("Fulfillment Velocity") }}</ion-label>
+            <ion-label>{{ translate("Fulfillment velocity") }}</ion-label>
           </ion-segment-button>
           <ion-segment-button value="rejections">
             <ion-label>{{ translate("Rejections") }}</ion-label>
@@ -280,7 +280,7 @@
           <!-- Fill Rate Card -->
           <ion-card class="fill-rate">
             <ion-item lines="none">
-              <p class="overline">{{ translate("Today's Fill Rate") }}</p>
+              <p class="overline">{{ translate("Today's fill rate") }}</p>
               <ion-icon slot="end" :icon="informationCircleOutline" />
             </ion-item>
             <ion-list lines="none">
@@ -304,7 +304,7 @@
           <ion-card class="orders">
             <ion-item lines="none" class="title">
               <ion-label>
-                <p class="overline">{{ translate("Orders Pending Fulfillment") }}</p>
+                <p class="overline">{{ translate("Orders pending fulfillment") }}</p>
               </ion-label>
             </ion-item>
             <div class="pending">
@@ -470,7 +470,7 @@
               </ion-list>
 
               <!-- Pre-made Options -->
-              <h3 class="options-header ion-margin-top">{{ translate("Schedule Options") }}</h3>
+              <h3 class="options-header ion-margin-top">{{ translate("Schedule options") }}</h3>
               <ion-radio-group v-model="selectedScheduleOption" @ionChange="handleScheduleOptionChange">
                 <ion-item v-for="option in scheduleOptions" :key="option.value">
                   <ion-radio slot="start" :value="option.value" />
@@ -492,8 +492,8 @@
             <template v-if="sortRules.length > 0">
               <!-- Queue Head/Tail Info Labels -->
               <div class="queue-header-labels">
-                <ion-note class="overline">{{ translate("Last to Process") }}</ion-note>
-                <ion-note class="overline">{{ translate("Next to Process") }} →</ion-note>
+                <ion-note class="overline">{{ translate("Last to process") }}</ion-note>
+                <ion-note class="overline">{{ translate("Next to process") }} →</ion-note>
               </div>
               <!-- Progress Bar -->
               <div class="queue-progress-bar-container">
@@ -522,7 +522,7 @@
 
               <!-- Segments Legend Grid Header -->
               <div class="queue-header-labels ion-margin-top">
-                <ion-note class="overline">{{ translate("Queue Breakdown") }}</ion-note>
+                <ion-note class="overline">{{ translate("Queue breakdown") }}</ion-note>
               </div>
 
               <!-- Segments Legend Grid -->

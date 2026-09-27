@@ -149,7 +149,7 @@
         <ion-list lines="none" :aria-label="translate('Fulfillment')">
           <ion-item lines="full">
             <ion-label>
-              {{ carrierName || translate('Carrier name') }} {{ methodLabel || translate('Shipping Method Name') }}
+              {{ carrierName || translate('Carrier name') }} {{ methodLabel || translate('Shipping method name') }}
             </ion-label>
           </ion-item>
           <ion-item>
@@ -224,7 +224,7 @@
             </ion-list-header>
             <ion-item lines="full">
               <ion-select :label="translate('Carrier')" interface="popover"
-                :placeholder="translate('Select Carrier')"
+                :placeholder="translate('Select carrier')"
                 :disabled="disabledActions.EDIT_CARRIER_METHOD"
                 :value="carrierId"
                 @ionChange="onCarrierChange($event.detail.value)">
@@ -236,7 +236,7 @@
 
             <ion-item lines="full">
               <ion-select :label="translate('Shipping method')" interface="popover"
-                :placeholder="translate('Select Shipping Method')"
+                :placeholder="translate('Select shipping method')"
                 :disabled="disabledActions.EDIT_CARRIER_METHOD"
                 :value="methodId || undefined"
                 @ionChange="onMethodChange($event.detail.value)">

@@ -29,7 +29,7 @@
       </ion-item>
       <ion-item>
         <ion-input
-          :label="requiredLabel('Task Name')"
+          :label="requiredLabel('Task name')"
           label-placement="stacked"
           :placeholder="translate('Enter task name')"
           :value="form.workEffortName"
@@ -147,7 +147,7 @@ const selectedPurpose = computed(() => taskPurposes.value.find((option) => optio
 const selectedPurposeLabel = computed(() =>
   selectedPurpose.value
     ? (selectedPurpose.value.description || selectedPurpose.value.enumName || selectedPurpose.value.enumId)
-    : translate('Select Task Purpose')
+    : translate('Select task purpose')
 );
 const generatedTaskName = computed(() => {
   if (!props.autoGenerateTaskName) return '';

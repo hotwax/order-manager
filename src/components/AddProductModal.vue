@@ -32,7 +32,7 @@
 
         <!-- Show Add button if product is NOT in order -->
         <ion-button data-testid="viewmore-add-to-order-btn" v-if="!isProductInOrder(product.productId)" slot="end" fill="outline" @click="addOrderItem(product)" :disabled="pendingProductIds.has(product.productId)">
-          {{ pendingProductIds.has(product.productId) ? translate("Adding...") : translate("Add to Order") }}
+          {{ pendingProductIds.has(product.productId) ? translate("Adding...") : translate("Add to order") }}
         </ion-button>
 
         <!-- Display checkmark only when product is actually in order -->

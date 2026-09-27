@@ -11,10 +11,10 @@
     <ion-toolbar>
       <ion-segment v-model="selectedSegment">
         <ion-segment-button value="substitute">
-          <ion-label>{{ translate('Substitute Products') }}</ion-label>
+          <ion-label>{{ translate('Substitute products') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="search">
-          <ion-label>{{ translate('Product Search') }}</ion-label>
+          <ion-label>{{ translate('Product search') }}</ion-label>
         </ion-segment-button>
       </ion-segment>
     </ion-toolbar>
@@ -37,7 +37,7 @@
       </div>
       <ion-radio-group v-else v-model="selectedProductId">
         <ion-list-header>
-          <ion-label>{{ translate('Approved Swaps') }}</ion-label>
+          <ion-label>{{ translate('Approved swaps') }}</ion-label>
         </ion-list-header>
         <ion-item
           v-for="product in filteredSubstitutes"

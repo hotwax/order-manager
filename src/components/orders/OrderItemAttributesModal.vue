@@ -6,14 +6,14 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Item Attributes') }}</ion-title>
+      <ion-title>{{ translate('Item attributes') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
   <ion-content>
     <ion-list>
       <ion-list-header>
-        <ion-label>{{ translate('Add Attribute') }}</ion-label>
+        <ion-label>{{ translate('Add attribute') }}</ion-label>
       </ion-list-header>
       <!--
         Name and Value sit side by side when the viewport has room so the
@@ -78,7 +78,7 @@
     />
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!form.attrName.trim() || saving" :aria-label="translate('Add Attribute')" @click="addAttribute">
+      <ion-fab-button :disabled="!form.attrName.trim() || saving" :aria-label="translate('Add attribute')" @click="addAttribute">
         <ion-spinner v-if="saving" name="crescent" />
         <ion-icon v-else :icon="addOutline" />
       </ion-fab-button>

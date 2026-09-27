@@ -17,7 +17,7 @@
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(Actions.APP_ORDERS_VIEW)" button router-link="/orders" router-direction="root" :class="{ selected: selectedPage === '/orders' }">
             <ion-icon slot="start" :icon="searchOutline" />
-            <ion-label>{{ translate("Find order") }}</ion-label>
+            <ion-label>{{ translate("Find orders") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">

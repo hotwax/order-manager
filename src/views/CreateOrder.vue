@@ -114,7 +114,7 @@
                 </div>
                 <ion-button class="ion-margin" fill="outline" size="small" @click="openCustomLineModal">
                   <ion-icon slot="start" :icon="addOutline"></ion-icon>
-                  {{ translate("Custom Line") }}
+                  {{ translate("Custom line") }}
                 </ion-button>
               </div>
               <div v-show="mode === 'scan'">
@@ -728,7 +728,7 @@ async function submitOrder() {
       };
       
       // Present success feedback
-      await commonUtil.showToast(translate("Shopify Order Created Successfully!"));
+      await commonUtil.showToast(translate("Shopify order created successfully."));
       resetForm();
     } else {
       throw new Error("Invalid response schema from order API");

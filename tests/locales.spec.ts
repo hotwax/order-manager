@@ -64,7 +64,7 @@ describe('locale messages', () => {
   it('give every message its own Spanish text', () => {
     // Words that read the same in both languages; anything else rendering identically is untranslated.
     const sameInBoth = new Set(['Error', 'ID', 'Launchpad', 'OMS', 'Shopify', 'SKU', 'Subtotal', 'Total', '{count} min']);
-    const params = { count: 2, shown: 1, total: 3, metric: 'Order Volume', query: 'q' };
+    const params = { count: 2, shown: 1, total: 3, metric: 'Order volume', query: 'q' };
     const render = (locale: string) => {
       i18n.global.setLocaleMessage('es-ES', esES);
       i18n.global.locale.value = locale;
@@ -85,7 +85,7 @@ describe('locale messages', () => {
   });
 
   it('resolve links, plurals through links, and escaped parameters', () => {
-    expect(translate('Top 10 facilities by {metric}', { metric: 'Order Volume' })).toBe('Top 10 facilities by order volume');
+    expect(translate('Top 10 facilities by {metric}', { metric: 'Order volume' })).toBe('Top 10 facilities by order volume');
     expect(translate('{count} items by order date', { count: 1 })).toBe('1 item by order date');
     expect(translate('Shopify Error: {message}', { message: '<b>x</b>' }, { escapeParameter: true })).toBe('Shopify Error: &lt;b&gt;x&lt;/b&gt;');
   });

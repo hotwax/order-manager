@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Reject Items') }}</ion-title>
+      <ion-title>{{ translate('Reject items') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 

@@ -13,7 +13,7 @@
   <ion-content ref="content">
     <ion-list>
       <ion-list-header>
-        <ion-label>{{ translate('Add Attribute') }}</ion-label>
+        <ion-label>{{ translate('Add attribute') }}</ion-label>
       </ion-list-header>
       <div class="attribute-form__pair">
         <ion-item class="attribute-form__field">

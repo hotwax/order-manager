@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate("Find Customer") }}</ion-title>
+      <ion-title>{{ translate("Find customer") }}</ion-title>
     </ion-toolbar>
     <ion-toolbar>
       <ion-segment v-model="selectedSection" @ionChange="segmentChange($event.target.value)">

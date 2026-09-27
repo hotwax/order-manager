@@ -10,7 +10,7 @@ describe('facility inventory modal', () => {
     expect(source).toContain('v-else-if="isMobileViewport"');
     expect(source).toContain('<ion-accordion-group');
     expect(source).toContain("translate('Consumed order limit')");
-    expect(source).toContain("translate('Consumed / Limit')");
+    expect(source).toContain("translate('Consumed / limit')");
     expect(source).toContain('buildFacilityCoverageRows');
     expect(source).not.toContain('<ion-grid');
     expect(source).not.toContain('<ion-row');

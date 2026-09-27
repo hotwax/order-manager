@@ -304,7 +304,7 @@ async function confirmCancelOrders() {
     header: translate('Cancel open items'),
     message: translate('This will cancel all open items for the {count} selected orders. This action cannot be undone.', { count: orderIds.length }),
     buttons: [
-      { text: translate('Dismiss'), role: 'cancel' },
+      { text: translate('Cancel'), role: 'cancel' },
       {
         text: translate('Confirm'),
         handler: async () => {

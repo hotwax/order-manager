@@ -77,14 +77,14 @@
           </ion-card-content>
           <ion-item v-if="showBrowserTimeZone">
             <ion-label>
-              <p class="overline">{{ translate("Browser TimeZone") }}</p>
+              <p class="overline">{{ translate("Browser time zone") }}</p>
               {{ browserTimeZone.id }}
               <p v-if="showDateTime">{{ commonUtil.getCurrentTime(browserTimeZone.id, dateTimeFormat) }}</p>
             </ion-label>
           </ion-item>
           <ion-item lines="none">
             <ion-label>
-              <p class="overline">{{ translate("Selected TimeZone") }}</p>
+              <p class="overline">{{ translate("Selected time zone") }}</p>
               {{ currentTimeZone }}
               <p v-if="showDateTime">{{ commonUtil.getCurrentTime(currentTimeZone, dateTimeFormat) }}</p>
             </ion-label>
@@ -110,7 +110,7 @@
           <ion-card-header>
             <div class="card-header">
               <div>
-                <ion-card-title>{{ translate('Data Fetch Status') }}</ion-card-title>
+                <ion-card-title>{{ translate('Data fetch status') }}</ion-card-title>
                 <ion-card-subtitle v-if="syncSubtitle">{{ syncSubtitle }}</ion-card-subtitle>
               </div>
               <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()" :aria-label="translate('Refresh all data')" :title="translate('Refresh all data')">
@@ -384,7 +384,7 @@ const userFetchStatus = computed(() => userStore.fetchStatus);
 
 const sessionFetchStatus = computed(() => [
   {
-    label: translate("User Profile"),
+    label: translate("User profile"),
     status: userFetchStatus.value.profile,
     count: userProfile.value ? 1 : 0,
     refresh: () => userStore.fetchUserProfile()

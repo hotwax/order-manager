@@ -3,7 +3,7 @@
   <ion-card>
     <ion-card-header>
       <ion-card-title>
-        {{ translate('Product Identifier') }}
+        {{ translate('Product identifier') }}
       </ion-card-title>
     </ion-card-header>
 
@@ -24,7 +24,7 @@
     </ion-item>
     <template v-if="currentSampleProduct">
       <ion-item lines="full" color="light">
-        <ion-label color="medium">{{ translate('Preview Product Identifier') }}</ion-label>
+        <ion-label color="medium">{{ translate('Preview product identifier') }}</ion-label>
       </ion-item>
       <ion-item lines="none">
         <ion-thumbnail slot="start">

@@ -8,10 +8,10 @@ export function facilityProgressAccessibleName(
   translate: Translate
 ) {
   if (dimension === 'volume') {
-    return translate('{facility}: {metric}', { facility: facilityName, metric: translate('Order Volume') });
+    return translate('{facility}: {metric}', { facility: facilityName, metric: translate('Order volume') });
   }
   if (dimension === 'velocity' && !activeFacilityFallback) {
-    return translate('{facility}: {metric}', { facility: facilityName, metric: translate('Fulfillment Velocity') });
+    return translate('{facility}: {metric}', { facility: facilityName, metric: translate('Fulfillment velocity') });
   }
   if (dimension === 'rejections') {
     return translate('{facility}: {metric}', { facility: facilityName, metric: translate('Active orders (rejections)') });
