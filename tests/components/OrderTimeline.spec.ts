@@ -28,6 +28,10 @@ vi.mock('@ionic/vue', () => {
 
 vi.mock('@/composables/useOrderDetail', () => ({ FACILITY_CHANGE_PAGE_SIZE: 200 }));
 
+vi.mock('@/composables/useProductIdentity', () => ({
+  useProductIdentity: () => ({ primaryIdentifier: (productId: string) => RAILS_UAT.productLabels[productId] ?? '' }),
+}));
+
 vi.mock('@/store/orderDetail', () => ({
   isVirtualFacilityId: (facilityId: string) => fixtureIsVirtual(facilityId),
   useOrderDetailStore: () => ({ orderById: (orderId: string) => RAILS_UAT.orders[orderId]?.order ?? null }),
@@ -90,6 +94,9 @@ describe('OrderTimeline', () => {
     // Six rows: the import date, the approval, the move into parking and three cancellation rows.
     expect(imported.findAll(':scope > .list > .item')).toHaveLength(6);
     expect(imported.text()).toContain('Rejected Item Parking');
+    // Each record names the item by its product and says what happened, not which field it came from.
+    expect(imported.text()).toContain('861B-398E-12130:XL');
+    expect(imported.text()).toContain('Created in HotWax');
   });
 
   it('opens a folded run onto every transaction it holds', () => {

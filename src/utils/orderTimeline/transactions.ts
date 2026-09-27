@@ -1,4 +1,4 @@
-import { isBrokeringMove, type OrderEvent, type OrderEventLink, type OrderEventOf, type OrderEventRecord } from '@/utils/orderEvents';
+import { isBrokeringMove, moveKind, type MoveKind, type OrderEvent, type OrderEventLink, type OrderEventOf, type OrderEventRecord } from '@/utils/orderEvents';
 
 export interface TimelineContext {
   translate: (key: string, params?: Record<string, unknown>) => string;
@@ -18,6 +18,8 @@ export interface TimelineContext {
   originFacilityId?: string;
   /** An order's name for an exchange line, when it has loaded. */
   orderLabel: (orderId: string) => string;
+  /** How the page names an order item: its product's primary identifier. '' when unknown. */
+  itemLabel: (orderItemSeqId: string) => string;
 }
 
 export type TransactionKind =
@@ -101,18 +103,22 @@ export function chainEvents(events: OrderEvent[]): OrderEvent[][] {
 
 /* ── Wording ─────────────────────────────────────────────────────────────── */
 
-function itemCount(events: OrderEvent[]): number {
-  const ids = new Set(events.flatMap((event) => event.orderItemSeqIds));
-  return ids.size || events.reduce((sum, event) => sum + event.records.length, 0);
-}
+const itemIds = (events: OrderEvent[]) => [...new Set(events.flatMap((event) => event.orderItemSeqIds))];
 
-function itemsPhrase(count: number, ctx: TimelineContext, total?: number): string {
+function countPhrase(count: number, ctx: TimelineContext, total?: number): string {
   if (total && total > count) return ctx.translate('{count} of {total} items', { count, total });
   return ctx.translate(count === 1 ? '{count} item' : '{count} items', { count });
 }
 
-function remainingPhrase(count: number, ctx: TimelineContext): string {
-  return ctx.translate(count === 1 ? '{count} remaining item' : '{count} remaining items', { count });
+/** The items an operation touched: the item itself when there is one, otherwise how many. */
+function itemsPhrase(ids: string[], ctx: TimelineContext, total?: number): string {
+  const label = ids.length === 1 ? ctx.itemLabel(ids[0]) : '';
+  return label || countPhrase(ids.length, ctx, total);
+}
+
+function remainingPhrase(ids: string[], ctx: TimelineContext): string {
+  const label = ids.length === 1 ? ctx.itemLabel(ids[0]) : '';
+  return label || ctx.translate(ids.length === 1 ? '{count} remaining item' : '{count} remaining items', { count: ids.length });
 }
 
 function facilityLine(key: '{items} to {facility}' | '{items} from {facility}' | '{items} at {facility}', items: string, facilityId: string | undefined, ctx: TimelineContext): string {
@@ -120,7 +126,7 @@ function facilityLine(key: '{items} to {facility}' | '{items} from {facility}' |
 }
 
 function moveLine(move: OrderEventOf<'move'>, ctx: TimelineContext, released = false): string {
-  const items = itemsPhrase(itemCount([move]), ctx);
+  const items = itemsPhrase(move.orderItemSeqIds, ctx);
   if (move.move === 'rejected') return facilityLine('{items} from {facility}', items, move.fromFacilityId, ctx);
   if (move.move === 'parked' || (move.move === 'assigned' && move.toFacilityId && ctx.isVirtualFacility(move.toFacilityId))) {
     return facilityLine('{items} at {facility}', items, move.toFacilityId, ctx);
@@ -155,7 +161,7 @@ function notePhrase(event: OrderEvent, all: OrderEvent[], ctx: TimelineContext):
       if (event.statusId === 'ORDER_COMPLETED') return translate('Order completed');
       return ctx.statusDescription(event.statusId);
     case 'itemStatus': {
-      const items = itemsPhrase(itemCount([event]), ctx);
+      const items = itemsPhrase(event.orderItemSeqIds, ctx);
       if (event.statusId === 'ITEM_APPROVED') {
         const routine = all.some((other) => other.kind === 'imported' || (other.kind === 'orderStatus' && other.statusId === 'ORDER_APPROVED'));
         return routine ? '' : translate('{items} approved', { items });
@@ -184,41 +190,66 @@ function notePhrase(event: OrderEvent, all: OrderEvent[], ctx: TimelineContext):
 
 /* ── Records ─────────────────────────────────────────────────────────────── */
 
-const RECORD_TITLES: Record<string, string> = {
-  orderDate: 'Order date',
-  entryDate: 'Import date',
-  picklistDate: 'Picklist date',
-  packedDate: 'Packed date',
-  shippedDate: 'Shipped date',
-  firstBrokeredDate: 'First brokered date',
-  firstReleasedDate: 'First released date',
+// A record names what its row says happened, not the field it came from.
+const DATE_RECORD_TITLES: Record<string, string> = {
+  entryDate: 'Created in HotWax',
+  picklistDate: 'Picklist created',
+  packedDate: 'Shipment packed',
+  shippedDate: 'Shipment shipped',
+  firstBrokeredDate: 'Brokered',
+  firstReleasedDate: 'Released',
 };
 
-function recordView(record: OrderEventRecord, index: number, ctx: TimelineContext): TimelineRecordView {
-  const { translate } = ctx;
-  let title = '';
-  if (record.source === 'order' || record.source === 'fulfillment') title = translate(RECORD_TITLES[record.type] || record.type);
-  else if (record.source === 'status') title = ctx.statusDescription(record.type);
-  else if (record.source === 'facilityChange') title = record.type ? ctx.enumDescription(record.type) : translate('Facility change');
-  else if (record.source === 'unfillable') title = translate('Brokering could not fill');
-  else if (record.source === 'return') title = translate('Return {id}', { id: record.refId });
-  else if (record.source === 'exchange') title = translate('Exchange with {id}', { id: ctx.orderLabel(record.refId || '') });
+const MOVE_RECORD_TITLES: Record<MoveKind, string> = {
+  assigned: 'Assigned',
+  brokered: 'Brokered',
+  released: 'Released',
+  allocated: 'Allocated',
+  parked: 'Parked',
+  rejected: 'Rejected',
+  cancelled: 'Moved to parking',
+  moved: 'Moved',
+};
 
-  const scope = [
-    record.orderItemSeqId ? translate('Item {id}', { id: record.orderItemSeqId }) : record.source === 'status' ? translate('Order') : '',
-    record.shipGroupSeqId ? translate('Ship group {id}', { id: record.shipGroupSeqId }) : '',
-  ].filter(Boolean).join(', ');
+function recordTitle(record: OrderEventRecord, event: OrderEvent, ctx: TimelineContext): string {
+  const { translate } = ctx;
+  switch (record.source) {
+    case 'order':
+      if (record.type === 'orderDate') return translate(event.kind === 'placed' && event.isShopify ? 'Placed in Shopify' : 'Order placed');
+      return translate(DATE_RECORD_TITLES[record.type] || record.type);
+    case 'fulfillment': return translate(DATE_RECORD_TITLES[record.type] || record.type);
+    case 'status': return ctx.statusDescription(record.type);
+    case 'facilityChange': return translate(MOVE_RECORD_TITLES[recordMove(record)]);
+    case 'unfillable': return translate('Brokering could not fill');
+    case 'return': return translate('Return {id}', { id: record.refId });
+    case 'exchange': return translate('Exchange with {id}', { id: ctx.orderLabel(record.refId || '') });
+    default: return '';
+  }
+}
+
+const recordMove = (record: OrderEventRecord) =>
+  moveKind({ changeReasonEnumId: record.type, fromFacilityId: record.fromFacilityId, facilityId: record.facilityId });
+
+function recordView(record: OrderEventRecord, event: OrderEvent, index: number, ctx: TimelineContext): TimelineRecordView {
+  const { translate } = ctx;
+  const item = record.orderItemSeqId
+    ? ctx.itemLabel(record.orderItemSeqId) || translate('Item {id}', { id: record.orderItemSeqId })
+    : record.source === 'status' ? translate('Order') : '';
   const place = record.fromFacilityId && record.facilityId && record.fromFacilityId !== record.facilityId
     ? translate('{from} to {to}', { from: ctx.facilityName(record.fromFacilityId), to: ctx.facilityName(record.facilityId) })
     : record.facilityId ? ctx.facilityName(record.facilityId) : '';
+  // Brokered, released, allocated and parked say it in the title; a rejection's reason does not.
+  const move = record.source === 'facilityChange' ? recordMove(record) : undefined;
+  const reason = record.source === 'status' && record.reason ? ctx.describe(record.reason)
+    : move && record.type && ['rejected', 'cancelled', 'moved', 'assigned'].includes(move) ? ctx.enumDescription(record.type) : '';
 
   return {
     id: `${record.source}-${record.type}-${index}`,
-    title,
+    title: recordTitle(record, event, ctx),
     lines: [
-      scope,
+      item,
       place,
-      record.source === 'status' && record.reason ? ctx.describe(record.reason) : '',
+      reason,
       record.userLogin ? translate('By {actor}', { actor: record.userLogin }) : '',
       record.comments || '',
     ].filter(Boolean),
@@ -272,32 +303,32 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
 
   if (orderCancelled) {
     const inShopify = [orderCancelled, ...itemCancels, ...cancelMoves].some(isShopifyCancellation);
-    const count = itemCount(itemCancels);
+    const ids = itemIds(itemCancels);
     draft = {
       kind: 'cancelled',
       headline: translate(imported
         ? (inShopify ? 'Imported, already cancelled in Shopify' : 'Imported, already cancelled')
         : (inShopify ? 'Order cancelled in Shopify' : 'Order cancelled')),
-      details: count ? [count < ctx.itemTotal && !imported ? remainingPhrase(count, ctx) : itemsPhrase(count, ctx)] : [],
+      details: ids.length ? [ids.length < ctx.itemTotal && !imported ? remainingPhrase(ids, ctx) : itemsPhrase(ids, ctx)] : [],
       reason: inShopify ? '' : describeReason(orderCancelled.reason || itemCancels[0]?.reason, ctx),
     };
     consume(orderCancelled, ...itemCancels, ...cancelMoves);
     if (imported) consumeImport();
   } else if (itemCancels.length) {
     const inShopify = [...itemCancels, ...cancelMoves].some(isShopifyCancellation);
-    const count = itemCount(itemCancels);
+    const ids = itemIds(itemCancels);
     draft = {
       kind: 'cancelled',
       headline: translate(inShopify
-        ? (count === 1 ? 'Item cancelled in Shopify' : 'Items cancelled in Shopify')
-        : (count === 1 ? 'Item cancelled' : 'Items cancelled')),
-      details: [itemsPhrase(count, ctx, ctx.itemTotal)],
+        ? (ids.length === 1 ? 'Item cancelled in Shopify' : 'Items cancelled in Shopify')
+        : (ids.length === 1 ? 'Item cancelled' : 'Items cancelled')),
+      details: [itemsPhrase(ids, ctx, ctx.itemTotal)],
       reason: inShopify ? '' : describeReason(itemCancels[0].reason, ctx),
     };
     consume(...itemCancels, ...cancelMoves);
   } else if (itemStatuses('ITEM_REQ_CANCELATN').length) {
     const requests = itemStatuses('ITEM_REQ_CANCELATN');
-    draft = { kind: 'cancelled', headline: translate('Cancellation requested'), details: [itemsPhrase(itemCount(requests), ctx, ctx.itemTotal)], reason: describeReason(requests[0].reason, ctx) };
+    draft = { kind: 'cancelled', headline: translate('Cancellation requested'), details: [itemsPhrase(itemIds(requests), ctx, ctx.itemTotal)], reason: describeReason(requests[0].reason, ctx) };
     consume(...requests);
   } else if (shipped.length) {
     const viaShopify = moves.filter(isFulfillmentSync);
@@ -310,7 +341,7 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
         const sgId = event.shipGroupSeqIds[0];
         const done = completedItems.flatMap((status) => status.orderItemSeqIds).filter((id) => ctx.shipGroupOfItem[id] === sgId);
         const facilityId = viaShopify[0]?.toFacilityId || event.facilityId;
-        return facilityLine('{items} from {facility}', itemsPhrase(done.length || event.orderItemSeqIds.length, ctx), facilityId, ctx);
+        return facilityLine('{items} from {facility}', itemsPhrase(done.length ? done : event.orderItemSeqIds, ctx), facilityId, ctx);
       }),
     };
     consume(...shipped, ...completedItems, ...viaShopify);
@@ -320,22 +351,22 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
     const isCounterSale = ctx.posShipGroupIds.size > 0 && (soldItems.length
       ? soldItems.every((id) => ctx.posShipGroupIds.has(ctx.shipGroupOfItem[id]))
       : Object.values(ctx.shipGroupOfItem).every((sgId) => ctx.posShipGroupIds.has(sgId)));
-    const count = itemCount(completedItems);
+    const ids = itemIds(completedItems);
     if (isCounterSale) {
       draft = {
         kind: 'sold',
         headline: translate('Sold in store'),
-        details: count ? [facilityLine('{items} at {facility}', itemsPhrase(count, ctx), ctx.originFacilityId, ctx)] : [],
+        details: ids.length ? [facilityLine('{items} at {facility}', itemsPhrase(ids, ctx), ctx.originFacilityId, ctx)] : [],
       };
       consumeImport();
     } else if (placed && !imported) {
       draft = { kind: 'completed', headline: translate(placed.isShopify ? 'Placed and completed in Shopify' : 'Placed and completed'), details: [] };
       consume(placed);
     } else if (imported) {
-      draft = { kind: 'completed', headline: translate('Imported, already completed'), details: count ? [itemsPhrase(count, ctx)] : [] };
+      draft = { kind: 'completed', headline: translate('Imported, already completed'), details: ids.length ? [itemsPhrase(ids, ctx)] : [] };
       consumeImport();
     } else {
-      draft = { kind: 'completed', headline: translate('Order completed'), details: count ? [itemsPhrase(count, ctx)] : [] };
+      draft = { kind: 'completed', headline: translate('Order completed'), details: ids.length ? [itemsPhrase(ids, ctx)] : [] };
     }
     consume(completed, ...completedItems);
   } else if (find('fulfillment').length) {
@@ -345,7 +376,7 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
       kind: packed ? 'packed' : 'picked',
       headline: translate(packed ? 'Packed' : 'Picked'),
       details: steps.filter((event) => event.step === (packed ? 'packed' : 'picked'))
-        .map((event) => facilityLine('{items} at {facility}', itemsPhrase(event.orderItemSeqIds.length, ctx), event.facilityId, ctx)),
+        .map((event) => facilityLine('{items} at {facility}', itemsPhrase(event.orderItemSeqIds, ctx), event.facilityId, ctx)),
     };
     consume(...steps.filter((event) => event.step === (packed ? 'packed' : 'picked')));
   } else if (brokering.length) {
@@ -391,7 +422,7 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
     consume(attempt);
   } else if (find('return').length) {
     const ret = find('return')[0];
-    const items = itemsPhrase(ret.itemCount, ctx);
+    const items = ret.itemCount === 1 ? itemsPhrase(ret.orderItemSeqIds, ctx) : countPhrase(ret.itemCount, ctx);
     draft = {
       kind: 'return',
       headline: translate('Return created'),
@@ -403,7 +434,7 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
     if (exchange.direction === 'from') {
       draft = { kind: 'exchange', headline: translate('Exchanged from'), details: [ctx.orderLabel(exchange.orderId)] };
     } else {
-      const items = itemsPhrase(exchange.itemCount || 0, ctx);
+      const items = countPhrase(exchange.itemCount || 0, ctx);
       draft = {
         kind: 'exchange',
         headline: translate('Exchange order created'),
@@ -431,16 +462,16 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
   } else if (find('itemStatus').length) {
     const status = find('itemStatus')[0];
     const same = itemStatuses(status.statusId);
-    const count = itemCount(same);
+    const ids = itemIds(same);
     const headlines: Record<string, string> = {
-      ITEM_CREATED: count === 1 ? 'Item added' : 'Items added',
-      ITEM_APPROVED: count === 1 ? 'Item approved' : 'Items approved',
-      ITEM_COMPLETED: count === 1 ? 'Item completed' : 'Items completed',
+      ITEM_CREATED: ids.length === 1 ? 'Item added' : 'Items added',
+      ITEM_APPROVED: ids.length === 1 ? 'Item approved' : 'Items approved',
+      ITEM_COMPLETED: ids.length === 1 ? 'Item completed' : 'Items completed',
     };
     draft = {
       kind: 'items',
       headline: headlines[status.statusId] ? translate(headlines[status.statusId]) : ctx.statusDescription(status.statusId),
-      details: [itemsPhrase(count, ctx, ctx.itemTotal)],
+      details: [itemsPhrase(ids, ctx, ctx.itemTotal)],
       reason: describeReason(status.reason, ctx),
     };
     consume(...same);
@@ -463,9 +494,9 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
   const notes = [...new Set(events.filter((event) => pool.has(event)).map((event) => notePhrase(event, events, ctx)).filter(Boolean))];
   const actors = [...new Set(events.map((event) => event.actor?.kind === 'user' ? event.actor.login : event.actor?.name || '').filter(Boolean))];
   const dated = events.filter((event) => event.at !== undefined);
-  const records = events.flatMap((event) => event.records)
-    .sort((left, right) => (left.at ?? Infinity) - (right.at ?? Infinity))
-    .map((record, index) => recordView(record, index, ctx));
+  const records = events.flatMap((event) => event.records.map((record) => ({ record, event })))
+    .sort((left, right) => (left.record.at ?? Infinity) - (right.record.at ?? Infinity))
+    .map(({ record, event }, index) => recordView(record, event, index, ctx));
 
   return {
     id: events.map((event) => event.id).join('+'),

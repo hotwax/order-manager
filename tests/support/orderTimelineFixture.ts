@@ -47,6 +47,14 @@ export function fixtureEvents(orderId: string): OrderEvent[] {
   });
 }
 
+/** An item as the page names it: its product's primary identifier, captured with the orders. */
+export function fixtureItemLabel(orderId: string, orderItemSeqId: string): string {
+  const item = RAILS_UAT.orders[orderId].order.shipGroups
+    .flatMap((shipGroup: any) => shipGroup.items)
+    .find((candidate: any) => candidate.orderItemSeqId === orderItemSeqId);
+  return item ? RAILS_UAT.productLabels[item.productId] || item.productId : '';
+}
+
 export function fixtureContext(orderId: string): TimelineContext {
   const order = RAILS_UAT.orders[orderId].order;
   const shipGroupOfItem: Record<string, string> = {};
@@ -63,5 +71,6 @@ export function fixtureContext(orderId: string): TimelineContext {
     posShipGroupIds: new Set((order.shipGroups || []).filter((sg: any) => sg.shipmentMethodTypeId === 'POS_COMPLETED').map((sg: any) => sg.shipGroupSeqId)),
     originFacilityId: order.originFacilityId && order.originFacilityId !== '_NA_' ? order.originFacilityId : undefined,
     orderLabel: (id) => RAILS_UAT.orders[id]?.order.orderName || id,
+    itemLabel: (seqId) => fixtureItemLabel(orderId, seqId),
   };
 }

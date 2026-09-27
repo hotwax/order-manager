@@ -32,16 +32,33 @@ describe('groupTransactions on rails-uat orders', () => {
     // 158647 wrote six rows at import: approval, a move into Rejected Item Parking, and the cancellations.
     const [, imported] = transactions('158647');
 
-    expect(imported.details).toEqual(['1 item']);
+    expect(imported.details).toEqual(['861B-398E-12130:XL']);
     expect(imported.notes).toEqual([]);
-    expect(imported.records).toHaveLength(6);
+    expect(imported.records.map((record) => record.title)).toEqual(['Created in HotWax', 'Approved', 'Approved', 'Moved to parking', 'Cancelled', 'Cancelled']);
   });
 
-  it('counts a partial cancellation against the order and the last one as the remaining items', () => {
+  it('names the one item an action touched, and counts several', () => {
     const [, , partial, last] = transactions('104494');
 
-    expect(partial.details).toEqual(['1 of 2 items']);
-    expect(last.details).toEqual(['1 remaining item']);
+    expect(partial.details).toEqual(['848C-357C-001001:XS']);
+    expect(last.details).toEqual(['848C-357C-0027617:XS']);
+    expect(transactions('107038')[1].details).toEqual(['2 items to 2301 E. 51st St.']);
+  });
+
+  it('names each record by what happened and the item it happened to', () => {
+    const [, imported] = transactions('104494');
+
+    expect(imported.records.map((record) => [record.title, ...record.lines])).toEqual([
+      ['Approved', '848C-357C-001001:XS'],
+      ['Created in HotWax'],
+      ['Approved', 'Order'],
+      ['Approved', '848C-357C-0027617:XS'],
+      ['Assigned', '848C-357C-001001:XS', 'Austin'],
+    ]);
+    // A rejection keeps its reason under the title; a release says it all in the title.
+    const [rejected, released] = transactions('123768').find((tx) => tx.kind === 'run')!.children!;
+    expect([rejected.records[0].title, ...rejected.records[0].lines]).toEqual(['Rejected', '201085-124H-5076:M', 'UK Ecomm to Rejected Item Parking', 'No variance', 'By user.2']);
+    expect([released.records[0].title, ...released.records[0].lines]).toEqual(['Released', '201085-124H-5076:M', 'Rejected Item Parking to UK Ecomm', 'By user.2']);
   });
 
   it('keeps First brokered, with the facility and the approval that came with it', () => {
@@ -52,20 +69,20 @@ describe('groupTransactions on rails-uat orders', () => {
   });
 
   it('says where an import placed the items', () => {
-    expect(transactions('104494')[1].details).toEqual(['1 item to Austin']);
+    expect(transactions('104494')[1].details).toEqual(['848C-357C-001001:XS to Austin']);
   });
 
   it('names the Shopify sync that fulfilled or moved an order', () => {
-    expect(transactions('101934')[2]).toMatchObject({ details: ['1 item from 2301 E. 51st St.'], actor: 'Shopify fulfillment sync' });
+    expect(transactions('101934')[2]).toMatchObject({ details: ['730A-255D-8419:25 from 2301 E. 51st St.'], actor: 'Shopify fulfillment sync' });
     expect(transactions('116143')[2]).toMatchObject({ headline: 'Location changed in Shopify', actor: 'Shopify inbound location sync' });
   });
 
   it('notes that the last item\'s cancellation completed the order', () => {
-    expect(transactions('107038')[3]).toMatchObject({ details: ['1 of 2 items'], notes: ['Order completed'] });
+    expect(transactions('107038')[3]).toMatchObject({ details: ['546-282D-7977:2'], notes: ['Order completed'] });
   });
 
   it('shows a counter sale as sold at the store it was sold in', () => {
-    expect(transactions('162079')[1].details).toEqual(['1 item at Fashion Island']);
+    expect(transactions('162079')[1].details).toEqual(['RM-860D-942F-8984:XL at Fashion Island']);
   });
 
   it('folds a store\'s reject and release churn into one run that keeps every step', () => {
@@ -76,8 +93,9 @@ describe('groupTransactions on rails-uat orders', () => {
     expect(run.details).toEqual(['3 rejections and 2 releases']);
     expect(run.children!.map((tx) => tx.headline)).toEqual(['Rejected', 'Released', 'Rejected', 'Released', 'Rejected']);
     expect(run.children!.map((tx) => tx.reason)).toEqual(['No variance', '', 'Not in Stock', '', 'Not in Stock']);
-    // The first brokering is never folded away.
-    expect(txs[2].details).toEqual(['1 item released to UK Ecomm']);
+    // The first brokering is never folded away, and each step names the item it moved.
+    expect(txs[2].details).toEqual(['201085-124H-5076:M released to UK Ecomm']);
+    expect(run.children![0].details).toEqual(['201085-124H-5076:M from UK Ecomm']);
   });
 
   it('tells the 11 reference orders in 34 lines', () => {

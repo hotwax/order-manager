@@ -139,7 +139,8 @@
               {
                 "orderItemSeqId": "02",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "148236"
               }
             ]
           },
@@ -151,7 +152,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_COMPLETED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "148309"
               }
             ]
           }
@@ -287,7 +289,8 @@
               {
                 "orderItemSeqId": "02",
                 "statusId": "ITEM_CANCELLED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "106471"
               }
             ]
           },
@@ -299,7 +302,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_CANCELLED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "128502"
               }
             ]
           },
@@ -438,7 +442,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_COMPLETED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "148320"
               }
             ]
           },
@@ -450,7 +455,8 @@
               {
                 "orderItemSeqId": "02",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "148367"
               }
             ]
           },
@@ -462,7 +468,8 @@
               {
                 "orderItemSeqId": "03",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "143797"
               }
             ]
           }
@@ -607,7 +614,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_COMPLETED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "139421"
               }
             ]
           },
@@ -619,7 +627,8 @@
               {
                 "orderItemSeqId": "02",
                 "statusId": "ITEM_CANCELLED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "149587"
               }
             ]
           },
@@ -720,12 +729,14 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_COMPLETED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "136532"
               },
               {
                 "orderItemSeqId": "02",
                 "statusId": "ITEM_COMPLETED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "141389"
               }
             ]
           }
@@ -856,7 +867,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "144074"
               }
             ]
           },
@@ -868,12 +880,14 @@
               {
                 "orderItemSeqId": "02",
                 "statusId": "ITEM_COMPLETED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "128629"
               },
               {
                 "orderItemSeqId": "03",
                 "statusId": "ITEM_COMPLETED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "122042"
               }
             ]
           }
@@ -1006,7 +1020,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "149052"
               }
             ]
           }
@@ -1167,12 +1182,14 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "149500"
               },
               {
                 "orderItemSeqId": "02",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "143869"
               }
             ]
           }
@@ -1277,7 +1294,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "140367"
               }
             ]
           }
@@ -1398,7 +1416,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_CANCELLED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "149980"
               }
             ]
           },
@@ -1502,7 +1521,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_CANCELLED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "148899"
               }
             ]
           },
@@ -1683,22 +1703,26 @@
               {
                 "orderItemSeqId": "02",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "147150"
               },
               {
                 "orderItemSeqId": "03",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "150464"
               },
               {
                 "orderItemSeqId": "04",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "150513"
               },
               {
                 "orderItemSeqId": "05",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "150599"
               }
             ]
           },
@@ -1710,7 +1734,8 @@
               {
                 "orderItemSeqId": "06",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "141511"
               }
             ]
           },
@@ -1722,7 +1747,8 @@
               {
                 "orderItemSeqId": "07",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "150534"
               }
             ]
           },
@@ -1734,7 +1760,8 @@
               {
                 "orderItemSeqId": "08",
                 "statusId": "ITEM_COMPLETED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "150450"
               }
             ]
           },
@@ -1746,7 +1773,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "143126"
               }
             ]
           }
@@ -1860,7 +1888,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_COMPLETED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "140369"
               }
             ]
           }
@@ -1953,12 +1982,14 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "151331"
               },
               {
                 "orderItemSeqId": "02",
                 "statusId": "ITEM_APPROVED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "149735"
               }
             ]
           }
@@ -2046,7 +2077,8 @@
               {
                 "orderItemSeqId": "01",
                 "statusId": "ITEM_COMPLETED",
-                "quantity": 1
+                "quantity": 1,
+                "productId": "150766"
               }
             ]
           }
@@ -2070,5 +2102,39 @@
         "exchanges": "loaded"
       }
     }
+  },
+  "productLabels": {
+    "106471": "848C-357C-0027617:XS",
+    "122042": "RM-638-923B-58605860:M",
+    "128502": "848C-357C-001001:XS",
+    "128629": "641-260B-41734173:L",
+    "136532": "536-105F-79277927:XS",
+    "139421": "546-282C-82538253:0",
+    "140367": "889C-369B-82848284:S",
+    "140369": "889C-369B-82848284:L",
+    "141389": "927-116G-84138413:XS",
+    "141511": "RM-128-919A-74187418:M",
+    "143126": "RM-621B-996E-85668566:M",
+    "143797": "200-582A-8840:M",
+    "143869": "509A-523A-86008600:M",
+    "144074": "641-633C-41734173:L",
+    "147150": "RM-665A-995D-154154:M",
+    "148236": "714A-219A-8701:25",
+    "148309": "730A-255D-8419:25",
+    "148320": "849C-264D-8729:S",
+    "148367": "849C-360E-8729:M",
+    "148899": "100-550-12063:S",
+    "149052": "201085-124H-5076:M",
+    "149500": "518-620-8857:M",
+    "149587": "546-282D-7977:2",
+    "149735": "835A-354B-12215:M",
+    "149980": "861B-398E-12130:XL",
+    "150450": "RM-632B-928-8877:M",
+    "150464": "RM-118-974-8919:M",
+    "150513": "RM-654D-933D-8954:M",
+    "150534": "RM-210A-902-8935:M",
+    "150599": "RM-670D-925F-2693:M",
+    "150766": "RM-860D-942F-8984:XL",
+    "151331": "722A-276D-4690:26"
   }
 }

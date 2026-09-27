@@ -73,6 +73,7 @@ import { timeOutline, warningOutline } from 'ionicons/icons';
 import { translate } from '@common';
 import OrderTimelineEntry from '@/components/orders/OrderTimelineEntry.vue';
 import { FACILITY_CHANGE_PAGE_SIZE } from '@/composables/useOrderDetail';
+import { useProductIdentity } from '@/composables/useProductIdentity';
 import { isVirtualFacilityId, useOrderDetailStore, type OrderEventSourceKey, type OrderEventSourceStatus } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import type { EnrichedOrder } from '@/types/orderDetail';
@@ -94,6 +95,7 @@ const emit = defineEmits<{ retry: [] }>();
 
 const seed = useSeedStore();
 const orderDetailStore = useOrderDetailStore();
+const { primaryIdentifier } = useProductIdentity();
 
 const SOURCE_LABELS: Record<OrderEventSourceKey, string> = {
   facilityChanges: 'Facility moves',
@@ -105,7 +107,11 @@ const SOURCE_LABELS: Record<OrderEventSourceKey, string> = {
 
 const context = computed<TimelineContext>(() => {
   const shipGroupOfItem: Record<string, string> = {};
-  props.order.shipGroups.forEach((shipGroup) => shipGroup.items.forEach((item) => { shipGroupOfItem[item.orderItemSeqId] = shipGroup.id; }));
+  const productOfItem: Record<string, string> = {};
+  props.order.shipGroups.forEach((shipGroup) => shipGroup.items.forEach((item) => {
+    shipGroupOfItem[item.orderItemSeqId] = shipGroup.id;
+    productOfItem[item.orderItemSeqId] = item.productId;
+  }));
   return {
     translate,
     facilityName: (facilityId: string) => seed.facilityName(facilityId),
@@ -118,6 +124,11 @@ const context = computed<TimelineContext>(() => {
     posShipGroupIds: new Set(props.order.shipGroups.filter((shipGroup) => shipGroup.isPosCompleted).map((shipGroup) => shipGroup.id)),
     originFacilityId: props.order.originFacilityName ? props.order.originFacilityId : undefined,
     orderLabel: (orderId: string) => orderDetailStore.orderById(orderId)?.orderName || orderId,
+    // Named as the item rows name it.
+    itemLabel: (orderItemSeqId: string) => {
+      const productId = productOfItem[orderItemSeqId];
+      return productId ? primaryIdentifier(productId) || productId : '';
+    },
   };
 });
 
