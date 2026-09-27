@@ -81,7 +81,7 @@ import {
   IonTextarea,
 } from '@ionic/vue';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
-import { DxpModal, translate, useModalFlow } from '@common';
+import { DxpModal, translate, useDxpModal } from '@common';
 import { requiredLabel } from '@/utils';
 import { useSeedStore } from '@/store/seed';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
@@ -161,7 +161,7 @@ const isDirty = computed(() => (taskNameEdited.value && !!form.workEffortName.tr
   || selectedShipGroupSeqIds.value.length !== (props.shipGroups?.length ?? 0));
 
 // Save hands the task back; the screen that opened the modal creates it, as before.
-useModalFlow({
+useDxpModal({
   dirty: isDirty,
   canConfirm: isValid,
   confirm() {
