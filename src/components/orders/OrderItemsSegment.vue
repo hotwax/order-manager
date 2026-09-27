@@ -169,14 +169,12 @@ const money = (value: number) => formatMoney(value, props.order.currency);
 
 /** The product identity a rolled up (or sole item) row shows. */
 function productRowProps(group: EnrichedItemGroup) {
-  const product = getProduct(group.productId);
   return {
     primary: primaryIdentifier(group.productId) || group.name || group.externalId,
     secondary: secondaryIdentifier(group.productId) || group.externalId,
     badgeLabel: isKit(group) ? translate('Kit') : '',
     features: featureLabel(group.productId),
-    imageUrl: product?.mainImageUrl,
-    previewProduct: product,
+    imageUrl: getProduct(group.productId)?.mainImageUrl,
   };
 }
 

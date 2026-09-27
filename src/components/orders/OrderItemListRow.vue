@@ -15,12 +15,14 @@
       />
       <ion-item lines="none">
         <!-- A product without an image keeps the slot, showing the placeholder, so its label lines
-             up with the rows that have one. -->
+             up with the rows that have one. The preview is titled by the row's primary identifier.
+             The directive reads its value once, when mounted, so the key remounts the thumbnail
+             when the image or the identifier arrives. -->
         <ion-thumbnail
           v-if="showImage"
           slot="start"
-          v-image-preview="previewProduct"
-          :key="imageUrl"
+          v-image-preview="{ mainImageUrl: imageUrl, productName: primary }"
+          :key="`${imageUrl} ${primary}`"
           @click.stop
         >
           <DxpShopifyImg :src="imageUrl" :key="imageUrl" size="small" />
@@ -102,7 +104,6 @@ withDefaults(defineProps<{
   /** Off for a row that names an order item rather than a product, which has no image to show. */
   showImage?: boolean;
   imageUrl?: string;
-  previewProduct?: any;
   selectable?: boolean;
   selected?: boolean;
   quantity: string | number;
@@ -122,7 +123,6 @@ withDefaults(defineProps<{
   features: '',
   showImage: true,
   imageUrl: '',
-  previewProduct: undefined,
   selectable: true,
   selected: false,
   showQuantity: true,

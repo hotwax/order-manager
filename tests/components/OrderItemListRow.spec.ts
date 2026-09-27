@@ -22,7 +22,9 @@ vi.mock('@ionic/vue', () => {
   };
 });
 
-const global = { directives: { imagePreview: {} } };
+// The preview directive's value, as the thumbnail last mounted it.
+let preview: unknown;
+const global = { directives: { imagePreview: { mounted: (_el: HTMLElement, binding: { value: unknown }) => { preview = binding.value; } } } };
 
 const mountRow = (props: Record<string, unknown> = {}) =>
   mount(OrderItemListRow, { props: { primary: 'SKU-1', quantity: 2, quantityLabel: 'qty', amount: '$20.00', ...props }, global });
@@ -51,6 +53,12 @@ describe('order item list row', () => {
 
   it('keeps the image slot for a product without an image, so its label lines up', () => {
     expect(mountRow({ imageUrl: '' }).find('.order-item-list-key img').exists()).toBe(true);
+  });
+
+  it('titles the image preview with the row\'s primary identifier, not the product name', () => {
+    mountRow({ primary: 'SHIRT-M', imageUrl: 'shirt.jpg' });
+
+    expect(preview).toEqual({ mainImageUrl: 'shirt.jpg', productName: 'SHIRT-M' });
   });
 
   it('shows no image on a row that names an order item', () => {
