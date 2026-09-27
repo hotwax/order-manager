@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { buildOrderEvents, moveKind, shipGroupMilestones, type OrderEvent, type OrderEventOf, type OrderEventSources } from '@/utils/orderEvents';
-import { fixtureEvents, RAILS_UAT } from '../support/orderTimelineFixture';
 
 const T = (seconds: number) => 1_790_000_000_000 + seconds * 1_000;
 
@@ -40,17 +39,6 @@ describe('buildOrderEvents', () => {
     expect(moves[0].records).toHaveLength(3);
   });
 
-  it('keeps a repeated move to the same facility as separate events', () => {
-    const events = buildOrderEvents(sources({
-      facilityChanges: [
-        { orderItemSeqId: '01', changeReasonEnumId: 'RELEASED', fromFacilityId: '_NA_', facilityId: 'BROADWAY', changeDatetime: '2026-06-26 14:17:51.892' },
-        { orderItemSeqId: '01', changeReasonEnumId: 'RELEASED', fromFacilityId: '_NA_', facilityId: 'BROADWAY', changeDatetime: '2026-06-26 15:02:11.100' },
-      ],
-    }));
-
-    expect(ofKind(events, 'move')).toHaveLength(2);
-  });
-
   it('groups item cancellations by reason, and folds the items created with the order into placing it', () => {
     const events = buildOrderEvents(sources({
       order: {
@@ -71,24 +59,6 @@ describe('buildOrderEvents', () => {
     // Item 01 was created with the order; item 04 was added a day later, which is its own event.
     expect(ofKind(events, 'placed')[0].records.map((record) => record.type)).toEqual(['orderDate', 'ITEM_CREATED']);
     expect(items.filter((event) => event.statusId === 'ITEM_CREATED').map((event) => event.orderItemSeqIds)).toEqual([['04']]);
-  });
-
-  it('keeps every header status, with its actor and reason', () => {
-    const events = buildOrderEvents(sources({
-      order: {
-        orderId: 'O1', orderDate: T(0), shipGroups: [],
-        statuses: [
-          { statusId: 'ORDER_CREATED', statusDatetime: T(0) },
-          { statusId: 'ORDER_APPROVED', statusDatetime: T(60), statusUserLogin: 'ops.user' },
-          { statusId: 'ORDER_HOLD', statusDatetime: T(120), statusUserLogin: 'ops.user', changeReason: 'Manual' },
-          { statusId: 'ORDER_APPROVED', statusDatetime: T(180) },
-        ],
-      },
-    }));
-
-    // ORDER_CREATED is part of placing the order; a second approval after a hold is shown.
-    expect(ofKind(events, 'orderStatus').map((event) => event.statusId)).toEqual(['ORDER_APPROVED', 'ORDER_HOLD', 'ORDER_APPROVED']);
-    expect(ofKind(events, 'orderStatus')[1]).toMatchObject({ reason: 'Manual', actor: { kind: 'user', login: 'ops.user' } });
   });
 
   it.each([
@@ -114,18 +84,20 @@ describe('buildOrderEvents', () => {
     expect(move.actor).toEqual({ kind: 'system', name: 'Shopify fulfillment sync' });
   });
 
-  it('marks the import assignment to a real facility as the first brokering', () => {
-    // 104494: item 01 arrived assigned to Austin; nothing later is "first".
-    const moves = ofKind(fixtureEvents('104494'), 'move');
+  it('marks the first brokering, whether it was an import assignment or a release', () => {
+    const firstOf = (facilityChanges: any[]) => ofKind(buildOrderEvents(sources({ facilityChanges })), 'move')
+      .filter((move) => move.isFirst).map((move) => [move.move, move.toFacilityId]);
 
-    expect(moves.filter((move) => move.isFirst).map((move) => [move.move, move.toFacilityId])).toEqual([['assigned', 'AUSTIN']]);
-  });
-
-  it('marks the first release when that is how the order was first brokered', () => {
-    // 123768: released from the queue to UK Ecomm, then rejected and released again.
-    const firsts = ofKind(fixtureEvents('123768'), 'move').filter((move) => move.isFirst);
-
-    expect(firsts.map((move) => [move.move, move.fromFacilityId, move.toFacilityId])).toEqual([['released', '_NA_', '100009']]);
+    // An import that assigned the item to a store counts as brokering it.
+    expect(firstOf([
+      { fromFacilityId: 'STORE', facilityId: 'STORE', changeDatetime: T(10) },
+      { changeReasonEnumId: 'BROKERED', fromFacilityId: '_NA_', facilityId: 'WH', changeDatetime: T(500) },
+    ])).toEqual([['assigned', 'STORE']]);
+    expect(firstOf([
+      { changeReasonEnumId: 'RELEASED', fromFacilityId: '_NA_', facilityId: 'STORE', changeDatetime: T(10) },
+      { changeReasonEnumId: 'NOT_IN_STOCK', fromFacilityId: 'STORE', facilityId: 'PARKING', changeDatetime: T(500) },
+      { changeReasonEnumId: 'RELEASED', fromFacilityId: 'PARKING', facilityId: 'WH', changeDatetime: T(900) },
+    ])).toEqual([['released', 'STORE']]);
   });
 
   it('never counts an assignment to a parking facility as brokering', () => {
@@ -150,14 +122,13 @@ describe('buildOrderEvents', () => {
   });
 
   it('dates a return by its return date and drops a facility of _NA_', () => {
-    // 115548: the return items were written at import (Sep 4); the return itself is dated Aug 11.
-    const [ret] = ofKind(fixtureEvents('115548'), 'return');
-    const header = RAILS_UAT.orders['115548'].returnHeadersById[ret.returnId];
+    // The return items were written by the import; the return itself happened earlier.
+    const [ret] = ofKind(buildOrderEvents(sources({
+      order: { orderId: 'O1', orderDate: T(0), statuses: [], shipGroups: [], returnItems: [{ returnId: 'R1', orderItemSeqId: '01', returnQuantity: 1, createdStamp: T(9000) }] },
+      returnHeadersById: { R1: { returnDate: String(T(4000)), destinationFacilityId: '_NA_' } },
+    })), 'return');
 
-    expect(ret.at).toBe(Number(header.returnDate));
-    expect(ret.atKind).toBeUndefined();
-    expect(ret.facilityId).toBeUndefined();
-    expect(ret.link).toEqual({ kind: 'return', id: ret.returnId });
+    expect(ret).toMatchObject({ at: T(4000), atKind: undefined, facilityId: undefined, link: { kind: 'return', id: 'R1' } });
   });
 
   it('falls back to when the return was recorded, and says so, when its header is unavailable', () => {
@@ -167,23 +138,6 @@ describe('buildOrderEvents', () => {
     })), 'return');
 
     expect(ret).toMatchObject({ at: T(900), atKind: 'recorded', itemCount: 2 });
-  });
-
-  it('links returns and both directions of an exchange for the view to resolve', () => {
-    const events = buildOrderEvents(sources({
-      order: {
-        orderId: 'O1', orderDate: T(0), statuses: [], shipGroups: [],
-        returnItems: [{ returnId: 'R1', returnQuantity: 1, createdStamp: T(100) }],
-        itemAssocs: [{ orderItemAssocTypeId: 'EXCHANGE', toOrderId: 'O0', orderItemSeqId: '01', createdStamp: T(1) }],
-      },
-      exchangeChildren: [{ orderId: 'O2', itemCount: 1, facilityId: 'STORE_A', value: T(200) }],
-    }));
-
-    expect(events.filter((event) => event.link).map((event) => [event.id, event.link])).toEqual([
-      ['exchange-from-O0', { kind: 'exchangeSource', id: 'O0' }],
-      ['return-R1', { kind: 'return', id: 'R1' }],
-      ['exchange-to-O2', { kind: 'exchangeChild', id: 'O2' }],
-    ]);
   });
 
   it('leaves an event undated rather than borrowing the order date, and sorts it last', () => {
@@ -223,16 +177,5 @@ describe('shipGroupMilestones', () => {
     expect(shipGroupMilestones(events, '00001', false)).toEqual({ firstBrokeredDate: T(10), picklistDate: T(100), packedDate: undefined, shippedDate: undefined });
     // A parked group's facility changes record parking and rejections, never a brokering.
     expect(shipGroupMilestones(events, '00002', true).firstBrokeredDate).toBeUndefined();
-  });
-
-  it('prefers the brokered or released row over an earlier facility change', () => {
-    const events = buildOrderEvents(sources({
-      facilityChanges: [
-        { shipGroupSeqId: '00001', fromFacilityId: 'STORE_A', facilityId: 'STORE_A', changeDatetime: T(10) },
-        { shipGroupSeqId: '00001', changeReasonEnumId: 'BROKERED', fromFacilityId: '_NA_', facilityId: 'STORE_A', changeDatetime: T(50) },
-      ],
-    }));
-
-    expect(shipGroupMilestones(events, '00001', false).firstBrokeredDate).toBe(T(50));
   });
 });

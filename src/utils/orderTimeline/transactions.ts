@@ -59,9 +59,9 @@ export interface TimelineTransaction {
   children?: TimelineTransaction[];
 }
 
-// Rows written by one action land within a second of each other; separate actions on rails-uat
-// were never closer than 3 s. The span cap and the actor check keep a busy moment from merging
-// two people's work.
+// Rows written by one action land within a second of each other; in a sample of 63 orders,
+// separate actions were never closer than 3 s. The span cap and the actor check keep a busy
+// moment from merging two people's work.
 export const CHAIN_GAP_MS = 2_000;
 const MAX_SPAN_MS = 10_000;
 

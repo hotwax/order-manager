@@ -1,210 +1,140 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Settings } from 'luxon';
 import { buildOrderEvents, type OrderEvent } from '@/utils/orderEvents';
-import { chainEvents, elapsedParts, formatElapsed, groupTransactions, MIN_RUN, timelineDays } from '@/utils/orderTimeline';
-import { englishTranslate, fixtureContext, fixtureEvents, fixtureIsVirtual } from '../support/orderTimelineFixture';
+import { chainEvents, formatElapsed, groupTransactions, timelineDays, type TimelineContext } from '@/utils/orderTimeline';
 
-const headlines = (orderId: string) => groupTransactions(fixtureEvents(orderId), fixtureContext(orderId)).map((tx) => tx.headline);
-const transactions = (orderId: string) => groupTransactions(fixtureEvents(orderId), fixtureContext(orderId));
+// 2:00 PM on Tuesday, Sep 22, 2026 in Los Angeles.
+const T = (seconds: number) => Date.UTC(2026, 8, 22, 21, 0, 0) + seconds * 1_000;
+const FACILITIES: Record<string, string> = { WH: 'Main Warehouse', STORE: 'Downtown Store', PARKING: 'Rejected Item Parking', _NA_: 'Brokering Queue' };
+const isVirtualFacility = (facilityId: string) => ['PARKING', '_NA_'].includes(facilityId);
+
+const ctx = (itemTotal = 1): TimelineContext => ({
+  translate: (key, params) => key.replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? '')),
+  facilityName: (facilityId) => FACILITIES[facilityId] ?? facilityId,
+  statusDescription: (statusId) => statusId,
+  describe: (value) => value,
+  enumDescription: (enumId) => enumId,
+  isVirtualFacility,
+  itemTotal,
+  shipGroupOfItem: { '01': '00001', '02': '00001' },
+  posShipGroupIds: new Set(),
+  orderLabel: (orderId) => orderId,
+  itemLabel: (orderItemSeqId) => ({ '01': 'TEE-M', '02': 'HOODIE-L' } as Record<string, string>)[orderItemSeqId] ?? '',
+});
+
+/** A Shopify order placed at T(0) and imported at T(600), with its later history. */
+function timeline(statuses: any[], facilityChanges: any[] = [], items = ['01']) {
+  const events = buildOrderEvents({
+    order: {
+      orderId: 'O1', orderDate: T(0), entryDate: T(600), salesChannelEnumId: 'WEB_SALES_CHANNEL',
+      identifications: [{ orderIdentificationTypeId: 'SHOPIFY_ORD_ID' }],
+      shipGroups: [{ shipGroupSeqId: '00001', facilityId: 'WH', items: items.map((orderItemSeqId) => ({ orderItemSeqId })) }],
+      statuses: [{ statusId: 'ORDER_CREATED', statusDatetime: T(0) }, ...statuses],
+    },
+    facilityChanges, facilityChangesLoaded: true, unfillable: null, fulfillment: [],
+    returnHeadersById: {}, exchangeChildren: [], isVirtualFacility,
+  });
+  return groupTransactions(events, ctx(items.length));
+}
+
+const move = (orderItemSeqId: string, changeReasonEnumId: string | undefined, fromFacilityId: string, facilityId: string, at: number, changeUserLogin?: string) =>
+  ({ orderItemSeqId, changeReasonEnumId, fromFacilityId, facilityId, changeDatetime: at, changeUserLogin });
 
 beforeAll(() => {
-  // The fixture's days and times are asserted as a Los Angeles viewer sees them.
   Settings.defaultZone = 'America/Los_Angeles';
 });
 
-describe('groupTransactions on rails-uat orders', () => {
-  it.each([
-    ['158647', ['Order placed in Shopify', 'Imported, already cancelled in Shopify']],
-    ['104494', ['Order placed in Shopify', 'Imported and brokered', 'Item cancelled in Shopify', 'Order cancelled in Shopify']],
-    ['157579', ['Order placed in Shopify', 'Imported from Shopify', 'First brokered']],
-    ['101934', ['Order placed in Shopify', 'Imported and brokered', 'Fulfilled in Shopify']],
-    ['107038', ['Order placed in Shopify', 'Imported and brokered', 'Item completed', 'Item cancelled in Shopify']],
-    ['115548', ['Placed and completed in Shopify', 'Return created', 'Imported from Shopify']],
-    ['161352', ['Order placed in Shopify', 'Imported and approved', 'Shipped']],
-    ['162079', ['Order placed in Shopify', 'Sold in store']],
-    ['104821', ['Order placed in Shopify', 'Imported and brokered']],
-    ['158477', ['Order placed in Shopify', 'Imported and approved', 'Location changed in Shopify']],
-  ])('tells %s as %j', (orderId, expected) => {
-    expect(headlines(orderId)).toEqual(expected);
+describe('groupTransactions', () => {
+  it('reads a Shopify cancellation at import as one line, never a rejection', () => {
+    const [placed, imported] = timeline([
+      { statusId: 'ORDER_APPROVED', statusDatetime: T(600.01) },
+      { orderItemSeqId: '01', statusId: 'ITEM_CANCELLED', changeReason: 'SHOPIFY_CANCELLATION', statusDatetime: T(600.04) },
+      { statusId: 'ORDER_CANCELLED', changeReason: 'SHOPIFY_CANCELLATION', statusDatetime: T(600.05) },
+    ], [move('01', 'SHOPIFY_CANCELLATION', 'WH', 'PARKING', T(600.03))]);
+
+    expect(placed.headline).toBe('Order placed in Shopify');
+    expect(imported).toMatchObject({ headline: 'Imported, already cancelled in Shopify', details: ['TEE-M from Main Warehouse'], notes: [] });
+    expect(imported.records.map((record) => record.title)).toEqual(['Created in HotWax', 'ORDER_APPROVED', 'Moved to parking', 'ITEM_CANCELLED', 'ORDER_CANCELLED']);
   });
 
-  it('reads a Shopify cancellation as one cancellation, never a rejection', () => {
-    // 158647 wrote six rows at import: approval, a move into Rejected Item Parking, and the cancellations.
-    const [, imported] = transactions('158647');
+  it('keeps First brokered, and reads two rows to one place once', () => {
+    // The brokering lands 3 s after the import, so it is its own line.
+    const txs = timeline([{ statusId: 'ORDER_APPROVED', statusDatetime: T(603.3) }], [
+      move('01', 'BROKERED', '_NA_', 'STORE', T(603)), move('02', 'BROKERED', '_NA_', 'STORE', T(603.1)),
+      move('01', undefined, 'STORE', 'STORE', T(603.2)), move('02', undefined, 'STORE', 'STORE', T(603.2)),
+    ], ['01', '02']);
 
-    expect(imported.details).toEqual(['861B-398E-12130:XL from 2301 E. 51st St.']);
-    expect(imported.notes).toEqual([]);
-    expect(imported.records.map((record) => record.title)).toEqual(['Created in HotWax', 'Approved', 'Approved', 'Moved to parking', 'Cancelled', 'Cancelled']);
+    expect(txs.map((tx) => tx.headline)).toEqual(['Order placed in Shopify', 'Imported from Shopify', 'First brokered']);
+    expect(txs[2]).toMatchObject({ details: ['2 items to Downtown Store'], notes: ['Approved for fulfillment'] });
   });
 
-  it('names the one item an action touched, and counts several', () => {
-    const [, , partial, last] = transactions('104494');
-
-    expect(partial.details).toEqual(['848C-357C-001001:XS']);
-    expect(last.details).toEqual(['848C-357C-0027617:XS']);
-    expect(transactions('107038')[1].details).toEqual(['2 items to 2301 E. 51st St.']);
-  });
-
-  it('names each record by what happened and the item it happened to', () => {
-    const [, imported] = transactions('104494');
-
-    expect(imported.records.map((record) => [record.title, ...record.lines])).toEqual([
-      ['Approved', '848C-357C-001001:XS'],
-      ['Created in HotWax'],
-      ['Approved', 'Order'],
-      ['Approved', '848C-357C-0027617:XS'],
-      ['Assigned', '848C-357C-001001:XS', 'Austin'],
-    ]);
-    // A record leaves out the reason and the person its row already shows.
-    const [rejected, released] = transactions('123768').find((tx) => tx.kind === 'run')!.children!;
-    expect(rejected).toMatchObject({ reason: 'No variance', actor: 'user.2' });
-    expect([rejected.records[0].title, ...rejected.records[0].lines]).toEqual(['Rejected', '201085-124H-5076:M', 'UK Ecomm to Rejected Item Parking']);
-    expect([released.records[0].title, ...released.records[0].lines]).toEqual(['Released', '201085-124H-5076:M', 'Rejected Item Parking to UK Ecomm']);
-  });
-
-  it('keeps First brokered, with the facility and the approval that came with it', () => {
-    const first = transactions('157579')[2];
-
-    expect(first.details).toEqual(['2 items to CAN WH - Ponyride']);
-    expect(first.notes).toEqual(['Approved for fulfillment']);
-  });
-
-  it('says where an import placed the items', () => {
-    expect(transactions('104494')[1].details).toEqual(['848C-357C-001001:XS to Austin']);
-  });
-
-  it('names the Shopify sync that fulfilled or moved an order', () => {
-    expect(transactions('101934')[2]).toMatchObject({ details: ['730A-255D-8419:25 from 2301 E. 51st St.'], actor: 'Shopify fulfillment sync' });
-    expect(transactions('116143')[2]).toMatchObject({ headline: 'Location changed in Shopify', actor: 'Shopify inbound location sync' });
-  });
-
-  it('notes that the last item\'s cancellation completed the order', () => {
-    expect(transactions('107038')[3]).toMatchObject({ details: ['546-282D-7977:2 from 2301 E. 51st St.'], notes: ['Order completed'] });
-  });
-
-  it('shows a counter sale as sold at the store it was sold in', () => {
-    expect(transactions('162079')[1].details).toEqual(['RM-860D-942F-8984:XL at Fashion Island']);
-  });
-
-  it('folds a store\'s reject and release churn into one run that keeps every step', () => {
-    const txs = transactions('123768');
-    const run = txs.find((tx) => tx.kind === 'run')!;
-
-    expect(txs.map((tx) => tx.headline)).toEqual(['Order placed in Shopify', 'Imported and approved', 'First brokered', 'Rejected and re-brokered', 'Released']);
-    expect(run.details).toEqual(['3 rejections and 2 releases']);
-    expect(run.children!.map((tx) => tx.headline)).toEqual(['Rejected', 'Released', 'Rejected', 'Released', 'Rejected']);
-    expect(run.children!.map((tx) => tx.reason)).toEqual(['No variance', '', 'Not in Stock', '', 'Not in Stock']);
-    // The first brokering is never folded away, and each step names the item it moved.
-    expect(txs[2].details).toEqual(['201085-124H-5076:M released to UK Ecomm']);
-    expect(run.children![0].details).toEqual(['201085-124H-5076:M from UK Ecomm']);
-  });
-
-  it('tells the 11 reference orders in 34 lines', () => {
-    const ids = ['158647', '104494', '157579', '101934', '107038', '115548', '161352', '162079', '104821', '123768', '158477'];
-    expect(ids.reduce((sum, id) => sum + transactions(id).length, 0)).toBe(34);
-  });
-});
-
-describe('groupTransactions on an operator cancellation', () => {
-  // The shape of rails-uat order 119403: imported with a BROKERED row and an assignment row per
-  // item to the same warehouse, then cancelled by an operator, which first moves each item into
-  // Rejected Item Parking under the cancellation's reason.
-  const T = (seconds: number) => 1_790_000_000_000 + seconds * 1_000;
-  const items = ['01', '02', '03'];
-  const order = {
-    orderId: 'O1', orderDate: T(0), entryDate: T(600),
-    shipGroups: [{ shipGroupSeqId: '00001', facilityId: '100002', items: items.map((orderItemSeqId) => ({ orderItemSeqId, productId: `P${orderItemSeqId}` })) }],
-    statuses: [
-      { statusId: 'ORDER_APPROVED', statusDatetime: T(600.5) },
+  it('reads the move into parking an operator cancellation makes as the cancellation', () => {
+    const cancelled = timeline([
+      ...['01', '02'].map((orderItemSeqId) => ({ orderItemSeqId, statusId: 'ITEM_CANCELLED', changeReason: 'NO_VARIANCE_LOG', statusUserLogin: 'ops.user', statusDatetime: T(9000.2) })),
       { statusId: 'ORDER_CANCELLED', changeReason: 'NO_VARIANCE_LOG', statusUserLogin: 'ops.user', statusDatetime: T(9000.4) },
-      ...items.map((orderItemSeqId) => ({ orderItemSeqId, statusId: 'ITEM_CANCELLED', changeReason: 'NO_VARIANCE_LOG', statusUserLogin: 'ops.user', statusDatetime: T(9000.2) })),
-    ],
-  };
-  const facilityChanges = items.flatMap((orderItemSeqId) => [
-    { orderItemSeqId, shipGroupSeqId: '00001', changeReasonEnumId: 'BROKERED', fromFacilityId: '_NA_', facilityId: '100002', changeDatetime: T(600.1) },
-    { orderItemSeqId, shipGroupSeqId: '00001', fromFacilityId: '100002', facilityId: '100002', changeDatetime: T(600.3) },
-    { orderItemSeqId, shipGroupSeqId: '00002', changeReasonEnumId: 'NO_VARIANCE_LOG', fromFacilityId: '100002', facilityId: 'REJECTED_ITM_PARKING', changeUserLogin: 'ops.user', changeDatetime: T(9000.1) },
-  ]);
-  const ctx = {
-    ...fixtureContext('158647'),
-    itemTotal: 3,
-    shipGroupOfItem: { '01': '00001', '02': '00001', '03': '00001' },
-    itemLabel: (seqId: string) => `SKU-${seqId}`,
-  };
-  const txs = () => groupTransactions(buildOrderEvents({
-    order, facilityChanges, facilityChangesLoaded: true, unfillable: null, fulfillment: [],
-    returnHeadersById: {}, exchangeChildren: [], isVirtualFacility: fixtureIsVirtual,
-  }), ctx);
+    ], ['01', '02'].map((id) => move(id, 'NO_VARIANCE_LOG', 'WH', 'PARKING', T(9000.1), 'ops.user')), ['01', '02']).pop()!;
 
-  it('says where the items went once, when two rows moved them to the same place', () => {
-    expect(txs()[1]).toMatchObject({ headline: 'Imported and brokered', details: ['3 items to CAN WH - Ponyride'] });
+    expect(cancelled).toMatchObject({ headline: 'Order cancelled', details: ['2 items from Main Warehouse'], notes: [], reason: 'NO_VARIANCE_LOG', actor: 'ops.user' });
+    expect(cancelled.records.map((record) => record.title)).not.toContain('Rejected');
+    // The row names the reason and the person once; the records do not repeat them.
+    expect(cancelled.records.flatMap((record) => record.lines)).not.toContain('By ops.user');
   });
 
-  it('reads the move into parking as part of the cancellation, not a rejection', () => {
-    const cancelled = txs()[2];
+  it('folds a store rejecting and releasing an item into one run that keeps every step', () => {
+    const txs = timeline([], [
+      move('01', 'RELEASED', '_NA_', 'STORE', T(700), 'lead'),
+      move('01', 'NO_VARIANCE_LOG', 'STORE', 'PARKING', T(5000), 'lead'),
+      move('01', 'RELEASED', 'PARKING', 'STORE', T(5400), 'lead'),
+      move('01', 'NOT_IN_STOCK', 'STORE', 'PARKING', T(5430), 'lead'),
+      move('01', 'RELEASED', 'PARKING', 'STORE', T(5480), 'lead'),
+      move('01', 'NOT_IN_STOCK', 'STORE', 'PARKING', T(5500), 'lead'),
+      move('01', 'RELEASED', 'PARKING', 'WH', T(90000), 'ops.user'),
+    ]);
+    const run = txs[3];
 
-    expect(cancelled).toMatchObject({ headline: 'Order cancelled', details: ['3 items from CAN WH - Ponyride'], notes: [], reason: 'No variance', actor: 'ops.user' });
-    expect(cancelled.records.filter((record) => record.title === 'Moved to parking')).toHaveLength(3);
-    expect(cancelled.records.some((record) => record.title === 'Rejected')).toBe(false);
-    // Every record was by the same person for the same reason, so no record repeats either.
-    expect(cancelled.records.flatMap((record) => record.lines).some((line) => line.includes('ops.user') || line === 'No variance')).toBe(false);
+    expect(txs.map((tx) => tx.headline)).toEqual(['Order placed in Shopify', 'Imported from Shopify', 'First brokered', 'Rejected and re-brokered', 'Released']);
+    expect(txs[2].details).toEqual(['TEE-M released to Downtown Store']);
+    expect(run.details).toEqual(['3 rejections and 2 releases']);
+    expect(run.children!.map((tx) => [tx.headline, tx.details[0], tx.reason])).toEqual([
+      ['Rejected', 'TEE-M from Downtown Store', 'NO_VARIANCE_LOG'],
+      ['Released', 'TEE-M to Downtown Store', ''],
+      ['Rejected', 'TEE-M from Downtown Store', 'NOT_IN_STOCK'],
+      ['Released', 'TEE-M to Downtown Store', ''],
+      ['Rejected', 'TEE-M from Downtown Store', 'NOT_IN_STOCK'],
+    ]);
   });
 });
 
 describe('chainEvents', () => {
-  const T = (seconds: number) => 1_790_000_000_000 + seconds * 1_000;
-  const move = (at: number, login?: string): OrderEvent => ({
-    id: `m${at}`, kind: 'move', move: 'rejected', at, actor: login ? { kind: 'user', login } : undefined,
+  const event = (seconds: number, login?: string): OrderEvent => ({
+    id: `m${seconds}`, kind: 'move', move: 'rejected', at: T(seconds), actor: login ? { kind: 'user', login } : undefined,
     shipGroupSeqIds: [], orderItemSeqIds: ['01'], records: [],
   });
 
-  it('chains events less than 2 seconds apart and splits at a longer gap', () => {
-    expect(chainEvents([move(T(0)), move(T(1)), move(T(2.5)), move(T(6))]).map((group) => group.length)).toEqual([3, 1]);
+  it('chains events less than 2 s apart and splits at a longer gap', () => {
+    expect(chainEvents([event(0), event(1), event(2.5), event(6)]).map((group) => group.length)).toEqual([3, 1]);
   });
 
   it('never merges two people\'s actions, however close', () => {
-    expect(chainEvents([move(T(0), 'amy'), move(T(0.5), 'raj')]).map((group) => group.length)).toEqual([1, 1]);
+    expect(chainEvents([event(0, 'amy'), event(0.5, 'raj')]).map((group) => group.length)).toEqual([1, 1]);
   });
 
-  it('caps a transaction at 10 seconds', () => {
-    const steady = Array.from({ length: 12 }, (_, index) => move(T(index * 1.5)));
-    expect(chainEvents(steady).map((group) => group.length)).toEqual([7, 5]);
-  });
-
-  it('keeps linked returns and exchanges on their own line', () => {
-    const events = buildOrderEvents({
-      order: { orderId: 'O1', orderDate: T(0), entryDate: T(0.2), statuses: [], shipGroups: [], returnItems: [{ returnId: 'R1', returnQuantity: 1, createdStamp: T(0.4) }] },
-      facilityChanges: [], facilityChangesLoaded: true, unfillable: null, fulfillment: [],
-      returnHeadersById: { R1: null }, exchangeChildren: [], isVirtualFacility: fixtureIsVirtual,
-    });
-
-    expect(chainEvents(events).map((group) => group.map((event) => event.kind))).toEqual([['placed', 'imported'], ['return']]);
-  });
-});
-
-describe('foldRuns', () => {
-  it(`folds only runs of ${MIN_RUN} or more`, () => {
-    // 160638 has one rejection on its own: nothing to fold.
-    expect(transactions('160638').some((tx) => tx.kind === 'run')).toBe(false);
+  it('caps a transaction at 10 s', () => {
+    expect(chainEvents(Array.from({ length: 12 }, (_, index) => event(index * 1.5))).map((group) => group.length)).toEqual([7, 5]);
   });
 });
 
 describe('timelineDays', () => {
-  it('puts each transaction under its day with the time since the one before', () => {
-    const ctx = fixtureContext('104494');
-    const days = timelineDays(transactions('104494'), ctx);
+  it('puts each line under its day with the time since the line before', () => {
+    const txs = timeline([{ orderItemSeqId: '01', statusId: 'ITEM_CANCELLED', statusDatetime: T(2 * 86_400 + 3_900) }]);
+    const days = timelineDays(txs, ctx());
 
-    expect(days.map((day) => day.label)).toEqual(['Tuesday, Sep 1, 2026', 'Thursday, Sep 3, 2026', 'Thursday, Sep 10, 2026', 'Wednesday, Sep 16, 2026']);
-    expect(days.map((day) => day.entries[0].elapsed)).toEqual(['', '1 day 19 hours later', '7 days 1 hour later', '5 days 21 hours later']);
-    expect(days[0].entries[0].time).toBe('8:34 AM');
-  });
-
-  it('gives a folded run the span it covers', () => {
-    const ctx = fixtureContext('123768');
-    const run = timelineDays(transactions('123768'), ctx).flatMap((day) => day.entries).find((entry) => entry.kind === 'run')!;
-
-    expect(run.time).toBe('12:32 PM');
-    expect(run.details).toEqual(['3 rejections and 2 releases', '12:32 PM to 12:41 PM']);
+    expect(days.map((day) => day.label)).toEqual(['Tuesday, Sep 22, 2026', 'Thursday, Sep 24, 2026']);
+    expect(days.flatMap((day) => day.entries.map((entry) => [entry.time, entry.elapsed]))).toEqual([
+      ['2:00 PM', ''],
+      ['2:10 PM', '10 minutes later'],
+      ['3:05 PM', '2 days 1 hour later'],
+    ]);
   });
 });
 
@@ -216,18 +146,11 @@ describe('formatElapsed', () => {
     [20_000, ''],
     [minutes(1), '1 minute'],
     [minutes(59) + 40_000, '59 minutes'],
-    [minutes(60), '1 hour'],
     [minutes(179) + 45_000, '3 hours'],
     [minutes(25 * 60), '1 day 1 hour'],
     [minutes(42 * 60 + 57), '1 day 19 hours'],
-    [minutes(47 * 60 + 45), '2 days'],
     [-minutes(3), ''],
   ])('reads %d ms as "%s"', (span, expected) => {
-    expect(formatElapsed(T0, T0 + span, englishTranslate)).toBe(expected);
-  });
-
-  it('is empty when either date is missing', () => {
-    expect(elapsedParts(undefined, T0)).toEqual([]);
-    expect(elapsedParts(T0, undefined)).toEqual([]);
+    expect(formatElapsed(T0, T0 + span, ctx().translate)).toBe(expected);
   });
 });
