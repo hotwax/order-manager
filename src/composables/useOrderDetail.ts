@@ -25,14 +25,6 @@ export const UNFILLABLE_SAMPLE_SIZE = 100;
  */
 export const FACILITY_CHANGE_PAGE_SIZE = 200;
 
-/** A task as AddOrderTaskModal collects it; one is created on each ship group it is for. */
-export interface OrderTask {
-  workEffortTypeId: string;
-  workEffortPurposeTypeId: string;
-  workEffortName: string;
-  description: string;
-}
-
 /** A product issued at a facility: one order line of a POS-completed ship group. */
 export interface IssuanceLine {
   productId: string;
@@ -160,35 +152,7 @@ export function useOrderDetail() {
     return details.flat();
   }
 
-  /** One task on each of these ship groups of one order. */
-  async function createOrderTasks(orderId: string, shipGroupSeqIds: string[], task: OrderTask): Promise<any> {
-    return api({
-      url: "oms/orders/tasks",
-      method: "POST",
-      data: shipGroupSeqIds.map((shipGroupSeqId) => ({ orderId, shipGroupSeqId, ...task, statusId: "TASK_CREATED" }))
-    });
-  }
-
-  /** One task on every ship group of each of these orders, in one request. */
-  async function bulkCreateOrderTasks(orderIds: string[], task: OrderTask): Promise<any> {
-    const shipGroupsByOrder = await Promise.all(orderIds.map(async (orderId) => ({
-      orderId,
-      shipGroups: await listOf(api({ url: `oms/orders/${orderId}/shipGroups`, method: "GET" }))
-    })));
-
-    return api({
-      url: "oms/orders/tasks",
-      method: "POST",
-      data: shipGroupsByOrder.flatMap(({ orderId, shipGroups }) => shipGroups
-        .map((shipGroup) => shipGroup.shipGroupSeqId)
-        .filter(Boolean)
-        .map((shipGroupSeqId) => ({ orderId, shipGroupSeqId, ...task, statusId: "TASK_CREATED" })))
-    });
-  }
-
   return {
-    createOrderTasks,
-    bulkCreateOrderTasks,
     getOrder,
     getCommunicationEvents,
     getRiskAssessments,

@@ -70,10 +70,10 @@
 
 <script setup lang="ts">
 import {
+  IonContent,
   IonIcon,
   IonInput,
   IonItem,
-  IonLabel,
   IonList,
   IonPopover,
   IonSelect,
@@ -82,18 +82,15 @@ import {
 } from '@ionic/vue';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { DxpModal, translate, useModalFlow } from '@common';
-import { useOrderDetail } from '@/composables/useOrderDetail';
-import { requiredLabel, showToast } from '@/utils';
+import { requiredLabel } from '@/utils';
 import { useSeedStore } from '@/store/seed';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
 
 const props = defineProps<{
   // Optional modal title (already localized by the caller); defaults to "Add task".
   title?: string;
-  // Tasks go on every ship group of these orders. The bulk "Add task" flow.
-  orderIds?: string[];
-  // Or on this order's ship groups, which the user picks from when there is more than one.
-  orderId?: string;
+  // When provided, the user can scope the task to one or more ship groups of an
+  // order. Omitted for the generic bulk "Add task" flow, which keeps its old shape.
   shipGroups?: Array<{ id: string; label?: string }>;
   autoGenerateTaskName?: boolean;
   defaultOrderName?: string;
@@ -163,20 +160,14 @@ const isDirty = computed(() => (taskNameEdited.value && !!form.workEffortName.tr
   || form.workEffortPurposeTypeId !== (props.defaultWorkEffortPurposeTypeId || '')
   || selectedShipGroupSeqIds.value.length !== (props.shipGroups?.length ?? 0));
 
-const { createOrderTasks, bulkCreateOrderTasks } = useOrderDetail();
-
+// Save hands the task back; the screen that opened the modal creates it, as before.
 useModalFlow({
   dirty: isDirty,
   canConfirm: isValid,
-  async confirm() {
-    const task = { ...form };
-    try {
-      if (props.orderId) await createOrderTasks(props.orderId, selectedShipGroupSeqIds.value, task);
-      else await bulkCreateOrderTasks(props.orderIds ?? [], task);
-    } catch {
-      throw new Error(translate('Failed to create tasks. Please try again.'));
-    }
-    await showToast(translate('Tasks created successfully.'));
+  confirm() {
+    const payload: Record<string, any> = { ...form };
+    if (props.shipGroups) payload.shipGroupSeqIds = [...selectedShipGroupSeqIds.value];
+    return payload;
   },
 });
 </script>

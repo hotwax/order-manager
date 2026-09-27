@@ -200,7 +200,7 @@ import {
   alertController,
   modalController,
 } from '@ionic/vue';
-import { openModal, translate } from '@common';
+import { translate } from '@common';
 import { chevronDownOutline } from 'ionicons/icons';
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
@@ -328,7 +328,18 @@ async function confirmCancelOrders() {
 }
 
 async function openAddTaskModal() {
-  if (await openModal(AddOrderTaskModal, { orderIds: [...selectedOrderIds.value] })) exitSelectMode();
+  const orderIds = [...selectedOrderIds.value];
+  const modal = await modalController.create({ component: AddOrderTaskModal });
+  await modal.present();
+  const { data, role } = await modal.onWillDismiss();
+  if (role !== 'confirm' || !data) return;
+  try {
+    await orderDetailStore.bulkCreateOrderTasks(orderIds, data);
+    await showToast(translate('Tasks created successfully.'));
+    exitSelectMode();
+  } catch {
+    await showToast(translate('Failed to create tasks. Please try again.'));
+  }
 }
 
 async function openEditShippingMethodModal() {

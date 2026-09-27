@@ -149,7 +149,7 @@ import {
   modalController,
   useIonRouter,
 } from '@ionic/vue';
-import { api, openModal, translate } from '@common';
+import { api, translate } from '@common';
 import { computed, onMounted, ref, watch } from 'vue';
 import { searchOrders } from '@/services/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -366,7 +366,18 @@ async function confirmCancelOrders() {
 }
 
 async function openAddTaskModal() {
-  if (await openModal(AddOrderTaskModal, { orderIds: [...selectedOrderIds.value] })) exitSelectMode();
+  const orderIds = [...selectedOrderIds.value];
+  const modal = await modalController.create({ component: AddOrderTaskModal });
+  await modal.present();
+  const { data, role } = await modal.onWillDismiss();
+  if (role !== 'confirm' || !data) return;
+  try {
+    await orderDetailStore.bulkCreateOrderTasks(orderIds, data);
+    await showToast(translate('Tasks created successfully.'));
+    exitSelectMode();
+  } catch {
+    await showToast(translate('Failed to create tasks. Please try again.'));
+  }
 }
 
 async function openEditShippingMethodModal() {
