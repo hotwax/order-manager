@@ -347,8 +347,9 @@ async function runAction(action: BulkActionDefinition) {
       header: translate(action.label),
       message: translate(action.confirmText),
       buttons: [
-        { text: translate('Cancel'), role: 'cancel' },
-        { text: translate('Confirm'), role: 'confirm' }
+        // The confirm button repeats the action, so backing out cannot read as "Cancel" too.
+        { text: translate(action.destructive ? 'Keep orders' : 'Cancel'), role: 'cancel' },
+        { text: translate(action.label), role: 'confirm' }
       ]
     });
     await alert.present();

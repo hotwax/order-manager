@@ -178,7 +178,7 @@ async function handleCreateCustomer() {
     emitter.emit('dismissLoader');
 
     if (res.hasShopifyError === 'Y') {
-      showToast(translate("Shopify Error: {message}", { message: String(res.shopifyErrorMessage) }, { escapeParameter: true }));
+      showToast(translate("Shopify error: {message}", { message: String(res.shopifyErrorMessage) }, { escapeParameter: true }));
       return;
     }
     if (!res.customerId) {

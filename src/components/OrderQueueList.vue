@@ -345,9 +345,10 @@ async function confirmCancelOrders() {
     header: translate('Cancel open items'),
     message: translate('This will cancel all open items for the {count} selected orders. This action cannot be undone.', { count: orderIds.length }),
     buttons: [
-      { text: translate('Cancel'), role: 'cancel' },
+      { text: translate('Keep items'), role: 'cancel' },
       {
-        text: translate('Confirm'),
+        text: translate('Cancel open items'),
+        role: 'confirm',
         handler: async () => {
           try {
             await orderDetailStore.bulkCancelOrders(orderIds);

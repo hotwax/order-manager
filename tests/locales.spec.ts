@@ -87,6 +87,6 @@ describe('locale messages', () => {
   it('resolve links, plurals through links, and escaped parameters', () => {
     expect(translate('Top 10 facilities by {metric}', { metric: 'Order volume' })).toBe('Top 10 facilities by order volume');
     expect(translate('{count} items by order date', { count: 1 })).toBe('1 item by order date');
-    expect(translate('Shopify Error: {message}', { message: '<b>x</b>' }, { escapeParameter: true })).toBe('Shopify Error: &lt;b&gt;x&lt;/b&gt;');
+    expect(translate('Shopify error: {message}', { message: '<b>x</b>' }, { escapeParameter: true })).toBe('Shopify error: &lt;b&gt;x&lt;/b&gt;');
   });
 });

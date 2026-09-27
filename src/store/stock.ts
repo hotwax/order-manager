@@ -42,7 +42,7 @@ export const useStockStore = defineStore("stock", {
         }
       } catch (err) {
         logger.error(err)
-        commonUtil.showToast(translate("No data available"))
+        commonUtil.showToast(translate("No data available."))
       }
     }
   },
