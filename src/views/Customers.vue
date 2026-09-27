@@ -29,7 +29,8 @@
       />
 
       <ion-list v-else>
-        <ion-list-header>
+        <!-- Hidden at zero, where the empty state says it better than "0 of 0". -->
+        <ion-list-header v-if="customers.length">
           <ion-label>{{ translate("{shown} of {count} customers", { shown: customers.length, count: total }) }}</ion-label>
           <OrderSortPopover
             v-model="searchSort"

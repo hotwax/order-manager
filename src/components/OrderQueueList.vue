@@ -70,7 +70,8 @@
       />
 
       <ion-list v-else>
-        <ion-list-header class="order-results-header">
+        <!-- Hidden at zero, where the empty state says it better than "0 of 0". -->
+        <ion-list-header v-if="searchResults.length" class="order-results-header">
           <span class="order-results-header-start">
             <ion-checkbox
               v-if="selectMode"

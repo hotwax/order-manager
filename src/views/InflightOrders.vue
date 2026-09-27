@@ -19,7 +19,8 @@
       />
 
       <ion-list>
-        <ion-list-header>
+        <!-- Hidden at zero, where the empty state says it better than "0 of 0". -->
+        <ion-list-header v-if="orders.length">
           <ion-checkbox
             class="ion-margin-end"
             v-if="selectMode"
