@@ -100,6 +100,8 @@ export interface OrderEventSources {
   facilityChanges: any[];
   /** False while the facility changes are loading or after they failed. */
   facilityChangesLoaded: boolean;
+  /** The facility changes filled their page: only the newest moves are here. */
+  facilityChangesTruncated?: boolean;
   unfillable: UnfillableSummary | null;
   /** `get#OrderFulfillmentTimeline` entries, one per ship group. */
   fulfillment: any[];

@@ -119,6 +119,12 @@ describe('chainEvents', () => {
     expect(chainEvents([event(0, 'amy'), event(0.5, 'raj')]).map((group) => group.length)).toEqual([1, 1]);
   });
 
+  it('keeps an action together either side of a return written in the same moment', () => {
+    const ret: OrderEvent = { id: 'return-R1', kind: 'return', returnId: 'R1', itemCount: 1, at: T(0.5), shipGroupSeqIds: [], orderItemSeqIds: ['01'], records: [], link: { kind: 'return', id: 'R1' } };
+
+    expect(chainEvents([event(0), ret, event(1)]).map((group) => group.map((item) => item.id))).toEqual([['m0', 'm1'], ['return-R1']]);
+  });
+
   it('caps a transaction at 10 s', () => {
     expect(chainEvents(Array.from({ length: 12 }, (_, index) => event(index * 1.5))).map((group) => group.length)).toEqual([7, 5]);
   });

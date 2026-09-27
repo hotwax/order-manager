@@ -100,6 +100,19 @@ describe('buildOrderEvents', () => {
     ])).toEqual([['released', 'STORE']]);
   });
 
+  it('takes the first brokering from the fulfillment timeline when the facility changes were cut off', () => {
+    const moves = (fulfillment: any[]) => ofKind(buildOrderEvents(sources({
+      facilityChanges: [{ changeReasonEnumId: 'BROKERED', fromFacilityId: '_NA_', facilityId: 'WH', changeDatetime: T(5000) }],
+      facilityChangesTruncated: true,
+      fulfillment,
+    })), 'move').map((move) => [move.at, !!move.isFirst]);
+
+    // The first brokering fell off the page; the fulfillment timeline still dates it.
+    expect(moves([{ shipGroupSeqId: '00001', firstBrokeredDate: T(100) }])).toEqual([[T(100), true], [T(5000), false]]);
+    // Without that date, nothing on a cut-off page is called first.
+    expect(moves([])).toEqual([[T(5000), false]]);
+  });
+
   it('never counts an assignment to a parking facility as brokering', () => {
     const moves = ofKind(buildOrderEvents(sources({
       facilityChanges: [

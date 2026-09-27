@@ -59,6 +59,13 @@ export function buildOrderEvents(sources: OrderEventSources): OrderEvent[] {
   const moves = sources.facilityChangesLoaded
     ? facilityChangeEvents(sources.facilityChanges)
     : fallbackBrokeringEvents(sources.fulfillment);
+  // A full page holds only the newest moves. The fulfillment timeline dates each group's first
+  // brokering from the whole history, so recover the ones that fell off the page.
+  const truncated = sources.facilityChangesLoaded && !!sources.facilityChangesTruncated;
+  if (truncated) {
+    const oldest = Math.min(...moves.map((move) => move.at ?? Infinity));
+    moves.push(...fallbackBrokeringEvents(sources.fulfillment).filter((move) => (move.at as number) < oldest));
+  }
 
   const events: OrderEvent[] = [
     ...statusEvents(order),
@@ -91,8 +98,10 @@ export function buildOrderEvents(sources: OrderEventSources): OrderEvent[] {
     return KIND_ORDER[left.kind] - KIND_ORDER[right.kind];
   });
 
+  // With a cut-off history the oldest move on the page is not necessarily the first; only a
+  // brokering recovered from the fulfillment timeline is known to be.
   const first = events.find((event) => event.at !== undefined && isBrokeringMove(event, sources.isVirtualFacility)) as OrderEventOf<'move'> | undefined;
-  if (first) first.isFirst = true;
+  if (first && (!truncated || first.records.every((record) => record.source === 'fulfillment'))) first.isFirst = true;
 
   return events;
 }

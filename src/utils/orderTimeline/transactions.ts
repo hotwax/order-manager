@@ -79,7 +79,8 @@ export function chainEvents(events: OrderEvent[]): OrderEvent[][] {
 
   events.forEach((event) => {
     // Returns and exchanges are their own records with their own links; undated events have no
-    // neighbours to join.
+    // neighbours to join. The open chain stays open: an import that writes a return in the same
+    // moment is still one import either side of it.
     if (event.at === undefined || event.link) {
       groups.push([event]);
       return;

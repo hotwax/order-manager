@@ -343,6 +343,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       order: state.byOrderId[orderId]?.payload || null,
       facilityChanges: state.facilityChangesByOrderId[orderId] || [],
       facilityChangesLoaded: Array.isArray(state.facilityChangesByOrderId[orderId]),
+      facilityChangesTruncated: !!state.facilityChangesTruncatedByOrderId[orderId],
       unfillable: state.unfillableByOrderId[orderId] || null,
       fulfillment: state.fulfillmentTimelineByOrderId[orderId] || [],
       returnHeadersById: state.returnHeadersById,
