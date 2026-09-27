@@ -2,10 +2,10 @@
   <div class="section-header">
     <div>
       <h1>{{ translate('App') }}</h1>
-      <p class="overline">{{ translate("Version: ", { appVersion }) }}</p>
+      <p class="overline">{{ translate("Version: {appVersion}", { appVersion }) }}</p>
     </div>
     <div class="ion-text-end">
-      <p class="overline">{{ translate("Built: ", { builtDateTime: getDateTime(appInfo.builtTime) }) }}</p>
+      <p class="overline">{{ translate("Built: {builtDateTime}", { builtDateTime: getDateTime(appInfo.builtTime) }) }}</p>
     </div>
   </div>
 </template>

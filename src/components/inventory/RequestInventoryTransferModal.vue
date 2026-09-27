@@ -73,7 +73,7 @@
                 {{ row.facilityName }}
                 <p>{{ row.facilityId }}</p>
                 <p v-if="row.miles !== undefined">
-                  {{ distanceFormat.format(row.miles) }} {{ translate('miles') }}
+                  {{ translate('{distance} miles', { distance: distanceFormat.format(row.miles), count: row.miles }) }}
                 </p>
               </ion-label>
               <ion-label slot="end" class="ion-text-end transfer-measure">
@@ -100,7 +100,7 @@
             <p class="overline">
               {{ translate('New transfer') }}
             </p>
-            {{ quantity }} {{ translate('qty') }}
+            {{ translate('{count} qty', { count: Number(quantity) }) }}
           </ion-label>
         </ion-item>
 

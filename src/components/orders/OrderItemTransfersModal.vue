@@ -32,7 +32,7 @@
         <ion-item lines="none">
           <ion-label>
             <p class="overline">{{ translate('Inventory transfer: {id}', { id: transfer.id }) }}</p>
-            {{ transfer.quantity }} {{ translate('qty') }}
+            {{ translate('{count} qty', { count: Number(transfer.quantity) }) }}
             <p v-if="transfer.requestedDate">
               {{ translate('Requested by {source} on {date}', { source: transfer.sourceLabel, date: formatDateTime(transfer.requestedDate) }) }}
             </p>

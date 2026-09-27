@@ -212,8 +212,8 @@ const searchPlaceholder = computed(() => ({
 // total when that total is genuinely larger than what has been loaded; otherwise claiming
 // "25 of 25" while more pages exist would be wrong.
 const resultCountLabel = computed(() => (total.value > returns.value.length
-  ? `${returns.value.length} ${translate("of")} ${total.value} ${translate("returns")}`
-  : `${returns.value.length} ${translate("returns")}`));
+  ? translate("{shown} of {count} returns", { shown: returns.value.length, count: total.value })
+  : translate("{count} returns", { count: returns.value.length })));
 const searchContractNote = computed(() => ({
   RETURN_ID: translate("Return ID lookup opens the existing return detail contract; partial matches are not supported."),
   ORDER_ID: translate("Order lookup uses the existing exact order ID filter."),

@@ -229,7 +229,7 @@
                 <ion-label class="ion-text-end return-item-amount">
                   {{ itemAmount(item) }}
                   <p v-if="item.returnPrice != null && !isAmountOnlyAppeasementItem(item)">
-                    {{ formatMoney(item.returnPrice, returnRecord.currencyUomId) }} {{ translate('each') }}
+                    {{ translate("{amount} each", { amount: formatMoney(item.returnPrice, returnRecord.currencyUomId) }) }}
                   </p>
                 </ion-label>
               </div>

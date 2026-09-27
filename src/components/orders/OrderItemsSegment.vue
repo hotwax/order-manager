@@ -26,7 +26,7 @@
               :facility-disabled="true"
               :statuses="group.statuses"
               :amount="money(group.totalPrice)"
-              :adjustments="group.adjustments.map((adj) => ({ label: adj.isIncluded ? `${adj.label} (${translate('included')})` : adj.label, amount: money(adj.amount) }))"
+              :adjustments="group.adjustments.map((adj) => ({ label: adj.isIncluded ? translate('{label} (included)', { label: adj.label }) : adj.label, amount: money(adj.amount) }))"
               @update:selected="selectItems(group.items, $event)"
             />
             <div slot="content">

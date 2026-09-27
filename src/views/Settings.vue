@@ -125,7 +125,7 @@
               <ion-icon slot="start" :icon="getStatusIcon(item.status)" :color="getStatusColor(item.status)" />
               <ion-label>
                 {{ item.label }}
-                <p v-if="item.status === 'success' && item.count !== undefined">{{ translate("Fetched") }} {{ item.count }} {{ translate("records") }}</p>
+                <p v-if="item.status === 'success' && item.count !== undefined">{{ translate('Fetched {count} records', { count: item.count }) }}</p>
                 <p v-else>{{ translate(getStatusLabel(item.status)) }}</p>
               </ion-label>
               <ion-button slot="end" fill="clear" @click="item.refresh()" :aria-label="translate('Refresh {label}', { label: item.label })" :title="translate('Refresh {label}', { label: item.label })">
@@ -135,14 +135,14 @@
 
             <!-- Local database (IndexedDB): live row counts straight from the database. -->
             <ion-item-divider>
-              <ion-label>{{ translate("Local database") }} · {{ totalRows }} {{ translate("records") }}</ion-label>
+              <ion-label>{{ translate('Local database: {count} records', { count: totalRows }) }}</ion-label>
             </ion-item-divider>
             <ion-item v-for="domain in domains" :key="domain.name">
               <ion-icon slot="start" :icon="getStatusIcon(domain.status)" :color="getStatusColor(domain.status)" />
               <ion-label>
                 {{ translate(domain.label) }}
                 <p>
-                  {{ domain.count }} {{ translate("records") }}
+                  {{ translate('{count} records', { count: domain.count }) }}
                   <template v-if="domain.syncedAt"> · {{ translate("synced") }} {{ formatSyncTime(domain.syncedAt) }}</template>
                   <template v-else-if="domain.syncClass === 'A'"> · {{ translate("live while in use") }}</template>
                   <template v-else> · {{ translate("not synced yet") }}</template>

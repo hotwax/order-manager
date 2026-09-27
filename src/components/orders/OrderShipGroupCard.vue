@@ -255,7 +255,7 @@
                 <div v-else>{{ translate('Shipping address not available') }}</div>
               </ion-label>
               <p slot="end" v-if="!shipGroup.isVirtual && distance">
-                {{ distance }} {{ translate('miles') }}
+                {{ translate('{distance} miles', { distance, count: Number(distance) }) }}
               </p>
               <ion-button v-if="!disabledActions.EDIT_ADDRESS" slot="end" fill="clear"
                 color="medium" :id="'shipping-opt-trigger-' + shipGroup.id"

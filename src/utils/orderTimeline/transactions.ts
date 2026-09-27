@@ -107,7 +107,7 @@ export function chainEvents(events: OrderEvent[]): OrderEvent[][] {
 const itemIds = (events: OrderEvent[]) => [...new Set(events.flatMap((event) => event.orderItemSeqIds))];
 
 function countPhrase(count: number, ctx: TimelineContext, total?: number): string {
-  if (total && total > count) return ctx.translate('{count} of {total} items', { count, total });
+  if (total && total > count) return ctx.translate('{shown} of {count} items', { shown: count, count: total });
   return ctx.translate('{count} items', { count });
 }
 

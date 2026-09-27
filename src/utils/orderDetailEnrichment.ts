@@ -181,7 +181,7 @@ function itemAdjustmentSummaries(raw: any, rawItem: any, seed: EnrichmentStores[
 
     const { amount, isIncluded } = adjustmentAmount(adj);
     if (amount === 0) return;
-    const comment = isIncluded ? `${label} (${translate('included')})` : label;
+    const comment = isIncluded ? translate('{label} (included)', { label }) : label;
     totals[comment] = (totals[comment] || 0) + amount;
   });
 

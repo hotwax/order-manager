@@ -117,7 +117,7 @@
           label-placement="start"
           type="number"
           :value="getSuggestedItems(task).suggestedRefund"
-          :helper-text="`${formatMoney(task.grandTotal, task.currencyUom)} ${translate('available to refund')}`"
+          :helper-text="translate('{amount} available to refund', { amount: formatMoney(task.grandTotal, task.currencyUom) })"
           :clear-input="true"
           @ionInput="task._refundAmount = $event.detail.value != null ? Number($event.detail.value) : undefined"
           @ionClear="task._refundAmount = undefined"

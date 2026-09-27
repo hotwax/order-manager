@@ -128,7 +128,7 @@
               @ionChange="toggleCurrentPageSelection($event.detail.checked)"
             />
           </span>
-          <ion-label>{{ translate("{loaded} of {total} matching orders", { loaded: searchResults.length, total: searchTotal }) }}</ion-label>
+          <ion-label>{{ translate("{shown} of {count} matching orders", { shown: searchResults.length, count: searchTotal }) }}</ion-label>
           <OrderSortPopover v-model="searchSort" trigger-id="find-order-sort-trigger" />
           <ion-button v-if="canUseBulkActions" fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
@@ -160,7 +160,7 @@
 
     <ion-footer v-if="selectMode">
       <ion-toolbar>
-        <ion-title size="small">{{ selectedOrderIds.length }} {{ translate('selected') }}</ion-title>
+        <ion-title size="small">{{ translate('{count} selected', { count: selectedOrderIds.length }) }}</ion-title>
         <ion-buttons slot="end" class="bulk-action-buttons">
           <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
           <ion-button :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
@@ -253,7 +253,7 @@ const statusFilterLabel = computed(() => {
   if (!selectedStatusIds.value.length) return translate('All statuses');
   if (selectedStatusIds.value.length === 1) return statusDescription(selectedStatusIds.value[0]);
 
-  return `${selectedStatusIds.value.length} ${translate('statuses')}`;
+  return translate('{count} statuses', { count: selectedStatusIds.value.length });
 });
 const currentPageOrderIds = computed(() => searchResults.value.map((order) => order.id));
 const allCurrentPageSelected = computed(() => {
@@ -302,7 +302,7 @@ async function confirmCancelOrders() {
   const orderIds = [...selectedOrderIds.value];
   const alert = await alertController.create({
     header: translate('Cancel open items'),
-    message: translate('This will cancel all open items for the {count} selected order(s). This action cannot be undone.', { count: orderIds.length }),
+    message: translate('This will cancel all open items for the {count} selected orders. This action cannot be undone.', { count: orderIds.length }),
     buttons: [
       { text: translate('Dismiss'), role: 'cancel' },
       {

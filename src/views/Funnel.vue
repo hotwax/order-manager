@@ -40,7 +40,7 @@
             <!-- Order Count today -->
             <h1 class="big-number">{{ (fulfillmentProgress.totalOrdersCount || 0).toLocaleString() }}</h1>
             <!-- Time since day start -->
-            <p class="time-elapsed">{{ hoursSinceDayStart }} {{ translate("hours since day start") }}</p>
+            <p class="time-elapsed">{{ translate("{count} hours since day start", { count: hoursSinceDayStart }) }}</p>
           </div>
 
           <div class="metrics">
@@ -50,7 +50,7 @@
                   <p>{{ metric.label }}</p>
                   <p>{{ metric.percent }}%</p>
                 </div>
-                <ion-note>{{ formatCount(metric.count) }} / {{ formatCount(fulfillmentStats.totalShipGroups) }} {{ translate("ship groups") }}</ion-note>
+                <ion-note>{{ translate("{shown} / {total} ship groups", { shown: formatCount(metric.count), total: formatCount(fulfillmentStats.totalShipGroups), count: countValue(fulfillmentStats.totalShipGroups) }) }}</ion-note>
                 <ion-progress-bar :value="metric.value" :aria-label="metric.label"></ion-progress-bar>
               </div>
             </ion-item>
@@ -220,7 +220,7 @@
       <!-- Facilities List -->
       <ion-list class="facilities ion-padding-top">
         <ion-list-header>
-          <ion-label>{{ translate("Top 10 facilities by") }} {{ selectedDimension }} {{ searchQuery && translate("or") }} {{ searchQuery }}</ion-label>
+          <ion-label>{{ facilityListHeader }}</ion-label>
         </ion-list-header>
 
         <!-- Error state: surface failure + retry instead of "No facilities found" -->
@@ -319,11 +319,11 @@
             <ion-list class="fulfill">
               <ion-item lines="full" :button="true" :detail="true" :href="routeHref(workflowRoute('/open'))" @click="navigateRoute($event, workflowRoute('/open'))">
                 <ion-icon :icon="mailUnreadOutline" slot="start" />
-                <ion-label>{{ facilityFulfillmentProgress?.openCount ?? 0 }} {{ translate("open") }}</ion-label>
+                <ion-label>{{ translate("{count} open", { count: facilityFulfillmentProgress?.openCount ?? 0 }) }}</ion-label>
               </ion-item>
               <ion-item lines="none" :button="true" :detail="true" :href="routeHref(workflowRoute('/inflight'))" @click="navigateRoute($event, workflowRoute('/inflight'))">
                 <ion-icon :icon="mailOpenOutline" slot="start" />
-                <ion-label>{{ facilityFulfillmentProgress?.inProgressCount ?? 0 }} {{ translate("in progress") }}</ion-label>
+                <ion-label>{{ translate("{count} in progress", { count: facilityFulfillmentProgress?.inProgressCount ?? 0 }) }}</ion-label>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -886,6 +886,11 @@ const selectedFacilityId = ref('');
 const hoveredSegmentId = ref<string | null>(null);
 const searchQuery = ref('');
 const selectedDimension = ref<'volume' | 'velocity' | 'rejections'>('volume');
+// The header links to the segment's own label, so each language lowercases (or not) its own words.
+const DIMENSION_LABELS = { volume: "Order Volume", velocity: "Fulfillment Velocity", rejections: "Rejections" } as const;
+const facilityListHeader = computed(() => (searchQuery.value
+  ? translate("Top 10 facilities by {metric} matching {query}", { metric: DIMENSION_LABELS[selectedDimension.value], query: searchQuery.value })
+  : translate("Top 10 facilities by {metric}", { metric: DIMENSION_LABELS[selectedDimension.value] })));
 const currentProductStore = computed(() => productStore.getCurrentProductStore || {});
 const selectedProductStoreId = computed(() => currentProductStore.value.productStoreId || '');
 const selectedStoreName = computed(
@@ -1138,7 +1143,7 @@ const filteredFacilities = computed(() => {
       facilityId: item.facilityId,
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.lastOrderCount,
-      label: `${item.lastOrderCount} orders`
+      label: ordersLabel(item.lastOrderCount || 0)
     }));
   } else if (selectedDimension.value === 'velocity') {
     list = facilityFulfillmentVelocity.value.map(item => ({
@@ -1147,8 +1152,8 @@ const filteredFacilities = computed(() => {
       value: item.activeFacilityFallback ? item.lastOrderCount : (item.fulfillmentVelocity || 0),
       activeFacilityFallback: item.activeFacilityFallback,
       label: item.activeFacilityFallback
-        ? `${item.lastOrderCount || 0} ${translate("active orders")}`
-        : `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
+        ? translate("{count} active orders", { count: item.lastOrderCount || 0 })
+        : translate("{percent}% velocity ({shipped}/{count} orders)", { percent: Math.round((item.fulfillmentVelocity || 0) * 100), shipped: item.shipGroupCount || 0, count: item.lastOrderCount || 0 })
     }));
   } else if (selectedDimension.value === 'rejections') {
     list = facilityRejections.value.map(item => ({
@@ -1156,8 +1161,8 @@ const filteredFacilities = computed(() => {
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.lastOrderCount || 0,
       label: item.rejectedShipGroupCount
-        ? `${item.lastOrderCount || 0} ${translate("active orders")}, ${item.rejectedShipGroupCount} ${translate("rejected orders")}`
-        : `${item.lastOrderCount || 0} ${translate("active orders")}`
+        ? `${translate("{count} active orders", { count: item.lastOrderCount || 0 })}, ${translate("{count} rejected orders", { count: item.rejectedShipGroupCount })}`
+        : translate("{count} active orders", { count: item.lastOrderCount || 0 })
     }));
   }
 

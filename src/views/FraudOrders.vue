@@ -291,8 +291,8 @@ async function runBulkResults(getResults: () => Promise<PromiseSettledResult<unk
     const results = await getResults();
     const failed = results.filter((result) => result.status === 'rejected').length;
     const succeeded = results.length - failed;
-    if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));
-    if (failed) await showToast(translate('{count} task(s) failed.', { count: failed }));
+    if (succeeded) await showToast(translate('{count} tasks completed.', { count: succeeded }));
+    if (failed) await showToast(translate('{count} tasks failed.', { count: failed }));
     await replaceFraudTasks();
   } finally {
     bulkActionRunning.value = false;

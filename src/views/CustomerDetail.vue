@@ -653,7 +653,10 @@ function nameParts(name: string): { firstName: string; lastName: string } {
 async function onDeleteCustomer() {
   const alert = await alertController.create({
     header: translate('Anonymize customer data'),
-    message: translate('This will permanently anonymize all PII for {name}. This cannot be undone.', { name: customer.value?.name || translate('this customer') }),
+    // Ionic renders alert text as HTML here (innerHTMLTemplatesEnabled), so the name is escaped.
+    message: customer.value?.name
+      ? translate('This will permanently anonymize all PII for {name}. This cannot be undone.', { name: customer.value.name }, { escapeParameter: true })
+      : translate('This will permanently anonymize all PII for this customer. This cannot be undone.'),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {

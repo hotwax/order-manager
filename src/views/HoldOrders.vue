@@ -240,7 +240,7 @@ async function resolveSelectedTasks() {
 
   const alert = await alertController.create({
     header: translate('Resolve tasks'),
-    message: translate('Are you sure you want to resolve {count} selected task(s)?').replace('{count}', String(selected.length)),
+    message: translate('Are you sure you want to resolve {count} selected tasks?', { count: selected.length }),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
@@ -257,8 +257,8 @@ async function resolveSelectedTasks() {
             );
             const failed = results.filter((result) => result.status === 'rejected').length;
             const succeeded = results.length - failed;
-            if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));
-            if (failed) await showToast(translate('{count} task(s) failed.', { count: failed }));
+            if (succeeded) await showToast(translate('{count} tasks completed.', { count: succeeded }));
+            if (failed) await showToast(translate('{count} tasks failed.', { count: failed }));
             await replaceHoldTasks();
           } finally {
             bulkActionRunning.value = false;

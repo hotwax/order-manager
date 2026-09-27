@@ -199,9 +199,9 @@
           </ion-item>
           <ion-item v-if="order.risk.facts.length" button detail lines="none" @click="emit('open-risk-details')">
             <div class="sentiment-chips">
-              <ion-chip color="danger" outline>{{ order.risk.counts.negative }} {{ translate('negative') }}</ion-chip>
-              <ion-chip color="medium" outline>{{ order.risk.counts.neutral }} {{ translate('neutral') }}</ion-chip>
-              <ion-chip color="success" outline>{{ order.risk.counts.positive }} {{ translate('positive') }}</ion-chip>
+              <ion-chip color="danger" outline>{{ translate('{count} negative', { count: order.risk.counts.negative }) }}</ion-chip>
+              <ion-chip color="medium" outline>{{ translate('{count} neutral', { count: order.risk.counts.neutral }) }}</ion-chip>
+              <ion-chip color="success" outline>{{ translate('{count} positive', { count: order.risk.counts.positive }) }}</ion-chip>
             </div>
           </ion-item>
         </ion-list>

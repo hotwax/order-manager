@@ -71,7 +71,7 @@
                   <p>{{ translate('Available') }}</p>
                 </template>
                 <template v-else>
-                  {{ translate('{count} of {total} items', { count: facility.coveredCount, total: facility.totalCount }) }}
+                  {{ translate('{shown} of {count} items', { shown: facility.coveredCount, count: facility.totalCount }) }}
                   <p v-if="!facility.inStore">{{ translate('Not in store') }}</p>
                 </template>
               </ion-label>
@@ -160,7 +160,7 @@
             </ion-label>
           </template>
           <ion-label class="tablet" v-else>
-            {{ translate('{count} of {total} items', { count: facility.coveredCount, total: facility.totalCount }) }}
+            {{ translate('{shown} of {count} items', { shown: facility.coveredCount, count: facility.totalCount }) }}
             <p>{{ translate('Coverage') }}</p>
             <p v-if="shortItemNames(facility)">{{ translate('Short:') }} {{ shortItemNames(facility) }}</p>
             <p v-if="unrecordedItemNames(facility)">{{ translate('No record:') }} {{ unrecordedItemNames(facility) }}</p>

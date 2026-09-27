@@ -14,7 +14,7 @@ export function facilityProgressAccessibleName(
     return `${facilityName}: ${translate('Fulfillment Velocity')}`;
   }
   if (dimension === 'rejections') {
-    return `${facilityName}: ${translate('active orders')} (${translate('Rejections')})`;
+    return `${facilityName}: ${translate('Active orders (rejections)')}`;
   }
-  return `${facilityName}: ${translate('active orders')}`;
+  return `${facilityName}: ${translate('Active orders')}`;
 }

@@ -73,9 +73,9 @@
 
       <ion-item v-if="taskFacts.length" lines="none">
         <div class="sentiment-chips">
-          <ion-chip color="danger" outline>{{ counts.negative }} {{ translate('negative') }}</ion-chip>
-          <ion-chip color="medium" outline>{{ counts.neutral }} {{ translate('neutral') }}</ion-chip>
-          <ion-chip color="success" outline>{{ counts.positive }} {{ translate('positive') }}</ion-chip>
+          <ion-chip color="danger" outline>{{ translate('{count} negative', { count: counts.negative }) }}</ion-chip>
+          <ion-chip color="medium" outline>{{ translate('{count} neutral', { count: counts.neutral }) }}</ion-chip>
+          <ion-chip color="success" outline>{{ translate('{count} positive', { count: counts.positive }) }}</ion-chip>
         </div>
         <ion-button slot="end" fill="clear" size="small" @click="openRiskDetails">{{ translate('View details') }}</ion-button>
       </ion-item>

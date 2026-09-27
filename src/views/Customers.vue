@@ -28,7 +28,7 @@
 
       <ion-list v-else>
         <ion-list-header>
-          <ion-label>{{ translate("{loaded} of {total} customers", { loaded: customers.length, total }) }}</ion-label>
+          <ion-label>{{ translate("{shown} of {count} customers", { shown: customers.length, count: total }) }}</ion-label>
           <OrderSortPopover
             v-model="searchSort"
             :options="sortOptions"

@@ -5,7 +5,8 @@ const translations: Record<string, string> = {
   'Order Volume': 'Volumen de pedidos',
   'Fulfillment Velocity': 'Velocidad de cumplimiento',
   'Rejections': 'Rechazos',
-  'active orders': 'pedidos activos',
+  'Active orders': 'Pedidos activos',
+  'Active orders (rejections)': 'Pedidos activos (rechazos)',
 };
 
 const translate = (key: string) => translations[key] || key;
@@ -20,8 +21,8 @@ describe('Funnel facility progress accessible names', () => {
 
   it('names velocity fallback and rejection-context bars from the value they display', () => {
     expect(facilityProgressAccessibleName('2301 E. 51st St.', 'velocity', true, translate))
-      .toBe('2301 E. 51st St.: pedidos activos');
+      .toBe('2301 E. 51st St.: Pedidos activos');
     expect(facilityProgressAccessibleName('2301 E. 51st St.', 'rejections', false, translate))
-      .toBe('2301 E. 51st St.: pedidos activos (Rechazos)');
+      .toBe('2301 E. 51st St.: Pedidos activos (rechazos)');
   });
 });

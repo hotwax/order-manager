@@ -71,7 +71,7 @@
 
     <ion-footer v-if="selectMode && actions.length">
       <ion-toolbar>
-        <ion-title size="small">{{ selectedIds.size }} {{ translate('selected') }}</ion-title>
+        <ion-title size="small">{{ translate('{count} selected', { count: selectedIds.size }) }}</ion-title>
         <ion-buttons slot="end">
           <ion-button
             v-for="action in actions"

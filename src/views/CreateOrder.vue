@@ -136,7 +136,7 @@
                 <ion-item lines="none" v-else-if="searchedProduct.scannedId && !searchedProduct.productId">
                   <ion-icon :icon="cloudOfflineOutline" slot="start" />
                   <ion-label>
-                    {{ searchedProduct.scannedId }} {{ translate("not found") }}
+                    {{ translate('{id} not found', { id: searchedProduct.scannedId }) }}
                     <p>{{ translate("Try searching using a keyword instead") }}</p>
                   </ion-label>
                   <ion-button size="small" slot="end" color="primary" @click="openAddProductModal">
@@ -416,7 +416,7 @@ onMounted(async () => {
       productStoreId
     });
   } catch (err: any) {
-    commonUtil.showToast(`${translate("Failed to load Shopify shops:")} ${err.message || err}`);
+    commonUtil.showToast(translate("Failed to load Shopify shops: {message}", { message: String(err.message || err) }, { escapeParameter: true }));
   }
 });
 
@@ -736,7 +736,7 @@ async function submitOrder() {
   } catch (err: any) {
     emitter.emit('dismissLoader');
     const errMsg = err?.message || translate('Error occurred while creating Shopify order.');
-    await commonUtil.showToast(err?.message ? `${translate('Failed to create Shopify order:')} ${errMsg}` : errMsg);
+    await commonUtil.showToast(err?.message ? translate('Failed to create Shopify order: {message}', { message: errMsg }, { escapeParameter: true }) : errMsg);
   } finally {
     isSubmitting.value = false;
   }

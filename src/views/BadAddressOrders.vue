@@ -250,7 +250,7 @@ async function bulkSaveAndReleaseHold() {
 
   const alert = await alertController.create({
     header: translate('Save and release hold'),
-    message: translate('Are you sure you want to save address and release hold for {count} selected ship group(s)?').replace('{count}', String(shipGroupCount)),
+    message: translate('Are you sure you want to save address and release hold for {count} selected ship groups?', { count: shipGroupCount }),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
@@ -272,7 +272,7 @@ async function bulkCancelOrder() {
 
   const alert = await alertController.create({
     header: translate('Cancel orders'),
-    message: translate('Are you sure you want to cancel {count} selected ship group(s)? This action cannot be undone.').replace('{count}', String(shipGroupCount)),
+    message: translate('Are you sure you want to cancel {count} selected ship groups? This action cannot be undone.', { count: shipGroupCount }),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
@@ -314,8 +314,8 @@ async function runGroupedBulkCards(
     );
     const failed = results.filter((result) => result.status === 'rejected').length;
     const succeeded = results.length - failed;
-    if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));
-    if (failed) await showToast(translate('{count} task(s) failed.', { count: failed }));
+    if (succeeded) await showToast(translate('{count} tasks completed.', { count: succeeded }));
+    if (failed) await showToast(translate('{count} tasks failed.', { count: failed }));
     await replaceAddressValidationTasks();
   } finally {
     bulkActionRunning.value = false;
