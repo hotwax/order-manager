@@ -51,6 +51,8 @@ describe('locale messages', () => {
       for (const match of source.matchAll(new RegExp(`(?:translate|requiredLabel)\\(\\s*${literal}`, 'g'))) keys.add(match[2].replace(/\\'/g, "'"));
     }
     expect(keys.size).toBeGreaterThan(800);
+    // A template attribute like translate("aren&apos;t") is decoded before it runs; keys hold the plain text.
+    expect(Object.keys(enUS).filter((key) => /&(apos|quot|amp|lt|gt);|\\/.test(key))).toEqual([]);
     expect([...keys].filter((key) => !(key in enUS))).toEqual([]);
     // Both files list the same keys in the same case-insensitive order, so a change lines up in review.
     const byCode = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
