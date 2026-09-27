@@ -114,12 +114,12 @@
       <ion-toolbar>
         <ion-title size="small">{{ translate('{count} selected', { count: selectedOrderIds.length }) }}</ion-title>
         <ion-buttons slot="end" class="bulk-action-buttons">
-          <ion-button v-if="hasGlobalAction('brokerSelected')" :disabled="!selectedOrderIds.length" @click="openBrokerSelectedModal">
+          <ion-button v-if="hasGlobalAction('brokerSelected')" :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openBrokerSelectedModal">
             {{ translate('Broker selected') }}
           </ion-button>
-          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" :disabled="!selectedOrderIds.length" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
-          <ion-button :disabled="!selectedOrderIds.length" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
-          <ion-button :disabled="!selectedOrderIds.length" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
+          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
+          <ion-button :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
+          <ion-button :disabled="!selectedOrderIds.length || !canCreateOrderTasks" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
@@ -172,6 +172,8 @@ import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { toSearchOrderRowViewModel } from '@/utils/orderRows';
 import { showToast } from '@/utils';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
+import Actions from '@/authorization/actions';
+import { useUserStore } from '@/store/user';
 
 type QueueGlobalAction = 'brokerSelected';
 
@@ -209,6 +211,11 @@ const orderStore = useOrderStore();
 const orderTaskStore = useOrderTaskStore();
 const productStore = useProductStore();
 const seedStore = useSeedStore();
+const userStore = useUserStore();
+// The same permissions Find orders checks for each bulk action.
+const canCancelOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_CANCEL));
+const canUpdateOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_UPDATE));
+const canCreateOrderTasks = computed(() => userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE));
 const ionRouter = useIonRouter();
 
 const PAGE_SIZE = 50;
