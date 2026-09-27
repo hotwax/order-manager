@@ -44,7 +44,7 @@
         <ion-label>{{ translate('Ordered items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="item in task.items" :key="item.orderItemSeqId">
-        <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="productImageUrl(item.productId)">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: productImageUrl(item.productId), productName: productPrimary(item) }" :key="`${productImageUrl(item.productId)} ${productPrimary(item)}`">
           <DxpShopifyImg :src="productImageUrl(item.productId)" :key="productImageUrl(item.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>
