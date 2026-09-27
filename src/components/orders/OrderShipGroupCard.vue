@@ -14,7 +14,7 @@
         <p>{{ shipGroup.statusLabel }}</p>
         <!-- A counter sale has one state, so there is nothing to expand into. -->
         <ion-button v-if="!shipGroup.isPosCompleted" fill="clear" color="medium" @click="emit('update:expanded', !expanded)" :aria-label="translate('Toggle ship group')" :title="translate('Toggle ship group')">
-          <ion-icon slot="icon-only" :icon="expanded ? chevronUp : chevronDown" />
+          <ion-icon slot="icon-only" :icon="expanded ? chevronUpOutline : chevronDownOutline" />
         </ion-button>
       </div>
     </div>
@@ -264,7 +264,7 @@
                 color="medium" :id="'shipping-opt-trigger-' + shipGroup.id"
                 :aria-label="translate('Shipping options')"
                 :title="translate('Shipping options')">
-                <ion-icon slot="icon-only" :icon="ellipsisVertical" />
+                <ion-icon slot="icon-only" :icon="ellipsisVerticalOutline" />
               </ion-button>
               <ion-popover :trigger="'shipping-opt-trigger-' + shipGroup.id" dismiss-on-select
                 :show-backdrop="false">
@@ -470,8 +470,9 @@ import {
   IonProgressBar, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar,
 } from '@ionic/vue';
 import {
-  calendarOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline,
-  ellipsisVertical, giftOutline, mailOutline, saveOutline, sendOutline, trashOutline, warningOutline,
+  calendarOutline, chevronDownOutline, chevronUpOutline, closeOutline, compassOutline, createOutline, cubeOutline,
+  documentTextOutline, ellipsisVerticalOutline, giftOutline, mailOutline, saveOutline, sendOutline, trashOutline,
+  warningOutline,
 } from 'ionicons/icons';
 import { DxpShopifyImg, translate } from '@common';
 import { useProductIdentity } from '@/composables/useProductIdentity';

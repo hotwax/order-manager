@@ -23,7 +23,7 @@
               </ion-select>
             </ion-item>
             <ion-item>
-              <ion-icon :icon="storefrontOutline" slot="start" />
+              <ion-icon :icon="businessOutline" slot="start" />
               <ion-select v-model="orderForm.facilityId" :label="translate('Facility')" :placeholder="translate('Select')" interface="popover">
                 <ion-select-option v-for="facility in facilities" :value="facility.facilityId" :key="facility.facilityId">{{ facility.faciityName ? facility.faciityName : facility.facilityId }}</ion-select-option>
               </ion-select>
@@ -41,7 +41,7 @@
               <ion-card-title>
                 {{ translate("Customer") }}
                 <ion-button size="small" fill="outline" @click="openCustomerModal">
-                  <ion-icon :icon="addCircleOutline" slot="start"/>
+                  <ion-icon :icon="orderForm.customer.id ? createOutline : addCircleOutline" slot="start"/>
                   {{ orderForm.customer.id ? translate("Edit") : translate("Add") }}
                 </ion-button>
               </ion-card-title>
@@ -78,7 +78,7 @@
               <ion-card-title>
                 {{ translate("Shipping address") }}
                 <ion-button size="small" fill="outline" @click="openShippingAddressModal">
-                  <ion-icon :icon="addCircleOutline" slot="start"/>
+                  <ion-icon :icon="orderForm.shippingAddress.zip ? createOutline : addCircleOutline" slot="start"/>
                   {{ orderForm.shippingAddress.zip ? translate("Edit") : translate("Add") }}
                 </ion-button>
               </ion-card-title>
@@ -294,7 +294,7 @@
 import { computed, ref, onMounted, nextTick, watch } from 'vue';
 import { formatMoney } from '@/utils/format';
 import { IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonMenuButton, IonPage, IonSearchbar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, IonSpinner, modalController } from '@ionic/vue';
-import { addCircleOutline, addOutline, barcodeOutline, cashOutline, checkmarkDoneOutline, checkmarkOutline, cloudOfflineOutline, globeOutline, locateOutline, saveOutline, searchOutline, shirtOutline, storefrontOutline, trashOutline } from 'ionicons/icons';
+import { addCircleOutline, addOutline, barcodeOutline, businessOutline, cashOutline, checkmarkDoneOutline, checkmarkOutline, cloudOfflineOutline, createOutline, globeOutline, locateOutline, saveOutline, searchOutline, shirtOutline, trashOutline } from 'ionicons/icons';
 import { api, commonUtil, DxpShopifyImg, emitter, logger, translate, useSolrSearch } from '@common';
 import { getShopifyShops } from '@/services/customer';
 import { useProductStore } from '@/store/productStore';

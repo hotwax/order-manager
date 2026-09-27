@@ -51,7 +51,7 @@
                     </ion-button>
                     <ion-button v-else slot="end" fill="clear" size="small" @click="onEditContact(section)">
                       {{ translate('Edit') }}
-                      <ion-icon slot="end" :icon="pencilOutline" />
+                      <ion-icon slot="end" :icon="createOutline" />
                     </ion-button>
                   </ion-item>
                   <ion-item v-for="value in section.values" :key="value.contactMechId">
@@ -472,11 +472,7 @@ import {
   modalController
 } from '@ionic/vue';
 import {
-  addCircleOutline,
-  informationCircleOutline,
-  pencilOutline,
-  pricetagOutline,
-  trashOutline
+  addCircleOutline, createOutline, informationCircleOutline, pricetagOutline, trashOutline,
 } from 'ionicons/icons';
 import { DateTime } from 'luxon';
 import { computed, onMounted, ref, watch } from 'vue';
