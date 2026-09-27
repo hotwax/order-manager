@@ -198,11 +198,17 @@
             <ion-item slot="header" lines="none" class="return-item-accordion-header">
               <div class="list-item return-item-row">
                 <div class="return-item-key">
-                  <ion-thumbnail v-if="item.productId">
+                  <!-- The row is an accordion header, so opening the preview must not also toggle it. -->
+                  <ion-thumbnail
+                    v-if="item.productId"
+                    v-image-preview="{ mainImageUrl: (productCache as any).getProduct(item.productId)?.mainImageUrl, productName: itemLabel(item) }"
+                    :key="`${(productCache as any).getProduct(item.productId)?.mainImageUrl} ${itemLabel(item)}`"
+                    @click.stop
+                  >
                     <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
                   </ion-thumbnail>
                   <ion-label class="ion-text-wrap">
-                    <h2>{{ itemLabel(item) }}</h2>
+                    {{ itemLabel(item) }}
                     <p v-if="itemSecondaryLabel(item)">
                       {{ itemSecondaryLabel(item) }}
                     </p>

@@ -18,7 +18,7 @@
         </ion-label>
       </ion-list-header>
       <ion-item v-for="(item, index) in cancelledItems" :key="`cancelled-${item.orderItemSeqId || index}`">
-        <ion-thumbnail slot="start">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: productImageUrl(item.productId), productName: productPrimary(item) }" :key="`${productImageUrl(item.productId)} ${productPrimary(item)}`">
           <DxpShopifyImg :src="productImageUrl(item.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>
@@ -40,7 +40,7 @@
         </ion-label>
       </ion-list-header>
       <ion-item v-for="(item, index) in substitutedItems" :key="`sub-${item.orderItemSeqId || index}`">
-        <ion-thumbnail slot="start">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: productImageUrl(item.productId), productName: productPrimary(item) }" :key="`${productImageUrl(item.productId)} ${productPrimary(item)}`">
           <DxpShopifyImg :src="productImageUrl(item.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>

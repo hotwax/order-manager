@@ -73,7 +73,7 @@
         <ion-label>{{ translate('Suggested items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="(suggested, index) in getSuggestedItems(task).list" :key="`suggested-${index}`">
-        <ion-thumbnail slot="start" :key="productImageUrl(suggested.productId)">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: productImageUrl(suggested.productId), productName: productPrimary(suggested) }" :key="`${productImageUrl(suggested.productId)} ${productPrimary(suggested)}`">
           <DxpShopifyImg :src="productImageUrl(suggested.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>

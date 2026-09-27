@@ -13,7 +13,7 @@
   <ion-content>
     <ion-list v-if="item">
       <ion-item lines="full">
-        <ion-thumbnail slot="start">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: product?.mainImageUrl, productName: primaryIdentifier(item.productId) || item.name }" :key="`${product?.mainImageUrl} ${primaryIdentifier(item.productId) || item.name}`">
           <DxpShopifyImg :src="product?.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>

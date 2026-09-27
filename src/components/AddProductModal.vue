@@ -22,11 +22,11 @@
     <!-- Product list -->
     <template v-if="products.length">
       <ion-item v-for="product in products" :key="product.productId">
-        <ion-thumbnail slot="start">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: product.mainImageUrl, productName: productPrimary(product) }" :key="product.mainImageUrl">
           <DxpShopifyImg :src="product.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
-          {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, product) || product?.internalName }}
+          {{ productPrimary(product) }}
           <p v-if="commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) !== 'null'">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) }}</p>
         </ion-label>
 
@@ -62,6 +62,11 @@ import { DxpShopifyImg } from '@common';
 
 const props = defineProps(["query", "addProductToQueue", "isProductInOrder", "pendingProductIds"]);
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
+
+/** How a search result is named: its row's primary line and its image preview's title. */
+function productPrimary(product: any): string {
+  return commonUtil.getProductIdentificationValue(productIdentificationPref.value.primaryId, product) || product?.internalName;
+}
 
 const queryString = ref(props.query);
 const products = ref([]) as any;
