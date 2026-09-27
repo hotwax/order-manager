@@ -447,8 +447,7 @@
             <ion-content class="ion-padding">
               <!-- Expression Input -->
               <ion-item class="expression-input-item">
-                <ion-label position="stacked">{{ translate("Expression") }}</ion-label>
-                <ion-input v-model="cronExpressionInput" placeholder="0 */15 * ? * *"></ion-input>
+                <ion-input v-model="cronExpressionInput" :label="translate('Expression')" label-placement="stacked" placeholder="0 */15 * ? * *" />
                 <ion-icon :icon="informationCircleOutline" slot="end" class="info-icon" />
               </ion-item>
 

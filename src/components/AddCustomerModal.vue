@@ -42,42 +42,42 @@
       <ion-segment-content id="create">
         <div v-if="step === 'info'">
           <ion-item>
-            <ion-input :label="translate('First name')" v-model="customerForm.firstName" />
+            <ion-input label-placement="stacked" :label="translate('First name')" v-model="customerForm.firstName" />
           </ion-item>
           <ion-item>
-            <ion-input :label="translate('Last name')" v-model="customerForm.lastName" />
+            <ion-input label-placement="stacked" :label="translate('Last name')" v-model="customerForm.lastName" />
           </ion-item>
           <ion-item>
-            <ion-input :label="translate('Phone')" v-model="customerForm.phone" />
+            <ion-input label-placement="stacked" :label="translate('Phone')" v-model="customerForm.phone" />
           </ion-item>
           <ion-item>
-            <ion-input :label="translate('Email')" v-model="customerForm.email" />
+            <ion-input label-placement="stacked" :label="translate('Email')" v-model="customerForm.email" />
           </ion-item>
         </div>
         <div v-if="step === 'shipping'">
           <ion-item>
-            <ion-input :label="translate('Country')" v-model="customerForm.address.country" />
+            <ion-input label-placement="stacked" :label="translate('Country')" v-model="customerForm.address.country" />
           </ion-item>
           <ion-item>
-            <ion-input :label="translate('Address line 1')" v-model="customerForm.address.address1" />
+            <ion-input label-placement="stacked" :label="translate('Address line 1')" v-model="customerForm.address.address1" />
           </ion-item>
           <ion-item>
-            <ion-input :label="translate('Address line 2')" v-model="customerForm.address.address2" />
+            <ion-input label-placement="stacked" :label="translate('Address line 2')" v-model="customerForm.address.address2" />
           </ion-item>
           <ion-item>
-            <ion-input :label="translate('City')" v-model="customerForm.address.city" />
+            <ion-input label-placement="stacked" :label="translate('City')" v-model="customerForm.address.city" />
           </ion-item>
           <ion-item>
-            <ion-input :label="translate('Province')" v-model="customerForm.address.province" />
+            <ion-input label-placement="stacked" :label="translate('Province')" v-model="customerForm.address.province" />
           </ion-item>
           <ion-item>
-            <ion-input :label="translate('Postal code')" v-model="customerForm.address.zip" />
+            <ion-input label-placement="stacked" :label="translate('Postal code')" v-model="customerForm.address.zip" />
           </ion-item>
           <ion-item>
-            <ion-input :label="translate('Phone')" v-model="customerForm.address.phone" />
+            <ion-input label-placement="stacked" :label="translate('Phone')" v-model="customerForm.address.phone" />
           </ion-item>
           <ion-item>
-            <ion-input :label="translate('Email')" v-model="customerForm.address.email" />
+            <ion-input label-placement="stacked" :label="translate('Email')" v-model="customerForm.address.email" />
           </ion-item>
         </div>
       </ion-segment-content>

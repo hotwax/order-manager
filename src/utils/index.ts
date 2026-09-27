@@ -13,6 +13,9 @@ export const showToast = async (message: string) => {
   return toast.present();
 }
 
+/** A required field's label: the translated label and an asterisk, the one required marker. */
+export const requiredLabel = (label: string) => `${translate(label)} *`;
+
 /** Asks before a change that saves at once and cannot be taken back: Cancel first, then the action's verb. */
 export const confirmAction = async (header: string, message: string, confirmText: string): Promise<boolean> => {
   const alert = await alertController.create({

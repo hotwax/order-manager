@@ -108,6 +108,7 @@ import {
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
+import { requiredLabel } from '@/utils';
 import { useSeedStore } from '@/store/seed';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
 
@@ -181,10 +182,6 @@ function dismiss() {
 function handleTaskNameInput(value: string | null | undefined) {
   taskNameEdited.value = true;
   form.workEffortName = value ?? '';
-}
-
-function requiredLabel(label: string) {
-  return `${translate(label)} *`;
 }
 
 function confirm() {
