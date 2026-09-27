@@ -115,7 +115,7 @@ import { DateTime } from 'luxon';
 import { api, commonUtil, translate } from '@common';
 import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
-import { showToast } from '@/utils';
+import { confirmAction, showToast } from '@/utils';
 import EmptyState from '@/components/common/EmptyState.vue';
 import IdentificationListItem from '@/components/orders/IdentificationListItem.vue';
 import CreateIdentificationTypeModal from '@/components/orders/CreateIdentificationTypeModal.vue';
@@ -282,6 +282,7 @@ async function saveEdit(identification: Identification) {
 
 async function removeIdentification(identification: Identification) {
   if (!isRowUpdatable(identification)) return;
+  if (!await confirmAction(translate('Remove identification'), translate('This identification will be removed from the order.'), translate('Remove'))) return;
   const key = rowKey(identification);
   removingKey.value = key;
   try {

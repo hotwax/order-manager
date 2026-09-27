@@ -67,7 +67,7 @@
             v-if="!shipGroup.isSettled"
             slot="end"
             fill="clear"
-            color="medium"
+            color="danger"
             :aria-label="translate('Clear gift message')"
             :title="translate('Clear gift message')"
             @click.stop="clearGiftMessage"
@@ -474,7 +474,7 @@ import { DxpShopifyImg, translate } from '@common';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
-import { isKit } from '@/utils';
+import { confirmAction, isKit } from '@/utils';
 import type { ShipGroupMilestones } from '@/utils/orderEvents';
 import { formatDateTime, formatElapsed, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
 import { OrderActionValidator, type ShipGroupActionId } from '@/utils/OrderActionValidator';
@@ -641,7 +641,10 @@ function openGiftModal() {
   openEditor('gift');
 }
 const saveGiftMessage = () => saveFields({ giftMessage: giftMessageDraft.value }, 'Gift message saved.', 'Failed to save gift message.');
-const clearGiftMessage = () => saveFields({ giftMessage: null }, 'Gift message cleared.', 'Failed to clear gift message.');
+async function clearGiftMessage() {
+  if (!await confirmAction(translate('Clear gift message'), translate('The gift message will be removed from this ship group.'), translate('Clear'))) return;
+  await saveFields({ giftMessage: null }, 'Gift message cleared.', 'Failed to clear gift message.');
+}
 
 const shippingDatesDraft = ref({ shipAfterDate: '', shipByDate: '' });
 function openShippingDatesModal() {

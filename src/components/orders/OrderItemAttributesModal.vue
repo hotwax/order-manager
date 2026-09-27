@@ -93,7 +93,7 @@ import { reactive, ref } from 'vue';
 import { api, translate } from '@common';
 import EmptyState from '@/components/common/EmptyState.vue';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
-import { showToast } from '@/utils';
+import { confirmAction, showToast } from '@/utils';
 
 type Attribute = { attrName: string; attrValue?: string; attrDescription?: string };
 
@@ -139,6 +139,7 @@ async function addAttribute() {
 }
 
 async function deleteAttribute(attr: Attribute) {
+  if (!await confirmAction(translate('Delete attribute'), translate('{name} will be deleted from this item.', { name: attr.attrName }), translate('Delete'))) return;
   deletingAttr.value = attr.attrName;
   try {
     await api({

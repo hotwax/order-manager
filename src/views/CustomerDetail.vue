@@ -497,6 +497,7 @@ import { useUserStore } from '@/store/user';
 import Actions from '@/authorization/actions';
 import type { CustomerOrderCardData, CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
 import type { ReturnSummary } from '@/types/returns';
+import { confirmAction } from '@/utils';
 import { formatDate, formatDateTime, formatMoney, formatMonthYear } from '@/utils/format';
 
 const props = defineProps<{
@@ -722,6 +723,7 @@ async function onMergeCandidate(candidatePartyId: string) {
 }
 
 async function onExpireDuplicateRelationship(duplicate: { keyFields: { partyIdFrom: string; partyIdTo: string; roleTypeIdFrom: string; roleTypeIdTo: string; fromDate: string } }) {
+  if (!await confirmAction(translate('Expire relationship'), translate('The relationship ends now and stays in its history.'), translate('Expire'))) return;
   await expireRelationship(duplicate.keyFields, DateTime.now().toMillis());
 }
 
@@ -758,11 +760,13 @@ async function onEditContact(section: import('@/types/customer').ContactSection)
   if (role === 'confirm' && data && section.values[0]) {
     await updateContact(section.contactMechTypeId, section.values[0].contactMechId, data);
   } else if (role === 'expire' && section.values[0]) {
+    if (!await confirmAction(translate('Delete contact'), translate('This contact will be removed from the customer.'), translate('Delete'))) return;
     await expireContact(section.values[0].contactMechId);
   }
 }
 
 async function onExpireRelationship(relationship: { keyFields: { partyIdFrom: string; partyIdTo: string; roleTypeIdFrom: string; roleTypeIdTo: string; fromDate: string } }) {
+  if (!await confirmAction(translate('Expire relationship'), translate('The relationship ends now and stays in its history.'), translate('Expire'))) return;
   await expireRelationship(relationship.keyFields, DateTime.now().toMillis());
 }
 
