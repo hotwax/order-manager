@@ -5,7 +5,7 @@
         <ion-buttons slot="start">
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate('Open orders') }}</ion-title>
+        <ion-title>{{ translate('Open') }}</ion-title>
       </ion-toolbar>
     </ion-header>
 

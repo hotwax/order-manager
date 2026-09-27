@@ -5,7 +5,7 @@
         <ion-buttons slot="start">
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate('Packed orders') }}</ion-title>
+        <ion-title>{{ translate('Packed') }}</ion-title>
       </ion-toolbar>
     </ion-header>
 

@@ -5,7 +5,7 @@
         <ion-buttons slot="start">
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate('Inflight orders') }}</ion-title>
+        <ion-title>{{ translate('In flight') }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
@@ -63,7 +63,7 @@
       />
       <EmptyState
         v-else-if="!isLoading && !orders.length"
-        :title="translate('No inflight orders')"
+        :title="translate('No orders in flight')"
         :message="translate('Orders that have arrived at a warehouse but aren\'t on a picklist yet will appear here.')"
       />
 

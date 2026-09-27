@@ -90,7 +90,7 @@
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(Actions.APP_ORDERS_VIEW)" button router-link="/inflight" router-direction="root" :class="{ selected: selectedPage.includes('/inflight') }">
             <ion-icon slot="start" :icon="airplaneOutline" />
-            <ion-label>{{ translate("Inflight") }}</ion-label>
+            <ion-label>{{ translate("In flight") }}</ion-label>
             <ion-badge v-if="rollupCounts.inflight !== undefined" slot="end" color="medium">{{ rollupCounts.inflight }}</ion-badge>
           </ion-item>
         </ion-menu-toggle>
