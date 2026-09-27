@@ -433,57 +433,41 @@
 
           <!-- Schedule Modal -->
           <ion-modal :is-open="isScheduleModalOpen" @didDismiss="closeScheduleModal">
-            <ion-header>
-              <ion-toolbar>
-                <ion-buttons slot="start">
-                  <ion-button @click="closeScheduleModal" :aria-label="translate('Close')" :title="translate('Close')">
-                    <ion-icon slot="icon-only" :icon="closeOutline" />
-                  </ion-button>
-                </ion-buttons>
-                <ion-title>{{ translate("Schedule") }}</ion-title>
-              </ion-toolbar>
-            </ion-header>
-
-            <ion-content class="ion-padding">
-              <!-- Expression Input -->
-              <ion-item class="expression-input-item">
-                <ion-input v-model="cronExpressionInput" :label="translate('Expression')" label-placement="stacked" placeholder="0 */15 * ? * *" />
-                <ion-icon :icon="informationCircleOutline" slot="end" class="info-icon" />
-              </ion-item>
-
-              <!-- Description, Next Run and Active Status -->
-              <ion-list lines="none" class="schedule-info-list ion-margin-top">
-                <ion-item>
-                  <ion-icon :icon="refreshOutline" slot="start" />
-                  <ion-label>{{ cronDescription }}</ion-label>
+            <DxpModal :state="scheduleModal" :title="translate('Schedule')" :confirm-label="translate('Save schedule')">
+              <div class="ion-padding">
+                <!-- Expression Input -->
+                <ion-item class="expression-input-item">
+                  <ion-input v-model="cronExpressionInput" :label="translate('Expression')" label-placement="stacked" placeholder="0 */15 * ? * *" />
+                  <ion-icon :icon="informationCircleOutline" slot="end" class="info-icon" />
                 </ion-item>
-                <ion-item>
-                  <ion-icon :icon="timeOutline" slot="start" />
-                  <ion-label>{{ nextRunTime }}</ion-label>
-                </ion-item>
-                <ion-item>
-                  <ion-icon :icon="powerOutline" slot="start" />
-                  <ion-label>{{ translate("Active") }}</ion-label>
-                  <ion-toggle slot="end" v-model="isJobActive" />
-                </ion-item>
-              </ion-list>
 
-              <!-- Pre-made Options -->
-              <h3 class="options-header ion-margin-top">{{ translate("Schedule options") }}</h3>
-              <ion-radio-group v-model="selectedScheduleOption" @ionChange="handleScheduleOptionChange">
-                <ion-item v-for="option in scheduleOptions" :key="option.value">
-                  <ion-radio slot="start" :value="option.value" />
-                  <ion-label>{{ option.label }}</ion-label>
-                </ion-item>
-              </ion-radio-group>
+                <!-- Description, Next Run and Active Status -->
+                <ion-list lines="none" class="schedule-info-list ion-margin-top">
+                  <ion-item>
+                    <ion-icon :icon="refreshOutline" slot="start" />
+                    <ion-label>{{ cronDescription }}</ion-label>
+                  </ion-item>
+                  <ion-item>
+                    <ion-icon :icon="timeOutline" slot="start" />
+                    <ion-label>{{ nextRunTime }}</ion-label>
+                  </ion-item>
+                  <ion-item>
+                    <ion-icon :icon="powerOutline" slot="start" />
+                    <ion-label>{{ translate("Active") }}</ion-label>
+                    <ion-toggle slot="end" v-model="isJobActive" />
+                  </ion-item>
+                </ion-list>
 
-              <!-- Floating Save Button -->
-              <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button :aria-label="translate('Save schedule')" @click="saveSchedule">
-                  <ion-icon :icon="saveOutline" />
-                </ion-fab-button>
-              </ion-fab>
-            </ion-content>
+                <!-- Pre-made Options -->
+                <h3 class="options-header ion-margin-top">{{ translate("Schedule options") }}</h3>
+                <ion-radio-group v-model="selectedScheduleOption" @ionChange="handleScheduleOptionChange">
+                  <ion-item v-for="option in scheduleOptions" :key="option.value">
+                    <ion-radio slot="start" :value="option.value" />
+                    <ion-label>{{ option.label }}</ion-label>
+                  </ion-item>
+                </ion-radio-group>
+              </div>
+            </DxpModal>
           </ion-modal>
 
           <!-- Right side: Queue progress & timeline -->
@@ -594,8 +578,6 @@ import {
   IonItemDivider,
   IonPopover,
   IonModal,
-  IonFab,
-  IonFabButton,
   IonToggle,
   IonSpinner,
   onIonViewWillEnter
@@ -611,11 +593,10 @@ import {
   closeOutline,
   timeOutline,
   refreshOutline,
-  saveOutline,
   powerOutline,
   alertCircleOutline
 } from 'ionicons/icons';
-import { translate, StatCard, Sparkline, commonUtil } from '@common';
+import { translate, StatCard, Sparkline, commonUtil, DxpModal, useDxpModal } from '@common';
 import { UNFILLABLE_FACILITY_ID, useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
@@ -1262,6 +1243,8 @@ const isScheduleModalOpen = ref(false);
 const cronExpressionInput = ref('');
 const selectedScheduleOption = ref('');
 const isJobActive = ref(true);
+// What the schedule held when the modal opened, so closing after an edit asks first.
+const scheduleOpenedWith = ref({ cron: '', active: true });
 
 const scheduleOptions = computed(() => [
   { label: translate('Every 5 minutes'), value: '0 */5 * ? * *' },
@@ -1300,6 +1283,7 @@ function openScheduleModal() {
   cronExpressionInput.value = currentCron;
   const paused = fulfillmentSyncData.value?.settings?.paused || 'N';
   isJobActive.value = paused !== 'Y';
+  scheduleOpenedWith.value = { cron: cronExpressionInput.value, active: isJobActive.value };
   isScheduleModalOpen.value = true;
 }
 
@@ -1314,22 +1298,21 @@ function handleScheduleOptionChange(event: any) {
   }
 }
 
-async function saveSchedule() {
-  const settings = fulfillmentSyncData.value?.settings;
-  if (!settings || !settings.jobName) {
-    commonUtil.showToast(translate('Job name not found. Cannot save.'));
-    return;
-  }
-  
-  await store.updateServiceJob(
-    settings.jobName,
-    cronExpressionInput.value,
-    isJobActive.value ? 'N' : 'Y',
-    selectedFacilityId.value
-  );
-  
-  closeScheduleModal();
-}
+// Save updates the job here; the modal closes once it is saved, and closeScheduleModal runs on its dismiss.
+const scheduleModal = useDxpModal({
+  dirty: () => cronExpressionInput.value !== scheduleOpenedWith.value.cron || isJobActive.value !== scheduleOpenedWith.value.active,
+  async confirm() {
+    const settings = fulfillmentSyncData.value?.settings;
+    if (!settings || !settings.jobName) throw new Error(translate('Job name not found. Cannot save.'));
+
+    await store.updateServiceJob(
+      settings.jobName,
+      cronExpressionInput.value,
+      isJobActive.value ? 'N' : 'Y',
+      selectedFacilityId.value
+    );
+  },
+});
 
 function handleBatchSizeChange(event: any) {
   const rawValue = event.detail?.value !== undefined ? event.detail.value : event.target?.value;
