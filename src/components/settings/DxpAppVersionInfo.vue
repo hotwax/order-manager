@@ -11,18 +11,13 @@
 </template>
   
 <script setup lang="ts">
-import { DateTime } from 'luxon';
 import { translate } from '@common';
-import { computed } from 'vue';
-import { useUserStore } from '@/store/user';
-
-const userStore = useUserStore();
-
-const userProfile = computed(() => userStore.getUserProfile)
+import { formatDateTime } from '@/utils/format';
 
 const appInfo = (import.meta.env.VITE_APP_VERSION_INFO ? JSON.parse(import.meta.env.VITE_APP_VERSION_INFO as string) : {}) as any;
 const appVersion = appInfo.branch ? (appInfo.branch + "-" + appInfo.revision) : appInfo.tag ? appInfo.tag : "";
-const getDateTime = (time: any) => time ? DateTime.fromMillis(time).setZone(userProfile.value?.timeZone).toLocaleString(DateTime.DATETIME_MED) : "";
+// The app runs in the user's time zone, so the build time reads in it.
+const getDateTime = (time: any) => formatDateTime(time);
 </script>
 
 <style scoped>

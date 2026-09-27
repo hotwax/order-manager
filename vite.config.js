@@ -58,7 +58,8 @@ export default defineConfig(({ mode }) => {
       '../../common/components/**/*.spec.ts',
       '../../common/core/**/*.spec.ts'
     ],
-    exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', '.claude']
+    exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', '.claude'],
+    setupFiles: ['tests/setup/i18n.ts']
   }
   }
 })

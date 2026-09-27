@@ -122,7 +122,7 @@
           <ion-item lines="none">
             <ion-label class="ion-text-wrap">
               <h2>{{ returnRecord.returnId }}</h2>
-              <p>{{ formatDate(returnRecord.entryDate) }}</p>
+              <p>{{ formatDate(returnRecord.entryDate) || translate("Date not available") }}</p>
             </ion-label>
           </ion-item>
 
@@ -186,7 +186,6 @@ import {
   IonToolbar,
   onIonViewWillEnter
 } from "@ionic/vue";
-import { DateTime } from "luxon";
 import { storeToRefs } from "pinia";
 import { computed, nextTick } from "vue";
 import EmptyState from "@/components/common/EmptyState.vue";
@@ -196,6 +195,7 @@ import UniformFilterLayout from "@/components/common/UniformFilterLayout.vue";
 import router from "@/router";
 import { useReturnsStore } from "@/store/returns";
 import { useSeedStore } from "@/store/seed";
+import { formatDate } from "@/utils/format";
 
 const returnsStore = useReturnsStore();
 const seed = useSeedStore();
@@ -270,16 +270,6 @@ function facilityLabel(destinationFacilityId?: string) {
   return destinationFacilityId ? seed.facilityName(destinationFacilityId) || destinationFacilityId : translate("No destination facility");
 }
 
-function formatDate(value?: string | number) {
-  if(!value) {return translate("Date not available");}
-  const stringValue = String(value);
-  const numericValue = Number(value);
-  const date = /^\d+$/.test(stringValue)
-    ? DateTime.fromMillis(stringValue.length <= 10 ? numericValue * 1000 : numericValue)
-    : DateTime.fromISO(stringValue).isValid ? DateTime.fromISO(stringValue) : DateTime.fromSQL(stringValue);
-
-  return date.isValid ? date.toLocaleString(DateTime.DATE_MED) : stringValue;
-}
 </script>
 
 <style scoped>

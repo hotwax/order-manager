@@ -4,7 +4,7 @@ import { OrderActionValidator } from './OrderActionValidator';
 import { shipGroupItemStates } from './shipGroupItemStates';
 import { rollUpItemStatuses } from './itemStatusBadges';
 import { sentimentCounts } from './index';
-import { timelineMillis } from './orderDetailDates';
+import { toMillis } from './format';
 import { shipGroupMilestones, type OrderEvent } from './orderEvents';
 import { adjustmentAmount, adjustmentKey, adjustmentLabel } from './orderAdjustments';
 import type { useSeedStore } from '@/store/seed';
@@ -53,10 +53,6 @@ export function isPosCompletedShipGroup(shipGroup: any): boolean {
   return shipGroup?.shipmentMethodTypeId === 'POS_COMPLETED';
 }
 
-function itemWord(count: number): string {
-  return count === 1 ? translate('item') : translate('items');
-}
-
 /* ── Contacts ─────────────────────────────────────────────────────────────── */
 
 function contactPurposeIds(contact: any): string[] {
@@ -89,7 +85,7 @@ function formatTelecomNumber(telecom: any) {
 
 function isActiveContact(contact: any) {
   if (!contact.thruDate) return true;
-  const thruMillis = timelineMillis(contact.thruDate);
+  const thruMillis = toMillis(contact.thruDate);
   return !thruMillis || thruMillis > Date.now();
 }
 
@@ -161,7 +157,7 @@ function itemTransfers(orderItemSeqId: string, rows: any[], seed: EnrichmentStor
       toFacilityId: row.facilityIdTo,
       toFacilityName: seed.facilityName(row.facilityIdTo),
       quantity: Number(row.quantity || 0),
-      requestedDate: timelineMillis(row.createdStamp),
+      requestedDate: toMillis(row.createdStamp),
       sourceLabel: row.sourceId ? translate(TRANSFER_SOURCE_LABELS[row.sourceId] || row.sourceId) : '',
       comments: row.comments || '',
       reason: row.statusReasonEnumId ? seed.enumDescription(row.statusReasonEnumId) : '',
@@ -291,7 +287,7 @@ function enrichShipGroup(
     isSettled: settled,
     progress,
     statusLabel,
-    itemSummary: `${rawItems.length} ${itemWord(rawItems.length)}, ${units} ${units === 1 ? translate('unit') : translate('units')}`,
+    itemSummary: `${translate('{count} items', { count: rawItems.length })}, ${translate('{count} units', { count: units })}`,
     lifecycle,
     shippingAddress: shippingAddress(sg.contactMechId ? context.contactMechsById[sg.contactMechId] : context.shippingLocation, seed),
     carrierPartyId: sg.carrierPartyId,

@@ -27,7 +27,7 @@
           <p v-if="item.quantity">{{ translate('Qty') }}: {{ item.quantity }}</p>
         </ion-label>
         <ion-note slot="end" color="danger">
-          <p>{{ money(itemPrice(item)) }}</p>
+          <p>{{ formatMoney(itemPrice(item), currency) }}</p>
           <ion-badge color="danger">{{ translate('Cancel') }}</ion-badge>
         </ion-note>
       </ion-item>
@@ -49,7 +49,7 @@
           <p v-if="item.quantity">{{ translate('Qty') }}: {{ item.quantity }}</p>
         </ion-label>
         <ion-note slot="end" color="success">
-          <p>{{ money(itemPrice(item)) }}</p>
+          <p>{{ formatMoney(itemPrice(item), currency) }}</p>
           <ion-badge color="success">{{ translate('Swap') }}</ion-badge>
         </ion-note>
       </ion-item>
@@ -61,14 +61,14 @@
       </ion-list-header>
       <ion-item>
         <ion-label>{{ translate('Original total') }}</ion-label>
-        <ion-label slot="end">{{ money(grandTotal) }}</ion-label>
+        <ion-label slot="end">{{ formatMoney(grandTotal, currency) }}</ion-label>
       </ion-item>
       <ion-item>
         <ion-label>
           {{ translate('New total') }}
         </ion-label>
         <ion-label slot="end" color="dark">
-          {{ money(newTotal) }}
+          {{ formatMoney(newTotal, currency) }}
         </ion-label>
       </ion-item>
       <ion-item v-if="refundAmount > 0">
@@ -78,7 +78,7 @@
           </ion-text>
         </ion-label>
         <ion-label slot="end" color="primary">
-          {{ money(refundAmount) }}
+          {{ formatMoney(refundAmount, currency) }}
         </ion-label>
       </ion-item>
     </ion-list>
@@ -123,8 +123,11 @@ import { closeOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
+import { formatMoney } from '@/utils/format';
 
 withDefaults(defineProps<{
+  /** The order's currency. */
+  currency?: string;
   grandTotal?: number;
   newTotal?: number;
   refundAmount?: number;
@@ -166,9 +169,6 @@ function itemPrice(item: any): number {
   return unit * qty;
 }
 
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(Number(value) || 0);
-}
 
 function closeModal(confirmed = false) {
   modalController.dismiss({ confirmed });

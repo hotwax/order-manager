@@ -2,7 +2,7 @@
   <TaskCardShell
     :title="taskOrderTitle(task)"
     :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
-    :amount="formatTaskAmount(task.grandTotal)"
+    :amount="formatTaskAmount(task.grandTotal, task.currencyUom)"
     :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"

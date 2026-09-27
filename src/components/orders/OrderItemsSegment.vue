@@ -123,12 +123,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonItem, IonItemDivider, IonLabel, IonList } from '@ionic/vue';
-import { commonUtil, translate } from '@common';
+import { translate } from '@common';
 import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
 import OrderItemTransferChip from '@/components/orders/OrderItemTransferChip.vue';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { isKit } from '@/utils';
-import { formatDateTime } from '@/utils/orderDetailDates';
+import { formatDateTime, formatMoney } from '@/utils/format';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import type { EnrichedItemGroup, EnrichedOrder, EnrichedOrderItem } from '@/types/orderDetail';
 
@@ -165,7 +165,7 @@ function selectItems(items: EnrichedOrderItem[], selected: boolean) {
   emit('update:selectedItemIds', ids);
 }
 
-const money = (value: number) => commonUtil.formatCurrency(value, props.order.currency || 'USD');
+const money = (value: number) => formatMoney(value, props.order.currency);
 
 /** The product identity a rolled up (or sole item) row shows. */
 function productRowProps(group: EnrichedItemGroup) {
@@ -200,7 +200,7 @@ function itemRow(item: EnrichedOrderItem, identity: ReturnType<typeof productRow
     quantityLabel: translate('qty'),
     facilityLabel: item.facilityName,
     facilityDisabled: props.itemActions[item.orderItemSeqId]?.facilityDisabled,
-    attributesLabel: `${attributeCount} ${attributeCount === 1 ? translate('attribute') : translate('attributes')}`,
+    attributesLabel: translate('{count} attributes', { count: attributeCount }),
     statuses: item.statuses,
     statusDetail: item.shipGroupSeqId ? `${translate('#')}${item.shipGroupSeqId}` : '',
     amount: money(item.unitPrice * item.quantity),

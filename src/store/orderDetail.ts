@@ -10,7 +10,7 @@ import { escapeSolrValue } from "@/services/order";
 import { getReturn } from "@/services/returns";
 import { fetchOrderInventoryTransfers } from "@/services/inventoryTransfers";
 import { enrichOrder, isPosCompletedShipGroup } from "@/utils/orderDetailEnrichment";
-import { timelineMillis } from "@/utils/orderDetailDates";
+import { toMillis } from "@/utils/format";
 import { OrderActionValidator } from "@/utils/OrderActionValidator";
 import { buildOrderEvents, clusterEvents, type ExchangeChild, type OrderEvent, type UnfillableSummary } from "@/utils/orderEvents";
 import { adjustmentAmount, adjustmentKey, adjustmentLabel } from "@/utils/orderAdjustments";
@@ -771,7 +771,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
               orderId: candidateId,
               itemCount,
               facilityId: payload.originFacilityId && payload.originFacilityId !== QUEUE_FACILITY_ID ? payload.originFacilityId : '',
-              value: timelineMillis(assoc.createdStamp) || timelineMillis(payload.orderDate) || 0
+              value: toMillis(assoc.createdStamp) || toMillis(payload.orderDate) || 0
             });
           }));
           this.exchangeChildrenByOrderId[orderId] = children;

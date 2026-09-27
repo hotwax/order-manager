@@ -28,7 +28,7 @@
         </div>
         <div class="tablet">
           <ion-label class="ion-text-center" v-if="ev.entryDate">
-            {{ formatDate(ev.entryDate) }}
+            {{ formatDateTime(ev.entryDate) }}
             <p>{{ translate("entry date") }}</p>
           </ion-label>
           <ion-label v-else>-</ion-label>
@@ -46,7 +46,7 @@
 <script setup lang="ts">
 import { IonItem, IonLabel, IonList } from '@ionic/vue';
 import { translate } from '@common';
-import { formatDate } from '@/utils/orderDetailDates';
+import { formatDateTime } from '@/utils/format';
 
 defineProps<{
   /** CommunicationEvent rows as the order store loads them. */

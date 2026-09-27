@@ -54,7 +54,7 @@
           <ion-label>
             {{ productMaster.primaryId(getProduct(product.productId) || product, [product.productName]) }}
             <p>{{ productMaster.secondaryId(getProduct(product.productId) || product, [product.internalName]) }}</p>
-            <p>{{ money(product.price) }}</p>
+            <p>{{ formatMoney(product.price, currency) }}</p>
           </ion-label>
           <ion-note class="facility-label ion-no-padding" slot="end">{{ facilityStockLabel(getSubstituteStock(product.productId)?.computedAtp) }}</ion-note>
         </ion-item>
@@ -130,10 +130,13 @@ import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
 import { useSeedStore } from '@/store/seed';
+import { formatMoney } from '@/utils/format';
 
 const props = defineProps<{
   substituteProducts: any[];
   facilityId: string;
+  /** The order's currency, for the product prices. */
+  currency?: string;
   selectedProductId?: string;
   defaultSearchKeyword?: string;
 }>();
@@ -201,9 +204,6 @@ function facilityStockLabel(count?: number | string | null) {
   });
 }
 
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value ?? 0);
-}
 
 function toSubstituteShape(product: any) {
   return {

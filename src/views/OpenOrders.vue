@@ -179,7 +179,7 @@ const isLoading = computed(() => orderStore.workflowOrdersLoading[bucket]);
 const orderTotal = computed(() => orderStore.workflowOrdersTotal[bucket]);
 const hasMore = computed(() => orderStore.workflowOrders[bucket].length < orderStore.workflowOrdersTotal[bucket]);
 const resultsSummary = computed(() =>
-  `${orders.value.length} of ${orderTotal.value} ${orderTotal.value === 1 ? translate('order') : translate('orders')}`
+  translate('{shown} of {count} orders', { shown: orders.value.length, count: orderTotal.value })
 );
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const sortOptions = WORKFLOW_ORDER_SORT_OPTIONS;
@@ -364,7 +364,7 @@ async function runAction(action: BulkActionDefinition) {
   const count = selectedIds.value.size;
   try {
     await store.runBulkAction(bucket, action.id);
-    toastMessage.value = `${action.label}: ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+    toastMessage.value = translate('{action}: {count} orders', { action: action.label, count });
   } catch {
     toastMessage.value = translate('Failed to complete bulk action. Please try again.');
   }

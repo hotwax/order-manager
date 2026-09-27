@@ -2,7 +2,7 @@
   <TaskCardShell
     :title="taskOrderTitle(task)"
     :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
-    :amount="formatTaskAmount(task.grandTotal)"
+    :amount="formatTaskAmount(task.grandTotal, task.currencyUom)"
     :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
@@ -45,7 +45,7 @@
             <ion-text :color="paymentStatusColor(payment)">{{ paymentStatusLabel(payment) }}</ion-text>
           </p>
         </ion-label>
-        <ion-note slot="end">{{ money(payment.maxAmount) }}</ion-note>
+        <ion-note slot="end">{{ formatMoney(payment.maxAmount, task.currencyUom) }}</ion-note>
       </ion-item>
     </ion-list>
 
@@ -97,6 +97,7 @@ import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
+import { formatMoney } from '@/utils/format';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import type { TaskCardAction } from '@/types/taskCard';
 
@@ -132,9 +133,6 @@ async function openRiskDetails() {
   await modal.present();
 }
 
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-}
 
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);

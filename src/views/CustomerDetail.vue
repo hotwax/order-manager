@@ -261,7 +261,7 @@
         </div>
         <ion-list v-if="customerReturns.length">
           <ion-list-header>
-            <ion-label>{{ customerReturns.length }} {{ customerReturns.length === 1 ? translate('RMA') : translate('RMAs') }}</ion-label>
+            <ion-label>{{ translate('{count} RMAs', { count: customerReturns.length }) }}</ion-label>
           </ion-list-header>
           <div
             v-for="returnRecord in customerReturns"
@@ -277,7 +277,7 @@
             <ion-item lines="none">
               <ion-label class="ion-text-wrap">
                 <h2>{{ returnRecord.returnId }}</h2>
-                <p>{{ formatDate(returnRecord.entryDate) }}</p>
+                <p>{{ formatDate(returnRecord.entryDate) || translate('Date not available') }}</p>
               </ion-label>
             </ion-item>
 
@@ -342,11 +342,11 @@
             <ion-item lines="full">
               <ion-label>
                 <p class="overline">{{ translate('Date') }}</p>
-                {{ formatLongDate(comm.datetimeStarted || comm.entryDate) }}
+                {{ formatDate(comm.datetimeStarted || comm.entryDate) }}
               </ion-label>
               <ion-label slot="end" v-if="comm.datetimeEnded">
                 <p class="overline">{{ translate('Ended') }}</p>
-                {{ formatLongDate(comm.datetimeEnded) }}
+                {{ formatDate(comm.datetimeEnded) }}
               </ion-label>
             </ion-item>
 
@@ -491,6 +491,7 @@ import { useUserStore } from '@/store/user';
 import Actions from '@/authorization/actions';
 import type { CustomerOrderCardData, CustomerOrderSummary, CustomerTaskSummary } from '@/types/customer';
 import type { ReturnSummary } from '@/types/returns';
+import { formatDate, formatDateTime, formatMoney } from '@/utils/format';
 
 const props = defineProps<{
   customerId: string;
@@ -549,8 +550,8 @@ const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_
 const hasActiveDuplicateRelationship = computed(() => duplicateRelationships.value.some((duplicate) => duplicate.active));
 
 const customerSince = computed(() => formatMonthYear(customerSinceRaw.value));
-const createdAtLabel = computed(() => (timeline.value[0]?.at ? formatTimestamp(timeline.value[0].at) : ''));
-const lifetimeValue = computed(() => money(lifetimeValueRaw.value, lifetimeCurrency.value));
+const createdAtLabel = computed(() => (timeline.value[0]?.at ? formatDateTime(timeline.value[0].at) : ''));
+const lifetimeValue = computed(() => formatMoney(lifetimeValueRaw.value, lifetimeCurrency.value));
 
 /** The store's timeline rows carry English labels; the created row is re-worded here so it can be translated. */
 const timelineLabel = (event: { type: string; label: string }) =>
@@ -560,13 +561,13 @@ function mapOrder(order: CustomerOrderSummary): CustomerOrderCardData {
   return {
     id: order.orderId,
     name: order.orderName || order.orderId,
-    subtitle: `${order.itemCount} ${order.itemCount === 1 ? translate('item') : translate('items')}, ${order.unitCount} ${order.unitCount === 1 ? translate('unit') : translate('units')}`,
+    subtitle: `${translate('{count} items', { count: order.itemCount })}, ${translate('{count} units', { count: order.unitCount })}`,
     progressLabel: order.progressPercent != null
       ? translate('{percent}% complete', { percent: order.progressPercent })
       : order.progressLabel || order.statusDesc || translate('In progress'),
     progressValue: order.progressValue ?? 0.5,
     progressColor: order.progressColor || 'primary',
-    orderDate: formatLongDate(order.orderDate),
+    orderDate: formatDate(order.orderDate),
     isUnfillable: order.isUnfillable,
     items: (order.items || []).map((item) => ({
       productId: item.productId || '',
@@ -610,7 +611,7 @@ function mapCustomerTaskCard(task: CustomerTaskSummary) {
     purposeDescription: seedDescribe(task.workEffortPurposeTypeId || task.workEffortTypeId)
       || task.workEffortPurposeTypeId
       || task.workEffortTypeId,
-    estimatedCompletionDate: task.dueDate ? formatLongDate(task.dueDate) : '',
+    estimatedCompletionDate: task.dueDate ? formatDate(task.dueDate) : '',
     resolutionComment: task.resolution || '',
     customer: {
       partyId: props.customerId,
@@ -777,9 +778,6 @@ function seedDescribe(id?: string): string {
   return (seed as any).describe(id) || '';
 }
 
-function money(value: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }).format(Number(value || 0));
-}
 
 function commStatusColor(statusId: string): string {
   if (statusId === 'COM_COMPLETE') return 'success';
@@ -804,15 +802,7 @@ function formatMonthYear(value?: string | number) {
   return date?.isValid ? date.toFormat('LLLL yyyy') : '';
 }
 
-function formatLongDate(value?: string | number) {
-  const date = parseDate(value);
-  return date?.isValid ? date.toLocaleString(DateTime.DATE_MED) : String(value ?? '');
-}
 
-function formatTimestamp(value?: string | number) {
-  const date = parseDate(value);
-  return date?.isValid ? date.toFormat('h:mma d LLL yyyy') : '';
-}
 
 function openReturn(returnId: string) {
   router.push(`/returns/${returnId}`);
@@ -837,16 +827,6 @@ function facilityLabel(destinationFacilityId?: string) {
   return destinationFacilityId ? seed.facilityName(destinationFacilityId) || destinationFacilityId : translate('No destination facility');
 }
 
-function formatDate(value?: string | number) {
-  if (!value) return translate('Date not available');
-  const stringValue = String(value);
-  const numericValue = Number(value);
-  const date = /^\d+$/.test(stringValue)
-    ? DateTime.fromMillis(stringValue.length <= 10 ? numericValue * 1000 : numericValue)
-    : DateTime.fromISO(stringValue).isValid ? DateTime.fromISO(stringValue) : DateTime.fromSQL(stringValue);
-
-  return date.isValid ? date.toLocaleString(DateTime.DATE_MED) : stringValue;
-}
 </script>
 
 <style scoped>

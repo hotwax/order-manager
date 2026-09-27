@@ -292,6 +292,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, nextTick, watch } from 'vue';
+import { formatMoney } from '@/utils/format';
 import { IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonMenuButton, IonPage, IonSearchbar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, IonSpinner, modalController } from '@ionic/vue';
 import { addOutline, storefrontOutline, searchOutline, checkmarkDoneOutline, barcodeOutline, cloudOfflineOutline, shirtOutline, checkmarkOutline, locateOutline, addCircleOutline, trashOutline, cashOutline, globeOutline } from 'ionicons/icons';
 import { api, commonUtil, DxpShopifyImg, emitter, logger, translate, useSolrSearch } from '@common';
@@ -601,9 +602,6 @@ const totals = computed(() => {
   return { subtotal, shipping, total };
 });
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-}
 
 function resetForm() {
   orderForm.value = {

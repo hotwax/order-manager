@@ -42,8 +42,7 @@
         <TaskQueueListHeader
           :loaded-count="swapTasks.length"
           :total-count="swapTotal"
-          singular-label="swap task"
-          plural-label="swap tasks"
+          summary-key="{shown} of {count} swap tasks"
           :sort="filters.sort"
           :sort-options="sortOptions"
           trigger-id="swap-task-sort"

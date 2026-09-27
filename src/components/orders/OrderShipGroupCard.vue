@@ -23,7 +23,7 @@
 
     <ion-item v-if="holdTaskCount" color="warning" lines="none">
       <ion-icon slot="start" :icon="warningOutline" />
-      <ion-label>{{ holdTaskCount }} {{ translate(holdTaskCount === 1 ? 'hold task' : 'hold tasks') }}</ion-label>
+      <ion-label>{{ translate('{count} hold tasks', { count: holdTaskCount }) }}</ion-label>
       <ion-button slot="end" fill="solid" color="dark" size="small" @click="emit('show-holds')">
         {{ translate('View details') }}
       </ion-button>
@@ -79,22 +79,22 @@
           :disabled="shipGroup.isSettled" @click="openShippingDatesModal">
           <ion-label>
             <p class="outline">{{ translate('Ship after') }}</p>
-            {{ formatDate(shipGroup.shipAfterDate) }}
+            {{ formatDateTime(shipGroup.shipAfterDate) }}
           </ion-label>
           <ion-label>
             <p class="outline">{{ translate('Ship by') }}</p>
-            {{ formatDate(shipGroup.shipByDate) }}
+            {{ formatDateTime(shipGroup.shipByDate) }}
           </ion-label>
         </ion-item>
         <ion-item v-if="shipGroup.estimatedShipDate || shipGroup.estimatedDeliveryDate" button :detail="false"
           lines="none" :disabled="shipGroup.isSettled" @click="openDeliveryDatesModal">
           <ion-label>
             <p class="outline">{{ translate('Estimated ship date') }}</p>
-            {{ formatDate(shipGroup.estimatedShipDate) }}
+            {{ formatDateTime(shipGroup.estimatedShipDate) }}
           </ion-label>
           <ion-label>
             <p class="outline">{{ translate('Estimated delivery date') }}</p>
-            {{ formatDate(shipGroup.estimatedDeliveryDate) }}
+            {{ formatDateTime(shipGroup.estimatedDeliveryDate) }}
           </ion-label>
         </ion-item>
         <ion-item v-if="shipGroup.shippingInstructions" button :detail="false" lines="none"
@@ -139,7 +139,7 @@
               </div>
               <p v-if="featureLabel(item.productId)" class="ship-group-item-features" :title="featureLabel(item.productId)">{{ featureLabel(item.productId) }}</p>
             </ion-label>
-            <ion-note slot="end">{{ item.quantity }} {{ translate('units') }}</ion-note>
+            <ion-note slot="end">{{ translate('{count} units', { count: Number(item.quantity) }) }}</ion-note>
           </ion-item>
           <ion-item v-if="hiddenItemCount" button :detail="false" @click="emit('update:expanded', true)">
             <ion-label color="medium">{{ translate('+{count} more', { count: hiddenItemCount }) }}</ion-label>
@@ -470,14 +470,13 @@ import {
   calendarOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline,
   ellipsisVertical, giftOutline, mailOutline, saveOutline, sendOutline, trashOutline, warningOutline,
 } from 'ionicons/icons';
-import { commonUtil, DxpShopifyImg, translate } from '@common';
+import { DxpShopifyImg, translate } from '@common';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { isKit } from '@/utils';
-import { formatDate, formatTime, toDateInputValue } from '@/utils/orderDetailDates';
 import type { ShipGroupMilestones } from '@/utils/orderEvents';
-import { formatElapsed } from '@/utils/orderTimeline';
+import { formatDateTime, formatElapsed, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
 import { OrderActionValidator, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import type { EnrichedShipGroup, ItemIssuance, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 
@@ -567,7 +566,7 @@ const hasSelectedOptions = computed(() => {
  * ("Pending") or behind us and simply not recorded ("No date").
  */
 function elapsedLater(start: number, end: number) {
-  const duration = formatElapsed(start, end, translate);
+  const duration = formatElapsed(start, end);
   return duration ? translate('{duration} later', { duration }) : '';
 }
 
@@ -580,7 +579,7 @@ const lifecycleSteps = computed(() => {
     return {
       ...step,
       date,
-      overline: date ? (previous ? elapsedLater(previous, date) : commonUtil.getRelativeTime(date)) : '',
+      overline: date ? (previous ? elapsedLater(previous, date) : formatRelative(date)) : '',
       note: formatTime(date) || (recorded ? translate('No date') : translate('Pending')),
     };
   });

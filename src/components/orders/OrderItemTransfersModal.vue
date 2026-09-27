@@ -119,7 +119,7 @@ import { cancelInventoryTransfer, executeInventoryTransfer, fetchFacilityStock }
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
 import { showToast } from '@/utils';
-import { formatDateTime } from '@/utils/orderDetailDates';
+import { formatDateTime } from '@/utils/format';
 import type { EnrichedTransfer } from '@/types/orderDetail';
 
 const props = defineProps<{

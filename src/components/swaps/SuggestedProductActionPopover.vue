@@ -82,6 +82,7 @@ const customSwap = async () => {
     componentProps: {
       substituteProducts: originalItem?.substituteProducts ?? [],
       facilityId: props.task.facilityId,
+      currency: props.task.currencyUom,
       selectedProductId: props.item.productId,
       defaultSearchKeyword: defaultCustomSwapSearchTerm(originalItem),
     },

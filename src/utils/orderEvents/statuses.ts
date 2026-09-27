@@ -1,4 +1,4 @@
-import { timelineMillis } from '@/utils/orderDetailDates';
+import { toMillis } from '@/utils/format';
 import { clusterEvents, distinct, rowMillis } from './cluster';
 import type { OrderEvent, OrderEventActor, OrderEventRecord } from './types';
 
@@ -15,7 +15,7 @@ function statusRecord(row: any): OrderEventRecord {
   return {
     source: 'status',
     type: row.statusId,
-    at: timelineMillis(row.statusDatetime),
+    at: toMillis(row.statusDatetime),
     orderItemSeqId: isHeaderStatus(row) ? undefined : row.orderItemSeqId,
     userLogin: row.statusUserLogin || undefined,
     reason: row.changeReason || undefined,
@@ -31,7 +31,7 @@ export function statusEvents(order: any): OrderEvent[] {
   const rows: any[] = order?.statuses || [];
   const isShopify = (order?.identifications || []).some((identification: any) => identification.orderIdentificationTypeId === 'SHOPIFY_ORD_ID');
   const created = rows.filter((row) => row.statusId === 'ORDER_CREATED' && isHeaderStatus(row));
-  const placedAt = timelineMillis(order?.orderDate) ?? timelineMillis(created[0]?.statusDatetime);
+  const placedAt = toMillis(order?.orderDate) ?? toMillis(created[0]?.statusDatetime);
   const isPlacement = (row: any) => row.statusId === 'ITEM_CREATED' && placedAt !== undefined
     && Math.abs(rowMillis(row.statusDatetime) - placedAt) <= PLACED_WINDOW_MS;
 
@@ -48,11 +48,11 @@ export function statusEvents(order: any): OrderEvent[] {
       isShopify,
       shipGroupSeqIds: [],
       orderItemSeqIds: distinct(placementRows, 'orderItemSeqId').length ? distinct(placementRows, 'orderItemSeqId') : itemSeqIds,
-      records: [{ source: 'order', type: 'orderDate', at: timelineMillis(order?.orderDate) }, ...placementRows.map(statusRecord)],
+      records: [{ source: 'order', type: 'orderDate', at: toMillis(order?.orderDate) }, ...placementRows.map(statusRecord)],
     });
   }
 
-  const importedAt = timelineMillis(order?.entryDate);
+  const importedAt = toMillis(order?.entryDate);
   if (importedAt !== undefined) {
     events.push({
       id: 'imported',
@@ -73,7 +73,7 @@ export function statusEvents(order: any): OrderEvent[] {
         kind: 'orderStatus',
         statusId: row.statusId,
         reason: row.changeReason || undefined,
-        at: timelineMillis(row.statusDatetime),
+        at: toMillis(row.statusDatetime),
         actor: userActor(row.statusUserLogin),
         shipGroupSeqIds: [],
         orderItemSeqIds: [],

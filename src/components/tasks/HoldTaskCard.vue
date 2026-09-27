@@ -2,7 +2,7 @@
   <TaskCardShell
     :title="taskOrderTitle(task)"
     :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
-    :amount="formatTaskAmount(task.grandTotal)"
+    :amount="formatTaskAmount(task.grandTotal, task.currencyUom)"
     :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
@@ -64,7 +64,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { DateTime } from 'luxon';
+import { formatDateTime } from '@/utils/format';
 import {
   IonItem,
   IonLabel,
@@ -170,13 +170,7 @@ function assignedPartyDate(task: any, roleTypeId: string): string {
   const fromDate = assignedParty(task, roleTypeId)?.fromDate;
   if (!fromDate) return '';
 
-  const value = String(fromDate);
-  const numericValue = Number(value);
-  const dt = Number.isFinite(numericValue)
-    ? DateTime.fromMillis(value.length <= 10 ? numericValue * 1000 : numericValue)
-    : (DateTime.fromISO(value).isValid ? DateTime.fromISO(value) : DateTime.fromSQL(value));
-
-  return dt.isValid ? dt.toFormat('yyyy-LL-dd HH:mm') : value;
+  return formatDateTime(fromDate) || String(fromDate);
 }
 
 defineExpose({

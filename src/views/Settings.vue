@@ -222,7 +222,6 @@
 <script setup lang="ts">
 import { IonAvatar, IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonPage, IonRadio, IonRadioGroup, IonSearchbar, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToolbar } from '@ionic/vue';
 import { checkmarkCircle, closeCircle, closeOutline, openOutline, saveOutline, syncOutline } from 'ionicons/icons';
-import { DateTime } from 'luxon';
 import { computed, onBeforeMount, ref } from 'vue';
 import { api, commonUtil, cookieHelper, i18n, translate } from '@common';
 import { useDbStatus } from '@common/db';
@@ -234,6 +233,7 @@ import { ORDER_MANAGER_SYNC_CATALOG } from '@/config/appSyncConfig';
 import DxpProductIdentifier from "@/components/settings/DxpProductIdentifier.vue";
 import DxpAppVersionInfo from "@/components/settings/DxpAppVersionInfo.vue";
 import Actions from "@/authorization/actions";
+import { formatDateTime } from '@/utils/format';
 
 const userStore = useUserStore();
 const userProfile = computed(() => userStore.getUserProfile);
@@ -366,8 +366,7 @@ const {
   domains, refreshing, totalRows, oldestSyncedAt, lastSyncedAt, refreshDomain, refreshAll,
 } = useDbStatus(getOrderManagerDb(commonUtil.getOMSInstanceName()), ORDER_MANAGER_SYNC_CATALOG);
 
-const formatSyncTime = (millis: number) =>
-  DateTime.fromMillis(millis).toLocaleString(DateTime.DATETIME_MED);
+const formatSyncTime = (millis: number) => formatDateTime(millis);
 
 const syncSubtitle = computed(() => {
   if (!lastSyncedAt.value) return translate("Database not synced yet");

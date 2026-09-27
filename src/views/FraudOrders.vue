@@ -27,8 +27,7 @@
       <TaskQueueListHeader
         :loaded-count="fraudTasks.length"
         :total-count="fraudTotal"
-        singular-label="fraud task"
-        plural-label="fraud tasks"
+        summary-key="{shown} of {count} fraud tasks"
         :sort="filters.sort"
         :sort-options="sortOptions"
         trigger-id="fraud-task-sort"

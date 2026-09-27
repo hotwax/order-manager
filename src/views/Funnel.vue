@@ -71,7 +71,7 @@
               @click="navigateRoute($event, virtualLocationRoute(item))"
             >
               <ion-label>{{ item.label }}</ion-label>
-              <p slot="end">{{ formatCount(item.count) }} {{ translate(item.count === 1 ? "order" : "orders") }}</p>
+              <p slot="end">{{ ordersLabel(item.count) }}</p>
             </ion-item>
           </ion-list>
         </StatCard>
@@ -83,15 +83,15 @@
           <ion-list v-if="!brokeredWorkloadLoading" lines="none" class="hold-tasks-list">
             <ion-item button :detail="true" :href="routeHref('/open')" @click="navigateRoute($event, '/open')">
               <ion-label>{{ translate("Open") }}</ion-label>
-              <p slot="end">{{ formatCount(brokeredWorkload.open) }} {{ translate(brokeredWorkload.open === 1 ? "order" : "orders") }}</p>
+              <p slot="end">{{ ordersLabel(brokeredWorkload.open) }}</p>
             </ion-item>
             <ion-item button :detail="true" :href="routeHref('/inflight')" @click="navigateRoute($event, '/inflight')">
               <ion-label>{{ translate("Picked") }}</ion-label>
-              <p slot="end">{{ formatCount(brokeredWorkload.inflight) }} {{ translate(brokeredWorkload.inflight === 1 ? "order" : "orders") }}</p>
+              <p slot="end">{{ ordersLabel(brokeredWorkload.inflight) }}</p>
             </ion-item>
             <ion-item button :detail="true" :href="routeHref('/packed')" @click="navigateRoute($event, '/packed')">
               <ion-label>{{ translate("Packed and shipped") }}</ion-label>
-              <p slot="end">{{ formatCount(brokeredWorkload.packed) }} {{ translate(brokeredWorkload.packed === 1 ? "order" : "orders") }}</p>
+              <p slot="end">{{ ordersLabel(brokeredWorkload.packed) }}</p>
             </ion-item>
           </ion-list>
         </StatCard>
@@ -139,7 +139,7 @@
                 @click="navigateRoute($event, unfillableDayRoute(day.date))"
               >
                 <ion-label>{{ formatOrderDate(day.date) }}</ion-label>
-                <p slot="end">{{ formatCount(day.orderCount) }} {{ translate(day.orderCount === 1 ? "order" : "orders") }}</p>
+                <p slot="end">{{ ordersLabel(day.orderCount) }}</p>
               </ion-item>
               <ion-item
                 v-if="unfillableRemainingDays"
@@ -149,7 +149,7 @@
                 @click="navigateRoute($event, unfillableRemainingRoute)"
               >
                 <ion-label>{{ unfillableRemainingLabel }}</ion-label>
-                <p slot="end">{{ formatCount(unfillableRemainingOrders) }} {{ translate(unfillableRemainingOrders === 1 ? "order" : "orders") }}</p>
+                <p slot="end">{{ ordersLabel(unfillableRemainingOrders) }}</p>
               </ion-item>
             </ion-list>
           </template>
@@ -514,7 +514,7 @@
                     transition: 'all 0.2s ease',
                     cursor: 'pointer'
                   }" 
-                  :title="`${segment.label}: ${segment.orderCount} ${translate('orders')} (${segment.estimatedTime})`"
+                  :title="`${segment.label}: ${ordersLabel(segment.orderCount)} (${segment.estimatedTime})`"
                   @mouseenter="hoveredSegmentId = segment.id"
                   @mouseleave="hoveredSegmentId = null"
                 />
@@ -542,7 +542,7 @@
                   <div class="legend-card-header">
                     <span class="legend-orders">
                       <span class="legend-position">#{{ visibleIndex + 1 }}</span>
-                      {{ segment.orderCount }} {{ translate("orders") }}
+                      {{ ordersLabel(segment.orderCount) }}
                     </span>
                     <span class="legend-time">{{ segment.estimatedTime }}</span>
                   </div>
@@ -631,6 +631,7 @@ import { useRouter, type RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 import { DateTime } from 'luxon';
+import { formatDate, formatRelative } from '@/utils/format';
 
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
@@ -693,7 +694,7 @@ const unfillableTrendLabel = computed(() => {
   if (!oldest.isValid) return translate('{count} items by order date', { count: items });
   return translate('{count} items by order date since {date}', {
     count: items,
-    date: oldest.toFormat('d LLL yyyy')
+    date: formatDate(oldest.toMillis())
   });
 });
 
@@ -709,14 +710,13 @@ const unfillableRemainingOrders = computed(() =>
 );
 const unfillableRemainingLabel = computed(() =>
   translate(
-    unfillableRemainingDays.value === 1 ? '{count} later date' : '{count} later dates',
+    '{count} later dates',
     { count: unfillableRemainingDays.value }
   )
 );
 
 function formatOrderDate(date: string) {
-  const parsed = DateTime.fromISO(date);
-  return parsed.isValid ? parsed.toFormat('d LLL yyyy') : date;
+  return formatDate(date) || date;
 }
 
 // Each row deep-links into the Unfillable queue with its order-date filter
@@ -1032,6 +1032,9 @@ function formatCount(value: number) {
   return countValue(value).toLocaleString();
 }
 
+/** "1 order", "1,204 orders". */
+const ordersLabel = (value: number) => translate('{total} orders', { total: formatCount(value), count: countValue(value) });
+
 const fulfillmentStats = computed(() => {
   const fp = fulfillmentProgress.value || {};
   const totalShipGroups = countValue(fp.totalShipGroupsCount);
@@ -1203,7 +1206,7 @@ function workflowRoute(path: string) {
 
 const oldestAssignedRelativeStr = computed(() => {
   const timestamp = facilityFulfillmentProgress.value?.oldestAssignedTime;
-  return timestamp ? commonUtil.getRelativeTime(timestamp) : translate('No pending orders');
+  return timestamp ? formatRelative(timestamp) : translate('No pending orders');
 });
 
 const progressPercent = computed(() => {

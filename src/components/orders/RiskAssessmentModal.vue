@@ -19,7 +19,7 @@
             {{ risk.providerName || risk.providerId || translate('Risk provider') }}
             <p>{{ translate('Risk level') }}: {{ seedStore.enumDescription(risk.riskLevelEnumId) }}</p>
           </ion-label>
-          <ion-note v-if="risk.createdDate" slot="end">{{ formatDate(risk.createdDate) }}</ion-note>
+          <ion-note v-if="risk.createdDate" slot="end">{{ formatDateTime(risk.createdDate) }}</ion-note>
         </ion-item>
         <ion-item v-for="fact in sortFactsBySentiment(risk.facts || [])" :key="fact.factSeqId" lines="none">
           <ion-icon slot="start" :icon="factSentimentIcon(fact.sentimentEnumId)" :color="factSentimentColor(fact.sentimentEnumId)" />
@@ -41,7 +41,7 @@
 <script setup lang="ts">
 import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonNote, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { closeOutline, shieldOutline } from 'ionicons/icons';
-import { DateTime } from 'luxon';
+import { formatDateTime } from '@/utils/format';
 import { translate } from '@common';
 import { useSeedStore } from '@/store/seed';
 import { factSentimentColor, factSentimentIcon, riskLevelColor, sortFactsBySentiment } from '@/utils';
@@ -56,9 +56,4 @@ function dismiss() {
   modalController.dismiss();
 }
 
-function formatDate(value: string | number | undefined) {
-  if (!value) return '';
-  const parsed = typeof value === 'number' ? DateTime.fromMillis(value) : DateTime.fromISO(String(value));
-  return parsed.isValid ? parsed.toLocaleString(DateTime.DATETIME_MED) : String(value);
-}
 </script>

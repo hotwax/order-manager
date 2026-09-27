@@ -35,8 +35,7 @@
         <TaskQueueListHeader
           :loaded-count="addressValidationTasks.length"
           :total-count="addressValidationTotal"
-          singular-label="bad address task"
-          plural-label="bad address tasks"
+          summary-key="{shown} of {count} bad address tasks"
           :sort="filters.sort"
           :sort-options="sortOptions"
           trigger-id="bad-address-task-sort"

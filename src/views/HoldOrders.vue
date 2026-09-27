@@ -27,8 +27,7 @@
       <TaskQueueListHeader
         :loaded-count="heldTasks.length"
         :total-count="holdTotal"
-        singular-label="hold task"
-        plural-label="hold tasks"
+        summary-key="{shown} of {count} hold tasks"
         :sort="filters.sort"
         :sort-options="sortOptions"
         trigger-id="hold-task-sort"

@@ -2,7 +2,7 @@
   <TaskCardShell
     :title="taskOrderTitle(task)"
     :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
-    :amount="formatTaskAmount(task.grandTotal)"
+    :amount="formatTaskAmount(task.grandTotal, task.currencyUom)"
     :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
@@ -109,7 +109,7 @@
       </ion-item>
       <ion-item>
         <ion-label>{{ translate('New total') }}</ion-label>
-        <ion-note slot="end" color="dark">{{ money(getSuggestedItems(task).newTotal) }}</ion-note>
+        <ion-note slot="end" color="dark">{{ formatMoney(getSuggestedItems(task).newTotal, task.currencyUom) }}</ion-note>
       </ion-item>
       <ion-item lines="none">
         <ion-input
@@ -117,12 +117,12 @@
           label-placement="start"
           type="number"
           :value="getSuggestedItems(task).suggestedRefund"
-          :helper-text="`${money(task.grandTotal)} ${translate('available to refund')}`"
+          :helper-text="`${formatMoney(task.grandTotal, task.currencyUom)} ${translate('available to refund')}`"
           :clear-input="true"
           @ionInput="task._refundAmount = $event.detail.value != null ? Number($event.detail.value) : undefined"
           @ionClear="task._refundAmount = undefined"
         >
-          <span slot="start">$</span>
+          <span slot="start">{{ currencySymbol(task.currencyUom) }}</span>
         </ion-input>
       </ion-item>
     </ion-list>
@@ -135,7 +135,6 @@ import { computed } from 'vue';
 import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
 import { arrowUndoOutline, chevronForwardOutline, closeCircleOutline, ellipsisVerticalOutline, gitBranchOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
-import { DateTime } from 'luxon';
 import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import ReleaseSwapOrderModal from '@/components/swaps/ReleaseSwapOrderModal.vue';
@@ -148,6 +147,7 @@ import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
 import { isSwapItemUnavailable } from '@/utils/swapItems';
+import { currencySymbol, formatDateTime, formatMoney } from '@/utils/format';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import type { TaskCardAction } from '@/types/taskCard';
 
@@ -219,12 +219,7 @@ function formatRoutingTimestamp(task: any): string {
   const value = routingTimestamp(task);
   if (!value) return '';
 
-  const num = Number(value);
-  const dt = Number.isFinite(num) && String(value).length >= 10
-    ? DateTime.fromMillis(num)
-    : DateTime.fromISO(String(value));
-
-  return dt.isValid ? dt.toFormat('yyyy-LL-dd HH:mm') : String(value);
+  return formatDateTime(value) || String(value);
 }
 
 function hasRoutingDetails(task: any): boolean {
@@ -376,9 +371,6 @@ function suggestedItemOverlineLabel(suggested: any): string {
   return '';
 }
 
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-}
 
 const openSuggestedProductActionsPopover = async (event: Event, item: any, task: any) => {
   const popover = await popoverController.create({
@@ -428,6 +420,7 @@ async function releaseUpdatedOrder(task: any) {
   const modal = await modalController.create({
     component: ReleaseSwapOrderModal,
     componentProps: {
+      currency: task.currencyUom,
       grandTotal: task.grandTotal,
       newTotal,
       refundAmount,

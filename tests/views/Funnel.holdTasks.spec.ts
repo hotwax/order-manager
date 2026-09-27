@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 
 vi.mock('@common', () => ({
-  translate: (value: string) => value,
+  translate: (value: string, params?: Record<string, unknown>) => value.replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? '')),
 }));
 
 const IonListStub = defineComponent({

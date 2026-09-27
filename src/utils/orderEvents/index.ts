@@ -1,4 +1,4 @@
-import { timelineMillis } from '@/utils/orderDetailDates';
+import { toMillis } from '@/utils/format';
 import { fallbackBrokeringEvents, facilityChangeEvents } from './facilityChanges';
 import { exchangeEvents, returnEvents } from './lineage';
 import { statusEvents } from './statuses';
@@ -23,7 +23,7 @@ const KIND_ORDER: Record<OrderEvent['kind'], number> = {
 function fulfillmentEvents(order: any, fulfillment: any[]): OrderEvent[] {
   const shipGroups: Record<string, any> = Object.fromEntries((order?.shipGroups || []).map((sg: any) => [sg.shipGroupSeqId, sg]));
   return fulfillment.flatMap((entry: any) => FULFILLMENT_FIELDS.flatMap(([field, step]) => {
-    const at = timelineMillis(entry?.[field]);
+    const at = toMillis(entry?.[field]);
     if (at === undefined) return [];
     const shipGroup = shipGroups[entry.shipGroupSeqId];
     return [{
@@ -75,7 +75,7 @@ export function buildOrderEvents(sources: OrderEventSources): OrderEvent[] {
     ...exchangeEvents(order, sources.exchangeChildren),
   ];
 
-  const lastAttempt = timelineMillis(sources.unfillable?.lastAttemptDate);
+  const lastAttempt = toMillis(sources.unfillable?.lastAttemptDate);
   if (sources.unfillable && lastAttempt !== undefined) {
     events.push({
       id: 'unfillable',
