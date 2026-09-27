@@ -14,7 +14,7 @@
     <ion-list lines="full" v-if="cancelledItems.length">
       <ion-list-header>
         <ion-label>
-          <ion-text color="danger">{{ translate('Items to cancel') }}</ion-text>
+          {{ translate('Items to cancel') }}
         </ion-label>
       </ion-list-header>
       <ion-item v-for="(item, index) in cancelledItems" :key="`cancelled-${item.orderItemSeqId || index}`">
@@ -24,7 +24,10 @@
         <ion-label>
           {{ productPrimary(item) }}
           <p>{{ productSecondary(item) }}</p>
-          <p v-if="item.quantity">{{ translate('Qty: {count}', { count: item.quantity }) }}</p>
+        </ion-label>
+        <ion-label v-if="item.quantity" slot="end" class="ion-text-center">
+          {{ item.quantity }}
+          <p>{{ translate('qty') }}</p>
         </ion-label>
         <ion-note slot="end" color="danger">
           <p>{{ formatMoney(itemPrice(item), currency) }}</p>
@@ -36,7 +39,7 @@
     <ion-list lines="full" v-if="substitutedItems.length">
       <ion-list-header>
         <ion-label>
-          <ion-text color="success">{{ translate('Substituted items') }}</ion-text>
+          {{ translate('Substituted items') }}
         </ion-label>
       </ion-list-header>
       <ion-item v-for="(item, index) in substitutedItems" :key="`sub-${item.orderItemSeqId || index}`">
@@ -46,7 +49,10 @@
         <ion-label>
           {{ productPrimary(item) }}
           <p>{{ productSecondary(item) }}</p>
-          <p v-if="item.quantity">{{ translate('Qty: {count}', { count: item.quantity }) }}</p>
+        </ion-label>
+        <ion-label v-if="item.quantity" slot="end" class="ion-text-center">
+          {{ item.quantity }}
+          <p>{{ translate('qty') }}</p>
         </ion-label>
         <ion-note slot="end" color="success">
           <p>{{ formatMoney(itemPrice(item), currency) }}</p>

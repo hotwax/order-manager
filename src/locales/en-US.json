@@ -783,7 +783,6 @@
   "QOH": "QOH",
   "Qty": "Qty",
   "qty": "@.lower:{'Qty'}",
-  "Qty: {count}": "Qty: {count}",
   "Quantity": "Quantity",
   "Quantity must be greater than 0": "Quantity must be greater than 0",
   "Queue breakdown": "Queue breakdown",

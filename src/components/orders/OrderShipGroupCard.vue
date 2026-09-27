@@ -139,7 +139,10 @@
               <p>{{ secondaryIdentifier(item.productId) }}</p>
               <p v-if="featureLabel(item.productId)" class="ship-group-item-features" :title="featureLabel(item.productId)">{{ featureLabel(item.productId) }}</p>
             </ion-label>
-            <ion-note slot="end">{{ translate('{count} units', { count: Number(item.quantity) }) }}</ion-note>
+            <ion-label slot="end" class="ion-text-center">
+              {{ item.quantity }}
+              <p>{{ translate('qty') }}</p>
+            </ion-label>
           </ion-item>
           <ion-item v-if="hiddenItemCount" button :detail="false" @click="emit('update:expanded', true)">
             <ion-label color="medium">{{ translate('+{count} more', { count: hiddenItemCount }) }}</ion-label>
