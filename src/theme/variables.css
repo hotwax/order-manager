@@ -1,0 +1,4 @@
+/* v-image-preview, from common, marks a thumbnail with .pointer so it reads as clickable. */
+.pointer {
+  cursor: pointer;
+}

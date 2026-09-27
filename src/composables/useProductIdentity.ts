@@ -15,11 +15,21 @@ export function useProductIdentity() {
   const getProduct = (productId?: string) => productCache.getProduct(productId as string);
   const identification = (prefId: string, productId?: string) =>
     commonUtil.getProductIdentificationValue(prefId, getProduct(productId) || {}) || '';
+  const primaryIdentifier = (productId?: string) => identification(identificationPref.value.primaryId, productId);
 
   return {
     getProduct,
-    primaryIdentifier: (productId?: string) => identification(identificationPref.value.primaryId, productId),
+    primaryIdentifier,
     secondaryIdentifier: (productId?: string) => identification(identificationPref.value.secondaryId, productId),
+    /**
+     * What v-image-preview opens: the product's image, titled by its primary identifier as the
+     * row names it. The product name alone can be just the variant, such as "XS". The directive
+     * reads this once, when mounted, so key the thumbnail by the image and the identifier.
+     */
+    imagePreview: (productId?: string) => ({
+      mainImageUrl: getProduct(productId)?.mainImageUrl,
+      productName: primaryIdentifier(productId) || productId,
+    }),
     /**
      * A variant's selectable features as one line ("SIZE/M" -> "M"). `productFeatures` is the Solr
      * field the fulfillment app already renders this way, so the two apps agree on what a variant

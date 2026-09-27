@@ -128,7 +128,7 @@
       <div class="ship-group-summary-content">
         <ion-list lines="none" :aria-label="translate('Items')">
           <ion-item v-for="item in shipGroup.items.slice(0, COLLAPSED_ITEM_LIMIT)" :key="item.orderItemSeqId">
-            <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="getProduct(item.productId)?.mainImageUrl">
+            <ion-thumbnail slot="start" v-image-preview="imagePreview(item.productId)" :key="`${getProduct(item.productId)?.mainImageUrl} ${primaryIdentifier(item.productId)}`">
               <DxpShopifyImg :src="item.imageUrl" :key="getProduct(item.productId)?.mainImageUrl" size="small" />
             </ion-thumbnail>
             <ion-label>
@@ -181,7 +181,7 @@
                    sale and a completed or cancelled order do not have. -->
               <ion-checkbox v-if="!shipGroup.isPosCompleted && !orderIsTerminal" slot="start" :checked="selectedItemIds.includes(item.orderItemSeqId)"
                 @ionChange="toggleItem(item.orderItemSeqId, $event.detail.checked)" />
-              <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="getProduct(item.productId)?.mainImageUrl">
+              <ion-thumbnail slot="start" v-image-preview="imagePreview(item.productId)" :key="`${getProduct(item.productId)?.mainImageUrl} ${primaryIdentifier(item.productId)}`">
                 <DxpShopifyImg :src="item.imageUrl" :key="getProduct(item.productId)?.mainImageUrl" size="small" />
               </ion-thumbnail>
               <ion-label>
@@ -520,7 +520,7 @@ const emit = defineEmits<{
 
 const seed = useSeedStore();
 const orderDetailStore = useOrderDetailStore();
-const { getProduct, primaryIdentifier, secondaryIdentifier, featureLabel } = useProductIdentity();
+const { getProduct, imagePreview, primaryIdentifier, secondaryIdentifier, featureLabel } = useProductIdentity();
 
 const ISSUANCE_LABELS: Record<ItemIssuance['kind'], string> = {
   none: 'Inventory not issued',
