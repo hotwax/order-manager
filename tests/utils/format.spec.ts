@@ -30,6 +30,7 @@ describe('format', () => {
     expect(formatDate(AT)).toBe('Sep 22, 2026');
     expect(formatDate('2026-09-22 14:33:14.000', { weekday: true })).toBe('Tuesday, Sep 22, 2026');
     expect(formatTime(Math.floor(AT / 1000))).toBe('2:33 PM');
+    expect(formatDate(946684799)).toBe('Dec 31, 1999');
     expect(formatTime(AT, { seconds: true })).toBe('2:33:14 PM');
     expect(formatDateTime(AT, { year: false })).toBe('Sep 22, 2:33 PM');
     expect(formatDateTime('')).toBe('');

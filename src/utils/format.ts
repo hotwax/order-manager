@@ -14,15 +14,16 @@ const locale = (): string | undefined => {
 };
 
 /**
- * Epoch millis for the date shapes OMS mixes: epoch millis, 10-digit epoch seconds, SQL
- * timestamps and ISO strings. undefined when the value is empty or unparseable.
+ * Epoch millis for the date shapes OMS mixes: epoch millis, epoch seconds (10 digits or
+ * fewer, so dates before 2001 still read as seconds), SQL timestamps and ISO strings.
+ * undefined when the value is empty or unparseable.
  */
 export function toMillis(value: any): number | undefined {
   if (!value) return undefined;
 
   const numericValue = Number(value);
   if (Number.isFinite(numericValue)) {
-    return String(value).length === 10 ? numericValue * 1000 : numericValue;
+    return String(value).length <= 10 ? numericValue * 1000 : numericValue;
   }
 
   const stringValue = String(value);
