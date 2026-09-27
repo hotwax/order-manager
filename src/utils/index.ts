@@ -3,11 +3,13 @@ import { alertCircleOutline, checkmarkCircleOutline, removeCircleOutline } from 
 import { translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 
-export const showToast = async (message: string) => {
+/** A persistent toast stays up, with a Dismiss button, until the operator closes it. */
+export const showToast = async (message: string, { persistent = false } = {}) => {
   const toast = await toastController.create({
     message,
-    duration: 3000,
+    duration: persistent ? 0 : 3000,
     position: 'bottom',
+    ...(persistent && { buttons: [{ text: translate('Dismiss'), role: 'cancel' }] }),
   })
 
   return toast.present();
@@ -17,11 +19,11 @@ export const showToast = async (message: string) => {
 export const requiredLabel = (label: string) => `${translate(label)} *`;
 
 /** Asks before a change that saves at once and cannot be taken back: Cancel first, then the action's verb. */
-export const confirmAction = async (header: string, message: string, confirmText: string): Promise<boolean> => {
+export const confirmAction = async (header: string, message: string, confirmText: string, cancelText = translate('Cancel')): Promise<boolean> => {
   const alert = await alertController.create({
     header,
     message,
-    buttons: [{ text: translate('Cancel'), role: 'cancel' }, { text: confirmText, role: 'confirm' }],
+    buttons: [{ text: cancelText, role: 'cancel' }, { text: confirmText, role: 'confirm' }],
   });
   await alert.present();
   return (await alert.onDidDismiss()).role === 'confirm';
