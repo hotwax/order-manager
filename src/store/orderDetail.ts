@@ -373,6 +373,11 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     },
 
     orderById: (state) => (orderId: string) => state.byOrderId[orderId]?.payload || null,
+    /**
+     * Whether an order's transfers have loaded. Until they have, every item looks like it has none,
+     * so anything that must not duplicate a transfer waits for this.
+     */
+    inventoryTransfersLoaded: (state) => (orderId: string) => Array.isArray(state.inventoryTransfersByOrderId[orderId]),
     loadingById: (state) => (orderId: string) => state.byOrderId[orderId]?.status === "loading",
     errorById: (state) => (orderId: string) => state.byOrderId[orderId]?.error || "",
     /**

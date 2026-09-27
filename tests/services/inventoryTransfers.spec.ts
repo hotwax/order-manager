@@ -3,6 +3,7 @@ import { api } from '@common';
 import {
   fetchFacilitySalesVelocity,
   fetchFacilityStock,
+  fetchOrderInventoryTransfers,
   inventoryTransferOpenQuantity,
   isInventoryTransferEligibleItem,
   requestInventoryTransfers,
@@ -52,6 +53,20 @@ describe('inventory transfers service', () => {
       url: 'oms/inventoryTransfers', method: 'POST', data: expect.objectContaining({
         sourceReferenceId: 'OM-REQUEST-02', orderItemSeqId: '02',
       }),
+    });
+  });
+
+  it('loads every page of an order\'s transfers, not just the first', async () => {
+    const page = (size: number, from: number) => Array.from({ length: size }, (_, index) => ({ inventoryTransferId: String(from + index) }));
+    vi.mocked(api)
+      .mockResolvedValueOnce({ data: page(250, 0) } as any)
+      .mockResolvedValueOnce({ data: page(3, 250) } as any);
+
+    await expect(fetchOrderInventoryTransfers('O1')).resolves.toHaveLength(253);
+    expect(api).toHaveBeenCalledTimes(2);
+    expect(api).toHaveBeenLastCalledWith({
+      url: 'oms/inventoryTransfers', method: 'GET',
+      params: { orderId: 'O1', orderByField: '-createdStamp', pageIndex: 1, pageSize: 250 },
     });
   });
 

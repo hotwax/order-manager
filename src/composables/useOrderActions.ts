@@ -109,8 +109,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
   /** What the facility picker shows for an item. */
   const itemName = (item: EnrichedOrderItem) => primaryIdentifier(item.productId) || item.name || item.externalId;
 
-  // An item already waiting on a transfer is left out, so it can't be requested twice.
+  // An item already waiting on a transfer is left out, so it can't be requested twice. Until the
+  // order's transfers load, no item can be told apart from one with none, so none is offered.
   const isInventoryTransferRequestEligible = (item: EnrichedOrderItem) =>
+    orderDetailStore.inventoryTransfersLoaded(order.value?.id || '') &&
     isInventoryTransferEligibleItem({ ...item }, isVirtualForItem(item)) && !item.transfers?.some((transfer) => transfer.isOpen);
 
   const inventoryTransferItemsForShipGroup = (shipGroup: EnrichedShipGroup) =>

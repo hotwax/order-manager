@@ -38,26 +38,32 @@ export function isInventoryTransferEligibleItem(item: Record<string, any>, isVir
     inventoryTransferOpenQuantity(item) > 0);
 }
 
-/** Every inventory transfer requested for an order's items. */
-export async function fetchOrderInventoryTransfers(orderId: string): Promise<any[]> {
-  const response: any = await api({
-    url: "oms/inventoryTransfers",
-    method: "GET",
-    params: { orderId, pageSize: 250, orderByField: "-createdStamp" },
-  });
+/**
+ * Every row of a list endpoint, page after page. The total comes back in X-Total-Count, which the OMS
+ * doesn't expose to the browser, so a short page is the only sign that nothing is left.
+ */
+async function fetchAllRows(url: string, params: Record<string, unknown>, pageSize = 250): Promise<any[]> {
+  const rows: any[] = [];
+  for(let pageIndex = 0; pageIndex < 20; pageIndex++) {
+    const response: any = await api({ url, method: "GET", params: { ...params, pageIndex, pageSize } });
+    const page = Array.isArray(response.data) ? response.data : [];
+    rows.push(...page);
+    if(page.length < pageSize) {break;}
+  }
 
-  return Array.isArray(response.data) ? response.data : [];
+  return rows;
+}
+
+/** Every inventory transfer requested for an order's items, newest first. */
+export function fetchOrderInventoryTransfers(orderId: string): Promise<any[]> {
+  return fetchAllRows("oms/inventoryTransfers", { orderId, orderByField: "-createdStamp" });
 }
 
 /** A product's available to promise and quantity on hand at each of the given facilities. */
 export async function fetchFacilityStock(productId: string, facilityIds: string[]): Promise<Record<string, { atp: number; qoh: number }>> {
-  const response: any = await api({
-    url: "oms/inventoryLogs",
-    method: "GET",
-    params: { productId, facilityId: facilityIds.join(","), facilityId_op: "in", pageSize: 500 },
-  });
+  const rows = await fetchAllRows("oms/inventoryLogs", { productId, facilityId: facilityIds.join(","), facilityId_op: "in" }, 500);
   const stock: Record<string, { atp: number; qoh: number }> = Object.fromEntries(facilityIds.map((facilityId) => [facilityId, { atp: 0, qoh: 0 }]));
-  (Array.isArray(response.data) ? response.data : []).forEach((row: any) => {
+  rows.forEach((row: any) => {
     const entry = stock[row.facilityId];
     if(!entry) {return;}
     entry.atp += numericValue(row.availableToPromiseTotal);

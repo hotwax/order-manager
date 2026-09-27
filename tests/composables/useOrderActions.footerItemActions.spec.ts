@@ -35,6 +35,8 @@ function setup(items: EnrichedOrderItem[], checked: string[], canTransfer = true
     groupedItems: items.map((groupItem) => ({ externalId: groupItem.orderItemSeqId, items: [groupItem] })),
   } as unknown as EnrichedOrder;
   const selectedItemIds = ref(new Set<string>(checked));
+  // The order's transfers have loaded, so an item without one can be told apart from one waiting on one.
+  useOrderDetailStore().inventoryTransfersByOrderId.O1 = [];
   const actions = useOrderActions({
     order: ref(order),
     loadOrder: vi.fn(),
@@ -96,6 +98,17 @@ describe('footer item actions', () => {
     expect(actions.footerActionLabel(transferAction(actions))).toBe('Request transfer for 2 items');
     expect(setup([waiting], ['02']).actions.footerActions.value.some((action: any) => action.id === 'REQUEST_TRANSFER')).toBe(false);
     expect(actions.inventoryTransferItemsForShipGroup(shipGroups[0] as any).map((entry) => entry.orderItemSeqId)).toEqual(['01', '03']);
+  });
+
+  it('offers no transfer until the order\'s transfers have loaded, since any item might already have one', () => {
+    const { actions } = setup([item('01', '00001')], ['01']);
+    delete useOrderDetailStore().inventoryTransfersByOrderId.O1;
+
+    expect(transferAction(actions)).toBeUndefined();
+    expect(actions.inventoryTransferItemsForShipGroup(shipGroups[0] as any)).toEqual([]);
+
+    useOrderDetailStore().inventoryTransfersByOrderId.O1 = [];
+    expect(transferAction(actions)).toBeDefined();
   });
 
   it('offers no transfer without the permission, or when nothing selected can be transferred', () => {

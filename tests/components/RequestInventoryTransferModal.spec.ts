@@ -88,7 +88,7 @@ const button = (wrapper: Wrapper, label: string) => wrapper.findAll('button').fi
 describe('request inventory transfer modal', () => {
   beforeEach(() => {
     Object.values(mocks).forEach((value) => typeof value === 'function' && (value as any).mockReset());
-    mocks.item = { orderItemSeqId: '01', productId: 'P1', name: 'Blouse', statusId: 'ITEM_APPROVED', quantity: 2, fulfilledQuantity: 1 };
+    mocks.item = { orderItemSeqId: '01', productId: 'P1', name: 'Blouse', statusId: 'ITEM_APPROVED', quantity: 2 };
     mocks.fetchFacilityStock.mockResolvedValue({
       DEST_WH: { atp: 0, qoh: 1 }, WH_A: { atp: 5, qoh: 5 }, WH_B: { atp: 20, qoh: 22 }, STORE_A: { atp: 2, qoh: 3 }, STORE_B: { atp: 0, qoh: 0 },
     });
@@ -173,9 +173,9 @@ describe('request inventory transfer modal', () => {
 
     expect(wrapper.find('.title').text()).toBe('Review transfer');
     expect(dividers(wrapper)).toEqual(['Transfer from', 'Transfer to']);
-    expect(wrapper.text()).toContain('1 qty');
-    // One of the two ordered is already fulfilled, so one moves.
-    expect(afterRows(wrapper)).toEqual(['Aftertransfer19(-1)21(-1)', 'Aftertransfer1(+1)2(+1)']);
+    // The whole item moves.
+    expect(wrapper.text()).toContain('2 qty');
+    expect(afterRows(wrapper)).toEqual(['Aftertransfer18(-2)20(-2)', 'Aftertransfer2(+2)3(+2)']);
 
     await wrapper.find('.comments').setValue('  Rush  ');
     await wrapper.find('.fab').trigger('click');
@@ -183,7 +183,7 @@ describe('request inventory transfer modal', () => {
 
     expect(mocks.requestInventoryTransfers).toHaveBeenCalledWith({
       requestReferencePrefix: expect.stringMatching(/^ORDER_MANAGER-O1-\d+$/),
-      transfers: [{ productId: 'P1', quantity: 1, facilityId: 'WH_B', facilityIdTo: 'DEST_WH', orderId: 'O1', orderItemSeqId: '01', comments: 'Rush' }],
+      transfers: [{ productId: 'P1', quantity: 2, facilityId: 'WH_B', facilityIdTo: 'DEST_WH', orderId: 'O1', orderItemSeqId: '01', comments: 'Rush' }],
     });
     expect(mocks.dismiss).toHaveBeenCalledWith({ inventoryTransferIds: ['T9'] }, 'confirm');
   });

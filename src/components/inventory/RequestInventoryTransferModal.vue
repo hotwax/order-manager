@@ -166,7 +166,7 @@ import { computed, nextTick, onMounted, ref, watch } from "vue";
 import { fetchDistancesFromFacility } from "@/composables/useOrderDistances";
 import { useProductIdentity } from "@/composables/useProductIdentity";
 import {
-  fetchFacilitySalesVelocity, fetchFacilityStock, inventoryTransferOpenQuantity, requestInventoryTransfers
+  fetchFacilitySalesVelocity, fetchFacilityStock, requestInventoryTransfers
 } from "@/services/inventoryTransfers";
 import { useOrderDetailStore } from "@/store/orderDetail";
 import { useSeedStore } from "@/store/seed";
@@ -197,8 +197,12 @@ const item = computed(() => orderDetailStore.enrichedOrderByOrderId(props.orderI
   .flatMap((shipGroup) => shipGroup.items)
   .find((entry) => entry.orderItemSeqId === props.orderItemSeqId));
 const product = computed(() => item.value && getProduct(item.value.productId));
-/** All of the item that is still open moves: what was ordered, less what was cancelled or fulfilled. */
-const quantity = computed(() => item.value ? inventoryTransferOpenQuantity({ ...item.value }) : 0);
+/**
+ * The whole item moves. The order document carries no cancelled or shipped quantity for an item:
+ * a cancellation takes all of it (ITEM_CANCELLED), and a completed item can't be transferred, so an
+ * item still open to transfer is open in full.
+ */
+const quantity = computed(() => item.value?.quantity || 0);
 
 const facilities = ref<any[]>([]);
 // Unknown until loaded, and left unknown if a lookup fails, so a row shows "-" rather than a false 0.
