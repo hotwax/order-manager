@@ -1067,5 +1067,7 @@
   "{count} neutral": "{count} neutral",
   "{count} positive": "{count} positive",
   "{count} records": "{count} record | {count} records",
-  "{amount} each": "{amount} each"
+  "{amount} each": "{amount} each",
+  "First name": "First name",
+  "Last name": "Last name"
 }

@@ -1047,5 +1047,7 @@
   "{count} neutral": "{count} neutral | {count} neutrales",
   "{count} positive": "{count} positivo | {count} positivos",
   "{count} records": "{count} registro | {count} registros",
-  "{amount} each": "{amount} cada uno"
+  "{amount} each": "{amount} cada uno",
+  "First name": "Nombre",
+  "Last name": "Apellido"
 }
