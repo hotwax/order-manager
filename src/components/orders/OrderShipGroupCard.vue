@@ -257,9 +257,9 @@
                 </template>
                 <div v-else>{{ translate('Shipping address not available') }}</div>
               </ion-label>
-              <p slot="end" v-if="!shipGroup.isVirtual && distance">
-                {{ translate('{distance} miles', { distance, count: Number(distance) }) }}
-              </p>
+              <ion-note slot="end" v-if="!shipGroup.isVirtual && distance">
+                {{ translate('{distance} miles', { distance: formatNumber(distance, { maximumFractionDigits: 1 }), count: Number(distance) }) }}
+              </ion-note>
               <ion-button v-if="!disabledActions.EDIT_ADDRESS" slot="end" fill="clear"
                 color="medium" :id="'shipping-opt-trigger-' + shipGroup.id"
                 :aria-label="translate('Shipping options')"
@@ -480,7 +480,7 @@ import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { confirmAction, isKit } from '@/utils';
 import type { ShipGroupMilestones } from '@/utils/orderEvents';
-import { formatDateTime, formatElapsed, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
+import { formatDateTime, formatElapsed, formatNumber, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
 import { OrderActionValidator, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import type { EnrichedShipGroup, ItemIssuance, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 
