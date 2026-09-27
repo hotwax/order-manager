@@ -78,7 +78,7 @@
     </ion-list>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!isValid" :aria-label="translate('Confirm')" @click="confirm()">
+      <ion-fab-button :disabled="!isValid" :aria-label="translate('Save')" @click="confirm()">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>

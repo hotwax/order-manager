@@ -37,9 +37,9 @@
     </ion-list>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="saving" @click="createType()" :aria-label="translate('Create')">
+      <ion-fab-button :disabled="saving" @click="createType()" :aria-label="translate('Save')">
         <ion-spinner v-if="saving" name="crescent" />
-        <ion-icon v-else :icon="checkmarkDoneOutline" />
+        <ion-icon v-else :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>
   </ion-content>
@@ -47,7 +47,7 @@
 
 <script setup lang="ts">
 import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonList, IonSpinner, IonText, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { checkmarkDoneOutline, closeOutline } from 'ionicons/icons';
+import { closeOutline, saveOutline } from 'ionicons/icons';
 import { ref } from 'vue';
 import { commonUtil, translate } from '@common';
 import { useSeedStore } from '@/store/seed';

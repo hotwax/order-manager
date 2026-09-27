@@ -283,7 +283,7 @@
       <ion-fab vertical="bottom" horizontal="end" slot="fixed">
         <ion-fab-button data-testid="create-order-submit-btn" @click="submitOrder" :aria-label="translate('Submit order')" :disabled="isSubmitting">
           <ion-spinner v-if="isSubmitting" name="crescent" />
-          <ion-icon v-else :icon="checkmarkDoneOutline" />
+          <ion-icon v-else :icon="saveOutline" />
         </ion-fab-button>
       </ion-fab>
     </ion-content>
@@ -294,7 +294,7 @@
 import { computed, ref, onMounted, nextTick, watch } from 'vue';
 import { formatMoney } from '@/utils/format';
 import { IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonMenuButton, IonPage, IonSearchbar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, IonSpinner, modalController } from '@ionic/vue';
-import { addOutline, storefrontOutline, searchOutline, checkmarkDoneOutline, barcodeOutline, cloudOfflineOutline, shirtOutline, checkmarkOutline, locateOutline, addCircleOutline, trashOutline, cashOutline, globeOutline } from 'ionicons/icons';
+import { addCircleOutline, addOutline, barcodeOutline, cashOutline, checkmarkDoneOutline, checkmarkOutline, cloudOfflineOutline, globeOutline, locateOutline, saveOutline, searchOutline, shirtOutline, storefrontOutline, trashOutline } from 'ionicons/icons';
 import { api, commonUtil, DxpShopifyImg, emitter, logger, translate, useSolrSearch } from '@common';
 import { getShopifyShops } from '@/services/customer';
 import { useProductStore } from '@/store/productStore';
