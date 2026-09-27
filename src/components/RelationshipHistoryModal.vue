@@ -1,16 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ translate('Relationship history') }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
-
-  <ion-content>
+  <DxpModal :title="translate('Relationship history')">
     <ion-list v-if="timeline.length" lines="none">
       <ion-item v-for="entry in timeline" :key="entry.key" class="timeline-item">
         <div class="timeline-track" slot="start">
@@ -40,28 +29,19 @@
     <div v-else class="ion-padding ion-text-center">
       <p>{{ translate('No relationship history for this customer.') }}</p>
     </div>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
 import {
   IonBadge,
-  IonButton,
-  IonButtons,
   IonChip,
-  IonContent,
-  IonHeader,
-  IonIcon,
   IonItem,
   IonLabel,
   IonList,
-  IonTitle,
-  IonToolbar,
-  modalController
 } from '@ionic/vue';
-import { closeOutline } from 'ionicons/icons';
 import { computed, onMounted } from 'vue';
-import { translate } from '@common';
+import { DxpModal, translate } from '@common';
 import { DateTime } from 'luxon';
 import { useCustomerStore } from '@/store/customer';
 import { useSeedStore } from '@/store/seed';
@@ -130,9 +110,6 @@ const timeline = computed(() => {
   return filtered.sort((a, b) => sortKey(a.fromDate) - sortKey(b.fromDate));
 });
 
-function dismiss() {
-  modalController.dismiss();
-}
 </script>
 
 <style scoped>

@@ -1,16 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ translate('Risk assessment') }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
-
-  <ion-content>
+  <DxpModal :title="translate('Risk assessment')">
     <template v-if="risks.length">
       <ion-list v-for="risk in risks" :key="risk.providerId" lines="none">
         <ion-item lines="none">
@@ -35,14 +24,14 @@
         <ion-label>{{ translate('No risk assessments for this order') }}</ion-label>
       </ion-item>
     </ion-list>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonNote, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, shieldOutline } from 'ionicons/icons';
+import { IonIcon, IonItem, IonLabel, IonList, IonNote } from '@ionic/vue';
+import { shieldOutline } from 'ionicons/icons';
 import { formatDateTime } from '@/utils/format';
-import { translate } from '@common';
+import { DxpModal, translate } from '@common';
 import { useSeedStore } from '@/store/seed';
 import { factSentimentColor, factSentimentIcon, riskLevelColor, sortFactsBySentiment } from '@/utils';
 
@@ -51,9 +40,4 @@ withDefaults(defineProps<{ risks?: any[] }>(), {
 });
 
 const seedStore = useSeedStore();
-
-function dismiss() {
-  modalController.dismiss();
-}
-
 </script>
