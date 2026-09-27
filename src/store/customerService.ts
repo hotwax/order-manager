@@ -1218,14 +1218,14 @@ export const useCustomerServiceStore = defineStore('customerService', {
 const ALL_BULK_ACTIONS: Record<WorkflowBucket, BulkActionDefinition[]> = {
   unfillable: [
     { id: 'rebroker', label: 'Rebroker order' },
-    { id: 'cancel', label: 'Cancel', confirmText: 'Cancel selected orders?' }
+    { id: 'cancel', label: 'Cancel', confirmText: 'Cancel selected orders?', destructive: true }
   ],
   fraud: [
     { id: 'release', label: 'Release order' },
-    { id: 'cancel', label: 'Cancel', confirmText: 'Cancel selected orders?' }
+    { id: 'cancel', label: 'Cancel', confirmText: 'Cancel selected orders?', destructive: true }
   ],
   open: [
-    { id: 'cancel', label: 'Cancel', confirmText: 'Cancel selected orders?' }
+    { id: 'cancel', label: 'Cancel', confirmText: 'Cancel selected orders?', destructive: true }
   ],
   inflight: [
     { id: 'wave', label: 'Add to picklist' }

@@ -114,12 +114,12 @@
       <ion-toolbar>
         <ion-title size="small">{{ translate('{count} selected', { count: selectedOrderIds.length }) }}</ion-title>
         <ion-buttons slot="end" class="bulk-action-buttons">
-          <ion-button v-if="hasGlobalAction('brokerSelected')" :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openBrokerSelectedModal">
+          <ion-button v-if="hasGlobalAction('brokerSelected')" fill="solid" :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openBrokerSelectedModal">
             {{ translate('Broker selected') }}
           </ion-button>
-          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
-          <ion-button :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
-          <ion-button :disabled="!selectedOrderIds.length || !canCreateOrderTasks" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
+          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" fill="outline" color="danger" :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
+          <ion-button fill="outline" :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
+          <ion-button fill="outline" :disabled="!selectedOrderIds.length || !canCreateOrderTasks" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>

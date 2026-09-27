@@ -88,7 +88,8 @@
 
     <ion-footer v-if="selectMode">
       <ion-toolbar>
-        <ion-buttons slot="start">
+        <ion-title size="small">{{ translate('{count} selected', { count: selectedTaskCount }) }}</ion-title>
+        <ion-buttons slot="end">
           <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks || bulkActionRunning" @click="resolveSelectedTasks()">{{ translate('Resolve') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -168,6 +169,7 @@ const isScrollable = computed(() => orderTaskStore.isHoldTasksScrollable);
 const holdStatus = computed(() => orderTaskStore.getHoldStatus);
 const holdError = computed(() => orderTaskStore.getHoldError);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
+const selectedTaskCount = computed(() => Object.values(selectedOrders.value).filter(Boolean).length);
 const hasFilters = computed(() => hasTaskFilters(filters.value));
 const currentPageTaskIds = computed(() => heldTasks.value.map((task) => task.workEffortId));
 const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));

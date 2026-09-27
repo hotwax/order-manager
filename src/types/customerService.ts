@@ -83,6 +83,8 @@ export interface BulkActionDefinition {
   id: string;
   label: string;
   confirmText?: string;
+  /** Shown as an outline danger button; every other bulk action is the queue's solid primary. */
+  destructive?: boolean;
 }
 
 export interface VirtualLocationWorkCount {

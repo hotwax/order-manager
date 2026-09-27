@@ -84,6 +84,8 @@
           <ion-button
             v-for="action in actions"
             :key="action.id"
+            :fill="action.destructive ? 'outline' : 'solid'"
+            :color="action.destructive ? 'danger' : 'primary'"
             :disabled="!selectedIds.size"
             @click="runAction(action)"
           >
