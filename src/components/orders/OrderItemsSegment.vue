@@ -185,6 +185,7 @@ function itemIdentity(item: EnrichedOrderItem) {
   return {
     primary: translate('Item {id}', { id: item.orderItemSeqId }),
     secondary: item.externalId && item.externalId !== 'null' ? translate('External ID: {id}', { id: item.externalId }) : '',
+    showImage: false,
     showQuantity: false,
   };
 }

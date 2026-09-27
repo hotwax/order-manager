@@ -1,39 +1,44 @@
 <template>
   <div class="list-item order-item-list-row">
-    <ion-item class="order-item-list-key" lines="none">
-      <!-- The checkbox is the only selection target. Its click and keys stay with it, since a
-           group header row sits in an accordion header that toggles on click. -->
+    <div class="order-item-list-key">
+      <!-- The checkbox is the only selection target, so it sits beside the item rather than in
+           it: an ion-item holding a single checkbox makes its whole area select. Its click and
+           keys stay with it, since a group header row sits in an accordion header that toggles
+           on click. -->
       <ion-checkbox
         v-if="selectable"
-        slot="start"
         :checked="selected"
         :aria-label="translate('Select item')"
         @click.stop
         @keydown.stop
         @ionChange="emit('update:selected', $event.detail.checked)"
       />
-      <ion-thumbnail
-        v-if="imageUrl"
-        slot="start"
-        v-image-preview="previewProduct"
-        :key="imageUrl"
-        @click.stop
-      >
-        <DxpShopifyImg :src="imageUrl" :key="imageUrl" size="small" />
-      </ion-thumbnail>
-      <ion-label>
-        <div>
-          {{ primary }}
-          <ion-badge v-if="badgeLabel" color="dark">{{ badgeLabel }}</ion-badge>
-        </div>
-        <p v-if="features" class="order-item-features" :title="features">{{ features }}</p>
-        <p v-if="secondary">{{ secondary }}</p>
-      </ion-label>
-      <ion-label v-if="showQuantity" slot="end" class="order-item-quantity">
-        {{ quantity }}
-        <p>{{ quantityLabel }}</p>
-      </ion-label>
-    </ion-item>
+      <ion-item lines="none">
+        <!-- A product without an image keeps the slot, showing the placeholder, so its label lines
+             up with the rows that have one. -->
+        <ion-thumbnail
+          v-if="showImage"
+          slot="start"
+          v-image-preview="previewProduct"
+          :key="imageUrl"
+          @click.stop
+        >
+          <DxpShopifyImg :src="imageUrl" :key="imageUrl" size="small" />
+        </ion-thumbnail>
+        <ion-label>
+          <div>
+            {{ primary }}
+            <ion-badge v-if="badgeLabel" color="dark">{{ badgeLabel }}</ion-badge>
+          </div>
+          <p v-if="features" class="order-item-features" :title="features">{{ features }}</p>
+          <p v-if="secondary">{{ secondary }}</p>
+        </ion-label>
+        <ion-label v-if="showQuantity" slot="end" class="order-item-quantity">
+          {{ quantity }}
+          <p>{{ quantityLabel }}</p>
+        </ion-label>
+      </ion-item>
+    </div>
 
     <div class="tablet order-item-details">
       <ion-chip
@@ -94,6 +99,8 @@ withDefaults(defineProps<{
   badgeLabel?: string;
   /** The variant's selectable features as one line, e.g. "Green M". */
   features?: string;
+  /** Off for a row that names an order item rather than a product, which has no image to show. */
+  showImage?: boolean;
   imageUrl?: string;
   previewProduct?: any;
   selectable?: boolean;
@@ -113,6 +120,7 @@ withDefaults(defineProps<{
   secondary: '',
   badgeLabel: '',
   features: '',
+  showImage: true,
   imageUrl: '',
   previewProduct: undefined,
   selectable: true,
@@ -168,8 +176,24 @@ const emit = defineEmits<{
   cursor: auto;
 }
 
-.order-item-list-key {
+/* The shared list-item rules reset the first column's display, so the row class raises this
+   rule above them. */
+.order-item-list-row > .order-item-list-key {
+  display: flex;
+  align-items: center;
   width: 100%;
+}
+
+/* The checkbox keeps the start padding it had inside the item, and the item's own padding
+   keeps the gap before the thumbnail. */
+.order-item-list-key > ion-checkbox {
+  flex: none;
+  margin-inline-start: var(--spacer-sm);
+}
+
+.order-item-list-key > ion-item {
+  flex: 1;
+  min-width: 0;
 }
 
 .order-item-details {

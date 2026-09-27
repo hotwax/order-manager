@@ -15,15 +15,17 @@ vi.mock('@ionic/vue', () => {
     },
     IonChip: component,
     IonIcon: component,
-    IonItem: component,
+    IonItem: { template: '<div class="item"><slot /></div>' },
     IonLabel: component,
     IonNote: component,
     IonThumbnail: component,
   };
 });
 
+const global = { directives: { imagePreview: {} } };
+
 const mountRow = (props: Record<string, unknown> = {}) =>
-  mount(OrderItemListRow, { props: { primary: 'SKU-1', quantity: 2, quantityLabel: 'qty', amount: '$20.00', ...props } });
+  mount(OrderItemListRow, { props: { primary: 'SKU-1', quantity: 2, quantityLabel: 'qty', amount: '$20.00', ...props }, global });
 
 describe('order item list row', () => {
   it('shows the ordered quantity at the end of the product item, not in a column of its own', () => {
@@ -40,16 +42,26 @@ describe('order item list row', () => {
 
     await wrapper.find('.order-item-list-key').trigger('click');
     expect(wrapper.emitted('update:selected')).toBeUndefined();
-    expect(wrapper.find('.order-item-list-key').attributes('button')).toBeUndefined();
+    // An ion-item holding a single checkbox turns its whole area into that checkbox.
+    expect(wrapper.find('.item .checkbox').exists()).toBe(false);
 
     await wrapper.find('.checkbox').setValue(true);
     expect(wrapper.emitted('update:selected')).toEqual([[true]]);
+  });
+
+  it('keeps the image slot for a product without an image, so its label lines up', () => {
+    expect(mountRow({ imageUrl: '' }).find('.order-item-list-key img').exists()).toBe(true);
+  });
+
+  it('shows no image on a row that names an order item', () => {
+    expect(mountRow({ showImage: false }).find('.order-item-list-key img').exists()).toBe(false);
   });
 
   it('puts extra detail chips, such as a transfer, under the facility and above the attributes', () => {
     const wrapper = mount(OrderItemListRow, {
       props: { primary: 'SKU-1', quantity: 1, quantityLabel: 'qty', amount: '$1.00', facilityLabel: 'Ponyride', attributesLabel: '0 attributes' },
       slots: { details: '<span class="transfer">Transfer from 51st St.</span>' },
+      global,
     });
 
     const chips = [...wrapper.find('.order-item-details').element.children].map((chip) => chip.textContent?.trim());
