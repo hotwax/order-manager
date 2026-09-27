@@ -626,7 +626,7 @@ import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
 import { createLatestRequestScope } from '@/utils/latestRequestScope';
 import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
 import { reconcileSelectedFacilityId } from '@/utils/funnelFacilitySelection';
-import { facilityProgressAccessibleName } from '@/utils/funnelProgress';
+import { DIMENSION_LABELS, facilityProgressAccessibleName } from '@/utils/funnelProgress';
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
@@ -887,7 +887,6 @@ const hoveredSegmentId = ref<string | null>(null);
 const searchQuery = ref('');
 const selectedDimension = ref<'volume' | 'velocity' | 'rejections'>('volume');
 // The header links to the segment's own label, so each language lowercases (or not) its own words.
-const DIMENSION_LABELS = { volume: "Order Volume", velocity: "Fulfillment Velocity", rejections: "Rejections" } as const;
 const facilityListHeader = computed(() => (searchQuery.value
   ? translate("Top 10 facilities by {metric} matching {query}", { metric: DIMENSION_LABELS[selectedDimension.value], query: searchQuery.value })
   : translate("Top 10 facilities by {metric}", { metric: DIMENSION_LABELS[selectedDimension.value] })));
