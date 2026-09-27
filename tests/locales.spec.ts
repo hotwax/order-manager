@@ -52,7 +52,11 @@ describe('locale messages', () => {
     }
     expect(keys.size).toBeGreaterThan(800);
     expect([...keys].filter((key) => !(key in enUS))).toEqual([]);
-    expect(Object.keys(esES).sort()).toEqual(Object.keys(enUS).sort());
+    // Both files list the same keys in the same case-insensitive order, so a change lines up in review.
+    const byCode = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+    const sorted = Object.keys(enUS).sort((a, b) => byCode(a.toLowerCase(), b.toLowerCase()) || byCode(a, b));
+    expect(Object.keys(enUS)).toEqual(sorted);
+    expect(Object.keys(esES)).toEqual(sorted);
   });
 
   it('give every message its own Spanish text', () => {
