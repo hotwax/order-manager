@@ -932,12 +932,12 @@ ion-card-header ion-card-title {
   align-items: start;
 }
 
+/* Every column shows from tablet up, so tablet needs all five. */
 .return-result-row {
   --columns-desktop: 5;
-  --columns-tablet: 4;
+  --columns-tablet: 5;
   min-height: 4.75rem;
   border-block-start: var(--border-medium);
-  cursor: pointer;
   padding-inline: var(--spacer-sm);
 }
 

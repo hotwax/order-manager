@@ -790,6 +790,12 @@ ion-card-title {
   border-bottom: var(--border-medium);
 }
 
+/* A line item is edited in place and opens nothing, so it keeps the shared list-item hover off. */
+.list-item:hover {
+  --list-item-bg-hover: initial;
+  cursor: auto;
+}
+
 /* Added width property as after updating to ionic7 min-width is getting applied on ion-label inside ion-item
 which results in distorted label text and thus reduced ion-item width */
 .list-item > ion-item {

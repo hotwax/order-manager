@@ -167,7 +167,7 @@ function goToCustomer(customer: Customer) {
 
 <style scoped>
 .customer-result-row {
-  --columns-desktop: 4;
+  --columns-desktop: 3;
   --columns-tablet: 3;
   min-height: 4rem;
   border-block-start: var(--border-medium);

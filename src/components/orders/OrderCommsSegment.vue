@@ -63,4 +63,10 @@ defineProps<{
 .comm-event-row>ion-item {
   width: 100%;
 }
+
+/* A communication row opens nothing, so it keeps the shared list-item hover off. */
+.comm-event-row:hover {
+  --list-item-bg-hover: initial;
+  cursor: auto;
+}
 </style>
