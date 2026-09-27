@@ -4,6 +4,7 @@ import { ref } from 'vue';
 import { createPinia, setActivePinia } from 'pinia';
 import { alertController, modalController } from '@ionic/vue';
 import { useOrderActions } from '@/composables/useOrderActions';
+import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useSeedStore } from '@/store/seed';
 import type { EnrichedOrder, EnrichedOrderItem, EnrichedShipGroup } from '@/types/orderDetail';
@@ -34,6 +35,8 @@ function setup(items: EnrichedOrderItem[], checked: string[], canTransfer = true
     groupedItems: items.map((groupItem) => ({ externalId: groupItem.orderItemSeqId, items: [groupItem] })),
   } as unknown as EnrichedOrder;
   const selectedItemIds = ref(new Set<string>(checked));
+  // The order's transfers have loaded, so an item without one can be told apart from one waiting on one.
+  useOrderDetailStore().inventoryTransfersByOrderId.O1 = [];
   const actions = useOrderActions({
     order: ref(order),
     loadOrder: vi.fn(),
@@ -60,7 +63,7 @@ function transferModalsDismissWith(...roles: string[]) {
 
 const destinations = () => vi.mocked(modalController.create).mock.calls.map(([options]: any) => ({
   destination: options.componentProps.destinationFacilityId,
-  items: options.componentProps.items.map((entry: any) => entry.orderItemSeqId),
+  item: options.componentProps.orderItemSeqId,
 }));
 
 describe('footer item actions', () => {
@@ -83,20 +86,43 @@ describe('footer item actions', () => {
     expect(actions.footerActionLabel(transferAction(actions))).toBe('Request transfer for 1 items');
   });
 
+  it('leaves out items already waiting on a transfer, so none is requested twice', () => {
+    const waiting = { ...item('02', '00001'), transfers: [{ id: 'T1', isOpen: true }] } as EnrichedOrderItem;
+    const transferred = { ...item('03', '00001'), transfers: [{ id: 'T2', isOpen: false }] } as EnrichedOrderItem;
+    const { actions } = setup([item('01', '00001'), waiting, transferred], ['01', '02', '03']);
+
+    // 03's transfer is finished or cancelled, so it can be requested again.
+    expect(actions.footerActionLabel(transferAction(actions))).toBe('Request transfer for 2 items');
+    expect(setup([waiting], ['02']).actions.footerActions.value.some((action: any) => action.id === 'REQUEST_TRANSFER')).toBe(false);
+    expect(actions.inventoryTransferItemsForShipGroup(shipGroups[0] as any).map((entry) => entry.orderItemSeqId)).toEqual(['01', '03']);
+  });
+
+  it('offers no transfer until the order\'s transfers have loaded, since any item might already have one', () => {
+    const { actions } = setup([item('01', '00001')], ['01']);
+    delete useOrderDetailStore().inventoryTransfersByOrderId.O1;
+
+    expect(transferAction(actions)).toBeUndefined();
+    expect(actions.inventoryTransferItemsForShipGroup(shipGroups[0] as any)).toEqual([]);
+
+    useOrderDetailStore().inventoryTransfersByOrderId.O1 = [];
+    expect(transferAction(actions)).toBeDefined();
+  });
+
   it('offers no transfer without the permission, or when nothing selected can be transferred', () => {
     expect(transferAction(setup([item('01', '00001')], ['01'], false).actions)).toBeUndefined();
     expect(transferAction(setup([item('01', '00001', 'ITEM_COMPLETED')], ['01']).actions)).toBeUndefined();
   });
 
-  it('requests one transfer per destination store, then clears the selection', async () => {
+  it('requests a transfer per item, each to the store its ship group ships from, then clears the selection', async () => {
     const { actions, selectedItemIds } = setup([item('01', '00001'), item('02', '00002'), item('03', '00001')], ['01', '02', '03']);
-    transferModalsDismissWith('confirm', 'confirm');
+    transferModalsDismissWith('confirm', 'confirm', 'confirm');
 
     await actions.runFooterAction(transferAction(actions));
 
     expect(destinations()).toEqual([
-      { destination: 'STORE_A', items: ['01', '03'] },
-      { destination: 'STORE_B', items: ['02'] },
+      { destination: 'STORE_A', item: '01' },
+      { destination: 'STORE_B', item: '02' },
+      { destination: 'STORE_A', item: '03' },
     ]);
     expect(selectedItemIds.value.size).toBe(0);
   });

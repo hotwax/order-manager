@@ -3,7 +3,7 @@ import { alertController, modalController } from '@ionic/vue';
 import { api, translate } from '@common';
 import { showToast } from '@/utils';
 import { OrderActionValidator, type FooterActionView, type ShipGroupActionId } from '@/utils/OrderActionValidator';
-import { inventoryTransferOpenQuantity, isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
+import { isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useCustomerStore } from '@/store/customer';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -20,6 +20,7 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import ManageOrderAttributesModal from '@/components/orders/ManageOrderAttributesModal.vue';
 import ManageOrderIdentificationsModal from '@/components/orders/ManageOrderIdentificationsModal.vue';
 import OrderItemAttributesModal from '@/components/orders/OrderItemAttributesModal.vue';
+import OrderItemTransfersModal from '@/components/orders/OrderItemTransfersModal.vue';
 import ProductInventoryModal from '@/components/inventory/ProductInventoryModal.vue';
 import RejectItemsModal from '@/components/orders/RejectItemsModal.vue';
 import RequestInventoryTransferModal from '@/components/inventory/RequestInventoryTransferModal.vue';
@@ -105,17 +106,14 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     return OrderActionValidator.validateItemAction(order.value, item, 'REJECT_AND_RELEASE', itemActionContext(item));
   }
 
-  /** What the transfer modal and the facility picker show for an item. */
+  /** What the facility picker shows for an item. */
   const itemName = (item: EnrichedOrderItem) => primaryIdentifier(item.productId) || item.name || item.externalId;
-  const transferItem = (item: EnrichedOrderItem) => ({
-    ...item,
-    name: itemName(item),
-    sku: item.sku || item.productId || '',
-    imageUrl: getProduct(item.productId)?.mainImageUrl
-  });
 
+  // An item already waiting on a transfer is left out, so it can't be requested twice. Until the
+  // order's transfers load, no item can be told apart from one with none, so none is offered.
   const isInventoryTransferRequestEligible = (item: EnrichedOrderItem) =>
-    isInventoryTransferEligibleItem(transferItem(item), isVirtualForItem(item));
+    orderDetailStore.inventoryTransfersLoaded(order.value?.id || '') &&
+    isInventoryTransferEligibleItem({ ...item }, isVirtualForItem(item)) && !item.transfers?.some((transfer) => transfer.isOpen);
 
   const inventoryTransferItemsForShipGroup = (shipGroup: EnrichedShipGroup) =>
     shipGroup.isVirtual ? [] : actionableItems(shipGroup).filter(isInventoryTransferRequestEligible);
@@ -157,23 +155,31 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     return facilityId || null;
   }
 
-  async function openInventoryTransferRequestModal(shipGroup: EnrichedShipGroup, items: EnrichedOrderItem[]) {
+  /** One item's request: its source is picked from where that product is stocked and selling. */
+  async function openInventoryTransferRequestModal(shipGroup: EnrichedShipGroup, item: EnrichedOrderItem) {
     const modal = await modalController.create({
       component: RequestInventoryTransferModal,
       componentProps: {
         orderId: order.value!.id,
-        productStoreId: order.value!.productStoreId,
+        orderItemSeqId: item.orderItemSeqId,
         destinationFacilityId: shipGroup.facilityId,
-        items: items.map((item) => {
-          const requested = transferItem(item);
-          return { ...requested, quantity: inventoryTransferOpenQuantity(requested) };
-        }),
       },
     });
     await modal.present();
     const { role } = await modal.onWillDismiss();
+    // The modal reloads the order's transfers before it closes, so the new one is already on its item.
     if (role === 'confirm') await showToast(translate('Inventory transfer requested.'));
     return role === 'confirm';
+  }
+
+  /** A request per item, one modal after another; cancelling one stops the rest. Resolves whether any was requested. */
+  async function requestInventoryTransfersForItems(shipGroup: EnrichedShipGroup, items: EnrichedOrderItem[]) {
+    let requested = false;
+    for (const item of items) {
+      if (!(await openInventoryTransferRequestModal(shipGroup, item))) break;
+      requested = true;
+    }
+    return requested;
   }
 
   const allocateItem = (orderId: string, orderItemSeqId: string, facilityId: string) => api({
@@ -274,8 +280,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
   });
 
   async function requestInventoryTransfersForShipGroup(shipGroup: EnrichedShipGroup) {
-    const items = inventoryTransferItemsForShipGroup(shipGroup);
-    if (items.length) await openInventoryTransferRequestModal(shipGroup, items);
+    await requestInventoryTransfersForItems(shipGroup, inventoryTransferItemsForShipGroup(shipGroup));
   }
 
   /** One task per ship group, from what AddOrderTaskModal returns. */
@@ -441,6 +446,14 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     await loadOrder(orderId, true);
   }
 
+  async function openItemTransfersModal(item: EnrichedOrderItem) {
+    const modal = await modalController.create({
+      component: OrderItemTransfersModal,
+      componentProps: { orderId: order.value!.id, orderItemSeqId: item.orderItemSeqId },
+    });
+    await modal.present();
+  }
+
   /** Footer "Add items": straight to the only ship group, or ask which one. */
   async function openAddItemFromItemsSegment() {
     const shipGroups = order.value?.shipGroups || [];
@@ -529,22 +542,15 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     canRequestInventoryTransfer?.value ? selectedItems.value.filter(isInventoryTransferRequestEligible) : []);
 
   /**
-   * Footer "Request transfer". A request goes to one destination, so the selection is split by
-   * the facility each item ships from, one modal after another; cancelling one stops the rest.
+   * Footer "Request transfer": one modal per selected item, each moving stock to the facility its
+   * ship group ships from, one after another; cancelling one stops the rest.
    */
   async function requestTransferForSelectedItems() {
-    const itemsByFacility = new Map<string, { shipGroup: EnrichedShipGroup; items: EnrichedOrderItem[] }>();
-    transferableSelectedItems.value.forEach((item) => {
-      const shipGroup = shipGroupById(item.shipGroupSeqId);
-      if (!shipGroup) return;
-      const entry = itemsByFacility.get(shipGroup.facilityId) || { shipGroup, items: [] };
-      entry.items.push(item);
-      itemsByFacility.set(shipGroup.facilityId, entry);
-    });
-
     let requested = false;
-    for (const { shipGroup, items } of itemsByFacility.values()) {
-      if (!(await openInventoryTransferRequestModal(shipGroup, items))) break;
+    for (const item of transferableSelectedItems.value) {
+      const shipGroup = shipGroupById(item.shipGroupSeqId);
+      if (!shipGroup) continue;
+      if (!(await openInventoryTransferRequestModal(shipGroup, item))) break;
       requested = true;
     }
     if (requested) selectedItemIds.value.clear();
@@ -739,6 +745,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     // items
     rejectAndReleaseItem,
     openItemAttributesModal,
+    openItemTransfersModal,
     // footer
     footerActions,
     runFooterAction,

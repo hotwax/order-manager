@@ -45,6 +45,7 @@ function aux(overrides: Partial<EnrichmentAuxiliaryData> = {}): EnrichmentAuxili
     returnedQtyBySeqId: {},
     exchangeChildren: [],
     returnHeadersById: {},
+    inventoryTransfers: [],
     ...overrides,
   };
 }
@@ -146,6 +147,29 @@ describe('enrichOrder', () => {
       },
     }), stores);
     expect(order.customer.email).toBe('jane@example.com');
+  });
+
+  it('gives each item its inventory transfers, newest first, with names, status and source resolved', () => {
+    const order = enrichOrder(rawOrder(), aux({
+      inventoryTransfers: [
+        { inventoryTransferId: 'X1', orderItemSeqId: '01', statusId: 'IXF_CANCELLED', statusReasonEnumId: 'IXF_ORDER_REALLOC',
+          facilityId: 'PARKING', facilityIdTo: 'STORE_A', quantity: 1, sourceId: 'REGIONAL_BROKER', createdStamp: T(0) },
+        { inventoryTransferId: 'X2', orderItemSeqId: '01', statusId: 'IXF_REQUESTED',
+          facilityId: 'PARKING', facilityIdTo: 'STORE_A', quantity: 2, sourceId: 'ORDER_MANAGER', comments: 'Rush', createdStamp: T(10) },
+        { inventoryTransferId: 'X3', orderItemSeqId: '02', statusId: 'IXF_COMPLETE',
+          facilityId: 'STORE_A', facilityIdTo: 'PARKING', quantity: 1, createdStamp: T(5) },
+      ],
+    }), stores);
+    const itemOf = (shipGroupId: string) => order.shipGroups.find((shipGroup) => shipGroup.id === shipGroupId)!.items[0];
+
+    expect(itemOf('00001').transfers).toEqual([
+      { id: 'X2', statusId: 'IXF_REQUESTED', status: 'desc:IXF_REQUESTED', isOpen: true, fromFacilityId: 'PARKING', fromFacilityName: 'Parking', toFacilityId: 'STORE_A', toFacilityName: 'Store A',
+        quantity: 2, requestedDate: T(10), sourceLabel: 'Order Manager', comments: 'Rush', reason: '' },
+      { id: 'X1', statusId: 'IXF_CANCELLED', status: 'desc:IXF_CANCELLED', isOpen: false, fromFacilityId: 'PARKING', fromFacilityName: 'Parking', toFacilityId: 'STORE_A', toFacilityName: 'Store A',
+        quantity: 1, requestedDate: T(0), sourceLabel: 'Regional brokering', comments: '', reason: 'enum:IXF_ORDER_REALLOC' },
+    ]);
+    expect(itemOf('00002').transfers.map((transfer) => transfer.id)).toEqual(['X3']);
+    expect(itemOf('00003').transfers).toEqual([]);
   });
 
   it('rolls items up by external id across ship groups', () => {

@@ -46,6 +46,16 @@ describe('order item list row', () => {
     expect(wrapper.emitted('update:selected')).toEqual([[true]]);
   });
 
+  it('puts extra detail chips, such as a transfer, under the facility and above the attributes', () => {
+    const wrapper = mount(OrderItemListRow, {
+      props: { primary: 'SKU-1', quantity: 1, quantityLabel: 'qty', amount: '$1.00', facilityLabel: 'Ponyride', attributesLabel: '0 attributes' },
+      slots: { details: '<span class="transfer">Transfer from 51st St.</span>' },
+    });
+
+    const chips = [...wrapper.find('.order-item-details').element.children].map((chip) => chip.textContent?.trim());
+    expect(chips).toEqual(['Ponyride', 'Transfer from 51st St.', '0 attributes']);
+  });
+
   it('leaves the quantity out when the row hides it', () => {
     const wrapper = mountRow({ showQuantity: false });
 

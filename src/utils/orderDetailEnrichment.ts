@@ -30,6 +30,7 @@ import type {
   EnrichedOrderTimelineEvent,
   EnrichedShipGroup,
   EnrichedShippingAddress,
+  EnrichedTransfer,
   ItemIssuance,
 } from '@/types/orderDetail';
 
@@ -61,6 +62,8 @@ export interface EnrichmentAuxiliaryData {
   returnedQtyBySeqId: Record<string, number>;
   exchangeChildren: ExchangeChild[];
   returnHeadersById: Record<string, any | null>;
+  /** Raw InventoryTransfer rows for the order's items, newest first. */
+  inventoryTransfers: any[];
 }
 
 export interface EnrichmentStores {
@@ -188,6 +191,35 @@ function shippingAddress(mech: any, seed: EnrichmentStores['seed']): EnrichedShi
 
 /* ── Items and ship groups ────────────────────────────────────────────────── */
 
+const OPEN_TRANSFER_STATUSES = new Set(['IXF_REQUESTED', 'IXF_SCHEDULED', 'IXF_EN_ROUTE']);
+const TRANSFER_SOURCE_LABELS: Record<string, string> = {
+  REGIONAL_BROKER: 'Regional brokering',
+  ORDER_MANAGER: 'Order Manager',
+  TRANSFERS_APP: 'Transfers app',
+};
+
+/** An order item's inventory transfers, newest first, with facility names, status and source resolved. */
+function itemTransfers(orderItemSeqId: string, rows: any[], seed: EnrichmentStores['seed']): EnrichedTransfer[] {
+  return rows
+    .filter((row: any) => row.orderItemSeqId === orderItemSeqId)
+    .map((row: any) => ({
+      id: row.inventoryTransferId,
+      statusId: row.statusId,
+      status: seed.statusDescription(row.statusId),
+      isOpen: OPEN_TRANSFER_STATUSES.has(row.statusId),
+      fromFacilityId: row.facilityId,
+      fromFacilityName: seed.facilityName(row.facilityId),
+      toFacilityId: row.facilityIdTo,
+      toFacilityName: seed.facilityName(row.facilityIdTo),
+      quantity: Number(row.quantity || 0),
+      requestedDate: timelineMillis(row.createdStamp),
+      sourceLabel: row.sourceId ? translate(TRANSFER_SOURCE_LABELS[row.sourceId] || row.sourceId) : '',
+      comments: row.comments || '',
+      reason: row.statusReasonEnumId ? seed.enumDescription(row.statusReasonEnumId) : '',
+    }))
+    .sort((left, right) => (right.requestedDate || 0) - (left.requestedDate || 0));
+}
+
 function itemAdjustmentSummaries(raw: any, rawItem: any, seed: EnrichmentStores['seed']): Array<{ comment: string; amount: number }> {
   const orderItemSeqId = rawItem.orderItemSeqId;
   const totals: Record<string, number> = {};
@@ -302,6 +334,7 @@ function enrichShipGroup(
       attributeCount: attributes.length,
       adjustments: itemAdjustmentSummaries(raw, item, seed),
       issuance: isPosCompleted && aux.issuanceByItem ? itemIssuance(item, aux.issuanceByItem) : undefined,
+      transfers: itemTransfers(item.orderItemSeqId, aux.inventoryTransfers, seed),
     };
   });
 
