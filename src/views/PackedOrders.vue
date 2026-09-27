@@ -71,7 +71,7 @@
 
     <ion-footer v-if="selectMode && actions.length">
       <ion-toolbar>
-        <ion-title size="small">{{ selectedIds.size }} {{ translate('selected') }}</ion-title>
+        <ion-title size="small">{{ translate('{count} selected', { count: selectedIds.size }) }}</ion-title>
         <ion-buttons slot="end">
           <ion-button
             v-for="action in actions"
@@ -79,7 +79,7 @@
             :disabled="!selectedIds.size"
             @click="runAction(action)"
           >
-            {{ action.label }}
+            {{ translate(action.label) }}
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -179,7 +179,7 @@ const isLoading = computed(() => orderStore.workflowOrdersLoading[bucket]);
 const orderTotal = computed(() => orderStore.workflowOrdersTotal[bucket]);
 const hasMore = computed(() => orderStore.workflowOrders[bucket].length < orderStore.workflowOrdersTotal[bucket]);
 const resultsSummary = computed(() =>
-  `${orders.value.length} of ${orderTotal.value} ${orderTotal.value === 1 ? translate('order') : translate('orders')}`
+  translate('{shown} of {count} orders', { shown: orders.value.length, count: orderTotal.value })
 );
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const sortOptions = WORKFLOW_ORDER_SORT_OPTIONS;
@@ -349,8 +349,8 @@ async function runAction(action: BulkActionDefinition) {
 
   if (action.confirmText) {
     const alert = await alertController.create({
-      header: action.label,
-      message: action.confirmText,
+      header: translate(action.label),
+      message: translate(action.confirmText),
       buttons: [
         { text: translate('Cancel'), role: 'cancel' },
         { text: translate('Confirm'), role: 'confirm' }
@@ -365,7 +365,7 @@ async function runAction(action: BulkActionDefinition) {
   try {
     await store.runBulkAction(bucket, action.id);
     await loadWorkflowOrders();
-    toastMessage.value = `${action.label}: ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+    toastMessage.value = translate('{action}: {count} orders', { action: translate(action.label), count });
   } catch {
     toastMessage.value = translate('Failed to complete bulk action. Please try again.');
   }

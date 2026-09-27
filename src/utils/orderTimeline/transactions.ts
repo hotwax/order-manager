@@ -107,8 +107,8 @@ export function chainEvents(events: OrderEvent[]): OrderEvent[][] {
 const itemIds = (events: OrderEvent[]) => [...new Set(events.flatMap((event) => event.orderItemSeqIds))];
 
 function countPhrase(count: number, ctx: TimelineContext, total?: number): string {
-  if (total && total > count) return ctx.translate('{count} of {total} items', { count, total });
-  return ctx.translate(count === 1 ? '{count} item' : '{count} items', { count });
+  if (total && total > count) return ctx.translate('{shown} of {count} items', { shown: count, count: total });
+  return ctx.translate('{count} items', { count });
 }
 
 /** The items an operation touched: the item itself when there is one, otherwise how many. */
@@ -119,7 +119,7 @@ function itemsPhrase(ids: string[], ctx: TimelineContext, total?: number): strin
 
 function remainingPhrase(ids: string[], ctx: TimelineContext): string {
   const label = ids.length === 1 ? ctx.itemLabel(ids[0]) : '';
-  return label || ctx.translate(ids.length === 1 ? '{count} remaining item' : '{count} remaining items', { count: ids.length });
+  return label || ctx.translate('{count} remaining items', { count: ids.length });
 }
 
 function facilityLine(key: '{items} to {facility}' | '{items} from {facility}' | '{items} at {facility}', items: string, facilityId: string | undefined, ctx: TimelineContext): string {
@@ -322,11 +322,11 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
     const ids = itemIds(itemCancels);
     const headline = orderCancelled
       ? (inShopify ? (imported ? 'Imported, already cancelled in Shopify' : 'Order cancelled in Shopify') : 'Order cancelled')
-      : ids.length === 1 ? (inShopify ? 'Item cancelled in Shopify' : 'Item cancelled') : (inShopify ? 'Items cancelled in Shopify' : 'Items cancelled');
+      : inShopify ? 'Items cancelled in Shopify' : 'Items cancelled';
     const items = !orderCancelled ? itemsPhrase(ids, ctx, ctx.itemTotal) : ids.length < ctx.itemTotal && !imported ? remainingPhrase(ids, ctx) : itemsPhrase(ids, ctx);
     draft = {
       kind: 'cancelled',
-      headline: translate(headline),
+      headline: translate(headline, { count: ids.length }),
       details: ids.length ? [fromFacility(items)] : [],
       reason: inShopify ? '' : describeReason(orderCancelled?.reason || itemCancels[0]?.reason, ctx),
     };
@@ -413,7 +413,7 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
     draft = {
       kind: 'unfillable',
       headline: translate('Brokering could not fill'),
-      details: [translate(attempt.atLeast ? 'At least {count} attempts' : attempt.attempts === 1 ? '{count} attempt' : '{count} attempts', { count: attempt.attempts })],
+      details: [translate(attempt.atLeast ? 'At least {count} attempts' : '{count} attempts', { count: attempt.attempts })],
     };
     consume(attempt);
   } else if (find('return').length) {
@@ -459,13 +459,10 @@ export function buildTransaction(events: OrderEvent[], ctx: TimelineContext): Ti
     const status = find('itemStatus')[0];
     const same = itemStatuses(status.statusId);
     const ids = itemIds(same);
-    const headlines: Record<string, string> = {
-      ITEM_CREATED: ids.length === 1 ? 'Item added' : 'Items added',
-      ITEM_COMPLETED: ids.length === 1 ? 'Item completed' : 'Items completed',
-    };
+    const headlines: Record<string, string> = { ITEM_CREATED: 'Items added', ITEM_COMPLETED: 'Items completed' };
     draft = {
       kind: 'items',
-      headline: headlines[status.statusId] ? translate(headlines[status.statusId]) : ctx.statusDescription(status.statusId),
+      headline: headlines[status.statusId] ? translate(headlines[status.statusId], { count: ids.length }) : ctx.statusDescription(status.statusId),
       details: [itemsPhrase(ids, ctx, ctx.itemTotal)],
       reason: describeReason(status.reason, ctx),
     };

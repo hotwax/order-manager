@@ -1,4 +1,4 @@
-import { timelineMillis } from '@/utils/orderDetailDates';
+import { toMillis } from '@/utils/format';
 import type { ExchangeChild, OrderEvent } from './types';
 
 const NOT_A_FACILITY = '_NA_';
@@ -21,8 +21,8 @@ export function returnEvents(order: any, returnHeadersById: Record<string, any |
 
   return [...byReturn.entries()].map(([returnId, items]) => {
     const header = returnHeadersById[returnId];
-    const businessDate = timelineMillis(header?.returnDate) ?? timelineMillis(header?.entryDate);
-    const writtenAt = items.map((item) => timelineMillis(item.createdStamp)).filter((value): value is number => value !== undefined);
+    const businessDate = toMillis(header?.returnDate) ?? toMillis(header?.entryDate);
+    const writtenAt = items.map((item) => toMillis(item.createdStamp)).filter((value): value is number => value !== undefined);
     const recordedAt = writtenAt.length ? Math.min(...writtenAt) : undefined;
     return {
       id: `return-${returnId}`,
@@ -37,7 +37,7 @@ export function returnEvents(order: any, returnHeadersById: Record<string, any |
       records: items.map((item) => ({
         source: 'return' as const,
         type: item.statusId || 'RETURN_ITEM',
-        at: timelineMillis(item.createdStamp),
+        at: toMillis(item.createdStamp),
         orderItemSeqId: item.orderItemSeqId,
         refId: item.returnId,
       })),
@@ -59,7 +59,7 @@ export function exchangeEvents(order: any, children: ExchangeChild[]): OrderEven
   return [
     ...sources.map((sourceId) => {
       const rows = assocs.filter((assoc: any) => assoc.toOrderId === sourceId);
-      const dates = rows.map((row: any) => timelineMillis(row.createdStamp)).filter((value: any): value is number => value !== undefined);
+      const dates = rows.map((row: any) => toMillis(row.createdStamp)).filter((value: any): value is number => value !== undefined);
       return {
         id: `exchange-from-${sourceId}`,
         kind: 'exchange' as const,
@@ -68,7 +68,7 @@ export function exchangeEvents(order: any, children: ExchangeChild[]): OrderEven
         at: dates.length ? Math.min(...dates) : undefined,
         shipGroupSeqIds: [],
         orderItemSeqIds: [...new Set<string>(rows.map((row: any) => row.orderItemSeqId).filter(Boolean))],
-        records: rows.map((row: any) => ({ source: 'exchange' as const, type: 'EXCHANGE', at: timelineMillis(row.createdStamp), orderItemSeqId: row.orderItemSeqId, refId: sourceId })),
+        records: rows.map((row: any) => ({ source: 'exchange' as const, type: 'EXCHANGE', at: toMillis(row.createdStamp), orderItemSeqId: row.orderItemSeqId, refId: sourceId })),
         link: { kind: 'exchangeSource' as const, id: sourceId },
       };
     }),

@@ -42,8 +42,7 @@
         <TaskQueueListHeader
           :loaded-count="swapTasks.length"
           :total-count="swapTotal"
-          singular-label="swap task"
-          plural-label="swap tasks"
+          summary-key="{shown} of {count} swap tasks"
           :sort="filters.sort"
           :sort-options="sortOptions"
           trigger-id="swap-task-sort"
@@ -270,8 +269,8 @@ async function runBulkAction(action: 'submitCancel' | 'submitPark', facilityId?:
     );
     const failed = results.filter((result) => result.status === 'rejected').length;
     const succeeded = results.length - failed;
-    if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));
-    if (failed) await showToast(translate('{count} task(s) failed.', { count: failed }));
+    if (succeeded) await showToast(translate('{count} tasks completed.', { count: succeeded }));
+    if (failed) await showToast(translate('{count} tasks failed.', { count: failed }));
     await replaceSwapTasks();
   } finally {
     bulkActionRunning.value = false;
@@ -284,7 +283,7 @@ async function bulkCancelOrders() {
   const shipGroupCount = countTaskTargets(cards, shipGroupTaskTarget);
   const alert = await alertController.create({
     header: translate('Cancel orders'),
-    message: translate('Are you sure you want to cancel {count} selected ship group(s)? This action cannot be undone.', { count: shipGroupCount }),
+    message: translate('Are you sure you want to cancel {count} selected ship groups? This action cannot be undone.', { count: shipGroupCount }),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       { text: translate('Cancel orders'), role: 'confirm', handler: () => runBulkAction('submitCancel') },
@@ -378,8 +377,8 @@ async function rebrokerProductOrders(candidate: SwapSetupCandidate) {
     })));
     const failures = results.filter((result) => result.status === 'rejected').length;
     const successes = results.length - failures;
-    if (successes) await showToast(translate('{count} ship group(s) submitted for rebrokering.', { count: successes }));
-    if (failures) await showToast(translate('{count} ship group(s) could not be rebrokered.', { count: failures }));
+    if (successes) await showToast(translate('{count} ship groups submitted for rebrokering.', { count: successes }));
+    if (failures) await showToast(translate('{count} ship groups could not be rebrokered.', { count: failures }));
     await fetchSwapTasks();
   } catch {
     setupError.value = translate('Failed to rebroker orders for this product. Please try again.');

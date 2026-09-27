@@ -3,7 +3,7 @@
     <div class="ship-group-header-wrapper">
       <ion-card-header>
         <ion-card-title>
-          {{ shipGroup.id }} {{ shipGroup.facilityName || translate('Facility Name') }}
+          {{ shipGroup.id }} {{ shipGroup.facilityName || translate('Facility name') }}
         </ion-card-title>
         <ion-card-subtitle>
           {{ shipGroup.itemSummary }}
@@ -23,7 +23,7 @@
 
     <ion-item v-if="holdTaskCount" color="warning" lines="none">
       <ion-icon slot="start" :icon="warningOutline" />
-      <ion-label>{{ holdTaskCount }} {{ translate(holdTaskCount === 1 ? 'hold task' : 'hold tasks') }}</ion-label>
+      <ion-label>{{ translate('{count} hold tasks', { count: holdTaskCount }) }}</ion-label>
       <ion-button slot="end" fill="solid" color="dark" size="small" @click="emit('show-holds')">
         {{ translate('View details') }}
       </ion-button>
@@ -79,22 +79,22 @@
           :disabled="shipGroup.isSettled" @click="openShippingDatesModal">
           <ion-label>
             <p class="outline">{{ translate('Ship after') }}</p>
-            {{ formatDate(shipGroup.shipAfterDate) }}
+            {{ formatDateTime(shipGroup.shipAfterDate) }}
           </ion-label>
           <ion-label>
             <p class="outline">{{ translate('Ship by') }}</p>
-            {{ formatDate(shipGroup.shipByDate) }}
+            {{ formatDateTime(shipGroup.shipByDate) }}
           </ion-label>
         </ion-item>
         <ion-item v-if="shipGroup.estimatedShipDate || shipGroup.estimatedDeliveryDate" button :detail="false"
           lines="none" :disabled="shipGroup.isSettled" @click="openDeliveryDatesModal">
           <ion-label>
             <p class="outline">{{ translate('Estimated ship date') }}</p>
-            {{ formatDate(shipGroup.estimatedShipDate) }}
+            {{ formatDateTime(shipGroup.estimatedShipDate) }}
           </ion-label>
           <ion-label>
             <p class="outline">{{ translate('Estimated delivery date') }}</p>
-            {{ formatDate(shipGroup.estimatedDeliveryDate) }}
+            {{ formatDateTime(shipGroup.estimatedDeliveryDate) }}
           </ion-label>
         </ion-item>
         <ion-item v-if="shipGroup.shippingInstructions" button :detail="false" lines="none"
@@ -139,7 +139,7 @@
               </div>
               <p v-if="featureLabel(item.productId)" class="ship-group-item-features" :title="featureLabel(item.productId)">{{ featureLabel(item.productId) }}</p>
             </ion-label>
-            <ion-note slot="end">{{ item.quantity }} {{ translate('units') }}</ion-note>
+            <ion-note slot="end">{{ translate('{count} units', { count: Number(item.quantity) }) }}</ion-note>
           </ion-item>
           <ion-item v-if="hiddenItemCount" button :detail="false" @click="emit('update:expanded', true)">
             <ion-label color="medium">{{ translate('+{count} more', { count: hiddenItemCount }) }}</ion-label>
@@ -209,7 +209,7 @@
                 <!-- Stock at the store as the sale was recorded, not stock now: later
                      movements against the same inventory item are not reflected here. -->
                 <ion-note v-if="item.issuance.kind === 'issued'">
-                  {{ translate('On hand at sale') }} {{ item.issuance.qohBefore }} → {{ item.issuance.qohAfter }}
+                  {{ translate('On hand at sale {before} → {after}', { before: item.issuance.qohBefore, after: item.issuance.qohAfter }) }}
                 </ion-note>
               </div>
             </ion-item>
@@ -255,7 +255,7 @@
                 <div v-else>{{ translate('Shipping address not available') }}</div>
               </ion-label>
               <p slot="end" v-if="!shipGroup.isVirtual && distance">
-                {{ distance }} {{ translate('miles') }}
+                {{ translate('{distance} miles', { distance, count: Number(distance) }) }}
               </p>
               <ion-button v-if="!disabledActions.EDIT_ADDRESS" slot="end" fill="clear"
                 color="medium" :id="'shipping-opt-trigger-' + shipGroup.id"
@@ -285,7 +285,7 @@
                     <ion-button @click="closeEditor('address')" :aria-label="translate('Close')" :title="translate('Close')"><ion-icon slot="icon-only"
                         :icon="closeOutline" /></ion-button>
                   </ion-buttons>
-                  <ion-title>{{ translate('Edit Shipping Address') }}</ion-title>
+                  <ion-title>{{ translate('Edit shipping address') }}</ion-title>
                   <ion-buttons slot="end">
                   </ion-buttons>
                 </ion-toolbar>
@@ -310,7 +310,7 @@
                   </ion-item>
                   <ion-item>
                     <ion-select :label="translate('Country')" label-placement="stacked" interface="popover"
-                      :placeholder="translate('Select Country')" v-model="shippingAddressForm.countryGeoId"
+                      :placeholder="translate('Select country')" v-model="shippingAddressForm.countryGeoId"
                       @ionChange="shippingAddressForm.stateProvinceGeoId = ''">
                       <ion-select-option v-for="country in seed.getCountries" :key="country.geoId" :value="country.geoId">
                         {{ country.geoName }}
@@ -356,9 +356,9 @@
             @click="emit('request-transfer')">{{ translate('Request transfer') }}</ion-button>
         </template>
       </template>
-      <ion-button fill="clear" :disabled="disabledActions.ADD_TASK" @click="emit('add-task')">{{ translate('Add Task') }}</ion-button>
+      <ion-button fill="clear" :disabled="disabledActions.ADD_TASK" @click="emit('add-task')">{{ translate('Add task') }}</ion-button>
       <ion-button v-if="!orderIsTerminal" fill="clear"
-        :disabled="disabledActions.ADD_ITEMS" @click="emit('add-items')">{{ translate('Add Items') }}</ion-button>
+        :disabled="disabledActions.ADD_ITEMS" @click="emit('add-items')">{{ translate('Add items') }}</ion-button>
     </div>
 
     <!-- Gift message modal -->
@@ -470,14 +470,13 @@ import {
   calendarOutline, chevronDown, chevronUp, closeOutline, compassOutline, createOutline, cubeOutline, documentTextOutline,
   ellipsisVertical, giftOutline, mailOutline, saveOutline, sendOutline, trashOutline, warningOutline,
 } from 'ionicons/icons';
-import { commonUtil, DxpShopifyImg, translate } from '@common';
+import { DxpShopifyImg, translate } from '@common';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import { isKit } from '@/utils';
-import { formatDate, formatTime, toDateInputValue } from '@/utils/orderDetailDates';
 import type { ShipGroupMilestones } from '@/utils/orderEvents';
-import { formatElapsed } from '@/utils/orderTimeline';
+import { formatDateTime, formatElapsed, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
 import { OrderActionValidator, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import type { EnrichedShipGroup, ItemIssuance, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 
@@ -567,7 +566,7 @@ const hasSelectedOptions = computed(() => {
  * ("Pending") or behind us and simply not recorded ("No date").
  */
 function elapsedLater(start: number, end: number) {
-  const duration = formatElapsed(start, end, translate);
+  const duration = formatElapsed(start, end);
   return duration ? translate('{duration} later', { duration }) : '';
 }
 
@@ -580,7 +579,7 @@ const lifecycleSteps = computed(() => {
     return {
       ...step,
       date,
-      overline: date ? (previous ? elapsedLater(previous, date) : commonUtil.getRelativeTime(date)) : '',
+      overline: date ? (previous ? elapsedLater(previous, date) : formatRelative(date)) : '',
       note: formatTime(date) || (recorded ? translate('No date') : translate('Pending')),
     };
   });

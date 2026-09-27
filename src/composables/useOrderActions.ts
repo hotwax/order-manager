@@ -465,7 +465,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       header: translate('Select ship group'),
       buttons: [
         ...shipGroups.map((shipGroup) => ({
-          text: `${shipGroup.id} ${shipGroup.facilityName || translate('Facility Name')}`,
+          text: `${shipGroup.id} ${shipGroup.facilityName || translate('Facility name')}`,
           handler: () => { selectedShipGroup = shipGroup; }
         })),
         { text: translate('Cancel'), role: 'cancel' }
@@ -489,7 +489,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     if (!order.value || !cancellableSelectedItems.value.length) return;
     const orderId = order.value.id;
     const itemsSnapshot = [...cancellableSelectedItems.value];
-    const message = translate('Are you sure you want to cancel the {count} selected item(s)? This action cannot be undone.', { count: itemsSnapshot.length });
+    const message = translate('Are you sure you want to cancel the {count} selected items? This action cannot be undone.', { count: itemsSnapshot.length });
     await confirmAlert(translate('Cancel items'), message, translate('Cancel items'), async () => {
       try {
         await cancelItems(orderId, itemsSnapshot);

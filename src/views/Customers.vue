@@ -28,7 +28,7 @@
 
       <ion-list v-else>
         <ion-list-header>
-          <ion-label>{{ translate("{loaded} of {total} customers", { loaded: customers.length, total }) }}</ion-label>
+          <ion-label>{{ translate("{shown} of {count} customers", { shown: customers.length, count: total }) }}</ion-label>
           <OrderSortPopover
             v-model="searchSort"
             :options="sortOptions"
@@ -133,7 +133,7 @@ async function runSearch() {
     customers.value = result.customers;
     total.value = result.total;
   } catch (searchError: any) {
-    error.value = searchError?.message || 'Failed to search customers';
+    error.value = searchError?.message || translate('Failed to search customers');
     customers.value = [];
     total.value = 0;
   } finally {

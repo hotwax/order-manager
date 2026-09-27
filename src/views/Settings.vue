@@ -48,7 +48,7 @@
 
         <ion-card>
           <ion-card-header>
-            <ion-card-subtitle>{{ translate("Product Store") }}</ion-card-subtitle>
+            <ion-card-subtitle>{{ translate("Product store") }}</ion-card-subtitle>
             <ion-card-title>{{ translate("Store") }}</ion-card-title>
           </ion-card-header>
           <ion-card-content>
@@ -125,7 +125,7 @@
               <ion-icon slot="start" :icon="getStatusIcon(item.status)" :color="getStatusColor(item.status)" />
               <ion-label>
                 {{ item.label }}
-                <p v-if="item.status === 'success' && item.count !== undefined">{{ translate("Fetched") }} {{ item.count }} {{ translate("records") }}</p>
+                <p v-if="item.status === 'success' && item.count !== undefined">{{ translate('Fetched {count} records', { count: item.count }) }}</p>
                 <p v-else>{{ translate(getStatusLabel(item.status)) }}</p>
               </ion-label>
               <ion-button slot="end" fill="clear" @click="item.refresh()" :aria-label="translate('Refresh {label}', { label: item.label })" :title="translate('Refresh {label}', { label: item.label })">
@@ -135,17 +135,14 @@
 
             <!-- Local database (IndexedDB): live row counts straight from the database. -->
             <ion-item-divider>
-              <ion-label>{{ translate("Local database") }} · {{ totalRows }} {{ translate("records") }}</ion-label>
+              <ion-label>{{ translate('Local database: {count} records', { count: totalRows }) }}</ion-label>
             </ion-item-divider>
             <ion-item v-for="domain in domains" :key="domain.name">
               <ion-icon slot="start" :icon="getStatusIcon(domain.status)" :color="getStatusColor(domain.status)" />
               <ion-label>
                 {{ translate(domain.label) }}
                 <p>
-                  {{ domain.count }} {{ translate("records") }}
-                  <template v-if="domain.syncedAt"> · {{ translate("synced") }} {{ formatSyncTime(domain.syncedAt) }}</template>
-                  <template v-else-if="domain.syncClass === 'A'"> · {{ translate("live while in use") }}</template>
-                  <template v-else> · {{ translate("not synced yet") }}</template>
+                  {{ domainSyncLabel(domain) }}
                 </p>
               </ion-label>
               <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)" :aria-label="translate('Refresh {label}', { label: translate(domain.label) })" :title="translate('Refresh {label}', { label: translate(domain.label) })">
@@ -222,7 +219,6 @@
 <script setup lang="ts">
 import { IonAvatar, IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonPage, IonRadio, IonRadioGroup, IonSearchbar, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToolbar } from '@ionic/vue';
 import { checkmarkCircle, closeCircle, closeOutline, openOutline, saveOutline, syncOutline } from 'ionicons/icons';
-import { DateTime } from 'luxon';
 import { computed, onBeforeMount, ref } from 'vue';
 import { api, commonUtil, cookieHelper, i18n, translate } from '@common';
 import { useDbStatus } from '@common/db';
@@ -234,6 +230,7 @@ import { ORDER_MANAGER_SYNC_CATALOG } from '@/config/appSyncConfig';
 import DxpProductIdentifier from "@/components/settings/DxpProductIdentifier.vue";
 import DxpAppVersionInfo from "@/components/settings/DxpAppVersionInfo.vue";
 import Actions from "@/authorization/actions";
+import { formatDateTime } from '@/utils/format';
 
 const userStore = useUserStore();
 const userProfile = computed(() => userStore.getUserProfile);
@@ -247,7 +244,7 @@ const locale = computed(() => i18n.global.locale.value);
 
 function setLocale(newLocale: string) {
   i18n.global.locale.value = newLocale;
-  cookieHelper().set('locale', newLocale);
+  cookieHelper().set('locale', newLocale, 60 * 60 * 24 * 365);
 }
 
 const props = defineProps({
@@ -366,17 +363,22 @@ const {
   domains, refreshing, totalRows, oldestSyncedAt, lastSyncedAt, refreshDomain, refreshAll,
 } = useDbStatus(getOrderManagerDb(commonUtil.getOMSInstanceName()), ORDER_MANAGER_SYNC_CATALOG);
 
-const formatSyncTime = (millis: number) =>
-  DateTime.fromMillis(millis).toLocaleString(DateTime.DATETIME_MED);
+const formatSyncTime = (millis: number) => formatDateTime(millis);
 
 const syncSubtitle = computed(() => {
   if (!lastSyncedAt.value) return translate("Database not synced yet");
-  const parts = [`${translate("Last sync:")} ${formatSyncTime(lastSyncedAt.value)}`];
   if (oldestSyncedAt.value && oldestSyncedAt.value !== lastSyncedAt.value) {
-    parts.push(`${translate("oldest:")} ${formatSyncTime(oldestSyncedAt.value)}`);
+    return translate("Last sync: {time}, oldest: {oldest}", { time: formatSyncTime(lastSyncedAt.value), oldest: formatSyncTime(oldestSyncedAt.value) });
   }
-  return parts.join(" · ");
+  return translate("Last sync: {time}", { time: formatSyncTime(lastSyncedAt.value) });
 });
+
+/** "1,204 records, synced Sep 22, 2026, 2:33 PM", as one message so each language orders it. */
+function domainSyncLabel(domain: { count: number; syncedAt?: number | null; syncClass?: string }) {
+  if (domain.syncedAt) return translate("{count} records, synced {time}", { count: domain.count, time: formatSyncTime(domain.syncedAt) });
+  if (domain.syncClass === "A") return translate("{count} records, live while in use", { count: domain.count });
+  return translate("{count} records, not synced yet", { count: domain.count });
+}
 
 const userFetchStatus = computed(() => userStore.fetchStatus);
 

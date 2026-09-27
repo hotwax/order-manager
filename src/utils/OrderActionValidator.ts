@@ -465,14 +465,14 @@ export const OrderActionValidator = {
         return { allowed: true };
       }
 
-      /** ADD_TASK — "Add Task" (OrderDetail.vue:607). Terminal-only gate. */
+      /** ADD_TASK — "Add task" (OrderDetail.vue:607). Terminal-only gate. */
       case 'ADD_TASK': {
         if (this.isOrderTerminal(order)) return { allowed: false, reason: 'Cannot add tasks to a cancelled/completed order.' };
         return { allowed: true };
       }
 
       /**
-       * ADD_ITEMS — "Add Items" (OrderDetail.vue:608). Terminal-only gate —
+       * ADD_ITEMS — "Add items" (OrderDetail.vue:608). Terminal-only gate —
        * consistent with the permissive-by-default policy model; a phase
        * cut-off can become store policy later if a business needs it.
        */

@@ -38,9 +38,9 @@
             <!-- Date Today -->
             <p class="overline">{{ translate("Today") }}</p>
             <!-- Order Count today -->
-            <h1 class="big-number">{{ (fulfillmentProgress.totalOrdersCount || 0).toLocaleString() }}</h1>
+            <h1 class="big-number">{{ formatNumber(fulfillmentProgress.totalOrdersCount) }}</h1>
             <!-- Time since day start -->
-            <p class="time-elapsed">{{ hoursSinceDayStart }} {{ translate("hours since day start") }}</p>
+            <p class="time-elapsed">{{ translate("{count} hours since day start", { count: hoursSinceDayStart }) }}</p>
           </div>
 
           <div class="metrics">
@@ -50,7 +50,7 @@
                   <p>{{ metric.label }}</p>
                   <p>{{ metric.percent }}%</p>
                 </div>
-                <ion-note>{{ formatCount(metric.count) }} / {{ formatCount(fulfillmentStats.totalShipGroups) }} {{ translate("ship groups") }}</ion-note>
+                <ion-note>{{ translate("{shown} / {total} ship groups", { shown: formatCount(metric.count), total: formatCount(fulfillmentStats.totalShipGroups), count: countValue(fulfillmentStats.totalShipGroups) }) }}</ion-note>
                 <ion-progress-bar :value="metric.value" :aria-label="metric.label"></ion-progress-bar>
               </div>
             </ion-item>
@@ -71,7 +71,7 @@
               @click="navigateRoute($event, virtualLocationRoute(item))"
             >
               <ion-label>{{ item.label }}</ion-label>
-              <p slot="end">{{ formatCount(item.count) }} {{ translate(item.count === 1 ? "order" : "orders") }}</p>
+              <p slot="end">{{ ordersLabel(item.count) }}</p>
             </ion-item>
           </ion-list>
         </StatCard>
@@ -83,15 +83,15 @@
           <ion-list v-if="!brokeredWorkloadLoading" lines="none" class="hold-tasks-list">
             <ion-item button :detail="true" :href="routeHref('/open')" @click="navigateRoute($event, '/open')">
               <ion-label>{{ translate("Open") }}</ion-label>
-              <p slot="end">{{ formatCount(brokeredWorkload.open) }} {{ translate(brokeredWorkload.open === 1 ? "order" : "orders") }}</p>
+              <p slot="end">{{ ordersLabel(brokeredWorkload.open) }}</p>
             </ion-item>
             <ion-item button :detail="true" :href="routeHref('/inflight')" @click="navigateRoute($event, '/inflight')">
               <ion-label>{{ translate("Picked") }}</ion-label>
-              <p slot="end">{{ formatCount(brokeredWorkload.inflight) }} {{ translate(brokeredWorkload.inflight === 1 ? "order" : "orders") }}</p>
+              <p slot="end">{{ ordersLabel(brokeredWorkload.inflight) }}</p>
             </ion-item>
             <ion-item button :detail="true" :href="routeHref('/packed')" @click="navigateRoute($event, '/packed')">
               <ion-label>{{ translate("Packed and shipped") }}</ion-label>
-              <p slot="end">{{ formatCount(brokeredWorkload.packed) }} {{ translate(brokeredWorkload.packed === 1 ? "order" : "orders") }}</p>
+              <p slot="end">{{ ordersLabel(brokeredWorkload.packed) }}</p>
             </ion-item>
           </ion-list>
         </StatCard>
@@ -139,7 +139,7 @@
                 @click="navigateRoute($event, unfillableDayRoute(day.date))"
               >
                 <ion-label>{{ formatOrderDate(day.date) }}</ion-label>
-                <p slot="end">{{ formatCount(day.orderCount) }} {{ translate(day.orderCount === 1 ? "order" : "orders") }}</p>
+                <p slot="end">{{ ordersLabel(day.orderCount) }}</p>
               </ion-item>
               <ion-item
                 v-if="unfillableRemainingDays"
@@ -149,7 +149,7 @@
                 @click="navigateRoute($event, unfillableRemainingRoute)"
               >
                 <ion-label>{{ unfillableRemainingLabel }}</ion-label>
-                <p slot="end">{{ formatCount(unfillableRemainingOrders) }} {{ translate(unfillableRemainingOrders === 1 ? "order" : "orders") }}</p>
+                <p slot="end">{{ ordersLabel(unfillableRemainingOrders) }}</p>
               </ion-item>
             </ion-list>
           </template>
@@ -220,7 +220,7 @@
       <!-- Facilities List -->
       <ion-list class="facilities ion-padding-top">
         <ion-list-header>
-          <ion-label>{{ translate("Top 10 facilities by") }} {{ selectedDimension }} {{ searchQuery && translate("or") }} {{ searchQuery }}</ion-label>
+          <ion-label>{{ facilityListHeader }}</ion-label>
         </ion-list-header>
 
         <!-- Error state: surface failure + retry instead of "No facilities found" -->
@@ -259,7 +259,7 @@
 
       <!-- Online Order Fulfillment Dashboard at selected Facility -->
       <div v-if="selectedFacilityId" class="fulfillment-dashboard-section ion-padding">
-        <h1 class="section-title">{{ translate("Fill rate at") }} {{ selectedFacilityName }}</h1>
+        <h1 class="section-title">{{ translate("Fill rate at {facility}", { facility: selectedFacilityName }) }}</h1>
 
         <!-- Error state: surface failure + retry instead of false zeros -->
         <div v-if="facilityProgressError" class="section-error ion-padding">
@@ -319,11 +319,11 @@
             <ion-list class="fulfill">
               <ion-item lines="full" :button="true" :detail="true" :href="routeHref(workflowRoute('/open'))" @click="navigateRoute($event, workflowRoute('/open'))">
                 <ion-icon :icon="mailUnreadOutline" slot="start" />
-                <ion-label>{{ facilityFulfillmentProgress?.openCount ?? 0 }} {{ translate("open") }}</ion-label>
+                <ion-label>{{ translate("{count} open", { count: facilityFulfillmentProgress?.openCount ?? 0 }) }}</ion-label>
               </ion-item>
               <ion-item lines="none" :button="true" :detail="true" :href="routeHref(workflowRoute('/inflight'))" @click="navigateRoute($event, workflowRoute('/inflight'))">
                 <ion-icon :icon="mailOpenOutline" slot="start" />
-                <ion-label>{{ facilityFulfillmentProgress?.inProgressCount ?? 0 }} {{ translate("in progress") }}</ion-label>
+                <ion-label>{{ translate("{count} in progress", { count: facilityFulfillmentProgress?.inProgressCount ?? 0 }) }}</ion-label>
               </ion-item>
             </ion-list>
           </ion-card>
@@ -369,7 +369,7 @@
               <ion-item-divider>
                 <ion-label>{{ translate("Sort") }}</ion-label>
                 <ion-button id="add-sort-rule-trigger" fill="outline" size="small" slot="end" :disabled="availableSortOptions.length === 0">
-                  {{ translate("ADD") }}
+                  {{ translate("Add") }}
                   <ion-icon slot="end" :icon="addCircleOutline" />
                 </ion-button>
               </ion-item-divider>
@@ -514,7 +514,7 @@
                     transition: 'all 0.2s ease',
                     cursor: 'pointer'
                   }" 
-                  :title="`${segment.label}: ${segment.orderCount} ${translate('orders')} (${segment.estimatedTime})`"
+                  :title="translate('{segment}: {orders} ({time})', { segment: segment.label, orders: ordersLabel(segment.orderCount), time: segment.estimatedTime })"
                   @mouseenter="hoveredSegmentId = segment.id"
                   @mouseleave="hoveredSegmentId = null"
                 />
@@ -542,7 +542,7 @@
                   <div class="legend-card-header">
                     <span class="legend-orders">
                       <span class="legend-position">#{{ visibleIndex + 1 }}</span>
-                      {{ segment.orderCount }} {{ translate("orders") }}
+                      {{ ordersLabel(segment.orderCount) }}
                     </span>
                     <span class="legend-time">{{ segment.estimatedTime }}</span>
                   </div>
@@ -631,6 +631,7 @@ import { useRouter, type RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
 import { DateTime } from 'luxon';
+import { formatDate, formatNumber, formatRelative } from '@/utils/format';
 
 const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
@@ -693,7 +694,7 @@ const unfillableTrendLabel = computed(() => {
   if (!oldest.isValid) return translate('{count} items by order date', { count: items });
   return translate('{count} items by order date since {date}', {
     count: items,
-    date: oldest.toFormat('d LLL yyyy')
+    date: formatDate(oldest.toMillis())
   });
 });
 
@@ -709,14 +710,13 @@ const unfillableRemainingOrders = computed(() =>
 );
 const unfillableRemainingLabel = computed(() =>
   translate(
-    unfillableRemainingDays.value === 1 ? '{count} later date' : '{count} later dates',
+    '{count} later dates',
     { count: unfillableRemainingDays.value }
   )
 );
 
 function formatOrderDate(date: string) {
-  const parsed = DateTime.fromISO(date);
-  return parsed.isValid ? parsed.toFormat('d LLL yyyy') : date;
+  return formatDate(date) || date;
 }
 
 // Each row deep-links into the Unfillable queue with its order-date filter
@@ -754,10 +754,10 @@ const queueSegments = computed(() => {
   }
 
   const formatEstimatedTime = (mins: number) => {
-    if (mins <= 0) return '0 MIN';
-    if (mins < 60) return `+${mins} MIN`;
+    if (mins <= 0) return translate("{count} MIN", { count: 0 });
+    if (mins < 60) return translate("+{count} MIN", { count: mins });
     const hrs = Math.round(mins / 60);
-    return `+${hrs} HR`;
+    return translate("+{count} HR", { count: hrs });
   };
 
   // 2. Queue segments based on the top sorting parameter
@@ -790,7 +790,7 @@ const queueSegments = computed(() => {
     let runningMinutes = 0;
     segments = sortedCombinations.map((item, index) => {
       const shipmentMethod = seedStore.shipmentMethodTypes?.byId?.[item.shipmentMethodTypeId];
-      const label = `${item.deliveryDays}d - ${shipmentMethod?.description || item.shipmentMethodTypeId || 'None'}`;
+      const label = translate("{count}d - {method}", { count: item.deliveryDays, method: shipmentMethod?.description || item.shipmentMethodTypeId || translate("None") });
       const segmentMinutes = Math.ceil(item.count / batchSize) * cronIntervalMinutes;
       runningMinutes += segmentMinutes;
       return {
@@ -870,7 +870,7 @@ const queueSegments = computed(() => {
       runningMinutes += mins;
       return {
         id: c.id,
-        label: c.label,
+        label: translate(c.label),
         orderCount: count,
         estimatedTime: formatEstimatedTime(runningMinutes),
         color: c.color,
@@ -886,6 +886,11 @@ const selectedFacilityId = ref('');
 const hoveredSegmentId = ref<string | null>(null);
 const searchQuery = ref('');
 const selectedDimension = ref<'volume' | 'velocity' | 'rejections'>('volume');
+// The header links to the segment's own label, so each language lowercases (or not) its own words.
+const DIMENSION_LABELS = { volume: "Order Volume", velocity: "Fulfillment Velocity", rejections: "Rejections" } as const;
+const facilityListHeader = computed(() => (searchQuery.value
+  ? translate("Top 10 facilities by {metric} matching {query}", { metric: DIMENSION_LABELS[selectedDimension.value], query: searchQuery.value })
+  : translate("Top 10 facilities by {metric}", { metric: DIMENSION_LABELS[selectedDimension.value] })));
 const currentProductStore = computed(() => productStore.getCurrentProductStore || {});
 const selectedProductStoreId = computed(() => currentProductStore.value.productStoreId || '');
 const selectedStoreName = computed(
@@ -1029,8 +1034,11 @@ function percentValue(count: number, total: number) {
 }
 
 function formatCount(value: number) {
-  return countValue(value).toLocaleString();
+  return formatNumber(countValue(value));
 }
+
+/** "1 order", "1,204 orders". */
+const ordersLabel = (value: number) => translate('{total} orders', { total: formatCount(value), count: countValue(value) });
 
 const fulfillmentStats = computed(() => {
   const fp = fulfillmentProgress.value || {};
@@ -1135,7 +1143,7 @@ const filteredFacilities = computed(() => {
       facilityId: item.facilityId,
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.lastOrderCount,
-      label: `${item.lastOrderCount} orders`
+      label: ordersLabel(item.lastOrderCount || 0)
     }));
   } else if (selectedDimension.value === 'velocity') {
     list = facilityFulfillmentVelocity.value.map(item => ({
@@ -1144,8 +1152,8 @@ const filteredFacilities = computed(() => {
       value: item.activeFacilityFallback ? item.lastOrderCount : (item.fulfillmentVelocity || 0),
       activeFacilityFallback: item.activeFacilityFallback,
       label: item.activeFacilityFallback
-        ? `${item.lastOrderCount || 0} ${translate("active orders")}`
-        : `${Math.round((item.fulfillmentVelocity || 0) * 100)}% velocity (${item.shipGroupCount || 0}/${item.lastOrderCount || 0} orders)`
+        ? translate("{count} active orders", { count: item.lastOrderCount || 0 })
+        : translate("{percent}% velocity ({shipped}/{count} orders)", { percent: Math.round((item.fulfillmentVelocity || 0) * 100), shipped: item.shipGroupCount || 0, count: item.lastOrderCount || 0 })
     }));
   } else if (selectedDimension.value === 'rejections') {
     list = facilityRejections.value.map(item => ({
@@ -1153,8 +1161,8 @@ const filteredFacilities = computed(() => {
       name: item.facilityName || getFacilityName(item.facilityId),
       value: item.lastOrderCount || 0,
       label: item.rejectedShipGroupCount
-        ? `${item.lastOrderCount || 0} ${translate("active orders")}, ${item.rejectedShipGroupCount} ${translate("rejected orders")}`
-        : `${item.lastOrderCount || 0} ${translate("active orders")}`
+        ? `${translate("{count} active orders", { count: item.lastOrderCount || 0 })}, ${translate("{count} rejected orders", { count: item.rejectedShipGroupCount })}`
+        : translate("{count} active orders", { count: item.lastOrderCount || 0 })
     }));
   }
 
@@ -1203,7 +1211,7 @@ function workflowRoute(path: string) {
 
 const oldestAssignedRelativeStr = computed(() => {
   const timestamp = facilityFulfillmentProgress.value?.oldestAssignedTime;
-  return timestamp ? commonUtil.getRelativeTime(timestamp) : translate('No pending orders');
+  return timestamp ? formatRelative(timestamp) : translate('No pending orders');
 });
 
 const progressPercent = computed(() => {
@@ -1289,7 +1297,8 @@ watch(cronExpressionInput, (newVal) => {
 
 
 function openScheduleModal() {
-  const currentCron = fulfillmentSyncData.value?.settings?.cronExpression || 'Paused';
+  // An unscheduled job starts empty so the input shows its example rather than an English word it can't parse.
+  const currentCron = fulfillmentSyncData.value?.settings?.cronExpression || '';
   cronExpressionInput.value = currentCron;
   const paused = fulfillmentSyncData.value?.settings?.paused || 'N';
   isJobActive.value = paused !== 'Y';

@@ -8,6 +8,7 @@
 </template>
 
 <script setup lang="ts">
+import { translate } from '@common';
 import { IonChip, IonLabel } from '@ionic/vue';
 import { computed } from 'vue';
 import type { OrderAllocationSummaryModel } from '@/types/orderRow';
@@ -23,6 +24,6 @@ const facilityLabel = computed(() => {
     : props.summary.facilityName;
 });
 const progressLabel = computed(() => props.summary
-  ? `${props.summary.brokeredItemCount}/${props.summary.totalItemCount} items brokered`
+  ? translate('{shown}/{count} items brokered', { shown: props.summary.brokeredItemCount, count: props.summary.totalItemCount })
   : '');
 </script>

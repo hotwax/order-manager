@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon';
+import { formatDate, formatDateTime, formatMoney } from '@/utils/format';
 
 function displayValue(value: unknown): string {
   return value === undefined || value === null ? '' : String(value).trim();
@@ -26,9 +27,7 @@ export function taskOrderTitle(task: any): string {
 
 export function formatTaskDate(value?: string | number | null): string {
   if (value === undefined || value === null || value === '') return '';
-
-  const date = parseDate(value);
-  return date.isValid ? date.toLocaleString(DateTime.DATE_MED) : displayValue(value);
+  return formatDate(value) || displayValue(value);
 }
 
 export function taskOrderSubtitle(value: string | number | null | undefined, orderedLabel: string): string {
@@ -36,13 +35,10 @@ export function taskOrderSubtitle(value: string | number | null | undefined, ord
   return orderDate ? `${orderedLabel} ${orderDate}` : '';
 }
 
-export function formatTaskAmount(value?: string | number | null, currency = 'USD'): string {
-  if (value === undefined || value === null || value === '') return '';
-
-  const amount = Number(value);
-  if (!Number.isFinite(amount)) return '';
-
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
+/** A task's order total in the order's own currency; blank when there is none. */
+export function formatTaskAmount(value?: string | number | null, currency?: string): string {
+  if (value === undefined || value === null || value === '' || !Number.isFinite(Number(value))) return '';
+  return formatMoney(value, currency);
 }
 
 export function taskAgeLabel(
@@ -65,6 +61,6 @@ export function taskCreatedTimestampLabel(
 ): string {
   if (value === undefined || value === null || value === '') return '';
 
-  const date = parseDate(value);
-  return date.isValid ? `${taskCreatedLabel}: ${date.toLocaleString(DateTime.DATETIME_MED)}` : '';
+  const created = formatDateTime(value);
+  return created ? `${taskCreatedLabel}: ${created}` : '';
 }

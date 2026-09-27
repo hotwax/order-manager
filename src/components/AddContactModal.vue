@@ -66,7 +66,7 @@
           <ion-input
             :label="translate('Address line 1')"
             label-placement="stacked"
-            placeholder="123 Main St"
+            :placeholder="translate('123 Main St')"
             v-model="form.address1"
           />
         </ion-item>
@@ -82,7 +82,7 @@
           <ion-input
             :label="translate('City')"
             label-placement="stacked"
-            placeholder="New York"
+            :placeholder="translate('New York')"
             v-model="form.city"
           />
         </ion-item>
@@ -144,7 +144,7 @@
             <ion-input
               :label="translate('State / Province')"
               label-placement="stacked"
-              placeholder="e.g. NY"
+              :placeholder="translate('e.g. NY')"
               v-model="form.stateProvinceGeoId"
             />
           </template>

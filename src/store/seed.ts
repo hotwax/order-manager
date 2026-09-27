@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { liveQuery } from "dexie";
-import { api, commonUtil, logger } from "@common";
+import { api, commonUtil, logger, translate } from "@common";
 import { DB_SYNC_CHANNEL } from "@common/db";
 import { getOrderManagerDb } from "@/db/orderManagerDb";
 
@@ -77,7 +77,7 @@ function setDataset<T = any>(target: SeedDatasetState<T>, records: T[], keyFn: (
 
 function setDatasetError(target: SeedDatasetState, error: any) {
   target.status = "error";
-  target.error = error?.message || "Failed to load seed data";
+  target.error = error?.message || translate("Failed to load seed data");
 }
 
 function itemDescription(item: any, id: string, fields = ["description", "enumName", "name"]) {

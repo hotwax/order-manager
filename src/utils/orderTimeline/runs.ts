@@ -3,11 +3,11 @@ import type { TimelineContext, TimelineTransaction } from './transactions';
 /** How many back-to-back transactions of one family make a run worth folding. */
 export const MIN_RUN = 3;
 
-const RUN_COUNT_KEYS: Partial<Record<TimelineTransaction['kind'], [string, string]>> = {
-  rejected: ['{count} rejection', '{count} rejections'],
-  released: ['{count} release', '{count} releases'],
-  brokered: ['{count} brokering', '{count} brokerings'],
-  moved: ['{count} location change', '{count} location changes'],
+const RUN_COUNT_KEYS: Partial<Record<TimelineTransaction['kind'], string>> = {
+  rejected: '{count} rejections',
+  released: '{count} releases',
+  brokered: '{count} brokerings',
+  moved: '{count} location changes',
 };
 
 function runHeadline(run: TimelineTransaction[], ctx: TimelineContext): string {
@@ -24,8 +24,8 @@ function runCounts(run: TimelineTransaction[], ctx: TimelineContext): string {
   const counts = new Map<TimelineTransaction['kind'], number>();
   run.forEach((tx) => counts.set(tx.kind, (counts.get(tx.kind) || 0) + 1));
   const parts = [...counts.entries()].map(([kind, count]) => {
-    const keys = RUN_COUNT_KEYS[kind];
-    return keys ? ctx.translate(keys[count === 1 ? 0 : 1], { count }) : `${count}`;
+    const key = RUN_COUNT_KEYS[kind];
+    return key ? ctx.translate(key, { count }) : `${count}`;
   });
   if (parts.length < 2) return parts[0] || '';
   return ctx.translate('{first} and {last}', { first: parts.slice(0, -1).join(', '), last: parts[parts.length - 1] });

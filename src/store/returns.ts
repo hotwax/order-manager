@@ -1,3 +1,4 @@
+import { translate } from "@common";
 import { defineStore } from "pinia";
 import { getPartyNames } from "@/services/customer";
 import { fetchOrderRowEnrichment } from "@/services/order";
@@ -133,7 +134,7 @@ export const useReturnsStore = defineStore("returns", {
         this.total = 0;
         this.lastPageFull = false;
         if(error?.response?.status === 404 && this.query.searchField === "RETURN_ID") {return;}
-        this.error = error?.message || "Failed to find returns";
+        this.error = error?.message || translate("Failed to find returns");
       } finally {
         if(requestId === this.requestSequence) {this.loading = false;}
       }
@@ -170,7 +171,7 @@ export const useReturnsStore = defineStore("returns", {
       } catch (error: any) {
         if(requestId !== this.requestSequence) {return;}
         this.lastPageFull = false;
-        this.error = error?.message || "Failed to load more returns";
+        this.error = error?.message || translate("Failed to load more returns");
       } finally {
         if(requestId === this.requestSequence) {this.loading = false;}
       }
@@ -183,7 +184,7 @@ export const useReturnsStore = defineStore("returns", {
         const detail = await getReturn(returnId);
         this.current = await enrichReturnDetail(detail);
       } catch (error: any) {
-        this.detailError = error?.message || "Failed to load return";
+        this.detailError = error?.message || translate("Failed to load return");
       } finally {
         this.detailLoading = false;
       }

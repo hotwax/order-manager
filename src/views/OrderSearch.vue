@@ -57,26 +57,26 @@
 
           <ion-select
             v-model="searchFilters.allocationState"
-            label="Allocation state"
+            :label="translate('Allocation state')"
             label-placement="stacked"
             fill="outline"
             interface="popover"
           >
-            <ion-select-option value="All">All locations</ion-select-option>
-            <ion-select-option value="Allocated">Allocated</ion-select-option>
-            <ion-select-option value="AwaitingBrokering">Awaiting brokering</ion-select-option>
-            <ion-select-option value="Unfillable">Unfillable</ion-select-option>
-            <ion-select-option value="Archived">Archived</ion-select-option>
+            <ion-select-option value="All">{{ translate('All locations') }}</ion-select-option>
+            <ion-select-option value="Allocated">{{ translate('Allocated') }}</ion-select-option>
+            <ion-select-option value="AwaitingBrokering">{{ translate('Awaiting brokering') }}</ion-select-option>
+            <ion-select-option value="Unfillable">{{ translate('Unfillable') }}</ion-select-option>
+            <ion-select-option value="Archived">{{ translate('Archived') }}</ion-select-option>
           </ion-select>
 
           <ion-select
             v-model="searchFilters.channel"
-            label="Sales channel"
+            :label="translate('Sales channel')"
             label-placement="stacked"
             fill="outline"
             interface="popover"
           >
-            <ion-select-option value="All">All channels</ion-select-option>
+            <ion-select-option value="All">{{ translate('All channels') }}</ion-select-option>
             <ion-select-option v-for="option in salesChannels" :key="option.enumId" :value="option.enumId">
               {{ option.description || option.enumName || option.enumId }}
             </ion-select-option>
@@ -84,12 +84,12 @@
 
           <ion-select
             v-model="searchFilters.shipmentMethodTypeId"
-            label="Shipping method"
+            :label="translate('Shipping method')"
             label-placement="stacked"
             fill="outline"
             interface="popover"
           >
-            <ion-select-option value="All">All methods</ion-select-option>
+            <ion-select-option value="All">{{ translate('All methods') }}</ion-select-option>
             <ion-select-option v-for="option in shipmentMethodOptions" :key="option.id" :value="option.id">
               {{ option.label }}
             </ion-select-option>
@@ -114,7 +114,7 @@
 
       <ErrorState
         v-if="error"
-        title="Order search failed"
+        :title="translate('Order search failed')"
         :message="error"
       />
 
@@ -128,7 +128,7 @@
               @ionChange="toggleCurrentPageSelection($event.detail.checked)"
             />
           </span>
-          <ion-label>{{ translate("{loaded} of {total} matching orders", { loaded: searchResults.length, total: searchTotal }) }}</ion-label>
+          <ion-label>{{ translate("{shown} of {count} matching orders", { shown: searchResults.length, count: searchTotal }) }}</ion-label>
           <OrderSortPopover v-model="searchSort" trigger-id="find-order-sort-trigger" />
           <ion-button v-if="canUseBulkActions" fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
@@ -160,7 +160,7 @@
 
     <ion-footer v-if="selectMode">
       <ion-toolbar>
-        <ion-title size="small">{{ selectedOrderIds.length }} {{ translate('selected') }}</ion-title>
+        <ion-title size="small">{{ translate('{count} selected', { count: selectedOrderIds.length }) }}</ion-title>
         <ion-buttons slot="end" class="bulk-action-buttons">
           <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
           <ion-button :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
@@ -253,7 +253,7 @@ const statusFilterLabel = computed(() => {
   if (!selectedStatusIds.value.length) return translate('All statuses');
   if (selectedStatusIds.value.length === 1) return statusDescription(selectedStatusIds.value[0]);
 
-  return `${selectedStatusIds.value.length} ${translate('statuses')}`;
+  return translate('{count} statuses', { count: selectedStatusIds.value.length });
 });
 const currentPageOrderIds = computed(() => searchResults.value.map((order) => order.id));
 const allCurrentPageSelected = computed(() => {
@@ -302,7 +302,7 @@ async function confirmCancelOrders() {
   const orderIds = [...selectedOrderIds.value];
   const alert = await alertController.create({
     header: translate('Cancel open items'),
-    message: translate('This will cancel all open items for the {count} selected order(s). This action cannot be undone.', { count: orderIds.length }),
+    message: translate('This will cancel all open items for the {count} selected orders. This action cannot be undone.', { count: orderIds.length }),
     buttons: [
       { text: translate('Dismiss'), role: 'cancel' },
       {

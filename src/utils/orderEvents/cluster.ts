@@ -1,4 +1,4 @@
-import { timelineMillis } from '@/utils/orderDetailDates';
+import { toMillis } from '@/utils/format';
 
 // OMS records order events one row per order item, so a single operator action on a
 // three-item ship group writes three rows milliseconds apart. Rows sharing a key
@@ -12,7 +12,7 @@ export interface EventCluster {
   rows: any[];
 }
 
-export const rowMillis = (value: any): number => timelineMillis(value) ?? 0;
+export const rowMillis = (value: any): number => toMillis(value) ?? 0;
 
 export function clusterEvents(rows: any[], keyOf: (row: any) => string, millisOf: (row: any) => number): EventCluster[] {
   const clusters: EventCluster[] = [];

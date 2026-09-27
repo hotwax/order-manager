@@ -18,7 +18,7 @@
             </ion-card-header>
             <ion-item>
               <ion-icon :icon="globeOutline" slot="start" />
-              <ion-select v-model="orderForm.shopId" :label="translate('Shopify Shop')" :placeholder="translate('Select')" interface="popover">
+              <ion-select v-model="orderForm.shopId" :label="translate('Shopify shop')" :placeholder="translate('Select')" interface="popover">
                 <ion-select-option v-for="shop in shopsList" :value="shop.shopId" :key="shop.shopId">{{ shop.name ? shop.name : shop.shopId }}</ion-select-option>
               </ion-select>
             </ion-item>
@@ -76,7 +76,7 @@
           <ion-card>
             <ion-card-header>
               <ion-card-title>
-                {{ translate("Shipping Address") }}
+                {{ translate("Shipping address") }}
                 <ion-button size="small" fill="outline" @click="openShippingAddressModal">
                   <ion-icon :icon="addCircleOutline" slot="start"/>
                   {{ orderForm.shippingAddress.zip ? translate("Edit") : translate("Add") }}
@@ -136,7 +136,7 @@
                 <ion-item lines="none" v-else-if="searchedProduct.scannedId && !searchedProduct.productId">
                   <ion-icon :icon="cloudOfflineOutline" slot="start" />
                   <ion-label>
-                    {{ searchedProduct.scannedId }} {{ translate("not found") }}
+                    {{ translate('{id} not found', { id: searchedProduct.scannedId }) }}
                     <p>{{ translate("Try searching using a keyword instead") }}</p>
                   </ion-label>
                   <ion-button size="small" slot="end" color="primary" @click="openAddProductModal">
@@ -151,7 +151,7 @@
                   </ion-thumbnail>
                   <ion-label>
                     {{ translate("Your scanner isn’t focused yet.") }}
-                    <p>{{ translate("Scanning is set to") }} {{ barcodeIdentificationDesc[barcodeIdentifier] || barcodeIdentifier }}</p>
+                    <p>{{ translate("Scanning is set to {identifier}", { identifier: barcodeIdentificationDesc[barcodeIdentifier] || barcodeIdentifier }) }}</p>
                     <p v-if="barcodeIdentifier !== 'SKU'">{{ translate("Swap to SKU from the settings page") }}</p>
                   </ion-label>
                   <ion-button slot="end" color="warning" size="small" @click="enableScan">
@@ -166,7 +166,7 @@
                   </ion-thumbnail>
                   <ion-label>
                     {{ translate("Begin scanning products to add them to this order") }}
-                    <p>{{ translate("Scanning is set to") }} {{ barcodeIdentificationDesc[barcodeIdentifier] || barcodeIdentifier }}</p>
+                    <p>{{ translate("Scanning is set to {identifier}", { identifier: barcodeIdentificationDesc[barcodeIdentifier] || barcodeIdentifier }) }}</p>
                     <p v-if="barcodeIdentifier !== 'SKU'">{{ translate("Swap to SKU from the settings page") }}</p>
                   </ion-label>
                   <ion-badge slot="end" color="success">{{ translate("start scanning") }}</ion-badge>
@@ -292,6 +292,7 @@
 
 <script setup lang="ts">
 import { computed, ref, onMounted, nextTick, watch } from 'vue';
+import { formatMoney } from '@/utils/format';
 import { IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonMenuButton, IonPage, IonSearchbar, IonSegment, IonSegmentButton, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar, IonSpinner, modalController } from '@ionic/vue';
 import { addOutline, storefrontOutline, searchOutline, checkmarkDoneOutline, barcodeOutline, cloudOfflineOutline, shirtOutline, checkmarkOutline, locateOutline, addCircleOutline, trashOutline, cashOutline, globeOutline } from 'ionicons/icons';
 import { api, commonUtil, DxpShopifyImg, emitter, logger, translate, useSolrSearch } from '@common';
@@ -415,7 +416,7 @@ onMounted(async () => {
       productStoreId
     });
   } catch (err: any) {
-    commonUtil.showToast(`${translate("Failed to load Shopify shops:")} ${err.message || err}`);
+    commonUtil.showToast(translate("Failed to load Shopify shops: {message}", { message: String(err.message || err) }, { escapeParameter: true }));
   }
 });
 
@@ -601,9 +602,6 @@ const totals = computed(() => {
   return { subtotal, shipping, total };
 });
 
-function formatMoney(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-}
 
 function resetForm() {
   orderForm.value = {
@@ -725,7 +723,7 @@ async function submitOrder() {
 
     if (response?.data?.shopifyOrderName) {
       orderResponseData.value = {
-        shopifyOrderId: response.data.shopifyOrderId || 'Unknown ID',
+        shopifyOrderId: response.data.shopifyOrderId || translate('Unknown ID'),
         shopifyOrderName: response.data.shopifyOrderName
       };
       
@@ -738,7 +736,7 @@ async function submitOrder() {
   } catch (err: any) {
     emitter.emit('dismissLoader');
     const errMsg = err?.message || translate('Error occurred while creating Shopify order.');
-    await commonUtil.showToast(err?.message ? `${translate('Failed to create Shopify order:')} ${errMsg}` : errMsg);
+    await commonUtil.showToast(err?.message ? translate('Failed to create Shopify order: {message}', { message: errMsg }, { escapeParameter: true }) : errMsg);
   } finally {
     isSubmitting.value = false;
   }

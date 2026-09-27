@@ -37,7 +37,7 @@
       <ion-label>
         {{ candidate.productName || candidate.parentProductName || candidate.internalName || candidate.productId }}
         <p>{{ candidate.sku || candidate.productId }}</p>
-        <p>{{ translate('{count} unfillable order item(s)', { count: candidate.itemCount }) }}</p>
+        <p>{{ translate('{count} unfillable order items', { count: candidate.itemCount }) }}</p>
       </ion-label>
       <ion-buttons slot="end">
         <ion-button

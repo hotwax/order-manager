@@ -17,7 +17,7 @@
           <DxpShopifyImg :src="product.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
-          <p class="overline">{{ translate('Item') }} {{ item.orderItemSeqId }}</p>
+          <p class="overline">{{ translate('Item {id}', { id: item.orderItemSeqId }) }}</p>
           {{ primaryIdentifier(item.productId) || item.name }}
           <p v-if="featureLabel(item.productId)">{{ featureLabel(item.productId) }}</p>
           <p v-if="secondaryIdentifier(item.productId)">{{ secondaryIdentifier(item.productId) }}</p>
@@ -32,7 +32,7 @@
         <ion-item lines="none">
           <ion-label>
             <p class="overline">{{ translate('Inventory transfer: {id}', { id: transfer.id }) }}</p>
-            {{ transfer.quantity }} {{ translate('qty') }}
+            {{ translate('{count} qty', { count: Number(transfer.quantity) }) }}
             <p v-if="transfer.requestedDate">
               {{ translate('Requested by {source} on {date}', { source: transfer.sourceLabel, date: formatDateTime(transfer.requestedDate) }) }}
             </p>
@@ -119,7 +119,7 @@ import { cancelInventoryTransfer, executeInventoryTransfer, fetchFacilityStock }
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
 import { showToast } from '@/utils';
-import { formatDateTime } from '@/utils/orderDetailDates';
+import { formatDateTime, formatNumber } from '@/utils/format';
 import type { EnrichedTransfer } from '@/types/orderDetail';
 
 const props = defineProps<{
@@ -161,7 +161,6 @@ async function loadStock() {
 }
 watch(() => transfer.value?.id, loadStock, { immediate: true });
 
-const signed = new Intl.NumberFormat(undefined, { signDisplay: 'always' });
 
 function stockNow(facilityId: string, measure: 'atp' | 'qoh') {
   const current = stock.value?.[facilityId]?.[measure];
@@ -171,7 +170,7 @@ function stockNow(facilityId: string, measure: 'atp' | 'qoh') {
 /** The stock once the transfer completes, with the change beside it: "37 (-1)". */
 function stockAfter(facilityId: string, measure: 'atp' | 'qoh', change: number) {
   const current = stock.value?.[facilityId]?.[measure];
-  return current === undefined ? '-' : `${current + change} (${signed.format(change)})`;
+  return current === undefined ? '-' : `${formatNumber(current + change)} (${formatNumber(change, { signDisplay: 'always' })})`;
 }
 
 function statusColor(entry: EnrichedTransfer) {

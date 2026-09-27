@@ -26,7 +26,7 @@
               :facility-disabled="true"
               :statuses="group.statuses"
               :amount="money(group.totalPrice)"
-              :adjustments="group.adjustments.map((adj) => ({ label: adj.isIncluded ? `${adj.label} (${translate('included')})` : adj.label, amount: money(adj.amount) }))"
+              :adjustments="group.adjustments.map((adj) => ({ label: adj.isIncluded ? translate('{label} (included)', { label: adj.label }) : adj.label, amount: money(adj.amount) }))"
               @update:selected="selectItems(group.items, $event)"
             />
             <div slot="content">
@@ -52,7 +52,7 @@
         <ion-card-header>
           <ion-card-title>{{ translate('Payment') }}</ion-card-title>
           <ion-card-subtitle v-if="order.payments.list.length" :color="order.payments.netColor">
-            {{ translate('Net') }} {{ money(order.payments.netAmount) }}
+            {{ translate('Net {amount}', { amount: money(order.payments.netAmount) }) }}
           </ion-card-subtitle>
         </ion-card-header>
         <ion-list lines="none">
@@ -76,7 +76,7 @@
                   :router-link="`/returns/${returnId}`"
                   @click.stop
                 >
-                  {{ translate('Return') }} {{ returnId }}
+                  {{ translate('Return {id}', { id: returnId }) }}
                 </ion-button>
               </ion-label>
               <ion-label slot="end">{{ money(payment.amount) }}</ion-label>
@@ -123,12 +123,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonItem, IonItemDivider, IonLabel, IonList } from '@ionic/vue';
-import { commonUtil, translate } from '@common';
+import { translate } from '@common';
 import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
 import OrderItemTransferChip from '@/components/orders/OrderItemTransferChip.vue';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { isKit } from '@/utils';
-import { formatDateTime } from '@/utils/orderDetailDates';
+import { formatDateTime, formatMoney } from '@/utils/format';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import type { EnrichedItemGroup, EnrichedOrder, EnrichedOrderItem } from '@/types/orderDetail';
 
@@ -165,7 +165,7 @@ function selectItems(items: EnrichedOrderItem[], selected: boolean) {
   emit('update:selectedItemIds', ids);
 }
 
-const money = (value: number) => commonUtil.formatCurrency(value, props.order.currency || 'USD');
+const money = (value: number) => formatMoney(value, props.order.currency);
 
 /** The product identity a rolled up (or sole item) row shows. */
 function productRowProps(group: EnrichedItemGroup) {
@@ -183,8 +183,8 @@ function productRowProps(group: EnrichedItemGroup) {
 /** Inside a rolled up group the item row names the order item rather than the product. */
 function itemIdentity(item: EnrichedOrderItem) {
   return {
-    primary: `${translate('Item')} ${item.orderItemSeqId}`,
-    secondary: item.externalId && item.externalId !== 'null' ? `${translate('External ID')}: ${item.externalId}` : '',
+    primary: translate('Item {id}', { id: item.orderItemSeqId }),
+    secondary: item.externalId && item.externalId !== 'null' ? translate('External ID: {id}', { id: item.externalId }) : '',
     showQuantity: false,
   };
 }
@@ -200,9 +200,9 @@ function itemRow(item: EnrichedOrderItem, identity: ReturnType<typeof productRow
     quantityLabel: translate('qty'),
     facilityLabel: item.facilityName,
     facilityDisabled: props.itemActions[item.orderItemSeqId]?.facilityDisabled,
-    attributesLabel: `${attributeCount} ${attributeCount === 1 ? translate('attribute') : translate('attributes')}`,
+    attributesLabel: translate('{count} attributes', { count: attributeCount }),
     statuses: item.statuses,
-    statusDetail: item.shipGroupSeqId ? `${translate('#')}${item.shipGroupSeqId}` : '',
+    statusDetail: item.shipGroupSeqId ? translate('#{id}', { id: item.shipGroupSeqId }) : '',
     amount: money(item.unitPrice * item.quantity),
     adjustments: item.adjustments.map((adj) => ({ label: adj.comment, amount: money(adj.amount) })),
     'onUpdate:selected': (selected: boolean) => selectItems([item], selected),

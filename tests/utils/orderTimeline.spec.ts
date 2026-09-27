@@ -1,7 +1,8 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { Settings } from 'luxon';
 import { buildOrderEvents, type OrderEvent } from '@/utils/orderEvents';
-import { chainEvents, formatElapsed, groupTransactions, timelineDays, type TimelineContext } from '@/utils/orderTimeline';
+import { formatElapsed } from '@/utils/format';
+import { chainEvents, groupTransactions, timelineDays, type TimelineContext } from '@/utils/orderTimeline';
 
 // 2:00 PM on Tuesday, Sep 22, 2026 in Los Angeles.
 const T = (seconds: number) => Date.UTC(2026, 8, 22, 21, 0, 0) + seconds * 1_000;
@@ -143,6 +144,6 @@ describe('formatElapsed', () => {
     [minutes(42 * 60 + 57), '1 day 19 hours'],
     [-minutes(3), ''],
   ])('reads %d ms as "%s"', (span, expected) => {
-    expect(formatElapsed(T0, T0 + span, ctx().translate)).toBe(expected);
+    expect(formatElapsed(T0, T0 + span)).toBe(expected);
   });
 });

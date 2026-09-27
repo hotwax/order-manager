@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { api, commonUtil, logger, useSolrSearch } from "@common";
+import { api, commonUtil, logger, translate, useSolrSearch } from "@common";
 import { FACILITY_CHANGE_PAGE_SIZE, UNFILLABLE_SAMPLE_SIZE, useOrderDetail, type IssuanceLine } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useSeedStore } from "./seed";
@@ -10,7 +10,7 @@ import { escapeSolrValue } from "@/services/order";
 import { getReturn } from "@/services/returns";
 import { fetchOrderInventoryTransfers } from "@/services/inventoryTransfers";
 import { enrichOrder, isPosCompletedShipGroup } from "@/utils/orderDetailEnrichment";
-import { timelineMillis } from "@/utils/orderDetailDates";
+import { toMillis } from "@/utils/format";
 import { OrderActionValidator } from "@/utils/OrderActionValidator";
 import { buildOrderEvents, clusterEvents, type ExchangeChild, type OrderEvent, type UnfillableSummary } from "@/utils/orderEvents";
 import { adjustmentAmount, adjustmentKey, adjustmentLabel } from "@/utils/orderAdjustments";
@@ -503,7 +503,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       } catch (error: any) {
         logger.error(`Failed to load order detail for [${orderId}]`, error);
         entry.status = "error";
-        entry.error = error?.message || "Failed to load order";
+        entry.error = error?.message || translate("Failed to load order");
       }
     },
     /** Run one of the order's history loads, counting it in the history status. It says whether it worked. */
@@ -771,7 +771,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
               orderId: candidateId,
               itemCount,
               facilityId: payload.originFacilityId && payload.originFacilityId !== QUEUE_FACILITY_ID ? payload.originFacilityId : '',
-              value: timelineMillis(assoc.createdStamp) || timelineMillis(payload.orderDate) || 0
+              value: toMillis(assoc.createdStamp) || toMillis(payload.orderDate) || 0
             });
           }));
           this.exchangeChildrenByOrderId[orderId] = children;

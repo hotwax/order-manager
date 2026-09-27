@@ -6,7 +6,7 @@
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ title || translate('Add Task') }}</ion-title>
+      <ion-title>{{ title || translate('Add task') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -45,7 +45,7 @@
            #391 fixes the work-effort type to a constant, so no type selector is shown. -->
       <ion-item button detail="false" id="task-purpose-trigger">
         <ion-label>
-          <p>{{ requiredLabel('Task Purpose') }}</p>
+          <p>{{ requiredLabel('Task purpose') }}</p>
           <span :class="{ 'task-purpose-placeholder': !form.workEffortPurposeTypeId }">{{ selectedPurposeLabel }}</span>
         </ion-label>
       </ion-item>
@@ -112,7 +112,7 @@ import { useSeedStore } from '@/store/seed';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
 
 const props = defineProps<{
-  // Optional modal title (already localized by the caller); defaults to "Add Task".
+  // Optional modal title (already localized by the caller); defaults to "Add task".
   title?: string;
   // When provided, the user can scope the task to one or more ship groups of an
   // order. Omitted for the generic bulk "Add task" flow, which keeps its old shape.

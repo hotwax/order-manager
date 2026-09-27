@@ -65,6 +65,7 @@ import { translate } from '@common';
 import { DateTime } from 'luxon';
 import { useCustomerStore } from '@/store/customer';
 import { useSeedStore } from '@/store/seed';
+import { formatDate } from '@/utils/format';
 
 const props = defineProps<{
   currentPartyId: string;
@@ -90,10 +91,6 @@ function parseDate(value?: string | number) {
   return iso.isValid ? iso : DateTime.fromSQL(str);
 }
 
-function formatDate(value?: string | number) {
-  const date = parseDate(value);
-  return date?.isValid ? date.toLocaleString(DateTime.DATE_MED) : String(value ?? '');
-}
 
 function sortKey(value?: string | number): number {
   const date = parseDate(value);

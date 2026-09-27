@@ -29,7 +29,7 @@
                     {{ record.title }}
                     <p v-for="(line, index) in record.lines" :key="index">{{ line }}</p>
                   </ion-label>
-                  <ion-note v-if="record.at" slot="end">{{ formatClockWithSeconds(record.at) }}</ion-note>
+                  <ion-note v-if="record.at" slot="end">{{ formatTime(record.at, { seconds: true }) }}</ion-note>
                 </ion-item>
               </ion-list>
             </ion-accordion>
@@ -76,8 +76,9 @@ import { useProductIdentity } from '@/composables/useProductIdentity';
 import { isVirtualFacilityId, useOrderDetailStore, type OrderHistoryStatus } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 import type { EnrichedOrder } from '@/types/orderDetail';
+import { formatTime } from '@/utils/format';
 import type { OrderEvent, OrderEventLink } from '@/utils/orderEvents';
-import { formatClock, formatClockWithSeconds, groupTransactions, timelineDays, type TimelineContext, type TimelineEntry } from '@/utils/orderTimeline';
+import { groupTransactions, timelineDays, type TimelineContext, type TimelineEntry } from '@/utils/orderTimeline';
 
 const props = defineProps<{
   order: EnrichedOrder;
@@ -132,5 +133,5 @@ const opens = (entry: TimelineEntry) => !entry.link && (!!entry.children?.length
 
 /** A folded run's transactions, each timed on its own. */
 const childEntries = (entry: TimelineEntry) =>
-  (entry.children || []).map((child) => ({ ...child, time: child.at === undefined ? '' : formatClock(child.at), elapsed: '' }));
+  (entry.children || []).map((child) => ({ ...child, time: formatTime(child.at), elapsed: '' }));
 </script>

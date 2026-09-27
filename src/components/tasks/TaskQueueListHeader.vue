@@ -32,8 +32,8 @@ import type { TaskSort, TaskSortOption } from '@/types/orderTaskFilters';
 const props = defineProps<{
   loadedCount: number;
   totalCount: number;
-  singularLabel: string;
-  pluralLabel: string;
+  /** A plural message with {shown} and {count}, e.g. "{shown} of {count} swap tasks". */
+  summaryKey: string;
   sort: TaskSort;
   sortOptions: TaskSortOption[];
   triggerId: string;
@@ -49,9 +49,7 @@ const emit = defineEmits<{
 }>();
 
 const resultsSummary = computed(() => {
-  const effectiveTotal = Math.max(props.totalCount, props.loadedCount);
-  const label = effectiveTotal === 1 ? props.singularLabel : props.pluralLabel;
-  return `${props.loadedCount} ${translate('of')} ${effectiveTotal} ${translate(label)}`;
+  return translate(props.summaryKey, { shown: props.loadedCount, count: Math.max(props.totalCount, props.loadedCount) });
 });
 
 function updateSort(value: string) {

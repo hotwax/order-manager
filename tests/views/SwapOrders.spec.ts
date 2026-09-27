@@ -15,7 +15,7 @@ describe('swap queue standardization', () => {
 
   it('adds the common result header and safe bulk actions', () => {
     expect(source).toContain('<TaskQueueListHeader');
-    expect(source).toContain("singular-label=\"swap task\"");
+    expect(source).toContain('summary-key="{shown} of {count} swap tasks"');
     expect(source).toContain("translate('Cancel orders')");
     expect(source).toContain("translate('Park')");
     expect(source).toContain('runGroupedTaskMutation(');

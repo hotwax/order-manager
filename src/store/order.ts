@@ -1,4 +1,4 @@
-import { api, logger } from '@common';
+import { api, logger, translate } from '@common';
 import { defineStore } from 'pinia';
 import {
   searchOrders as searchOrderService,
@@ -238,7 +238,7 @@ export const useOrderStore = defineStore('orders', {
       try {
         return await searchOrderService(this.toSearchParams(pageIndex));
       } catch (error: any) {
-        this.error = error?.message || 'Failed to search orders';
+        this.error = error?.message || translate('Failed to search orders');
         return Promise.reject(error);
       } finally {
         this.loading = false;
