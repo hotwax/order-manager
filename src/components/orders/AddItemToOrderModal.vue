@@ -38,8 +38,8 @@
           <DxpShopifyImg :src="product.mainImageUrl" :key="product.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
-          <p class="overline">{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) }}</p>
           {{ productPrimary(product) }}
+          <p>{{ commonUtil.getProductIdentificationValue(productIdentificationPref.secondaryId, product) }}</p>
         </ion-label>
         <!-- Show success check if already added, spinner while adding, Add button otherwise -->
         <ion-icon v-if="addedProductIds.has(product.productId)" slot="end" color="success" :icon="checkmarkCircle" />

@@ -123,7 +123,7 @@
                 </ion-item>
                 <ion-item lines="none" v-if="searchedProduct.productId">
                   <ion-thumbnail slot="start">
-                    <DxpShopifyImg :src="getProduct(searchedProduct.productId)?.mainImageUrl || searchedProduct.mainImageUrl" :key="getProduct(searchedProduct.productId)?.mainImageUrl || searchedProduct.mainImageUrl" />
+                    <DxpShopifyImg :src="getProduct(searchedProduct.productId)?.mainImageUrl || searchedProduct.mainImageUrl" :key="getProduct(searchedProduct.productId)?.mainImageUrl || searchedProduct.mainImageUrl" size="small" />
                   </ion-thumbnail>
                   <ion-label>
                     {{ commonUtil.getProductIdentificationValue(barcodeIdentifier, getProduct(searchedProduct.productId)) }}
@@ -182,7 +182,7 @@
                 <ion-list lines="none" v-else-if="searchedProduct.productId">
                   <ion-item>
                     <ion-thumbnail slot="start">
-                      <DxpShopifyImg :src="searchedProduct.mainImageUrl" :key="searchedProduct.mainImageUrl" />
+                      <DxpShopifyImg :src="searchedProduct.mainImageUrl" :key="searchedProduct.mainImageUrl" size="small" />
                     </ion-thumbnail>
                     <ion-label>
                       {{ commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(searchedProduct.productId)) }}
@@ -224,7 +224,7 @@
             <div class="list-item ion-margin-horizontal" v-for="(lineItem, index) in orderForm.lineItems" :key="lineItem.productId">
               <ion-item lines="none">
                 <ion-thumbnail slot="start">
-                  <DxpShopifyImg :src="lineItem.mainImageUrl" :key="lineItem.mainImageUrl"/>
+                  <DxpShopifyImg :src="lineItem.mainImageUrl" :key="lineItem.mainImageUrl" size="small" />
                 </ion-thumbnail>
                 <ion-label>
                   {{ lineItem.productId ? commonUtil.getProductIdentificationValue(productIdentificationPref.primaryId, getProduct(lineItem.productId)) : lineItem.title }}

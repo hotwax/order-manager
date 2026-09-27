@@ -16,8 +16,8 @@
   <ion-content ref="content">
     <ion-list v-if="item">
       <ion-item lines="full">
-        <ion-thumbnail v-if="product?.mainImageUrl" slot="start">
-          <DxpShopifyImg :src="product.mainImageUrl" size="small" />
+        <ion-thumbnail slot="start">
+          <DxpShopifyImg :src="product?.mainImageUrl" size="small" />
         </ion-thumbnail>
         <ion-label>
           <p class="overline">

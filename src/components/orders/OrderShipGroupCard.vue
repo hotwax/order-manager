@@ -78,29 +78,29 @@
         <ion-item v-if="shipGroup.shipAfterDate || shipGroup.shipByDate" button :detail="false" lines="none"
           :disabled="shipGroup.isSettled" @click="openShippingDatesModal">
           <ion-label>
-            <p class="outline">{{ translate('Ship after') }}</p>
+            <p>{{ translate('Ship after') }}</p>
             {{ formatDateTime(shipGroup.shipAfterDate) }}
           </ion-label>
           <ion-label>
-            <p class="outline">{{ translate('Ship by') }}</p>
+            <p>{{ translate('Ship by') }}</p>
             {{ formatDateTime(shipGroup.shipByDate) }}
           </ion-label>
         </ion-item>
         <ion-item v-if="shipGroup.estimatedShipDate || shipGroup.estimatedDeliveryDate" button :detail="false"
           lines="none" :disabled="shipGroup.isSettled" @click="openDeliveryDatesModal">
           <ion-label>
-            <p class="outline">{{ translate('Estimated ship date') }}</p>
+            <p>{{ translate('Estimated ship date') }}</p>
             {{ formatDateTime(shipGroup.estimatedShipDate) }}
           </ion-label>
           <ion-label>
-            <p class="outline">{{ translate('Estimated delivery date') }}</p>
+            <p>{{ translate('Estimated delivery date') }}</p>
             {{ formatDateTime(shipGroup.estimatedDeliveryDate) }}
           </ion-label>
         </ion-item>
         <ion-item v-if="shipGroup.shippingInstructions" button :detail="false" lines="none"
           :disabled="shipGroup.isSettled" @click="openInstructionModal">
           <ion-label>
-            <p class="outline">{{ translate('Instructions') }}</p>
+            <p>{{ translate('Instructions') }}</p>
             {{ shipGroup.shippingInstructions }}
           </ion-label>
         </ion-item>
@@ -132,11 +132,11 @@
               <DxpShopifyImg :src="item.imageUrl" :key="getProduct(item.productId)?.mainImageUrl" size="small" />
             </ion-thumbnail>
             <ion-label>
-              <p class="overline">{{ secondaryIdentifier(item.productId) }}</p>
               <div>
                 {{ primaryIdentifier(item.productId) || item.productId }}
                 <ion-badge class="kit-badge" color="dark" v-if="isKit(item)">{{ translate("Kit") }}</ion-badge>
               </div>
+              <p>{{ secondaryIdentifier(item.productId) }}</p>
               <p v-if="featureLabel(item.productId)" class="ship-group-item-features" :title="featureLabel(item.productId)">{{ featureLabel(item.productId) }}</p>
             </ion-label>
             <ion-note slot="end">{{ translate('{count} units', { count: Number(item.quantity) }) }}</ion-note>
