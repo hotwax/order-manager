@@ -1,16 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="modalController.dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ translate('Create identification type') }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
-
-  <ion-content>
+  <DxpModal :state="typeModal" :title="translate('Create identification type')">
     <ion-list>
       <ion-item>
         <ion-input
@@ -18,7 +7,7 @@
           :label="requiredLabel('Name')"
           label-placement="stacked"
           required
-          :disabled="saving"
+          :disabled="typeModal.saving"
           @ionBlur="formData.enumId ? null : setEnumId(formData.enumName)"
         />
       </ion-item>
@@ -27,37 +16,27 @@
           v-model="formData.enumId"
           :label="translate('Type ID')"
           label-placement="stacked"
-          :disabled="saving"
+          :disabled="typeModal.saving"
           @ionChange="validateEnumId"
           @ionBlur="markEnumIdTouched"
           :errorText="translate('ID cannot be more than 20 characters.')"
         />
       </ion-item>
       <ion-item>
-        <ion-input v-model="formData.description" :label="translate('Description')" label-placement="stacked" :disabled="saving" />
+        <ion-input v-model="formData.description" :label="translate('Description')" label-placement="stacked" :disabled="typeModal.saving" />
       </ion-item>
     </ion-list>
-
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="saving" @click="createType()" :aria-label="translate('Save')">
-        <ion-spinner v-if="saving" name="crescent" />
-        <ion-icon v-else :icon="saveOutline" />
-      </ion-fab-button>
-    </ion-fab>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonList, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
+import { IonInput, IonItem, IonList } from '@ionic/vue';
 import { ref } from 'vue';
-import { commonUtil, translate } from '@common';
+import { commonUtil, DxpModal, translate, useDxpModal } from '@common';
 import { useSeedStore } from '@/store/seed';
 import { showToast, requiredLabel } from '@/utils';
 
 const seedStore = useSeedStore();
-const saving = ref(false);
-
 const formData = ref({ enumId: '', enumName: '', description: '' });
 
 function setEnumId(enumName: string) {
@@ -76,31 +55,26 @@ function markEnumIdTouched(event: any) {
   event.target.classList.add('ion-touched');
 }
 
-async function createType() {
-  if (!formData.value.enumName.trim()) {
-    await showToast(translate('Identification type name is required.'));
-    return;
-  }
-  if (!formData.value.enumId) {
-    formData.value.enumId = commonUtil.generateInternalId(formData.value.enumName);
-  }
-  if (formData.value.enumId.length > 20) {
-    await showToast(translate('ID cannot be more than 20 characters.'));
-    return;
-  }
+// Save creates the type here and hands back its id; a thrown message is the toast, and the modal stays open.
+const typeModal = useDxpModal({
+  dirty: () => !!(formData.value.enumName.trim() || formData.value.enumId || formData.value.description.trim()),
+  async confirm() {
+    if (!formData.value.enumName.trim()) throw new Error(translate('Identification type name is required.'));
+    if (!formData.value.enumId) {
+      formData.value.enumId = commonUtil.generateInternalId(formData.value.enumName);
+    }
+    if (formData.value.enumId.length > 20) throw new Error(translate('ID cannot be more than 20 characters.'));
 
-  saving.value = true;
-  try {
-    await seedStore.createOrderIdentificationType({
-      enumId: formData.value.enumId,
-      description: formData.value.description.trim() || formData.value.enumName.trim()
-    });
+    try {
+      await seedStore.createOrderIdentificationType({
+        enumId: formData.value.enumId,
+        description: formData.value.description.trim() || formData.value.enumName.trim()
+      });
+    } catch {
+      throw new Error(translate('Failed to create identification type. Please try again.'));
+    }
     await showToast(translate('Identification type created successfully.'));
-    modalController.dismiss({ enumId: formData.value.enumId }, 'confirm');
-  } catch {
-    await showToast(translate('Failed to create identification type. Please try again.'));
-  } finally {
-    saving.value = false;
-  }
-}
+    return { enumId: formData.value.enumId };
+  },
+});
 </script>
