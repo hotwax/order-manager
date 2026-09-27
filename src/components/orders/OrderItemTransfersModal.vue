@@ -29,24 +29,27 @@
       </ion-item>
 
       <template v-if="transfer">
-        <ion-item>
+        <ion-item lines="none">
           <ion-label>
-            <p class="overline">{{ transfer.id }}</p>
+            <p class="overline">{{ translate('Inventory transfer: {id}', { id: transfer.id }) }}</p>
             {{ transfer.quantity }} {{ translate('qty') }}
             <p v-if="transfer.requestedDate">
               {{ translate('Requested by {source} on {date}', { source: transfer.sourceLabel, date: formatDateTime(transfer.requestedDate) }) }}
             </p>
             <p v-if="transfer.comments">{{ transfer.comments }}</p>
+          </ion-label>
+          <!-- Why the transfer is in its status sits with the status. -->
+          <ion-label slot="end" class="ion-text-end transfer-status">
+            <ion-badge :color="statusColor(transfer)">{{ transfer.status }}</ion-badge>
             <p v-if="transfer.reason">{{ transfer.reason }}</p>
           </ion-label>
-          <ion-badge slot="end" :color="statusColor(transfer)">{{ transfer.status }}</ion-badge>
         </ion-item>
 
         <template v-for="side in sides" :key="side.title">
           <ion-item-divider color="light">
             <ion-label>{{ side.title }}</ion-label>
           </ion-item-divider>
-          <ion-item>
+          <ion-item lines="none">
             <ion-label>
               {{ side.facilityName }}
               <p>{{ side.facilityId }}</p>
@@ -61,7 +64,7 @@
             </ion-label>
           </ion-item>
           <!-- Only a transfer still under way has an after; a finished one already shows in "now". -->
-          <ion-item v-if="transfer.isOpen">
+          <ion-item v-if="transfer.isOpen" lines="none">
             <ion-label>
               <p>{{ translate('After transfer') }}</p>
             </ion-label>
@@ -230,5 +233,10 @@ async function cancelTransfer() {
 /* A fixed width keeps the now and after columns lined up, since "37 (-1)" is wider than "38". */
 .transfer-stock {
   min-width: 5rem;
+}
+
+/* A long status reason wraps under its badge rather than crowding out the transfer's details. */
+.transfer-status {
+  max-width: 40%;
 }
 </style>

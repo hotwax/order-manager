@@ -129,6 +129,16 @@ describe('order item transfers modal', () => {
     expect(afterRows(wrapper)).toEqual([]);
   });
 
+  it('names the transfer by its id, and puts why it is in its status under the status', async () => {
+    mocks.transfers = [{ ...requested, statusId: 'IXF_CANCELLED', status: 'Cancelled', isOpen: false, reason: 'Order item reallocated to another facility' }];
+    const wrapper = await mountModal();
+
+    expect(wrapper.findAll('.overline').map((overline) => overline.text())).toContain('Inventory transfer: 100428');
+    const status = wrapper.findAll('[slot="end"]').find((label) => label.find('.badge').exists())!;
+    expect(status.find('.badge').text()).toBe('Cancelled');
+    expect(status.find('p').text()).toBe('Order item reallocated to another facility');
+  });
+
   it('keeps older transfers below the current one', async () => {
     mocks.transfers = [requested, { ...requested, id: '100001', statusId: 'IXF_CANCELLED', status: 'Cancelled', isOpen: false, reason: 'Order item reallocated to another facility' }];
     const wrapper = await mountModal();
