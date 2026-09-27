@@ -1,5 +1,5 @@
 <template>
-  <ModalHeader :title="translate('Park order')" />
+  <DxpModalHeader :title="translate('Park order')" />
 
   <ion-content>
     <ion-searchbar
@@ -33,7 +33,7 @@
       </ion-list>
     </ion-radio-group>
 
-    <ModalConfirmFab />
+    <DxpModalConfirmFab />
   </ion-content>
 </template>
 
@@ -41,8 +41,8 @@
 import { IonContent, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSearchbar, IonSpinner } from '@ionic/vue';
 import { onMounted, ref } from 'vue';
 import { api, logger, translate } from '@common';
-import ModalConfirmFab from '@/components/common/ModalConfirmFab.vue';
-import ModalHeader from '@/components/common/ModalHeader.vue';
+import DxpModalConfirmFab from '@/components/common/DxpModalConfirmFab.vue';
+import DxpModalHeader from '@/components/common/DxpModalHeader.vue';
 import { useModalFlow } from '@/composables/useModalFlow';
 
 type Facility = {

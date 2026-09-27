@@ -45,7 +45,7 @@ export type ModalFlow = {
   readonly canConfirm: boolean;
   exit: () => Promise<boolean>;
   confirm: () => Promise<void>;
-  /** Hands the flow its ion-modal. ModalHeader does this; a custom header calls it with any element inside the modal. */
+  /** Hands the flow its ion-modal. DxpModalHeader does this; a custom header calls it with any element inside the modal. */
   attach: (element?: Element | null) => void;
 };
 
@@ -65,7 +65,7 @@ function errorText(error: unknown) {
  * A modal's two ways out. The exit path (the close button, a backdrop tap, Escape, a swipe, the
  * hardware back button) asks first when the modal is dirty. The confirm path runs the modal's own
  * work, stays open with a toast when that fails, and closes with its result when it succeeds.
- * The modal brings the content and the logic; ModalHeader and ModalConfirmFab bring the paths.
+ * The modal brings the content and the logic; DxpModalHeader and DxpModalConfirmFab bring the paths.
  */
 export function useModalFlow<T = true>(options: ModalFlowOptions<T> = {}): ModalFlow {
   const state = ref<ModalFlowState>('open');
@@ -142,6 +142,6 @@ export function useModalFlow<T = true>(options: ModalFlowOptions<T> = {}): Modal
 /** The flow of the modal this component sits in. */
 export function injectModalFlow(): ModalFlow {
   const flow = inject(ModalFlowKey, null);
-  if (!flow) throw new Error('ModalHeader and ModalConfirmFab need useModalFlow() in the modal that renders them.');
+  if (!flow) throw new Error('DxpModalHeader and DxpModalConfirmFab need useModalFlow() in the modal that renders them.');
   return flow;
 }

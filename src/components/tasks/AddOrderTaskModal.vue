@@ -1,5 +1,5 @@
 <template>
-  <ModalHeader :title="title || translate('Add task')" />
+  <DxpModalHeader :title="title || translate('Add task')" />
 
   <ion-content>
     <ion-list>
@@ -68,7 +68,7 @@
       </ion-item>
     </ion-list>
 
-    <ModalConfirmFab />
+    <DxpModalConfirmFab />
   </ion-content>
 </template>
 
@@ -87,8 +87,8 @@ import {
 } from '@ionic/vue';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
-import ModalConfirmFab from '@/components/common/ModalConfirmFab.vue';
-import ModalHeader from '@/components/common/ModalHeader.vue';
+import DxpModalConfirmFab from '@/components/common/DxpModalConfirmFab.vue';
+import DxpModalHeader from '@/components/common/DxpModalHeader.vue';
 import { useModalFlow } from '@/composables/useModalFlow';
 import { requiredLabel, showToast } from '@/utils';
 import { useOrderDetailStore } from '@/store/orderDetail';
