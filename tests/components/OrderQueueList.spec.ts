@@ -7,7 +7,6 @@ describe('OrderQueueList', () => {
 
   it('renders queue results with the design-system list item row structure', () => {
     expect(source).toContain('<OrderRow');
-    expect(source).toContain('row-class="queue-order-row"');
     expect(source).toContain(':model="toSearchOrderRowViewModel(order)"');
     expect(source).toContain("mode: 'queue-first' as const");
     expect(source).toContain('queueFacilityIds: props.facilityIds');

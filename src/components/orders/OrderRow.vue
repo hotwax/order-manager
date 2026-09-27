@@ -1,7 +1,6 @@
 <template>
   <div
-    class="list-item"
-    :class="rowClass"
+    class="list-item order-row"
     :role="selectMode ? 'button' : 'link'"
     tabindex="0"
     @click="emit('activate')"
@@ -38,7 +37,7 @@
       <p v-if="model.orderedRelativeAge">{{ translate('Ordered {age}', { age: model.orderedRelativeAge }) }}</p>
     </ion-label>
 
-    <ion-label :class="deadlineClass">
+    <ion-label class="order-row-end ion-text-end">
       <template v-if="model.estimatedDeliveryDateTime">
         {{ model.estimatedDeliveryDateTime }}
         <p v-if="model.estimatedDeliveryRelativeLabel">{{ model.estimatedDeliveryRelativeLabel }}</p>
@@ -59,8 +58,6 @@ import type { OrderRowViewModel } from '@/types/orderRow';
 
 const props = defineProps<{
   model: OrderRowViewModel;
-  rowClass: string;
-  deadlineClass: string;
   selectMode?: boolean;
   selected?: boolean;
 }>();
@@ -73,3 +70,27 @@ const identityLabel = computed(() => [...new Set([props.model.orderName, props.m
   .filter(Boolean))]
   .join(' - '));
 </script>
+
+<style scoped>
+/* One row for every order list: Open, In flight, Packed, Find orders and the queues. The end
+   column holds the delivery date, so it keeps one width and the other columns line up. */
+.order-row {
+  --columns-desktop: 5;
+  --columns-tablet: 5;
+  min-height: 5rem;
+  border-block-start: var(--border-medium);
+  padding-inline-end: var(--spacer-sm);
+}
+
+.order-row > ion-label {
+  width: 100%;
+}
+
+.order-row > ion-label.order-row-end {
+  display: block;
+  justify-self: end;
+  max-width: 10rem;
+  min-width: 10rem;
+  width: 10rem;
+}
+</style>

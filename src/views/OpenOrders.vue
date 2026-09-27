@@ -44,8 +44,6 @@
           v-for="order in orders"
           :key="order.orderId"
           :model="orderRow(order)"
-          row-class="open-order-row"
-          deadline-class="open-order-total ion-text-end"
           :select-mode="selectMode"
           :selected="selectedIds.has(order.orderId)"
           @activate="handleOrderRowClick(order)"
@@ -384,26 +382,3 @@ function formatChannel(channel: string) {
 }
 
 </script>
-
-<style scoped>
-.open-order-row {
-  --columns-desktop: 5;
-  --columns-tablet: 5;
-  min-height: 5rem;
-  border-block-start: var(--border-medium);
-  padding-inline-end: var(--spacer-sm);
-}
-
-.open-order-row > ion-label {
-  width: 100%;
-}
-
-.open-order-row > ion-label.open-order-total {
-  display: block;
-  justify-self: end;
-  max-width: 7rem;
-  min-width: 7rem;
-  width: 7rem;
-}
-
-</style>

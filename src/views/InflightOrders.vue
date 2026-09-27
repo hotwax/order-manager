@@ -44,8 +44,6 @@
           v-for="order in orders"
           :key="`${order.orderId}-${order.shipGroupSeqId}`"
           :model="orderRow(order)"
-          row-class="inflight-order-row"
-          deadline-class="inflight-delivery ion-text-end"
           :select-mode="selectMode"
           :selected="selectedIds.has(order.orderId)"
           @activate="handleOrderRowClick(order)"
@@ -374,26 +372,3 @@ function formatChannel(channel: string) {
 }
 
 </script>
-
-<style scoped>
-.inflight-order-row {
-  --columns-desktop: 5;
-  --columns-tablet: 5;
-  min-height: 5rem;
-  border-block-start: var(--border-medium);
-  padding-inline-end: var(--spacer-sm);
-}
-
-.inflight-order-row > ion-label {
-  width: 100%;
-}
-
-.inflight-order-row > ion-label.inflight-delivery {
-  display: block;
-  justify-self: end;
-  max-width: 10rem;
-  min-width: 10rem;
-  width: 10rem;
-}
-
-</style>

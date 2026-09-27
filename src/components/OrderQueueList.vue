@@ -91,8 +91,6 @@
           v-for="order in searchResults"
           :key="order.id"
           :model="toSearchOrderRowViewModel(order)"
-          row-class="queue-order-row"
-          deadline-class="queue-delivery ion-text-end"
           :select-mode="selectMode"
           :selected="selectedOrderIds.includes(order.id)"
           @activate="handleOrderRowClick(order)"
@@ -562,23 +560,4 @@ function orderDetailLink(order: Order) {
   overflow-x: auto;
 }
 
-.queue-order-row {
-  --columns-desktop: 5;
-  --columns-tablet: 5;
-  min-height: 5rem;
-  border-block-start: var(--border-medium);
-  padding-inline-end: var(--spacer-sm);
-}
-
-.queue-order-row > ion-label {
-  width: 100%;
-}
-
-.queue-order-row > ion-label.queue-delivery {
-  display: block;
-  justify-self: end;
-  max-width: 10rem;
-  min-width: 10rem;
-  width: 10rem;
-}
 </style>
