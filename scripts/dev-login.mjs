@@ -3,7 +3,8 @@
  * Headless dev login — prints a fresh Bearer token (and the resolved Maarg base URL)
  * to stdout, so you can hit Moqui endpoints with `curl` without booting the app.
  *
- * Reads credentials from .env.local (gitignored). Never logs the password.
+ * Reads VITE_DEV_USERNAME / VITE_DEV_PASSWORD from the accxui root .env / .env.local and
+ * VITE_DEV_OMS from this app's .env.local (all gitignored). Never logs the password.
  *
  * Usage:
  *   node scripts/dev-login.mjs                # prints JSON: { token, expiresAt, oms, maarg }
@@ -21,20 +22,30 @@ import url from 'node:url';
 
 const here = path.dirname(url.fileURLToPath(import.meta.url));
 const appRoot = path.resolve(here, '..');
-const envPath = path.join(appRoot, '.env.local');
+const accxuiRoot = path.resolve(appRoot, '../..');
+// Credentials live in the accxui root env shared by every app; VITE_DEV_OMS in this app's .env.local.
+// Later files win, and empty values never hide an earlier one.
+const envPaths = [
+  path.join(accxuiRoot, '.env'),
+  path.join(accxuiRoot, '.env.local'),
+  path.join(appRoot, '.env.local'),
+];
 
-if (!fs.existsSync(envPath)) {
-  fail(`No .env.local at ${envPath}. Copy .env.example to .env.local and fill in VITE_DEV_OMS / VITE_DEV_USERNAME / VITE_DEV_PASSWORD.`);
+const env = {};
+for (const envPath of envPaths) {
+  if (!fs.existsSync(envPath)) continue;
+  for (const [key, value] of Object.entries(parseDotenv(fs.readFileSync(envPath, 'utf8')))) {
+    if (value !== '') env[key] = value;
+  }
 }
 
-const env = parseDotenv(fs.readFileSync(envPath, 'utf8'));
 const omsInput = env.VITE_DEV_OMS?.trim();
 const username = env.VITE_DEV_USERNAME?.trim();
 const password = env.VITE_DEV_PASSWORD; // do not trim — passwords may have intentional whitespace? still don't log
 
-if (!omsInput) fail('VITE_DEV_OMS is empty in .env.local');
-if (!username) fail('VITE_DEV_USERNAME is empty in .env.local');
-if (!password) fail('VITE_DEV_PASSWORD is empty in .env.local');
+if (!omsInput) fail(`VITE_DEV_OMS is not set. Copy .env.example to ${path.join(appRoot, '.env.local')} and fill it in.`);
+if (!username) fail(`VITE_DEV_USERNAME is not set. Add it to the accxui root .env (see ${path.join(accxuiRoot, '.env.example')}).`);
+if (!password) fail(`VITE_DEV_PASSWORD is not set. Add it to the accxui root .env (see ${path.join(accxuiRoot, '.env.example')}).`);
 
 const omsBase = expandOmsUrl(omsInput);
 const loginUrl = `${omsBase}login`;
