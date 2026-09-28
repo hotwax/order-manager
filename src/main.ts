@@ -74,8 +74,4 @@ app.use(router)
 router.isReady().then(async () => {
   app.directive('image-preview', imagePreview)
   app.mount('#app');
-
-  if (import.meta.env.DEV) {
-    import('./dev/autoLogin').then(({ tryDevAutoLogin }) => tryDevAutoLogin());
-  }
 });
