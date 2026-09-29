@@ -4,7 +4,7 @@
 
 // Deep imports, not the barrel: this is a worker entry, and the barrel pulls in `vue`.
 // The pre-existing `from "@common/db"` here was the one place Order Manager violated that.
-import { commonDomains } from "@common/db/domains/commonDomains";
+import { commonDomains } from "@common/db/seed/seedDomains";
 import { exposeWorkerHarness } from "@common/db/sync/pollingWorkerHarness";
 import { registerDomains } from "@common/db/sync/syncRegistry";
 import { getOrderManagerDb } from "@/db/orderManagerDb";

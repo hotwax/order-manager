@@ -17,10 +17,10 @@
  * Deep imports, not the `@common/db` barrel, for the same reason.
  */
 
-import { defineAppDb } from "@common/db/defineAppDb";
-import { commonSchema } from "@common/db/domains/commonSchema";
-import type { BaseDB } from "@common/db/baseDb";
-import type { DbClient } from "@common/db/dbClient";
+import { defineAppDb } from "@common/db/schema/defineAppDb";
+import { commonSchema } from "@common/db/seed/seedSchema";
+import type { BaseDB } from "@common/db/storage/baseDb";
+import type { DbClient } from "@common/db/storage/dbClient";
 
 /**
  * Order Manager reads only HotWax seed reference data, so it takes the whole common schema and
