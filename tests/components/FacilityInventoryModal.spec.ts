@@ -10,7 +10,7 @@ describe('facility inventory modal', () => {
     expect(source).toContain('v-else-if="isMobileViewport"');
     expect(source).toContain('<ion-accordion-group');
     expect(source).toContain("translate('Consumed order limit')");
-    expect(source).toContain("translate('Consumed / Limit')");
+    expect(source).toContain("translate('Consumed / limit')");
     expect(source).toContain('buildFacilityCoverageRows');
     expect(source).not.toContain('<ion-grid');
     expect(source).not.toContain('<ion-row');
@@ -23,7 +23,7 @@ describe('facility inventory modal', () => {
     expect(source).toContain('detailedItemIndex = ref(props.items.length === 1 ? 0 : -1)');
     expect(source).toContain('facility-inventory-row');
     expect(source).toContain('facility-coverage-row');
-    expect(source).toContain("translate('{count} of {total} items'");
+    expect(source).toContain("translate('{shown} of {count} items'");
     expect(source).toContain("translate('Short by {count}'");
     expect(source).toContain("translate('No inventory record')");
     expect(source).toContain("translate('Not in store')");

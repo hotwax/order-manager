@@ -2,7 +2,7 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="modalController.dismiss()" :aria-label="translate('Close')">
+        <ion-button @click="modalController.dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
@@ -15,16 +15,18 @@
       <ion-item>
         <ion-input
           v-model="formData.enumName"
+          :label="requiredLabel('Name')"
+          label-placement="stacked"
+          required
           :disabled="saving"
           @ionBlur="formData.enumId ? null : setEnumId(formData.enumName)"
-        >
-          <div slot="label">{{ translate('Name') }} <ion-text color="danger">*</ion-text></div>
-        </ion-input>
+        />
       </ion-item>
       <ion-item lines="none">
         <ion-input
           v-model="formData.enumId"
           :label="translate('Type ID')"
+          label-placement="stacked"
           :disabled="saving"
           @ionChange="validateEnumId"
           @ionBlur="markEnumIdTouched"
@@ -32,26 +34,26 @@
         />
       </ion-item>
       <ion-item>
-        <ion-input v-model="formData.description" :label="translate('Description')" :disabled="saving" />
+        <ion-input v-model="formData.description" :label="translate('Description')" label-placement="stacked" :disabled="saving" />
       </ion-item>
     </ion-list>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="saving" @click="createType()" :aria-label="translate('Create')">
+      <ion-fab-button :disabled="saving" @click="createType()" :aria-label="translate('Save')">
         <ion-spinner v-if="saving" name="crescent" />
-        <ion-icon v-else :icon="checkmarkDoneOutline" />
+        <ion-icon v-else :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>
   </ion-content>
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonList, IonSpinner, IonText, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { checkmarkDoneOutline, closeOutline } from 'ionicons/icons';
+import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonList, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
+import { closeOutline, saveOutline } from 'ionicons/icons';
 import { ref } from 'vue';
 import { commonUtil, translate } from '@common';
 import { createOrderIdentificationType } from '@/services/orderIdentification';
-import { showToast } from '@/utils';
+import { showToast, requiredLabel } from '@/utils';
 
 const saving = ref(false);
 

@@ -27,8 +27,7 @@
       <TaskQueueListHeader
         :loaded-count="heldTasks.length"
         :total-count="holdTotal"
-        singular-label="hold task"
-        plural-label="hold tasks"
+        summary-key="{shown} of {count} hold tasks"
         :sort="filters.sort"
         :sort-options="sortOptions"
         trigger-id="hold-task-sort"
@@ -59,7 +58,7 @@
 
         <ErrorState
           v-else-if="isError"
-          :title="translate('Unable to load hold tasks')"
+          :title="translate('Could not load hold tasks')"
           :message="translate(holdError)"
           retryable
           @retry="fetchHoldTasks()"
@@ -89,7 +88,8 @@
 
     <ion-footer v-if="selectMode">
       <ion-toolbar>
-        <ion-buttons slot="start">
+        <ion-title size="small">{{ translate('{count} selected', { count: selectedTaskCount }) }}</ion-title>
+        <ion-buttons slot="end">
           <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks || bulkActionRunning" @click="resolveSelectedTasks()">{{ translate('Resolve') }}</ion-button>
         </ion-buttons>
       </ion-toolbar>
@@ -183,6 +183,7 @@ const isScrollable = computed(() => orderTaskStore.isHoldTasksScrollable);
 const holdStatus = computed(() => orderTaskStore.getHoldStatus);
 const holdError = computed(() => orderTaskStore.getHoldError);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
+const selectedTaskCount = computed(() => Object.values(selectedOrders.value).filter(Boolean).length);
 const hasFilters = computed(() => hasTaskFilters(filters.value));
 const currentPageTaskIds = computed(() => heldTasks.value.map((task) => task.workEffortId));
 const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));
@@ -255,7 +256,7 @@ async function resolveSelectedTasks() {
 
   const alert = await alertController.create({
     header: translate('Resolve tasks'),
-    message: translate('Are you sure you want to resolve {count} selected task(s)?').replace('{count}', String(selected.length)),
+    message: translate('Are you sure you want to resolve {count} selected tasks?', { count: selected.length }),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
@@ -272,8 +273,8 @@ async function resolveSelectedTasks() {
             );
             const failed = results.filter((result) => result.status === 'rejected').length;
             const succeeded = results.length - failed;
-            if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));
-            if (failed) await showToast(translate('{count} task(s) failed.', { count: failed }));
+            if (succeeded) await showToast(translate('{count} tasks completed.', { count: succeeded }));
+            if (failed) await showToast(translate('{count} tasks failed.', { count: failed }));
             await replaceHoldTasks();
           } finally {
             bulkActionRunning.value = false;
@@ -333,17 +334,6 @@ onIonViewWillEnter(() => {
 <style scoped>
 .hold-orders-list {
   padding: 0 var(--spacer-sm) var(--spacer-sm);
-}
-
-.order-results-header {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-
-.order-results-header-start {
-  display: flex;
-  min-width: 24px;
 }
 
 @media (max-width: 640px) {

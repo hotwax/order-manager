@@ -2,7 +2,9 @@
   <ion-page class="settings">
     <ion-header>
       <ion-toolbar>
-        <ion-menu-button slot="start" />
+        <ion-buttons slot="start">
+          <ion-menu-button />
+        </ion-buttons>
         <ion-title>{{ translate("Settings") }}</ion-title>
       </ion-toolbar>
     </ion-header>
@@ -48,7 +50,7 @@
 
         <ion-card>
           <ion-card-header>
-            <ion-card-subtitle>{{ translate("Product Store") }}</ion-card-subtitle>
+            <ion-card-subtitle>{{ translate("Product store") }}</ion-card-subtitle>
             <ion-card-title>{{ translate("Store") }}</ion-card-title>
           </ion-card-header>
           <ion-card-content>
@@ -77,14 +79,14 @@
           </ion-card-content>
           <ion-item v-if="showBrowserTimeZone">
             <ion-label>
-              <p class="overline">{{ translate("Browser TimeZone") }}</p>
+              <p class="overline">{{ translate("Browser time zone") }}</p>
               {{ browserTimeZone.id }}
               <p v-if="showDateTime">{{ commonUtil.getCurrentTime(browserTimeZone.id, dateTimeFormat) }}</p>
             </ion-label>
           </ion-item>
           <ion-item lines="none">
             <ion-label>
-              <p class="overline">{{ translate("Selected TimeZone") }}</p>
+              <p class="overline">{{ translate("Selected time zone") }}</p>
               {{ currentTimeZone }}
               <p v-if="showDateTime">{{ commonUtil.getCurrentTime(currentTimeZone, dateTimeFormat) }}</p>
             </ion-label>
@@ -110,10 +112,10 @@
           <ion-card-header>
             <div class="card-header">
               <div>
-                <ion-card-title>{{ translate('Data Fetch Status') }}</ion-card-title>
+                <ion-card-title>{{ translate('Data fetch status') }}</ion-card-title>
                 <ion-card-subtitle v-if="syncSubtitle">{{ syncSubtitle }}</ion-card-subtitle>
               </div>
-              <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()" :aria-label="translate('Refresh all data')">
+              <ion-button fill="clear" size="small" :disabled="!!refreshing" @click="refreshAll()" :aria-label="translate('Refresh all data')" :title="translate('Refresh all data')">
                 <ion-spinner v-if="refreshing === '*'" name="dots" slot="icon-only" />
                 <ion-icon v-else slot="icon-only" :icon="syncOutline" />
               </ion-button>
@@ -125,30 +127,27 @@
               <ion-icon slot="start" :icon="getStatusIcon(item.status)" :color="getStatusColor(item.status)" />
               <ion-label>
                 {{ item.label }}
-                <p v-if="item.status === 'success' && item.count !== undefined">{{ translate("Fetched") }} {{ item.count }} {{ translate("records") }}</p>
+                <p v-if="item.status === 'success' && item.count !== undefined">{{ translate('Fetched {count} records', { count: item.count }) }}</p>
                 <p v-else>{{ translate(getStatusLabel(item.status)) }}</p>
               </ion-label>
-              <ion-button slot="end" fill="clear" @click="item.refresh()" :aria-label="translate('Refresh {label}', { label: item.label })">
+              <ion-button slot="end" fill="clear" @click="item.refresh()" :aria-label="translate('Refresh {label}', { label: item.label })" :title="translate('Refresh {label}', { label: item.label })">
                 <ion-icon slot="icon-only" :icon="syncOutline" />
               </ion-button>
             </ion-item>
 
             <!-- Local database (IndexedDB): live row counts straight from the database. -->
             <ion-item-divider>
-              <ion-label>{{ translate("Local database") }} · {{ totalRows }} {{ translate("records") }}</ion-label>
+              <ion-label>{{ translate('Local database: {count} records', { count: totalRows }) }}</ion-label>
             </ion-item-divider>
             <ion-item v-for="domain in domains" :key="domain.name">
               <ion-icon slot="start" :icon="getStatusIcon(domain.status)" :color="getStatusColor(domain.status)" />
               <ion-label>
                 {{ translate(domain.label) }}
                 <p>
-                  {{ domain.count }} {{ translate("records") }}
-                  <template v-if="domain.syncedAt"> · {{ translate("synced") }} {{ formatSyncTime(domain.syncedAt) }}</template>
-                  <template v-else-if="domain.syncClass === 'A'"> · {{ translate("live while in use") }}</template>
-                  <template v-else> · {{ translate("not synced yet") }}</template>
+                  {{ domainSyncLabel(domain) }}
                 </p>
               </ion-label>
-              <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)" :aria-label="translate('Refresh {label}', { label: translate(domain.label) })">
+              <ion-button slot="end" fill="clear" :disabled="!!refreshing" @click="refreshDomain(domain.name)" :aria-label="translate('Refresh {label}', { label: translate(domain.label) })" :title="translate('Refresh {label}', { label: translate(domain.label) })">
                 <ion-spinner v-if="refreshing === domain.name" name="dots" slot="icon-only" />
                 <ion-icon v-else slot="icon-only" :icon="syncOutline" />
               </ion-button>
@@ -161,7 +160,7 @@
         <ion-header>
           <ion-toolbar>
             <ion-buttons slot="start">
-              <ion-button @click="closeModal" :aria-label="translate('Close')">
+              <ion-button @click="closeModal" :aria-label="translate('Close')" :title="translate('Close')">
                 <ion-icon slot="icon-only" :icon="closeOutline" />
               </ion-button>
             </ion-buttons>
@@ -175,7 +174,7 @@
         <ion-content>
           <ion-radio-group v-model="timeZoneId">
             <ion-list v-if="showBrowserTimeZone">
-              <ion-list-header>{{ translate("Browser time zone") }}</ion-list-header>
+              <ion-list-header><ion-label>{{ translate("Browser time zone") }}</ion-label></ion-list-header>
               <ion-item>
                 <ion-radio label-placement="end" justify="start" :value="browserTimeZone.id">
                   <ion-label>
@@ -187,7 +186,7 @@
             </ion-list>
 
             <ion-list>
-              <ion-list-header v-if="showBrowserTimeZone">{{ translate("Select a different time zone") }}</ion-list-header>
+              <ion-list-header v-if="showBrowserTimeZone"><ion-label>{{ translate("Select a different time zone") }}</ion-label></ion-list-header>
               <ion-item v-if="isLoading" lines="none">
                 <ion-spinner color="secondary" name="crescent" slot="start" />
                 <ion-label>{{ translate("Fetching time zones") }}</ion-label>
@@ -222,7 +221,6 @@
 <script setup lang="ts">
 import { IonAvatar, IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonPage, IonRadio, IonRadioGroup, IonSearchbar, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToolbar } from '@ionic/vue';
 import { checkmarkCircle, closeCircle, closeOutline, openOutline, saveOutline, syncOutline } from 'ionicons/icons';
-import { DateTime } from 'luxon';
 import { computed, onBeforeMount, ref } from 'vue';
 import { api, commonUtil, cookieHelper, i18n, translate } from '@common';
 import { useDbStatus } from '@common/db';
@@ -234,6 +232,7 @@ import { resyncDomain, resyncReferenceData, syncService } from '@/services/appDb
 import DxpProductIdentifier from "@/components/settings/DxpProductIdentifier.vue";
 import DxpAppVersionInfo from "@/components/settings/DxpAppVersionInfo.vue";
 import Actions from "@/authorization/actions";
+import { formatDateTime } from '@/utils/format';
 
 const userStore = useUserStore();
 const userProfile = computed(() => userStore.getUserProfile);
@@ -247,7 +246,7 @@ const locale = computed(() => i18n.global.locale.value);
 
 function setLocale(newLocale: string) {
   i18n.global.locale.value = newLocale;
-  cookieHelper().set('locale', newLocale);
+  cookieHelper().set('locale', newLocale, 60 * 60 * 24 * 365);
 }
 
 const props = defineProps({
@@ -373,23 +372,28 @@ const {
   },
 );
 
-const formatSyncTime = (millis: number) =>
-  DateTime.fromMillis(millis).toLocaleString(DateTime.DATETIME_MED);
+const formatSyncTime = (millis: number) => formatDateTime(millis);
 
 const syncSubtitle = computed(() => {
   if (!lastSyncedAt.value) return translate("Database not synced yet");
-  const parts = [`${translate("Last sync:")} ${formatSyncTime(lastSyncedAt.value)}`];
   if (oldestSyncedAt.value && oldestSyncedAt.value !== lastSyncedAt.value) {
-    parts.push(`${translate("oldest:")} ${formatSyncTime(oldestSyncedAt.value)}`);
+    return translate("Last sync: {time}, oldest: {oldest}", { time: formatSyncTime(lastSyncedAt.value), oldest: formatSyncTime(oldestSyncedAt.value) });
   }
-  return parts.join(" · ");
+  return translate("Last sync: {time}", { time: formatSyncTime(lastSyncedAt.value) });
 });
+
+/** "1,204 records, synced Sep 22, 2026, 2:33 PM", as one message so each language orders it. */
+function domainSyncLabel(domain: { count: number; syncedAt?: number | null; syncClass?: string }) {
+  if (domain.syncedAt) return translate("{count} records, synced {time}", { count: domain.count, time: formatSyncTime(domain.syncedAt) });
+  if (domain.syncClass === "A") return translate("{count} records, live while in use", { count: domain.count });
+  return translate("{count} records, not synced yet", { count: domain.count });
+}
 
 const userFetchStatus = computed(() => userStore.fetchStatus);
 
 const sessionFetchStatus = computed(() => [
   {
-    label: translate("User Profile"),
+    label: translate("User profile"),
     status: userFetchStatus.value.profile,
     count: userProfile.value ? 1 : 0,
     refresh: () => userStore.fetchUserProfile()
@@ -444,7 +448,7 @@ section {
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
 }
 hr {
-  border-top: 1px solid var(--border-medium);
+  border-top: var(--border-medium);
 }
 .section-header {
   display: flex;

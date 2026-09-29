@@ -7,6 +7,7 @@ import { ideTraceVue } from 'chrome-ide-trace/vite'
 import { defineConfig, loadEnv } from 'vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { versionInfoUtil } from '../../common/utils/versionInfoUtil'
+import { commonEnvPlugin } from '../../common/vite/commonEnvPlugin'
 import { localApiServerDiscoveryPlugin } from '../../common/vite/localApiServerDiscoveryPlugin'
 import pkg from './package.json'
 import manifest from './manifest.json'
@@ -22,6 +23,7 @@ export default defineConfig(({ mode }) => {
     outDir: appBuild ? `dist/${appBuild}` : 'dist'
   },
   plugins: [
+    commonEnvPlugin(),
     ideTraceVue(),
     vue(),
     legacy(),
@@ -49,10 +51,17 @@ export default defineConfig(({ mode }) => {
   test: {
     globals: true,
     environment: 'jsdom',
-    // The shared footer component this app renders is specced in accxui; run it here too so
-    // a change to common/ that breaks this app's menu is caught by this app's suite.
-    include: ['tests/**/*.spec.ts', 'tests/**/*.test.ts', '../../common/components/**/*.spec.ts'],
-    exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', '.claude']
+    // The shared code this app depends on has no suite of its own, so its specs run here:
+    // the footer component this app's menu renders, and common/core (the logger's redaction
+    // hook). A change to common/ that breaks this app is caught by this app's suite.
+    include: [
+      'tests/**/*.spec.ts',
+      'tests/**/*.test.ts',
+      '../../common/components/**/*.spec.ts',
+      '../../common/core/**/*.spec.ts'
+    ],
+    exclude: ['node_modules', 'dist', '.idea', '.git', '.cache', '.claude'],
+    setupFiles: ['tests/setup/i18n.ts']
   }
   }
 })

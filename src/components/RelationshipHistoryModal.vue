@@ -2,11 +2,11 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')">
+        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>Relationship History</ion-title>
+      <ion-title>{{ translate('Relationship history') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -23,7 +23,7 @@
               {{ entry.typeLabel }}
             </ion-chip>
             <ion-badge :color="entry.active ? 'primary' : 'medium'">
-              {{ entry.active ? 'Active' : 'Expired' }}
+              {{ entry.active ? translate('Active') : translate('Expired') }}
             </ion-badge>
           </div>
           <h3>{{ entry.partyName }}</h3>
@@ -31,14 +31,14 @@
           <p class="date-range">
             {{ formatDate(entry.fromDate) }}
             <span v-if="entry.thruDate"> → {{ formatDate(entry.thruDate) }}</span>
-            <span v-else> → Active</span>
+            <span v-else> → {{ translate('Active') }}</span>
           </p>
         </ion-label>
       </ion-item>
     </ion-list>
 
     <div v-else class="ion-padding ion-text-center">
-      <p>No relationship history for this customer.</p>
+      <p>{{ translate('No relationship history for this customer.') }}</p>
     </div>
   </ion-content>
 </template>
@@ -65,6 +65,7 @@ import { translate } from '@common';
 import { DateTime } from 'luxon';
 import { useCustomerStore } from '@/store/customer';
 import { useSeedData } from '@common/db';
+import { formatDate } from '@/utils/format';
 
 const seed = useSeedData();
 
@@ -100,10 +101,6 @@ function parseDate(value?: string | number) {
   return iso.isValid ? iso : DateTime.fromSQL(str);
 }
 
-function formatDate(value?: string | number) {
-  const date = parseDate(value);
-  return date?.isValid ? date.toLocaleString(DateTime.DATE_MED) : String(value ?? '');
-}
 
 function sortKey(value?: string | number): number {
   const date = parseDate(value);
@@ -182,7 +179,7 @@ function dismiss() {
   flex: 1;
   width: 2px;
   background: var(--ion-color-step-150, #d9d9d9);
-  margin-top: 4px;
+  margin-top: var(--spacer-2xs);
 }
 
 .timeline-item:last-child .timeline-line {
@@ -190,14 +187,14 @@ function dismiss() {
 }
 
 .timeline-content {
-  padding: 12px 16px 16px 8px;
+  padding: 12px var(--spacer-sm) var(--spacer-sm) var(--spacer-xs);
 }
 
 .timeline-header-row {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 4px;
+  gap: var(--spacer-xs);
+  margin-bottom: var(--spacer-2xs);
 }
 
 .type-chip {

@@ -7,3 +7,5 @@ Start here:
 
 - [FEATURE_INVENTORY.md](Scope.md) — working catalog of known rebuild
   features and ownership boundaries.
+- [Translations.md](Translations.md) — how messages, plurals, links and
+  formatting work, and what the locale tests enforce.

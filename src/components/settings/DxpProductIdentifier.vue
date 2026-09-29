@@ -3,7 +3,7 @@
   <ion-card>
     <ion-card-header>
       <ion-card-title>
-        {{ translate('Product Identifier') }}
+        {{ translate('Product identifier') }}
       </ion-card-title>
     </ion-card-header>
 
@@ -24,7 +24,7 @@
     </ion-item>
     <template v-if="currentSampleProduct">
       <ion-item lines="full" color="light">
-        <ion-label color="medium">{{ translate('Preview Product Identifier') }}</ion-label>
+        <ion-label color="medium">{{ translate('Preview product identifier') }}</ion-label>
       </ion-item>
       <ion-item lines="none">
         <ion-thumbnail slot="start">
@@ -34,7 +34,7 @@
           {{ getProductIdentificationValue(productIdentificationPref.primaryId, currentSampleProduct) ? getProductIdentificationValue(productIdentificationPref.primaryId, currentSampleProduct) : currentSampleProduct.productId }}
           <p>{{ getProductIdentificationValue(productIdentificationPref.secondaryId, currentSampleProduct) }}</p>
         </ion-label>
-        <ion-button size="default" fill="clear" @click="shuffle" :aria-label="translate('Shuffle')">
+        <ion-button size="default" fill="clear" @click="shuffle" :aria-label="translate('Shuffle')" :title="translate('Shuffle')">
           <ion-icon slot="icon-only" :icon="shuffleOutline"/>
         </ion-button>
       </ion-item>

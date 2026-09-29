@@ -3,7 +3,7 @@
     <ion-toolbar>
       <ion-title>{{ translate("Shipping address") }}</ion-title>
       <ion-buttons slot="end" @click="close()">
-        <ion-button :aria-label="translate('Close')">
+        <ion-button :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
@@ -12,13 +12,13 @@
   <ion-content>
     <ion-list>
       <ion-item>
-        <ion-input :label="translate('Address 1')" class="ion-text-right" name="address1" v-model="address.address1" id="address1" type="text"/>
+        <ion-input label-placement="stacked" :label="translate('Address line 1')" name="address1" v-model="address.address1" id="address1" type="text"/>
       </ion-item>
       <ion-item>
-        <ion-input :label="translate('Address 2')" class="ion-text-right" name="address2" v-model="address.address2" id="address2" type="text"/>
+        <ion-input label-placement="stacked" :label="translate('Address line 2')" name="address2" v-model="address.address2" id="address2" type="text"/>
       </ion-item>
       <ion-item>
-        <ion-input :label="translate('City')" class="ion-text-right" name="city" v-model="address.city" id="city" type="text"/>
+        <ion-input label-placement="stacked" :label="translate('City')" name="city" v-model="address.city" id="city" type="text"/>
       </ion-item>
       <ion-item>
         <ion-select :label="translate('Country')" interface="popover" name="country" v-model="address.country" id="country" @ionChange="onCountryChange">
@@ -31,10 +31,10 @@
         </ion-select>
       </ion-item>
       <ion-item>
-        <ion-input :label="translate('Zipcode')" class="ion-text-right" name="zip" v-model="address.zip" id="zip"/>
+        <ion-input label-placement="stacked" :label="translate('Postal code')" name="zip" v-model="address.zip" id="zip"/>
       </ion-item>
       <ion-item>
-        <ion-input :label="translate('Phone')" class="ion-text-right" name="phone" v-model="address.phone" id="phone"/>
+        <ion-input label-placement="stacked" :label="translate('Phone')" name="phone" v-model="address.phone" id="phone"/>
       </ion-item>
     </ion-list>
     <ion-fab horizontal="end" vertical="bottom">

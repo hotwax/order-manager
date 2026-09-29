@@ -1,3 +1,4 @@
+import { translate } from '@common';
 import { DateTime } from 'luxon';
 import type { Order } from '@/types/order';
 import type { WorkflowOrder } from '@/types/customerService';
@@ -8,6 +9,7 @@ import type {
   OrderRowEnrichment,
   OrderRowViewModel
 } from '@/types/orderRow';
+import { formatDateTime } from '@/utils/format';
 
 type FacilityCount = {
   facilityId: string;
@@ -43,7 +45,7 @@ export function toSearchOrderRowViewModel(order: Order): OrderRowViewModel {
   return createOrderRowViewModel({
     orderId: order.id,
     orderName: order.orderName || order.id,
-    customerName: order.customerName || order.customerId || 'Unknown customer',
+    customerName: order.customerName || order.customerId || translate('Unknown customer'),
     status: order.status,
     allocationSummary: order.allocationSummary,
     carrier: order.carrierPartyId,
@@ -61,7 +63,7 @@ export function toWorkflowOrderRowViewModel(
   return createOrderRowViewModel({
     orderId: order.orderId,
     orderName: order.orderName || enrichment?.orderName || order.orderId,
-    customerName: enrichment?.customerPartyName || order.customerName?.trim() || order.customerPartyId || 'Unknown customer',
+    customerName: enrichment?.customerPartyName || order.customerName?.trim() || order.customerPartyId || translate('Unknown customer'),
     allocationSummary: workflowAllocationSummary(order, enrichment),
     carrier: usableCarrier(order.carrierPartyId) || usableCarrier(enrichment?.carrierPartyId),
     shippingMethod: order.shipmentMethodDesc || order.shippingMethodTypeId || enrichment?.shipmentMethodTypeId,
@@ -142,9 +144,9 @@ function createOrderRowViewModel(input: {
     allocationSummary: input.allocationSummary,
     fulfillmentContext: [carrier, shippingMethod].filter(Boolean).join(' - '),
     channelName: formatIdentifier(input.channel),
-    orderedDateTime: ordered?.toFormat('MMM d, h:mm a') || '',
+    orderedDateTime: ordered ? formatDateTime(ordered.toMillis(), { year: false }) : '',
     orderedRelativeAge: orderedRelativeLabel(ordered),
-    estimatedDeliveryDateTime: deadline?.toFormat('MMM d, h:mm a'),
+    estimatedDeliveryDateTime: deadline ? formatDateTime(deadline.toMillis(), { year: false }) : undefined,
     estimatedDeliveryRelativeLabel: deadlineRelativeLabel(deadline)
   };
 }
@@ -188,14 +190,14 @@ function orderedRelativeLabel(date?: DateTime) {
   const now = DateTime.now();
   if (date.hasSame(now, 'day')) {
     const minutes = Math.max(Math.floor(now.diff(date, 'minutes').minutes), 0);
-    if (minutes < 60) return `${minutes} min ago`;
+    if (minutes < 60) return translate('{count} min ago', { count: minutes });
     const hours = Math.floor(minutes / 60);
     const remainingMinutes = minutes % 60;
-    return remainingMinutes ? `${hours}h ${remainingMinutes}m ago` : `${hours}h ago`;
+    return remainingMinutes ? translate('{hours}h {minutes}m ago', { hours, minutes: remainingMinutes }) : translate('{count}h ago', { count: hours });
   }
 
   const days = Math.max(Math.floor(now.startOf('day').diff(date.startOf('day'), 'days').days), 1);
-  return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+  return translate('{count} days ago', { count: days });
 }
 
 function deadlineRelativeLabel(date?: DateTime) {
@@ -204,9 +206,9 @@ function deadlineRelativeLabel(date?: DateTime) {
   const overdue = minutes < 0;
   const absoluteMinutes = Math.abs(minutes);
   const value = absoluteMinutes < 60
-    ? `${absoluteMinutes} min`
+    ? translate('{count} min', { count: absoluteMinutes })
     : absoluteMinutes < 1440
-      ? `${Math.round(absoluteMinutes / 60)}h`
-      : `${Math.round(absoluteMinutes / 1440)} ${Math.round(absoluteMinutes / 1440) === 1 ? 'day' : 'days'}`;
-  return overdue ? `overdue by ${value}` : `in ${value}`;
+      ? translate('{count}h', { count: Math.round(absoluteMinutes / 60) })
+      : translate('{count} days', { count: Math.round(absoluteMinutes / 1440) });
+  return translate(overdue ? 'overdue by {value}' : 'in {value}', { value });
 }

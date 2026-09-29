@@ -2,7 +2,7 @@
   <TaskCardShell
     :title="taskOrderTitle(task)"
     :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
-    :amount="formatTaskAmount(task.grandTotal)"
+    :amount="formatTaskAmount(task.grandTotal, task.currencyUom)"
     :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
@@ -22,14 +22,17 @@
         <ion-label>{{ translate('Ordered items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="item in task.items" :key="item.orderItemSeqId">
-        <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="productImageUrl(item.productId)">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: productImageUrl(item.productId), productName: orderedItemPrimary(item) }" :key="`${productImageUrl(item.productId)} ${orderedItemPrimary(item)}`">
           <DxpShopifyImg :src="productImageUrl(item.productId)" :key="productImageUrl(item.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>
           {{ orderedItemPrimary(item) }}
           <p>{{ orderedItemSecondary(item) }}</p>
         </ion-label>
-        <ion-note slot="end">{{ item.quantity }} {{ translate('Qty') }}</ion-note>
+        <ion-label slot="end" class="ion-text-center">
+          {{ item.quantity }}
+          <p>{{ translate('qty') }}</p>
+        </ion-label>
       </ion-item>
     </ion-list>
 
@@ -45,7 +48,7 @@
             <ion-text :color="paymentStatusColor(payment)">{{ paymentStatusLabel(payment) }}</ion-text>
           </p>
         </ion-label>
-        <ion-note slot="end">{{ money(payment.maxAmount) }}</ion-note>
+        <ion-note slot="end">{{ formatMoney(payment.maxAmount, task.currencyUom) }}</ion-note>
       </ion-item>
     </ion-list>
 
@@ -73,9 +76,9 @@
 
       <ion-item v-if="taskFacts.length" lines="none">
         <div class="sentiment-chips">
-          <ion-chip color="danger" outline>{{ counts.negative }} {{ translate('negative') }}</ion-chip>
-          <ion-chip color="medium" outline>{{ counts.neutral }} {{ translate('neutral') }}</ion-chip>
-          <ion-chip color="success" outline>{{ counts.positive }} {{ translate('positive') }}</ion-chip>
+          <ion-chip color="danger" outline>{{ translate('{count} negative', { count: counts.negative }) }}</ion-chip>
+          <ion-chip color="medium" outline>{{ translate('{count} neutral', { count: counts.neutral }) }}</ion-chip>
+          <ion-chip color="success" outline>{{ translate('{count} positive', { count: counts.positive }) }}</ion-chip>
         </div>
         <ion-button slot="end" fill="clear" size="small" @click="openRiskDetails">{{ translate('View details') }}</ion-button>
       </ion-item>
@@ -97,6 +100,7 @@ import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
+import { formatMoney } from '@/utils/format';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import type { TaskCardAction } from '@/types/taskCard';
 
@@ -147,9 +151,6 @@ async function openRiskDetails() {
   await modal.present();
 }
 
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-}
 
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);

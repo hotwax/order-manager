@@ -24,19 +24,19 @@
         <ion-spinner name="crescent" />
       </div>
 
-      <template v-else-if="error">
-        <ErrorState :title="translate('Could not load bad address tasks')" :message="error" />
-        <div class="ion-text-center ion-padding">
-          <ion-button fill="outline" @click="fetchAddressValidationTasks()">{{ translate('Retry') }}</ion-button>
-        </div>
-      </template>
+      <ErrorState
+        v-else-if="error"
+        :title="translate('Could not load bad address tasks')"
+        :message="error"
+        retryable
+        @retry="fetchAddressValidationTasks()"
+      />
 
       <template v-else>
         <TaskQueueListHeader
           :loaded-count="addressValidationTasks.length"
           :total-count="addressValidationTotal"
-          singular-label="bad address task"
-          plural-label="bad address tasks"
+          summary-key="{shown} of {count} bad address tasks"
           :sort="filters.sort"
           :sort-options="sortOptions"
           trigger-id="bad-address-task-sort"
@@ -85,7 +85,8 @@
 
     <ion-footer v-if="selectMode">
       <ion-toolbar>
-        <ion-buttons slot="start">
+        <ion-title size="small">{{ translate('{count} selected', { count: selectedTaskCount }) }}</ion-title>
+        <ion-buttons slot="end">
           <ion-button fill="solid" color="primary" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkSaveAndReleaseHold()">{{ translate('Save and release hold') }}</ion-button>
           <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" fill="outline" color="danger" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkCancelOrder()">{{ translate('Cancel orders') }}</ion-button>
           <ion-button fill="outline" color="medium" :disabled="!hasSelectedTasks || bulkActionRunning" @click="bulkParkOrder()">{{ translate('Park') }}</ion-button>
@@ -160,6 +161,7 @@ const addressValidationTasks = computed(() => orderTaskStore.getAddressValidatio
 const addressValidationTotal = computed(() => orderTaskStore.getAddressValidationTotal);
 const isScrollable = computed(() => orderTaskStore.isAddressValidationTasksScrollable);
 const hasSelectedTasks = computed(() => Object.values(selectedOrders.value).some(Boolean));
+const selectedTaskCount = computed(() => Object.values(selectedOrders.value).filter(Boolean).length);
 const hasFilters = computed(() => hasTaskFilters(filters.value));
 const currentPageTaskIds = computed(() => addressValidationTasks.value.map((task: any) => task.workEffortId));
 const allCurrentPageSelected = computed(() => currentPageTaskIds.value.length > 0 && currentPageTaskIds.value.every((workEffortId: string) => selectedOrders.value[workEffortId]));
@@ -264,7 +266,7 @@ async function bulkSaveAndReleaseHold() {
 
   const alert = await alertController.create({
     header: translate('Save and release hold'),
-    message: translate('Are you sure you want to save address and release hold for {count} selected ship group(s)?').replace('{count}', String(shipGroupCount)),
+    message: translate('Are you sure you want to save address and release hold for {count} selected ship groups?', { count: shipGroupCount }),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
@@ -286,7 +288,7 @@ async function bulkCancelOrder() {
 
   const alert = await alertController.create({
     header: translate('Cancel orders'),
-    message: translate('Are you sure you want to cancel {count} selected ship group(s)? This action cannot be undone.').replace('{count}', String(shipGroupCount)),
+    message: translate('Are you sure you want to cancel {count} selected ship groups? This action cannot be undone.', { count: shipGroupCount }),
     buttons: [
       { text: translate('Cancel'), role: 'cancel' },
       {
@@ -328,8 +330,8 @@ async function runGroupedBulkCards(
     );
     const failed = results.filter((result) => result.status === 'rejected').length;
     const succeeded = results.length - failed;
-    if (succeeded) await showToast(translate('{count} task(s) completed.', { count: succeeded }));
-    if (failed) await showToast(translate('{count} task(s) failed.', { count: failed }));
+    if (succeeded) await showToast(translate('{count} tasks completed.', { count: succeeded }));
+    if (failed) await showToast(translate('{count} tasks failed.', { count: failed }));
     await replaceAddressValidationTasks();
   } finally {
     bulkActionRunning.value = false;
@@ -347,27 +349,30 @@ async function loadMoreAddressValidationTasks(event: any) {
   }
 }
 
-onIonViewWillEnter(() => {
-  loadSeedData();
+onIonViewWillEnter(async () => {
   loadPhysicalFacilities();
-  replaceAddressValidationTasks();
+
+  // The cards name a country from the geo rows, so the queue waits for the seed read. The page's
+  // own loading state has to be raised for that wait too: with nothing in the store yet, the
+  // template would otherwise render the "no addresses to review" empty state for the whole of
+  // the read, and a read that never settles would leave that false answer on screen.
+  // Only when there is nothing to show — a revisit keeps its hydrated cards, as the task fetch
+  // itself does. The fetch raises the flag again in the same tick, so there is no flicker.
+  const showFullLoading = !addressValidationTasks.value.length;
+  if (showFullLoading) loading.value = true;
+  try {
+    await loadSeedData();
+  } finally {
+    if (showFullLoading) loading.value = false;
+  }
+
+  await replaceAddressValidationTasks();
 });
 </script>
 
 <style scoped>
 .bad-address-list {
   padding: 0 var(--spacer-sm) var(--spacer-sm);
-}
-
-.order-results-header {
-  align-items: center;
-  display: flex;
-  gap: 8px;
-}
-
-.order-results-header-start {
-  display: flex;
-  min-width: 24px;
 }
 
 @media (max-width: 640px) {

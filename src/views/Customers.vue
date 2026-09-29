@@ -22,13 +22,16 @@
 
       <ErrorState
         v-if="error"
-        :title="translate('Customer search failed')"
+        :title="translate('Could not load customers')"
         :message="error"
+        retryable
+        @retry="runSearch()"
       />
 
       <ion-list v-else>
-        <ion-list-header>
-          <ion-label>{{ translate("{loaded} of {total} customers", { loaded: customers.length, total }) }}</ion-label>
+        <!-- Hidden at zero, where the empty state says it better than "0 of 0". -->
+        <ion-list-header v-if="customers.length">
+          <ion-label>{{ translate("{shown} of {count} customers", { shown: customers.length, count: total }) }}</ion-label>
           <OrderSortPopover
             v-model="searchSort"
             :options="sortOptions"
@@ -133,7 +136,7 @@ async function runSearch() {
     customers.value = result.customers;
     total.value = result.total;
   } catch (searchError: any) {
-    error.value = searchError?.message || 'Failed to search customers';
+    error.value = searchError?.message || translate('Failed to search customers');
     customers.value = [];
     total.value = 0;
   } finally {
@@ -167,7 +170,7 @@ function goToCustomer(customer: Customer) {
 
 <style scoped>
 .customer-result-row {
-  --columns-desktop: 4;
+  --columns-desktop: 3;
   --columns-tablet: 3;
   min-height: 4rem;
   border-block-start: var(--border-medium);

@@ -2,7 +2,7 @@
   <TaskCardShell
     :title="taskOrderTitle(task)"
     :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
-    :amount="formatTaskAmount(task.grandTotal)"
+    :amount="formatTaskAmount(task.grandTotal, task.currencyUom)"
     :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
@@ -31,7 +31,7 @@
             </ion-label>
             <ion-label>
               <p class="overline">{{ translate('Routing justification') }}</p>
-              {{ routingJustification(task) || '-' }}
+              {{ routingJustification(task) || translate('No routing justification') }}
             </ion-label>
           </div>
           <ion-note slot="end" v-if="routingTimestamp(task)">{{ formatRoutingTimestamp(task) }}</ion-note>
@@ -44,7 +44,7 @@
         <ion-label>{{ translate('Ordered items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="item in task.items" :key="item.orderItemSeqId">
-        <ion-thumbnail slot="start" v-image-preview="getProduct(item.productId)" :key="productImageUrl(item.productId)">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: productImageUrl(item.productId), productName: productPrimary(item) }" :key="`${productImageUrl(item.productId)} ${productPrimary(item)}`">
           <DxpShopifyImg :src="productImageUrl(item.productId)" :key="productImageUrl(item.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>
@@ -61,6 +61,7 @@
           color="medium"
           @click.stop="openSuggestedProductActionsPopover($event, orderedSwapActionItem(item), task)"
           :aria-label="translate('Options')"
+          :title="translate('Options')"
         >
           <ion-icon slot="icon-only" :icon="chevronForwardOutline" />
         </ion-button>
@@ -72,7 +73,7 @@
         <ion-label>{{ translate('Suggested items') }}</ion-label>
       </ion-list-header>
       <ion-item v-for="(suggested, index) in getSuggestedItems(task).list" :key="`suggested-${index}`">
-        <ion-thumbnail slot="start" :key="productImageUrl(suggested.productId)">
+        <ion-thumbnail slot="start" v-image-preview="{ mainImageUrl: productImageUrl(suggested.productId), productName: productPrimary(suggested) }" :key="`${productImageUrl(suggested.productId)} ${productPrimary(suggested)}`">
           <DxpShopifyImg :src="productImageUrl(suggested.productId)" size="small" />
         </ion-thumbnail>
         <ion-label>
@@ -89,26 +90,26 @@
 
         <template v-if="suggested._cancel">
           <ion-badge slot="end" color="danger">{{ translate('Cancel') }}</ion-badge>
-          <ion-button slot="end" fill="clear" color="medium" @click="revertCancel(task, suggested)" :aria-label="translate('Undo')">
+          <ion-button slot="end" fill="clear" color="medium" @click="revertCancel(task, suggested)" :aria-label="translate('Undo')" :title="translate('Undo')">
             <ion-icon slot="icon-only" :icon="arrowUndoOutline" />
           </ion-button>
         </template>
         <template v-else-if="suggested._isSubstitute">
           <ion-badge slot="end" color="success">{{ availableBadgeLabel(suggested, task) }}</ion-badge>
-          <ion-button slot="end" fill="clear" color="danger" @click="removeSuggestedSubstitute(task, suggested)" :aria-label="translate('Close')">
+          <ion-button slot="end" fill="clear" color="danger" @click="removeSuggestedSubstitute(task, suggested)" :aria-label="translate('Remove substitute')" :title="translate('Remove substitute')">
             <ion-icon slot="icon-only" :icon="closeCircleOutline" />
           </ion-button>
         </template>
         <ion-badge v-else-if="!suggested._noReplacement" slot="end" color="success">{{ availableBadgeLabel(suggested, task) }}</ion-badge>
         <ion-badge v-else slot="end" color="danger">{{ translate('Cancel') }}</ion-badge>
 
-        <ion-button slot="end" fill="clear" color="medium" @click="openSuggestedProductActionsPopover($event, suggested, task)" :aria-label="translate('Options')">
+        <ion-button slot="end" fill="clear" color="medium" @click="openSuggestedProductActionsPopover($event, suggested, task)" :aria-label="translate('Options')" :title="translate('Options')">
           <ion-icon slot="icon-only" :icon="ellipsisVerticalOutline" />
         </ion-button>
       </ion-item>
       <ion-item>
         <ion-label>{{ translate('New total') }}</ion-label>
-        <ion-note slot="end" color="dark">{{ money(getSuggestedItems(task).newTotal) }}</ion-note>
+        <ion-note slot="end" color="dark">{{ formatMoney(getSuggestedItems(task).newTotal, task.currencyUom) }}</ion-note>
       </ion-item>
       <ion-item lines="none">
         <ion-input
@@ -116,12 +117,12 @@
           label-placement="start"
           type="number"
           :value="getSuggestedItems(task).suggestedRefund"
-          :helper-text="`${money(task.grandTotal)} ${translate('available to refund')}`"
+          :helper-text="translate('{amount} available to refund', { amount: formatMoney(task.grandTotal, task.currencyUom) })"
           :clear-input="true"
           @ionInput="task._refundAmount = $event.detail.value != null ? Number($event.detail.value) : undefined"
           @ionClear="task._refundAmount = undefined"
         >
-          <span slot="start">$</span>
+          <span slot="start">{{ currencySymbol(task.currencyUom) }}</span>
         </ion-input>
       </ion-item>
     </ion-list>
@@ -134,7 +135,6 @@ import { computed, ref, watch } from 'vue';
 import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
 import { arrowUndoOutline, chevronForwardOutline, closeCircleOutline, ellipsisVerticalOutline, gitBranchOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
-import { DateTime } from 'luxon';
 import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import ReleaseSwapOrderModal from '@/components/swaps/ReleaseSwapOrderModal.vue';
@@ -147,6 +147,7 @@ import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
 import { isSwapItemUnavailable } from '@/utils/swapItems';
+import { currencySymbol, formatDateTime, formatMoney } from '@/utils/format';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import type { TaskCardAction } from '@/types/taskCard';
 
@@ -188,7 +189,7 @@ function routingFacilityName(task: any): string {
 
 function routingMovementLabel(task: any): string {
   const facilityName = routingFacilityName(task);
-  return facilityName ? `${translate('Moved to')} ${facilityName}` : translate('Moved to parking');
+  return facilityName ? translate('Moved to {facility}', { facility: facilityName }) : translate('Moved to parking');
 }
 
 function routingPath(task: any): string {
@@ -223,12 +224,7 @@ function formatRoutingTimestamp(task: any): string {
   const value = routingTimestamp(task);
   if (!value) return '';
 
-  const num = Number(value);
-  const dt = Number.isFinite(num) && String(value).length >= 10
-    ? DateTime.fromMillis(num)
-    : DateTime.fromISO(String(value));
-
-  return dt.isValid ? dt.toFormat('yyyy-LL-dd HH:mm') : String(value);
+  return formatDateTime(value) || String(value);
 }
 
 function hasRoutingDetails(task: any): boolean {
@@ -254,7 +250,7 @@ function isVirtualFacility(task: any): boolean {
 }
 
 function brokerageLabel(task: any): string {
-  return isVirtualFacility(task) ? translate('Not Brokered') : translate('Brokered');
+  return isVirtualFacility(task) ? translate('Not brokered') : translate('Brokered');
 }
 
 function taskProgressValue(task: any): number | undefined {
@@ -330,7 +326,7 @@ function availableBadgeLabel(item: any, task: any): string {
     ?? item.computedAtp
     ?? 0;
 
-  return `${translate('Available')}: ${Number(quantity)}`;
+  return translate('Available: {count}', { count: Number(quantity) });
 }
 
 function getSuggestedItems(task: any): { list: any[]; newTotal: number; suggestedRefund: number } {
@@ -380,9 +376,6 @@ function suggestedItemOverlineLabel(suggested: any): string {
   return '';
 }
 
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-}
 
 const openSuggestedProductActionsPopover = async (event: Event, item: any, task: any) => {
   const popover = await popoverController.create({
@@ -432,6 +425,7 @@ async function releaseUpdatedOrder(task: any) {
   const modal = await modalController.create({
     component: ReleaseSwapOrderModal,
     componentProps: {
+      currency: task.currencyUom,
       grandTotal: task.grandTotal,
       newTotal,
       refundAmount,

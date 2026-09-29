@@ -1,6 +1,8 @@
 # Order Clone — Design & Implementation
 
-Product decisions: 2026-06-11. Status: implemented (uncommitted) across `order-manager` and `hotwax/oms`.
+Product decisions: 2026-06-11. Status: built, hidden from the footer on 2026-08-12 (469a024), and removed from
+the app in #534. The last complete version of the modal, the payload builder and its spec is at 8d5ab9a.
+Bringing it back is #556.
 
 ## Intent
 

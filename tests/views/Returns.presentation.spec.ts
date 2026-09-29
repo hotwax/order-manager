@@ -98,7 +98,7 @@ describe("Find Returns integration surface", () => {
     expect(detail).toContain("Whole return");
     expect(detail).toContain("status.returnItemSeqId === \"_NA_\"");
     expect(detail).toContain("candidate.returnItemSeqId === status.returnItemSeqId");
-    expect(detail).toContain("`${translate(\"Item\")} · ${itemLabel}`");
+    expect(detail).toContain("translate(\"Item: {item}\", { item: itemLabel })");
   });
 
   it("builds a semantic timeline with event-specific icons and only confirms timed restocks from received item events", () => {
@@ -118,7 +118,7 @@ describe("Find Returns integration surface", () => {
     expect(detail).toContain("Shopify status");
     expect(detail).toContain("Shopify refund ID");
     expect(detail).toContain("Last synchronized");
-    expect(detail).toContain("shopifyStatusColor(returnRecord.shopifySync.returnStatusId)");
+    expect(detail).toContain("shopifyReturnStatusColor(returnRecord.shopifySync.returnStatusId)");
     expect(detail).toContain("Exchange of");
     expect(detail).toContain("sourceOrder?.itemAssocs");
     expect(detail).toContain("association.orderItemAssocTypeId === \"EXCHANGE\"");
@@ -128,9 +128,6 @@ describe("Find Returns integration surface", () => {
   it("uses the shared AccxUI status color utility for return lifecycle badges", () => {
     expect(detail).toContain(":color=\"returnStatusColor(returnRecord.statusId)\"");
     expect(detail).toContain(":color=\"returnStatusColor(item.statusId)\"");
-    expect(detail).toContain("RETURN_CANCELLED: \"ORDER_CANCELLED\"");
-    expect(detail).toContain("RETURN_COMPLETED: \"ORDER_COMPLETED\"");
-    expect(detail).toContain("commonUtil.getStatusColor(returnStatusColorAliases[statusId] || statusId)");
     expect(detail).not.toContain("<ion-badge slot=\"end\" color=\"medium\">");
   });
 });

@@ -3,10 +3,10 @@
     <ion-header>
       <ion-toolbar>
         <ion-buttons slot="start">
-          <ion-back-button default-href="/returns" />
+          <ion-back-button default-href="/returns" :aria-label="translate('Back')" />
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate('Return detail') }}</ion-title>
+        <ion-title>{{ translate('Return details') }}</ion-title>
       </ion-toolbar>
       <ion-progress-bar v-if="detailLoading" type="indeterminate" />
     </ion-header>
@@ -21,10 +21,7 @@
             </p>
             <h1>{{ returnRecord.returnId }}</h1>
             <p>
-              {{ itemCountLabel }}
-              <template v-if="returnRecord.returnTotal != null">
-                · {{ money(returnRecord.returnTotal, returnRecord.currencyUomId) }}
-              </template>
+              {{ headerSummary }}
             </p>
           </ion-label>
           <ion-badge v-if="returnRecord.statusId" slot="end" :color="returnStatusColor(returnRecord.statusId)">
@@ -43,13 +40,13 @@
                   <p>
                     {{ translate('Requested') }}
                   </p>
-                  {{ formatLongDate(returnRecord.entryDate) }}
+                  {{ formatDateTime(returnRecord.entryDate) }}
                 </ion-label>
               </ion-item>
               <ion-item v-if="returnRecord.returnDate">
                 <ion-label>
                   <p>{{ translate('Return date') }}</p>
-                  {{ formatLongDate(returnRecord.returnDate) }}
+                  {{ formatDateTime(returnRecord.returnDate) }}
                 </ion-label>
               </ion-item>
               <ion-item>
@@ -80,7 +77,6 @@
                 </ion-label>
                 <ion-button v-if="returnRecord.fromPartyId && canViewCustomers" slot="end" fill="clear" :router-link="`/customers/${returnRecord.fromPartyId}`">
                   {{ translate('View customer') }}
-                  <ion-icon slot="end" :icon="openOutline" />
                 </ion-button>
               </ion-item>
             </ion-list>
@@ -115,7 +111,7 @@
               <ion-item v-if="returnRecord.shopifySync?.returnStatusId">
                 <ion-label>
                   <p>{{ translate('Shopify status') }}</p>
-                  <ion-badge :color="shopifyStatusColor(returnRecord.shopifySync.returnStatusId)">
+                  <ion-badge :color="shopifyReturnStatusColor(returnRecord.shopifySync.returnStatusId)">
                     {{ notSpecified(statusLabels[returnRecord.shopifySync.returnStatusId]) }}
                   </ion-badge>
                 </ion-label>
@@ -129,7 +125,7 @@
               <ion-item v-if="returnRecord.shopifySync?.lastSyncedDate">
                 <ion-label>
                   <p>{{ translate('Last synchronized') }}</p>
-                  {{ formatLongDate(returnRecord.shopifySync.lastSyncedDate) }}
+                  {{ formatDateTime(returnRecord.shopifySync.lastSyncedDate) }}
                 </ion-label>
               </ion-item>
               <ion-item v-if="returnRecord.replacementOrderId">
@@ -177,7 +173,7 @@
                 <p>{{ event.detail }}</p>
               </ion-label>
               <ion-note slot="end">
-                {{ formatLongDate(event.date) }}
+                {{ formatDateTime(event.date) }}
               </ion-note>
             </ion-item>
             <ion-item v-if="!returnTimelineEvents.length">
@@ -195,7 +191,6 @@
           <ion-label>{{ itemGroupLabel(group) }}</ion-label>
           <ion-button v-if="group.orderId && canViewOrders" fill="clear" :router-link="`/orders/${group.orderId}`">
             {{ translate('View order') }}
-            <ion-icon slot="end" :icon="openOutline" />
           </ion-button>
         </ion-list-header>
         <ion-accordion-group>
@@ -203,13 +198,19 @@
             <ion-item slot="header" lines="none" class="return-item-accordion-header">
               <div class="list-item return-item-row">
                 <div class="return-item-key">
-                  <ion-thumbnail v-if="item.productId">
+                  <!-- The row is an accordion header, so opening the preview must not also toggle it. -->
+                  <ion-thumbnail
+                    v-if="item.productId"
+                    v-image-preview="{ mainImageUrl: (productCache as any).getProduct(item.productId)?.mainImageUrl, productName: itemLabel(item) }"
+                    :key="`${(productCache as any).getProduct(item.productId)?.mainImageUrl} ${itemLabel(item)}`"
+                    @click.stop
+                  >
                     <DxpShopifyImg :src="(productCache as any).getProduct(item.productId)?.mainImageUrl" size="small" />
                   </ion-thumbnail>
                   <ion-label class="ion-text-wrap">
-                    <h2>{{ itemLabel(item) }}</h2>
-                    <p v-if="item.sku || item.productId">
-                      {{ item.sku || item.productId }}
+                    {{ itemLabel(item) }}
+                    <p v-if="itemSecondaryLabel(item)">
+                      {{ itemSecondaryLabel(item) }}
                     </p>
                   </ion-label>
                 </div>
@@ -234,7 +235,7 @@
                 <ion-label class="ion-text-end return-item-amount">
                   {{ itemAmount(item) }}
                   <p v-if="item.returnPrice != null && !isAmountOnlyAppeasementItem(item)">
-                    {{ money(item.returnPrice, returnRecord.currencyUomId) }} {{ translate('each') }}
+                    {{ translate("{amount} each", { amount: formatMoney(item.returnPrice, returnRecord.currencyUomId) }) }}
                   </p>
                 </ion-label>
               </div>
@@ -254,11 +255,11 @@
                 <dl class="return-item-facts">
                   <div v-if="item.unitPrice != null" class="return-item-fact">
                     <dt>{{ translate('Original unit price') }}</dt>
-                    <dd>{{ money(item.unitPrice, returnRecord.currencyUomId) }}</dd>
+                    <dd>{{ formatMoney(item.unitPrice, returnRecord.currencyUomId) }}</dd>
                   </div>
                   <div v-if="item.returnPrice != null" class="return-item-fact">
                     <dt>{{ translate('Return price') }}</dt>
-                    <dd>{{ money(item.returnPrice, returnRecord.currencyUomId) }}</dd>
+                    <dd>{{ formatMoney(item.returnPrice, returnRecord.currencyUomId) }}</dd>
                   </div>
                   <div v-if="item.receivedQuantity != null" class="return-item-fact">
                     <dt>{{ translate('Received quantity') }}</dt>
@@ -291,7 +292,7 @@
           <ion-card-header>
             <ion-card-title>{{ translate('Payment outcome') }}</ion-card-title>
             <ion-card-subtitle v-if="sourceOrderPayments.length">
-              {{ translate('Net refunded') }} {{ money(paymentNetRefundedAmount, returnRecord.currencyUomId) }}
+              {{ translate("Net refunded {amount}", { amount: formatMoney(paymentNetRefundedAmount, returnRecord.currencyUomId) }) }}
             </ion-card-subtitle>
           </ion-card-header>
           <ion-list lines="none">
@@ -304,7 +305,7 @@
                 <ion-item-divider color="light">
                   <ion-label>{{ section.label }}</ion-label>
                   <ion-label slot="end">
-                    {{ money(section.total, returnRecord.currencyUomId) }}
+                    {{ formatMoney(section.total, returnRecord.currencyUomId) }}
                   </ion-label>
                 </ion-item-divider>
                 <ion-item v-for="payment in section.payments" :key="payment.key">
@@ -313,13 +314,13 @@
                       {{ payment.paymentMethodTypeId || translate('Payment preference') }}
                     </p>
                     {{ payment.paymentMethodTypeDescription }}
-                    <p>{{ translate('From order') }} {{ payment.orderName }}</p>
+                    <p>{{ translate("From order {order}", { order: payment.orderName }) }}</p>
                     <p v-if="payment.createdDate">
-                      {{ formatLongDate(payment.createdDate) }}
+                      {{ formatDateTime(payment.createdDate) }}
                     </p>
                   </ion-label>
                   <ion-label slot="end">
-                    {{ money(payment.amount, returnRecord.currencyUomId) }}
+                    {{ formatMoney(payment.amount, returnRecord.currencyUomId) }}
                   </ion-label>
                 </ion-item>
               </template>
@@ -340,13 +341,13 @@
             <ion-item>
               <ion-label>{{ translate('Item subtotal') }}</ion-label>
               <ion-label slot="end">
-                {{ returnItemSubtotal != null ? money(returnItemSubtotal, returnRecord.currencyUomId) : translate('Not available') }}
+                {{ returnItemSubtotal != null ? formatMoney(returnItemSubtotal, returnRecord.currencyUomId) : translate('Not available') }}
               </ion-label>
             </ion-item>
             <ion-item class="grand-total-row">
               <ion-label>{{ translate('Total return value') }}</ion-label>
               <ion-label slot="end" color="dark">
-                {{ returnRecord.returnTotal != null ? money(returnRecord.returnTotal, returnRecord.currencyUomId) : translate('Not available') }}
+                {{ returnRecord.returnTotal != null ? formatMoney(returnRecord.returnTotal, returnRecord.currencyUomId) : translate('Not available') }}
               </ion-label>
             </ion-item>
           </ion-list>
@@ -363,7 +364,7 @@
 
     <ion-content v-else-if="detailError">
       <ErrorState
-        :title="translate('Return failed to load')"
+        :title="translate('Could not load return')"
         :message="detailError"
         retryable
         @retry="loadReturn"
@@ -417,7 +418,6 @@ import {
   closeCircleOutline,
   cubeOutline,
   documentTextOutline,
-  openOutline,
   pulseOutline,
   timeOutline
 } from "ionicons/icons";
@@ -434,6 +434,8 @@ import { useReturnsStore } from "@/store/returns";
 import { useSeedData } from '@common/db';
 import { useUserStore } from "@/store/user";
 import type { ReturnItemDetail, ReturnStatusHistory, ReturnSyncState } from "@/types/returns";
+import { formatDateTime, formatMoney } from "@/utils/format";
+import { returnStatusColor, shopifyReturnStatusColor } from "@/utils/statusColors";
 
 const seed = useSeedData();
 
@@ -580,7 +582,12 @@ const returnItemSubtotal = computed(() => {
 const itemCountLabel = computed(() => {
   const itemCount = returnRecord.value?.itemCount || 0;
 
-  return `${itemCount} ${itemCount === 1 ? translate("item") : translate("items")}`;
+  return translate("{count} items", { count: itemCount });
+});
+const headerSummary = computed(() => {
+  const total = returnRecord.value?.returnTotal;
+
+  return total != null ? `${itemCountLabel.value}, ${formatMoney(total, returnRecord.value?.currencyUomId)}` : itemCountLabel.value;
 });
 const returnTypeLabel = computed(() => {
   if(returnRecord.value?.returnHeaderTypeId === "CUSTOMER_RETURN") {return translate("Customer return");}
@@ -609,27 +616,6 @@ const syncError = computed(() => {
     sync.pushErrorMessage ||
     "";
 });
-const returnStatusColorAliases: Record<string, string> = {
-  RETURN_REQUESTED: "ORDER_CREATED",
-  RETURN_APPROVED: "ORDER_APPROVED",
-  RETURN_ACCEPTED: "ORDER_APPROVED",
-  RETURN_AUTHORIZED: "PAYMENT_AUTHORIZED",
-  RETURN_RECEIVED: "SHIPMENT_SHIPPED",
-  RETURN_COMPLETED: "ORDER_COMPLETED",
-  RETURN_REJECTED: "ORDER_REJECTED",
-  RETURN_CANCELLED: "ORDER_CANCELLED"
-};
-const shopifyStatusColorAliases: Record<string, string> = {
-  OPEN: "ORDER_CREATED",
-  REQUESTED: "ORDER_CREATED",
-  APPROVED: "ORDER_APPROVED",
-  AUTHORIZED: "PAYMENT_AUTHORIZED",
-  COMPLETED: "ORDER_COMPLETED",
-  CLOSED: "ORDER_COMPLETED",
-  REJECTED: "ORDER_REJECTED",
-  CANCELED: "ORDER_CANCELLED",
-  CANCELLED: "ORDER_CANCELLED"
-};
 const returnTimelineEvents = computed(() => {
   const record = returnRecord.value;
   if(!record) {return [];}
@@ -696,9 +682,6 @@ async function loadReturn() {
 
 const notSpecified = (value?: string) => value || translate("Not specified");
 
-function money(value: number, currency = "USD") {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: currency || "USD" }).format(value);
-}
 
 function isAmountOnlyAppeasementItem(item: ReturnItemDetail) {
   return returnRecord.value?.returnHeaderTypeId === "APPEASEMENT" && !item.productId && item.returnPrice != null;
@@ -708,19 +691,34 @@ function itemAmount(item: ReturnItemDetail) {
   if(item.returnPrice == null) {return translate("Not available");}
   const amount = isAmountOnlyAppeasementItem(item) ? item.returnPrice : item.returnPrice * item.returnQuantity;
 
-  return money(amount, returnRecord.value?.currencyUomId);
+  return formatMoney(amount, returnRecord.value?.currencyUomId);
 }
 
 function itemLabel(item: ReturnItemDetail) {
-  return item.productName || item.description || item.sku || item.productId || translate("Return item");
+  return productMaster.primaryId(productCache.getProduct(item.productId) || item, [
+    item.productName,
+    item.description,
+    item.sku,
+    item.productId,
+    translate("Return item")
+  ]);
+}
+
+// A returned line can predate the product cache, and a custom line has no catalog product at
+// all, so the item's own fields stay as fallbacks behind the operator's chosen identifier.
+function itemSecondaryLabel(item: ReturnItemDetail) {
+  return productMaster.secondaryId(productCache.getProduct(item.productId) || item, [
+    item.sku,
+    item.productId
+  ]);
 }
 
 function itemReferenceLabel(item: ReturnItemDetail) {
   return [
-    `${translate("Return item")} ${item.returnItemSeqId}`,
-    item.orderItemSeqId ? `${translate("Order item")} ${item.orderItemSeqId}` : "",
-    item.productId ? `${translate("Product")} ${item.productId}` : ""
-  ].filter(Boolean).join(" · ");
+    translate("Return item {id}", { id: item.returnItemSeqId }),
+    item.orderItemSeqId ? translate("Order item {id}", { id: item.orderItemSeqId }) : "",
+    item.productId ? translate("Product {id}", { id: item.productId }) : ""
+  ].filter(Boolean).join(", ");
 }
 
 function inventoryStatusLabel(statusId: string) {
@@ -730,14 +728,6 @@ function inventoryStatusLabel(statusId: string) {
   };
 
   return labels[statusId] ? translate(labels[statusId]) : notSpecified(statusLabels.value[statusId]);
-}
-
-function returnStatusColor(statusId: string) {
-  return commonUtil.getStatusColor(returnStatusColorAliases[statusId] || statusId);
-}
-
-function shopifyStatusColor(statusId: string) {
-  return commonUtil.getStatusColor(shopifyStatusColorAliases[statusId] || returnStatusColorAliases[statusId] || statusId);
 }
 
 function restockState(item: ReturnItemDetail) {
@@ -767,7 +757,7 @@ function restockState(item: ReturnItemDetail) {
 function itemGroupLabel(group: { orderId?: string; orderName?: string }) {
   const orderLabel = group.orderName || group.orderId;
 
-  return orderLabel ? `${translate("Items from order")} ${orderLabel}` : translate("Items without linked order");
+  return orderLabel ? translate("Items from order {order}", { order: orderLabel }) : translate("Items without linked order");
 }
 
 function timelineScopeLabel(status: ReturnStatusHistory) {
@@ -775,7 +765,7 @@ function timelineScopeLabel(status: ReturnStatusHistory) {
   const item = returnRecord.value?.items.find((candidate) => candidate.returnItemSeqId === status.returnItemSeqId);
   const itemLabel = item?.productName || item?.description || item?.sku || item?.productId || status.returnItemSeqId;
 
-  return `${translate("Item")} · ${itemLabel}`;
+  return translate("Item: {item}", { item: itemLabel });
 }
 
 function statusItem(status: ReturnStatusHistory) {
@@ -819,11 +809,6 @@ function parseDate(value?: string | number) {
   return isoDate.isValid ? isoDate : DateTime.fromSQL(stringValue);
 }
 
-function formatLongDate(value?: string | number) {
-  const date = parseDate(value);
-
-  return date?.isValid ? date.toLocaleString(DateTime.DATETIME_MED) : String(value ?? "");
-}
 
 function syncColor(state: ReturnSyncState) {
   return { synced: "success", pending: "warning", failed: "danger", not_synced: "medium" }[state];
@@ -935,7 +920,7 @@ function syncLabel(state: ReturnSyncState) {
 
 .return-item-detail-label,
 .return-item-fact dt {
-  margin: 0 0 4px;
+  margin: 0 0 var(--spacer-2xs);
   color: var(--ion-color-medium, #92949c);
   font-size: 0.75rem;
   font-weight: 500;

@@ -8,51 +8,51 @@
     <UniformFilterLayout @clear="emit('clear')">
       <ion-select
         :value="modelValue.priority"
-        label="Priority"
+        :label="translate('Priority')"
         label-placement="stacked"
         fill="outline"
         interface="popover"
         @ionChange="updateField('priority', $event.detail.value)"
       >
-        <ion-select-option :value="null">All priorities</ion-select-option>
-        <ion-select-option :value="true">High priority</ion-select-option>
-        <ion-select-option :value="false">Normal or no priority</ion-select-option>
+        <ion-select-option :value="null">{{ translate('All priorities') }}</ion-select-option>
+        <ion-select-option :value="true">{{ translate('High priority') }}</ion-select-option>
+        <ion-select-option :value="false">{{ translate('Normal or no priority') }}</ion-select-option>
       </ion-select>
       <ion-select
         :value="modelValue.salesChannelEnumId"
-        label="Sales channel"
+        :label="translate('Sales channel')"
         label-placement="stacked"
         fill="outline"
         interface="popover"
         @ionChange="updateField('salesChannelEnumId', $event.detail.value)"
       >
-        <ion-select-option value="All">All channels</ion-select-option>
+        <ion-select-option value="All">{{ translate('All channels') }}</ion-select-option>
         <ion-select-option v-for="channel in channelOptions" :key="channel.id" :value="channel.id">
           {{ channel.label }}
         </ion-select-option>
       </ion-select>
       <ion-select
         :value="modelValue.facilityId"
-        label="Facility"
+        :label="translate('Facility')"
         label-placement="stacked"
         fill="outline"
         interface="popover"
         @ionChange="updateField('facilityId', $event.detail.value)"
       >
-        <ion-select-option value="All">All facilities</ion-select-option>
+        <ion-select-option value="All">{{ translate('All facilities') }}</ion-select-option>
         <ion-select-option v-for="facility in facilityOptions" :key="facility.id" :value="facility.id">
           {{ facility.label }}
         </ion-select-option>
       </ion-select>
       <ion-select
         :value="modelValue.shipmentMethodTypeId"
-        label="Shipping method"
+        :label="translate('Shipping method')"
         label-placement="stacked"
         fill="outline"
         interface="popover"
         @ionChange="updateField('shipmentMethodTypeId', $event.detail.value)"
       >
-        <ion-select-option value="All">All methods</ion-select-option>
+        <ion-select-option value="All">{{ translate('All methods') }}</ion-select-option>
         <ion-select-option v-for="method in shipmentMethodOptions" :key="method.id" :value="method.id">
           {{ method.label }}
         </ion-select-option>
@@ -60,12 +60,14 @@
       <DateFilterSelect
         :model-value="modelValue.dateFrom"
         :label="translate('Order date from')"
+        :max="modelValue.dateThru"
         outlined
         @update:modelValue="updateField('dateFrom', $event)"
       />
       <DateFilterSelect
         :model-value="modelValue.dateThru"
         :label="translate('Order date through')"
+        :min="modelValue.dateFrom"
         outlined
         @update:modelValue="updateField('dateThru', $event)"
       />

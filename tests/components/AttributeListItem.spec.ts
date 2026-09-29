@@ -1,50 +1,33 @@
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
-import { describe, expect, it } from 'vitest';
+import { mount } from '@vue/test-utils';
+import { describe, expect, it, vi } from 'vitest';
+import AttributeListItem from '@/components/orders/AttributeListItem.vue';
+
+vi.mock('@common', () => ({ translate: (value: string) => value }));
+
+const mountItem = (props: Record<string, unknown>, slots = {}) => mount(AttributeListItem, { props: { name: 'gift_message', ...props }, slots });
 
 describe('AttributeListItem', () => {
-  const source = readFileSync(resolve(process.cwd(), 'src/components/orders/AttributeListItem.vue'), 'utf8');
+  it('shows the name with its value and description', () => {
+    const wrapper = mountItem({ value: 'Happy birthday', description: 'From checkout' });
 
-  it('maps the name and value into a horizontal key/value pair', () => {
-    // Name at the start, value trailing on the same row, both inside one
-    // native definition list so they stack on narrow widths.
-    expect(source).toContain('<dl class="attribute-kv__terms">');
-    expect(source).toContain('<dt>{{ name }}</dt>');
-    expect(source).toContain('class="attribute-kv__value"');
-    expect(source).toContain('hasValue ? value : translate(\'Value not available\')');
+    expect(wrapper.find('dt').text()).toBe('gift_message');
+    expect(wrapper.find('.attribute-kv__value').text()).toBe('Happy birthday');
+    expect(wrapper.find('.attribute-kv__description').text()).toBe('From checkout');
   });
 
-  it('uses native HTML and flexbox rather than an ion-item layout', () => {
-    expect(source).toContain('display: flex;');
-    expect(source).toContain('flex-wrap: wrap;');
-    expect(source).toContain('justify-content: space-between;');
-    expect(source).not.toContain('<ion-item');
-    expect(source).not.toContain('<ion-label');
-    expect(source).not.toContain('IonItem');
-    expect(source).not.toContain('IonLabel');
-    expect(source).not.toContain('<ion-grid');
-    expect(source).not.toContain('<ion-row');
-    expect(source).not.toContain('<ion-col');
+  it.each([undefined, null, '', '   '])('says the value is not available rather than dropping it (%j)', (value) => {
+    const wrapper = mountItem({ value });
+
+    expect(wrapper.find('.attribute-kv__value').text()).toBe('Value not available');
   });
 
-  it('renders a clear empty state instead of dropping blank values', () => {
-    expect(source).toContain('translate(\'Value not available\')');
-    // hasValue treats whitespace-only / null / undefined as empty.
-    expect(source).toContain("String(value).trim() !== ''");
+  it('leaves the description out when there is none', () => {
+    expect(mountItem({ value: 'x' }).find('.attribute-kv__description').exists()).toBe(false);
   });
 
-  it('exposes a trailing slot for row actions (e.g. delete)', () => {
-    expect(source).toContain('<slot name="end" />');
-  });
+  it('renders row actions passed in the end slot', () => {
+    const wrapper = mountItem({ value: 'x' }, { end: '<button class="delete">Delete</button>' });
 
-  it('keeps the description as secondary supporting text', () => {
-    expect(source).toContain('v-if="description"');
-    expect(source).toContain('class="attribute-kv__description"');
-  });
-
-  it('keeps new CSS limited to layout properties', () => {
-    expect(source).not.toContain('font-weight');
-    expect(source).not.toContain('font-style');
-    expect(source).not.toContain('color:');
+    expect(wrapper.find('button.delete').exists()).toBe(true);
   });
 });

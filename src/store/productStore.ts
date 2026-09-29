@@ -239,13 +239,13 @@ export const useProductStore = defineStore('productStore', {
     async prepareProductIdentifierOptions() {
       //static identifications 
       const productIdentificationOptions = [
-        { goodIdentificationTypeId: "productId", description: "Product ID" },
-        { goodIdentificationTypeId: "groupId", description: "Group ID" },
-        { goodIdentificationTypeId: "groupName", description: "Group Name" },
-        { goodIdentificationTypeId: "internalName", description: "Internal Name" },
-        { goodIdentificationTypeId: "parentProductName", description: "Parent Product Name" },
-        { goodIdentificationTypeId: "primaryProductCategoryName", description: "Primary Product Category Name" },
-        { goodIdentificationTypeId: "title", description: "Title" }
+        { goodIdentificationTypeId: "productId", description: translate("Product ID") },
+        { goodIdentificationTypeId: "groupId", description: translate("Group ID") },
+        { goodIdentificationTypeId: "groupName", description: translate("Group name") },
+        { goodIdentificationTypeId: "internalName", description: translate("Internal name") },
+        { goodIdentificationTypeId: "parentProductName", description: translate("Parent product name") },
+        { goodIdentificationTypeId: "primaryProductCategoryName", description: translate("Primary product category name") },
+        { goodIdentificationTypeId: "title", description: translate("Title") }
       ]
       //good identification types
       let fetchedGoodIdentificationOptions = []

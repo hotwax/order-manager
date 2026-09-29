@@ -7,7 +7,6 @@ describe('OrderQueueList', () => {
 
   it('renders queue results with the design-system list item row structure', () => {
     expect(source).toContain('<OrderRow');
-    expect(source).toContain('row-class="queue-order-row"');
     expect(source).toContain(':model="toSearchOrderRowViewModel(order)"');
     expect(source).toContain("mode: 'queue-first' as const");
     expect(source).toContain('queueFacilityIds: props.facilityIds');
@@ -17,9 +16,9 @@ describe('OrderQueueList', () => {
   });
 
   it('labels result totals as matching the active queue filters', () => {
-    expect(source).toContain('translate("{loaded} of {total} matching orders"');
-    expect(source).toContain('total: searchTotal');
-    expect(source).not.toContain('translate("{loaded} of {total} orders"');
+    expect(source).toContain('translate("{shown} of {count} matching orders"');
+    expect(source).toContain('count: searchTotal');
+    expect(source).not.toContain('translate("{shown} of {count} orders"');
   });
 
   it('keeps the row-level navigation behavior while letting checkboxes enter select mode', () => {

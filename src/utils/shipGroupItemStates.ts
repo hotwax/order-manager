@@ -1,0 +1,38 @@
+import { OrderActionValidator } from '@/utils/OrderActionValidator';
+
+export interface ShipGroupItemStates {
+  /** Items carrying a status. Items without one cannot be reasoned about and are ignored. */
+  total: number;
+  fulfilled: number;
+  /** Every item has stopped — nothing in this group will move again. */
+  settled: boolean;
+}
+
+/**
+ * Where a ship group stands according to its items, which is the authority for anything
+ * terminal.
+ *
+ * `get#OrderFulfillmentTimeline` records how far a *moving* group has travelled, but says
+ * nothing about one that has stopped — and on some instances it records almost nothing at all.
+ * Deriving the card purely from those dates left a finished group reading "25% Complete" with
+ * Pick/Pack/Ship still "Pending", because a physical facility scores 25% for being brokered and
+ * no later date ever arrives.
+ *
+ * Only three numbers are needed. "All fulfilled", "all cancelled" and "partially fulfilled" are
+ * each one comparison away from them, and naming them here bought nothing: `fulfilled / total`
+ * already answers all three for progress, and the label derives the two it distinguishes.
+ *
+ * Items without a `statusId` are skipped rather than counted as unfinished: a group whose
+ * statuses have not loaded yet should read as in-progress, not as freshly cancelled.
+ */
+export function shipGroupItemStates(items: any[] | undefined | null): ShipGroupItemStates {
+  const known = (items || []).filter((item: any) => item?.statusId);
+
+  return {
+    total: known.length,
+    fulfilled: known.filter((item: any) => OrderActionValidator.isItemFulfilled(item)).length,
+    // Single definition of "this group has stopped" — the action gating reads the same one,
+    // so the card's label and its controls can never disagree about it.
+    settled: OrderActionValidator.isShipGroupSettled({ items: known })
+  };
+}

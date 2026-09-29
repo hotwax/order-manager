@@ -18,7 +18,8 @@ vi.mock('@/services/customer', () => ({
   expirePartyRelationship: vi.fn()
 }));
 
-vi.mock('@/db/orderManagerDb', () => ({
+vi.mock('@/db/orderManagerDb', async (importOriginal) => ({
+  ...(await importOriginal<any>()),
   omDb: () => ({ all: async () => [], get: async () => undefined }),
 }));
 

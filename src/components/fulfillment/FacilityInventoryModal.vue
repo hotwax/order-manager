@@ -2,11 +2,11 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="modalController.dismiss()" :aria-label="translate('Close')">
+        <ion-button @click="modalController.dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ title || translate('Select Facility') }}</ion-title>
+      <ion-title>{{ title || translate('Select facility') }}</ion-title>
     </ion-toolbar>
     <!-- The strip names every item being placed. With more than one it also picks which item the
          list details, so the operator can go from "can this facility cover all three" to the full
@@ -71,7 +71,7 @@
                   <p>{{ translate('Available') }}</p>
                 </template>
                 <template v-else>
-                  {{ translate('{count} of {total} items', { count: facility.coveredCount, total: facility.totalCount }) }}
+                  {{ translate('{shown} of {count} items', { shown: facility.coveredCount, count: facility.totalCount }) }}
                   <p v-if="!facility.inStore">{{ translate('Not in store') }}</p>
                 </template>
               </ion-label>
@@ -160,10 +160,10 @@
             </ion-label>
           </template>
           <ion-label class="tablet" v-else>
-            {{ translate('{count} of {total} items', { count: facility.coveredCount, total: facility.totalCount }) }}
+            {{ translate('{shown} of {count} items', { shown: facility.coveredCount, count: facility.totalCount }) }}
             <p>{{ translate('Coverage') }}</p>
-            <p v-if="shortItemNames(facility)">{{ translate('Short:') }} {{ shortItemNames(facility) }}</p>
-            <p v-if="unrecordedItemNames(facility)">{{ translate('No record:') }} {{ unrecordedItemNames(facility) }}</p>
+            <p v-if="shortItemNames(facility)">{{ translate('Short: {items}', { items: shortItemNames(facility) }) }}</p>
+            <p v-if="unrecordedItemNames(facility)">{{ translate('No record: {items}', { items: unrecordedItemNames(facility) }) }}</p>
           </ion-label>
           <ion-label class="tablet">
             {{ facility.allowBrokering }}
@@ -171,8 +171,8 @@
           </ion-label>
           <ion-label class="ion-text-end">
             {{ formatQuantity(facility.consumedToday) }} / {{ formatOrderLimit(facility.orderLimit) }}
-            <p>{{ translate('Consumed / Limit') }}</p>
-            <p>{{ translate('Remaining') }} {{ formatOrderLimit(facility.remainingCapacity) }}</p>
+            <p>{{ translate('Consumed / limit') }}</p>
+            <p>{{ translate('Remaining {value}', { value: formatOrderLimit(facility.remainingCapacity) }) }}</p>
           </ion-label>
         </div>
       </ion-list>
@@ -192,6 +192,7 @@ import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api, DxpShopifyImg, logger, translate } from '@common';
 import { useSeedData } from '@common/db';
+import { formatNumber } from '@/utils/format';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
 import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
 
@@ -267,7 +268,7 @@ function itemNameList(items: FacilityItemAvailability[]) {
   if (!items.length) return '';
   const names = items.slice(0, MAX_SHORT_NAMES).map((item) => item.name).join(', ');
   const remaining = items.length - MAX_SHORT_NAMES;
-  return remaining > 0 ? `${names} ${translate('+{count} more', { count: remaining })}` : names;
+  return remaining > 0 ? translate('{names} +{count} more', { names, count: remaining }) : names;
 }
 
 function shortItemNames(facility: FacilityCoverageRow) {
@@ -280,13 +281,13 @@ function unrecordedItemNames(facility: FacilityCoverageRow) {
 
 function itemAvailabilityLabel(item: FacilityItemAvailability) {
   if (!item.hasRecord) return translate('No inventory record');
-  if (item.shortBy) return `${formatQuantity(item.available)} (${translate('Short by {count}', { count: item.shortBy })})`;
+  if (item.shortBy) return translate('{quantity} (Short by {count})', { quantity: formatQuantity(item.available), count: item.shortBy });
   return formatQuantity(item.available);
 }
 
 function formatQuantity(value: number | null | undefined) {
-  if (value === null || value === undefined) return '-';
-  return Number.isInteger(value) ? String(value) : value.toFixed(2);
+  if (value === null || value === undefined) return translate('Not available');
+  return formatNumber(value, { maximumFractionDigits: 2 });
 }
 
 function formatOrderLimit(value: number | null | undefined) {
@@ -437,10 +438,6 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-
 .item-chips {
   display: flex;
   overflow-x: auto;

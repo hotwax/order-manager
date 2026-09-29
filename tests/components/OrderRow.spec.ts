@@ -12,7 +12,7 @@ describe('OrderRow', () => {
     const orderedIndex = source.indexOf('{{ model.orderedDateTime }}');
     const deadlineIndex = source.indexOf('{{ model.estimatedDeliveryDateTime }}');
 
-    expect(source).toContain('class="list-item"');
+    expect(source).toContain('class="list-item order-row"');
     expect(itemIndex).toBeGreaterThan(0);
     expect(allocationIndex).toBeGreaterThan(itemIndex);
     expect(fulfillmentIndex).toBeGreaterThan(allocationIndex);
@@ -23,8 +23,8 @@ describe('OrderRow', () => {
   it('keeps the deadline column visible and preserves whole-row keyboard and selection behavior', () => {
     expect(source).toContain('props.model.orderName');
     expect(source).not.toContain('props.model.orderReference');
-    expect(source).toContain('Ordered {{ model.orderedRelativeAge }}');
-    expect(source).toContain('<ion-note>No estimated delivery date</ion-note>');
+    expect(source).toContain("translate('Ordered {age}', { age: model.orderedRelativeAge })");
+    expect(source).toContain("<ion-note>{{ translate('No estimated delivery date') }}</ion-note>");
     expect(source).not.toContain('v-show="model.estimatedDeliveryDateTime"');
     expect(source).not.toContain(String.fromCharCode(183));
     expect(source).toContain("@keydown.enter.prevent=\"emit('activate')\"");

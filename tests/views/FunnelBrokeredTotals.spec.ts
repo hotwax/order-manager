@@ -8,9 +8,9 @@ describe('Funnel Brokered workload totals', () => {
   it('uses the total counts returned by the Open, Inflight, and Packed workflow APIs', () => {
     expect(source).toContain('fetchWorkflowOrderTotals(productStoreId)');
     expect(source).toContain('brokeredWorkload.value.open + brokeredWorkload.value.inflight + brokeredWorkload.value.packed');
-    expect(source).toContain('formatCount(brokeredWorkload.open)');
-    expect(source).toContain('formatCount(brokeredWorkload.inflight)');
-    expect(source).toContain('formatCount(brokeredWorkload.packed)');
+    expect(source).toContain('ordersLabel(brokeredWorkload.open)');
+    expect(source).toContain('ordersLabel(brokeredWorkload.inflight)');
+    expect(source).toContain('ordersLabel(brokeredWorkload.packed)');
   });
 
   it('navigates to the unfiltered operational queues', () => {

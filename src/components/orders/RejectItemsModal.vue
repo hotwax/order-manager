@@ -2,11 +2,11 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')">
+        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Reject Items') }}</ion-title>
+      <ion-title>{{ translate('Reject items') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -30,8 +30,8 @@
     </ion-radio-group>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedReasonId" @click="confirm()" :aria-label="translate('Confirm')">
-        <ion-icon :icon="checkmarkOutline" />
+      <ion-fab-button :disabled="!selectedReasonId" @click="confirm()" :aria-label="translate('Save')">
+        <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>
   </ion-content>
@@ -39,7 +39,7 @@
 
 <script setup lang="ts">
 import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { checkmarkOutline, closeOutline } from 'ionicons/icons';
+import { closeOutline, saveOutline } from 'ionicons/icons';
 import { onMounted, ref } from 'vue';
 import { translate } from '@common';
 import { useSeedData } from '@common/db';
@@ -84,8 +84,3 @@ async function loadRejectionReasons() {
 onMounted(loadRejectionReasons);
 </script>
 
-<style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-</style>

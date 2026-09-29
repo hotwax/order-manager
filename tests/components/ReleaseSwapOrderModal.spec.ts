@@ -32,9 +32,9 @@ describe('ReleaseSwapOrderModal', () => {
     expect(source).toContain("translate('Original total')");
     expect(source).toContain("translate('New total')");
     expect(source).toContain("translate('Refund to customer')");
-    expect(source).toContain('money(grandTotal)');
-    expect(source).toContain('money(newTotal)');
-    expect(source).toContain('money(refundAmount)');
+    expect(source).toContain('formatMoney(grandTotal, currency)');
+    expect(source).toContain('formatMoney(newTotal, currency)');
+    expect(source).toContain('formatMoney(refundAmount, currency)');
   });
 
   it('dismisses modal with confirmed flag', () => {

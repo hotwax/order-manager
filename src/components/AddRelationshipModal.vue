@@ -2,14 +2,14 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button v-if="step === 'party'" @click="dismiss()" :aria-label="translate('Close')">
+        <ion-button v-if="step === 'party'" @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
-        <ion-button v-else @click="step = 'party'" :aria-label="translate('Back')">
+        <ion-button v-else @click="step = 'party'" :aria-label="translate('Back')" :title="translate('Back')">
           <ion-icon slot="icon-only" :icon="arrowBackOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ step === 'party' ? translate("Find party") : translate("Add Relationship") }}</ion-title>
+      <ion-title>{{ step === 'party' ? translate("Find party") : translate("Add relationship") }}</ion-title>
     </ion-toolbar>
     <ion-toolbar v-if="step === 'party'">
       <ion-searchbar
@@ -125,8 +125,8 @@
       </ion-list>
 
       <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-        <ion-fab-button :disabled="!isValid" :aria-label="translate('Confirm')" @click="confirm()">
-          <ion-icon :icon="checkmarkCircle" />
+        <ion-fab-button :disabled="!isValid" :aria-label="translate('Save')" @click="confirm()">
+          <ion-icon :icon="saveOutline" />
         </ion-fab-button>
       </ion-fab>
     </template>
@@ -157,7 +157,7 @@ import {
   IonToolbar,
   modalController
 } from '@ionic/vue';
-import { arrowBackOutline, arrowForwardOutline, checkmarkCircle, closeOutline } from 'ionicons/icons';
+import { arrowBackOutline, arrowForwardOutline, closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, ref } from 'vue';
 import { translate } from '@common';
 import { searchCustomers } from '@/services/customer';

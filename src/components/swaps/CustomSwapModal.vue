@@ -2,19 +2,19 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="closeModal()" :aria-label="translate('Close')">
+        <ion-button @click="closeModal()" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Custom Swap') }}</ion-title>
+      <ion-title>{{ translate('Custom swap') }}</ion-title>
     </ion-toolbar>
     <ion-toolbar>
       <ion-segment v-model="selectedSegment">
         <ion-segment-button value="substitute">
-          <ion-label>{{ translate('Substitute Products') }}</ion-label>
+          <ion-label>{{ translate('Substitute products') }}</ion-label>
         </ion-segment-button>
         <ion-segment-button value="search">
-          <ion-label>{{ translate('Product Search') }}</ion-label>
+          <ion-label>{{ translate('Product search') }}</ion-label>
         </ion-segment-button>
       </ion-segment>
     </ion-toolbar>
@@ -37,7 +37,7 @@
       </div>
       <ion-radio-group v-else v-model="selectedProductId">
         <ion-list-header>
-          <ion-label>{{ translate('Approved Swaps') }}</ion-label>
+          <ion-label>{{ translate('Approved swaps') }}</ion-label>
         </ion-list-header>
         <ion-item
           v-for="product in filteredSubstitutes"
@@ -47,14 +47,14 @@
           :disabled="!hasSubstituteStock(product.productId)"
           @click="selectSubstituteProduct(product.productId)"
         >
-          <ion-radio slot="start" :value="product.productId" :aria-label="getProduct(product.productId)?.productName || product.productName" />
+          <ion-radio slot="start" :value="product.productId" :aria-label="productMaster.primaryId(getProduct(product.productId) || product, [product.productName])" />
           <ion-thumbnail slot="start">
             <DxpShopifyImg :src="getProduct(product.productId)?.mainImageUrl || product.mainImageUrl" size="small" />
           </ion-thumbnail>
           <ion-label>
-            {{ getProduct(product.productId)?.productName || product.productName }}
-            <p>{{ translate('SKU') }}: {{ getProduct(product.productId)?.internalName || product.internalName }}</p>
-            <p>{{ money(product.price) }}</p>
+            {{ productMaster.primaryId(getProduct(product.productId) || product, [product.productName]) }}
+            <p>{{ productMaster.secondaryId(getProduct(product.productId) || product, [product.internalName]) }}</p>
+            <p>{{ formatMoney(product.price, currency) }}</p>
           </ion-label>
           <ion-note class="facility-label ion-no-padding" slot="end">{{ facilityStockLabel(getSubstituteStock(product.productId)?.computedAtp) }}</ion-note>
         </ion-item>
@@ -91,14 +91,13 @@
             :disabled="!hasSearchStock(product)"
             @click="selectSearchProduct(product)"
           >
-            <ion-radio slot="start" :value="product.productId" :aria-label="product.productName" />
+            <ion-radio slot="start" :value="product.productId" :aria-label="productMaster.primaryId(getProduct(product.productId) || product, [product.parentProductName, product.productName])" />
             <ion-thumbnail slot="start">
               <DxpShopifyImg :src="product.mainImageUrl" size="small" />
             </ion-thumbnail>
             <ion-label>
-              {{ product.parentProductName }}
-              <p>{{ product.productName }}</p>
-              <p>{{ translate('SKU') }}: {{ product.internalName || product.sku }}</p>
+              {{ productMaster.primaryId(getProduct(product.productId) || product, [product.parentProductName, product.productName]) }}
+              <p>{{ productMaster.secondaryId(getProduct(product.productId) || product, [product.productName, product.internalName, product.sku]) }}</p>
             </ion-label>
             <ion-note class="facility-label ion-no-padding" slot="end">{{ facilityStockLabel(product.inventoryConfig?.computedLastInventoryCount) }}</ion-note>
           </ion-item>
@@ -131,12 +130,15 @@ import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
 import { useSeedData } from '@common/db';
+import { formatMoney } from '@/utils/format';
 
 const seed = useSeedData();
 
 const props = defineProps<{
   substituteProducts: any[];
   facilityId: string;
+  /** The order's currency, for the product prices. */
+  currency?: string;
   selectedProductId?: string;
   defaultSearchKeyword?: string;
 }>();
@@ -178,6 +180,8 @@ watch(() => props.facilityId, async (facilityId) => {
   facilityLabel.value = await seed.getFacilityName(facilityId ?? '');
 }, { immediate: true });
 
+const productMaster = useProductMaster();
+
 function getProduct(productId: string) {
   return useProductCacheStore().getProduct(productId);
 }
@@ -204,9 +208,6 @@ function facilityStockLabel(count?: number | string | null) {
   });
 }
 
-function money(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value ?? 0);
-}
 
 function toSubstituteShape(product: any) {
   return {
@@ -307,15 +308,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-
 .empty-state {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding: 32px 16px;
+  padding: var(--spacer-lg) var(--spacer-sm);
   text-align: center;
   color: var(--ion-color-medium);
 }

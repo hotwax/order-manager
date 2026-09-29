@@ -2,18 +2,18 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="closeModal" :aria-label="translate('Close')">
+        <ion-button @click="closeModal" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate("Add Custom Line") }}</ion-title>
+      <ion-title>{{ translate("Add custom line") }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
   <ion-content>
     <ion-list>
       <ion-item>
-        <ion-input :label="translate('Product Name')" label-placement="stacked" v-model="form.productName" :placeholder="translate('Enter product name')" />
+        <ion-input :label="translate('Product name')" label-placement="stacked" v-model="form.productName" :placeholder="translate('Enter product name')" />
       </ion-item>
       <ion-item>
         <ion-input :label="translate('Quantity')" label-placement="stacked" type="number" v-model="form.quantity" :placeholder="translate('Enter quantity')" min="1" />

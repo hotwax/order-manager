@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from '@/composables/useOrderDetail';
+import { api } from '@common';
+import { FACILITY_CHANGE_PAGE_SIZE, UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from '@/composables/useOrderDetail';
 
 vi.mock('@common', async (importOriginal) => {
   const actual = await importOriginal<any>();
@@ -18,7 +19,8 @@ vi.mock('@/composables/useOrderDetail', async (importOriginal) => {
   return { ...actual, useOrderDetail: vi.fn() };
 });
 
-vi.mock('@/db/orderManagerDb', () => ({
+vi.mock('@/db/orderManagerDb', async (importOriginal) => ({
+  ...(await importOriginal<any>()),
   omDb: () => ({ all: async () => [], get: async () => undefined }),
 }));
 
@@ -36,12 +38,11 @@ function orderEntryWithStatuses(statuses: any[]) {
 function mockOrderDetail(overrides: Record<string, any> = {}) {
   vi.mocked(useOrderDetail).mockReturnValue({
     getOrder: vi.fn(),
-    getWorkEfforts: vi.fn(),
     getCommunicationEvents: vi.fn(),
     getRiskAssessments: vi.fn(),
     getFacilityChanges: vi.fn().mockResolvedValue({ data: [] }),
     getUnfillableAttempts: vi.fn().mockResolvedValue({ data: [] }),
-    getInventoryIssuance: vi.fn().mockResolvedValue({ data: [] }),
+    getInventoryIssuance: vi.fn().mockResolvedValue([]),
     ...overrides,
   } as any);
 }
@@ -53,8 +54,11 @@ describe('order detail event sources', () => {
     mockOrderDetail();
   });
 
-  it('collapses the per-item rows of one facility move into a single event', () => {
+  it('builds the order events from the document statuses and the loaded facility changes', () => {
     const store = useOrderDetailStore();
+    store.byOrderId[ORDER_ID] = orderEntryWithStatuses([
+      { statusId: 'ORDER_APPROVED', statusDatetime: '2026-06-26 14:00:00.000', statusUserLogin: 'ops.user' },
+    ]);
     // OMS writes one OrderFacilityChange row per order item; these three are one release.
     store.facilityChangesByOrderId[ORDER_ID] = [
       { orderItemSeqId: '01', changeReasonEnumId: 'RELEASED', fromFacilityId: '_NA_', facilityId: 'BROADWAY', changeDatetime: '2026-06-26 14:17:51.892', changeUserLogin: 'swati.pandey' },
@@ -62,61 +66,16 @@ describe('order detail event sources', () => {
       { orderItemSeqId: '03', changeReasonEnumId: 'RELEASED', fromFacilityId: '_NA_', facilityId: 'BROADWAY', changeDatetime: '2026-06-26 14:17:51.901' },
     ];
 
-    const events = store.facilityChangeEventsByOrderId(ORDER_ID);
+    const events = store.orderEventsByOrderId(ORDER_ID);
 
-    expect(events).toHaveLength(1);
-    expect(events[0]).toMatchObject({ changeReasonEnumId: 'RELEASED', facilityId: 'BROADWAY', itemCount: 3 });
-    // The actor is on one row only; the cluster still reports it.
-    expect(events[0].changeUserLogin).toBe('swati.pandey');
+    expect(events.map((event) => event.kind)).toEqual(['orderStatus', 'move']);
+    expect(events[1]).toMatchObject({ move: 'released', orderItemSeqIds: ['01', '02', '03'], isFirst: true });
   });
 
-  it('keeps a repeated move to the same facility as separate events', () => {
-    const store = useOrderDetailStore();
-    store.facilityChangesByOrderId[ORDER_ID] = [
-      { orderItemSeqId: '01', changeReasonEnumId: 'RELEASED', fromFacilityId: '_NA_', facilityId: 'BROADWAY', changeDatetime: '2026-06-26 14:17:51.892' },
-      { orderItemSeqId: '01', changeReasonEnumId: 'RELEASED', fromFacilityId: '_NA_', facilityId: 'BROADWAY', changeDatetime: '2026-06-26 15:02:11.100' },
-    ];
-
-    expect(store.facilityChangeEventsByOrderId(ORDER_ID)).toHaveLength(2);
-  });
-
-  it('groups item cancellations by reason and ignores routine item statuses', () => {
-    const store = useOrderDetailStore();
-    store.byOrderId[ORDER_ID] = orderEntryWithStatuses([
-      { orderItemSeqId: '01', statusId: 'ITEM_CREATED', statusDatetime: '2026-07-08 12:00:00.000' },
-      { orderItemSeqId: '01', statusId: 'ITEM_CANCELLED', changeReason: 'AUTO_CANCEL', statusDatetime: '2026-07-08 12:55:14.164', statusUserLogin: 'system' },
-      { orderItemSeqId: '02', statusId: 'ITEM_CANCELLED', changeReason: 'AUTO_CANCEL', statusDatetime: '2026-07-08 12:55:14.201' },
-      { orderItemSeqId: '03', statusId: 'ITEM_CANCELLED', changeReason: 'BAD_REVIEW', statusDatetime: '2026-07-08 12:55:14.205' },
-    ]);
-
-    const events = store.itemStatusEventsByOrderId(ORDER_ID);
-
-    expect(events).toHaveLength(2);
-    expect(events.map((event) => [event.changeReason, event.itemCount])).toEqual(
-      expect.arrayContaining([['AUTO_CANCEL', 2], ['BAD_REVIEW', 1]])
-    );
-  });
-
-  it('takes header statuses from the order document, newest first, with actor and reason', () => {
-    const store = useOrderDetailStore();
-    store.byOrderId[ORDER_ID] = orderEntryWithStatuses([
-      { statusId: 'ORDER_APPROVED', statusDatetime: '2026-07-08 10:00:00.000', statusUserLogin: 'ops.user' },
-      { statusId: 'ORDER_HOLD', statusDatetime: '2026-07-08 11:00:00.000', statusUserLogin: 'ops.user', changeReason: 'Manual' },
-      { orderItemSeqId: '01', statusId: 'ITEM_CANCELLED', statusDatetime: '2026-07-08 12:00:00.000' },
-    ]);
-
-    const headerStatuses = store.headerStatusesByOrderId(ORDER_ID);
-
-    // Item-scoped rows are excluded here; they drive the item events instead.
-    expect(headerStatuses.map((status: any) => status.statusId)).toEqual(['ORDER_HOLD', 'ORDER_APPROVED']);
-    expect(headerStatuses[0].statusUserLogin).toBe('ops.user');
-    expect(headerStatuses[0].changeReason).toBe('Manual');
-  });
-
-  it('reports no statuses when the order document has not loaded', () => {
+  it('has no events when the order document has not loaded', () => {
     const store = useOrderDetailStore();
 
-    expect(store.headerStatusesByOrderId(ORDER_ID)).toEqual([]);
+    expect(store.orderEventsByOrderId(ORDER_ID)).toEqual([]);
   });
 
   it('counts one failed brokering run as one attempt however many items it touched', async () => {
@@ -189,12 +148,10 @@ describe('order detail event sources', () => {
     // Real shape from rails-uat order 118954: one issuance row per line. lastQuantityOnHand
     // is the balance before the row, so after = last + diff.
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
-          { orderItemSeqId: '01', inventoryItemId: '1008212', itemIssuanceId: '108495', quantityOnHandDiff: -1, lastQuantityOnHand: 12, effectiveDate: 1786895792358 },
-          { orderItemSeqId: '02', inventoryItemId: '1008213', itemIssuanceId: '108496', quantityOnHandDiff: -1, lastQuantityOnHand: -2, effectiveDate: 1786895792367 },
-        ],
-      }),
+      getInventoryIssuance: vi.fn().mockResolvedValue([
+        { orderItemSeqId: '01', inventoryItemId: '1008212', itemIssuanceId: '108495', quantityOnHandDiff: -1, lastQuantityOnHand: 12, effectiveDate: 1786895792358 },
+        { orderItemSeqId: '02', inventoryItemId: '1008213', itemIssuanceId: '108496', quantityOnHandDiff: -1, lastQuantityOnHand: -2, effectiveDate: 1786895792367 },
+      ]),
     });
     const store = useOrderDetailStore();
 
@@ -209,12 +166,10 @@ describe('order detail event sources', () => {
 
   it('adds the stock positions when one line issues from two inventory items', async () => {
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
-          { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '1', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 1 },
-          { orderItemSeqId: '01', inventoryItemId: 'B', itemIssuanceId: '2', quantityOnHandDiff: -2, lastQuantityOnHand: 5, effectiveDate: 2 },
-        ],
-      }),
+      getInventoryIssuance: vi.fn().mockResolvedValue([
+        { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '1', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 1 },
+        { orderItemSeqId: '01', inventoryItemId: 'B', itemIssuanceId: '2', quantityOnHandDiff: -2, lastQuantityOnHand: 5, effectiveDate: 2 },
+      ]),
     });
     const store = useOrderDetailStore();
 
@@ -229,12 +184,10 @@ describe('order detail event sources', () => {
     // The second row's lastQuantityOnHand already reflects the first, so summing both
     // opening balances would report a stock position that never existed.
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
-          { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '2', quantityOnHandDiff: -1, lastQuantityOnHand: 9, effectiveDate: 2 },
-          { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '1', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 1 },
-        ],
-      }),
+      getInventoryIssuance: vi.fn().mockResolvedValue([
+        { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '2', quantityOnHandDiff: -1, lastQuantityOnHand: 9, effectiveDate: 2 },
+        { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '1', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 1 },
+      ]),
     });
     const store = useOrderDetailStore();
 
@@ -247,12 +200,10 @@ describe('order detail event sources', () => {
 
   it('ignores reservation rows that carry no issuance id', async () => {
     mockOrderDetail({
-      getInventoryIssuance: vi.fn().mockResolvedValue({
-        data: [
-          { orderItemSeqId: '01', inventoryItemId: 'A', reasonEnumId: 'INV_RES_CREATE', availableToPromiseDiff: -1, quantityOnHandDiff: 0, lastQuantityOnHand: 99 },
-          { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '108495', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 2 },
-        ],
-      }),
+      getInventoryIssuance: vi.fn().mockResolvedValue([
+        { orderItemSeqId: '01', inventoryItemId: 'A', reasonEnumId: 'INV_RES_CREATE', availableToPromiseDiff: -1, quantityOnHandDiff: 0, lastQuantityOnHand: 99 },
+        { orderItemSeqId: '01', inventoryItemId: 'A', itemIssuanceId: '108495', quantityOnHandDiff: -1, lastQuantityOnHand: 10, effectiveDate: 2 },
+      ]),
     });
     const store = useOrderDetailStore();
 
@@ -261,6 +212,25 @@ describe('order detail event sources', () => {
     expect(store.issuanceByItemSeqIdByOrderId(ORDER_ID)).toEqual({
       '01': { issued: 1, qohBefore: 10, qohAfter: 9 },
     });
+  });
+
+  it('asks for the product and facility of every POS-completed line, and no others', async () => {
+    const getInventoryIssuance = vi.fn().mockResolvedValue([]);
+    mockOrderDetail({ getInventoryIssuance });
+    const store = useOrderDetailStore();
+    store.byOrderId[ORDER_ID] = {
+      payload: {
+        shipGroups: [
+          { shipGroupSeqId: '00001', shipmentMethodTypeId: 'POS_COMPLETED', facilityId: 'FASHION_ISLAND', items: [{ orderItemSeqId: '01', productId: '151000' }] },
+          { shipGroupSeqId: '00002', shipmentMethodTypeId: 'STANDARD', facilityId: 'BROADWAY', items: [{ orderItemSeqId: '02', productId: '151001' }] },
+        ],
+      },
+      status: 'loaded', loadedAt: '', error: '',
+    } as any;
+
+    await store.fetchInventoryIssuance(ORDER_ID);
+
+    expect(getInventoryIssuance).toHaveBeenCalledWith(ORDER_ID, [{ productId: '151000', facilityId: 'FASHION_ISLAND' }]);
   });
 
   it('reports unknown rather than zero when the issuance call fails', async () => {
@@ -298,9 +268,90 @@ describe('order detail event sources', () => {
     await store.fetchOrderEvents(ORDER_ID);
 
     // Statuses come off the document, so a failed sibling call cannot take them out.
-    expect(store.headerStatusesByOrderId(ORDER_ID)).toHaveLength(1);
-    expect(store.facilityChangeEventsByOrderId(ORDER_ID)).toEqual([]);
+    const events = store.orderEventsByOrderId(ORDER_ID);
+    expect(events.filter((event) => event.kind === 'orderStatus')).toHaveLength(1);
+    expect(events.filter((event) => event.kind === 'move')).toEqual([]);
     expect(store.unfillableAttemptsByOrderId(ORDER_ID)).toMatchObject({ count: 1 });
-    expect(store.orderEventsStatusByOrderId[ORDER_ID]).toBe('error');
+    // The timeline says some history is missing.
+    expect(store.orderHistoryStatus(ORDER_ID)).toEqual({ loading: false, failed: true, truncated: false });
+  });
+
+  it('fetches again after a load that was already running when a forced reload arrives', async () => {
+    // An action reloads the order while the first load is still in flight: the reload must not
+    // return the rows fetched before the action.
+    let release!: () => void;
+    const firstLoad = new Promise<{ data: any[] }>((resolve) => { release = () => resolve({ data: [] }); });
+    const getFacilityChanges = vi.fn()
+      .mockReturnValueOnce(firstLoad)
+      .mockResolvedValueOnce({ data: [{ orderItemSeqId: '01', changeReasonEnumId: 'NOT_IN_STOCK', fromFacilityId: 'BROADWAY', facilityId: 'PARKING', changeDatetime: 1_790_000_000_000 }] });
+    mockOrderDetail({ getFacilityChanges });
+    const store = useOrderDetailStore();
+
+    const initial = store.fetchOrderEvents(ORDER_ID);
+    const reload = store.fetchOrderEvents(ORDER_ID, true);
+    release();
+    await Promise.all([initial, reload]);
+
+    expect(getFacilityChanges).toHaveBeenCalledTimes(2);
+    expect(store.facilityChangesByOrderId[ORDER_ID]).toHaveLength(1);
+  });
+
+  it('clears a failure when the history is fetched again', async () => {
+    const getFacilityChanges = vi.fn().mockRejectedValueOnce(new Error('boom')).mockResolvedValueOnce({ data: [] });
+    mockOrderDetail({ getFacilityChanges });
+    vi.mocked(api).mockResolvedValue({ data: [] });
+    const store = useOrderDetailStore();
+    await store.fetchOrderEvents(ORDER_ID);
+
+    await store.retryOrderHistory(ORDER_ID);
+
+    expect(getFacilityChanges).toHaveBeenCalledTimes(2);
+    expect(store.orderHistoryStatus(ORDER_ID).failed).toBe(false);
+  });
+});
+
+describe('getFacilityChanges', () => {
+  it('reads the newest moves first, so a full page drops the oldest', async () => {
+    const { useOrderDetail: realUseOrderDetail } = await vi.importActual<any>('@/composables/useOrderDetail');
+    vi.mocked(api).mockReset();
+    vi.mocked(api).mockResolvedValue({ data: [] });
+
+    await realUseOrderDetail().getFacilityChanges(ORDER_ID);
+
+    expect(vi.mocked(api).mock.calls[0][0]).toMatchObject({ params: { orderByField: '-changeDatetime', pageSize: FACILITY_CHANGE_PAGE_SIZE } });
+  });
+});
+
+describe('getInventoryIssuance', () => {
+  it('reads each line\'s inventory item from ProductFacility, then its issuance rows for the order', async () => {
+    const { useOrderDetail: realUseOrderDetail } = await vi.importActual<any>('@/composables/useOrderDetail');
+    vi.mocked(api).mockReset();
+    vi.mocked(api).mockImplementation(async ({ url }: any) => {
+      // The `in` filters cross both products with both facilities, so one row is not a line.
+      if (url === 'oms/productFacilities') return { data: [
+        { productId: 'P1', facilityId: 'F1', inventoryItemId: 'I1' },
+        { productId: 'P1', facilityId: 'F2', inventoryItemId: 'I_NOT_A_LINE' },
+        { productId: 'P2', facilityId: 'F2', inventoryItemId: 'I2' },
+      ] };
+      return { data: [{ inventoryItemId: url.split('/')[2], orderItemSeqId: '01', itemIssuanceId: 'X' }] };
+    });
+
+    const rows = await realUseOrderDetail().getInventoryIssuance(ORDER_ID, [
+      { productId: 'P1', facilityId: 'F1' },
+      { productId: 'P2', facilityId: 'F2' },
+    ]);
+
+    const urls = vi.mocked(api).mock.calls.map(([request]: any) => request.url);
+    expect(urls).toEqual(['oms/productFacilities', 'oms/inventoryItem/I1/detail', 'oms/inventoryItem/I2/detail']);
+    expect(vi.mocked(api).mock.calls[1][0]).toMatchObject({ params: { orderId: ORDER_ID, itemIssuanceId_op: 'empty', itemIssuanceId_not: 'Y' } });
+    expect(rows.map((row: any) => row.inventoryItemId)).toEqual(['I1', 'I2']);
+  });
+
+  it('makes no call for an order with no issued lines', async () => {
+    const { useOrderDetail: realUseOrderDetail } = await vi.importActual<any>('@/composables/useOrderDetail');
+    vi.mocked(api).mockReset();
+
+    expect(await realUseOrderDetail().getInventoryIssuance(ORDER_ID, [])).toEqual([]);
+    expect(api).not.toHaveBeenCalled();
   });
 });

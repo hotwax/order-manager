@@ -1,8 +1,21 @@
 import { defineStore } from "pinia";
 import { omDb } from "@/db/orderManagerDb";
-import { api, commonUtil, logger} from "@common";
-import { UNFILLABLE_SAMPLE_SIZE, useOrderDetail } from "@/composables/useOrderDetail";
+import { api, commonUtil, logger, translate, useSolrSearch } from "@common";
+import { FACILITY_CHANGE_PAGE_SIZE, UNFILLABLE_SAMPLE_SIZE, useOrderDetail, type IssuanceLine } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
+import { useCustomerStore } from "./customer";
+import { useUserStore } from "./user";
+import Actions from "@/authorization/actions";
+import { escapeSolrValue } from "@/services/order";
+import { getReturn } from "@/services/returns";
+import { fetchOrderInventoryTransfers } from "@/services/inventoryTransfers";
+import { enrichOrder, isPosCompletedShipGroup } from "@/utils/orderDetailEnrichment";
+import { toMillis } from "@/utils/format";
+import { OrderActionValidator } from "@/utils/OrderActionValidator";
+import { buildOrderEvents, clusterEvents, type ExchangeChild, type OrderEvent, type UnfillableSummary } from "@/utils/orderEvents";
+import { adjustmentAmount, adjustmentKey, adjustmentLabel } from "@/utils/orderAdjustments";
+import { buildSeedLookup, readSeedLookupRows, type SeedLookup, type SeedLookupRows } from "@/utils/seedLookup";
+import type { EnrichedOrder } from "@/types/orderDetail";
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error" | "notfound";
 
@@ -15,28 +28,107 @@ interface OrderEntry {
 
 const HEADER_SEQ_ID = "_NA_";
 
+/** Whether the sources behind an order's history are still loading, and whether one failed. */
+export interface OrderHistoryStatus {
+  loading: boolean;
+  failed: boolean;
+  /** The facility changes filled their page, so older moves are not shown. */
+  truncated: boolean;
+}
+
+// Loads in flight, by source and order. A forced reload that arrives while one is running waits
+// for it and then fetches again, so a reload right after an action never returns the stale rows.
+const inFlight = new Map<string, Promise<void>>();
+
+async function singleFlight(key: string, force: boolean, run: () => Promise<void>): Promise<void> {
+  const running = inFlight.get(key);
+  if (running) {
+    if (!force) return running;
+    await running.catch(() => undefined);
+    const next = inFlight.get(key);
+    if (next) return next;
+  }
+  const task = run().finally(() => inFlight.delete(key));
+  inFlight.set(key, task);
+  return task;
+}
+
+// The brokering queue: a ship group waiting to be brokered sits on this facility id.
+const QUEUE_FACILITY_ID = "_NA_";
+
+/** Parking and queue facilities, where an item waits rather than being fulfilled. */
+export function isVirtualFacilityId(facilityId: string, seed: SeedLookup): boolean {
+  if (!facilityId || facilityId === QUEUE_FACILITY_ID) return true;
+  const facilityTypeId = seed.facility(facilityId)?.facilityTypeId;
+  return OrderActionValidator.isVirtualFacility({
+    facilityId,
+    facilityTypeId,
+    facilityParentTypeId: seed.facilityType(facilityTypeId)?.parentTypeId,
+  });
+}
+
 const newEntry = (): OrderEntry => ({ payload: null, status: "idle", loadedAt: "", error: "" });
 
-// Order adjustments (e.g. tax) commonly carry only an orderAdjustmentTypeId, no free-text
-// comment/description — fall back to the seeded enum description so rows show "Sales Tax"
-// rather than the raw "SALES_TAX" id. This also backs the rollup grouping key below, so
-// adjustments only merge under their human-readable label, not the raw type id.
-const adjustmentDisplayLabel = (adj: any, adjustmentTypes: any[]) =>
-  adj.comments
-  || adj.comment
-  || adj.description
-  || adjustmentTypes.find((type: any) => type.orderAdjustmentTypeId === adj.orderAdjustmentTypeId)?.description
-  || adj.orderAdjustmentTypeId
-  || "OTHER_ADJUSTMENT";
+const adjustmentDisplayLabel = (adj: any, seed: SeedLookup) =>
+  adjustmentLabel(adj, seed.orderAdjustmentTypeDescription, "OTHER_ADJUSTMENT");
 
-const adjustmentUniqueKey = (adj: any, adjustmentTypes: any[], fallbackSeqId = "") =>
-  adj.orderAdjustmentId || [
-    fallbackSeqId || adj.orderItemSeqId || "",
-    adj.shipGroupSeqId || "",
-    adj.orderAdjustmentTypeId || "",
-    adjustmentDisplayLabel(adj, adjustmentTypes),
-    Number(adj.amount || 0)
-  ].join("|");
+const adjustmentUniqueKey = (adj: any, seed: SeedLookup, fallbackSeqId = "") =>
+  adjustmentKey(adj, adjustmentDisplayLabel(adj, seed), fallbackSeqId);
+
+/**
+ * Subtotal, adjustments grouped by label, and grand total. Sums the rows actually displayed
+ * (subtotal + every adjustment, including tax) rather than trusting the backend's grandTotal,
+ * which has been observed to exclude tax. Rounded to avoid floating-point drift
+ * (e.g. 59 + 1.53 + 0.59 + 2.86 = 63.980000000000004).
+ */
+function orderTotals(order: any, seed: SeedLookup) {
+  if (!order) return { subtotal: 0, adjustments: {}, total: 0, includedAdjustments: {} };
+
+  let subtotal = 0;
+  (order.shipGroups || []).forEach((sg: any) => {
+    (sg.items || []).forEach((item: any) => {
+      subtotal += Number(item.unitPrice || 0) * Number(item.quantity || 0);
+    });
+  });
+
+  const adjustments: Record<string, number> = {};
+  const includedAdjustments: Record<string, number> = {};
+  let adjustmentsTotal = 0;
+  const seenAdjustments = new Set<string>();
+
+  const recordAdjustment = (adj: any, fallbackSeqId = "") => {
+    const uniqueKey = adjustmentUniqueKey(adj, seed, fallbackSeqId);
+    if (seenAdjustments.has(uniqueKey)) return;
+    seenAdjustments.add(uniqueKey);
+
+    adjustmentsTotal += Number(adj.amount || 0);
+    const { amount, isIncluded } = adjustmentAmount(adj);
+    const label = adjustmentDisplayLabel(adj, seed);
+
+    // Included and excluded amounts stay in separate buckets: a label can carry both
+    // (an included tax on one item, an ordinary one on another), and merging them would
+    // label the ordinary amount "included" while it still adds to the grand total.
+    const bucket = isIncluded ? includedAdjustments : adjustments;
+    bucket[label] = (bucket[label] || 0) + amount;
+  };
+
+  (order.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
+  (order.shipGroups || []).forEach((sg: any) => {
+    (sg.items || []).forEach((item: any) => {
+      (item.adjustments || []).forEach((adj: any) => recordAdjustment(adj, item.orderItemSeqId));
+    });
+  });
+
+  // Filter out zero-sum adjustments
+  [adjustments, includedAdjustments].forEach((bucket) => {
+    Object.keys(bucket).forEach((key) => {
+      if (bucket[key] === 0) delete bucket[key];
+    });
+  });
+
+  const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
+  return { subtotal, adjustments, total: computedTotal || order.grandTotal || 0, includedAdjustments };
+}
 
 const NON_CANCELLABLE_ITEM_STATUSES = new Set(["ITEM_CANCELLED", "ITEM_COMPLETED"]);
 
@@ -50,119 +142,6 @@ function responseList(data: any): any[] {
 
 function eventMillis(value: any): number {
   return commonUtil.parseDateTimeValue(value)?.toMillis() ?? 0;
-}
-
-// OMS records order events one row per order item, so a single operator action on a
-// three-item ship group writes three rows milliseconds apart. Rows sharing a key
-// within this window are one event; anything further apart is a separate action,
-// even when it repeats an earlier move.
-const EVENT_CLUSTER_MS = 60_000;
-
-interface EventCluster {
-  id: string;
-  value: number;
-  rows: any[];
-}
-
-function clusterEvents(rows: any[], keyOf: (row: any) => string, millisOf: (row: any) => number): EventCluster[] {
-  const clusters: EventCluster[] = [];
-  const openByKey: Record<string, EventCluster> = {};
-
-  rows
-    .map((row) => ({ row, millis: millisOf(row) }))
-    .filter(({ millis }) => millis > 0)
-    .sort((left, right) => left.millis - right.millis)
-    .forEach(({ row, millis }) => {
-      const key = keyOf(row);
-      const open = openByKey[key];
-      if (open && millis - open.value <= EVENT_CLUSTER_MS) {
-        open.rows.push(row);
-        return;
-      }
-      const cluster: EventCluster = { id: `${key}|${millis}`, value: millis, rows: [row] };
-      openByKey[key] = cluster;
-      clusters.push(cluster);
-    });
-
-  return clusters;
-}
-
-/** Distinct order items touched by a cluster; falls back to the row count for header-scoped rows. */
-function clusterItemCount(cluster: EventCluster): number {
-  const itemSeqIds = new Set(cluster.rows.map((row: any) => row.orderItemSeqId).filter(Boolean));
-  return itemSeqIds.size || cluster.rows.length;
-}
-
-export interface FacilityChangeEvent {
-  id: string;
-  changeReasonEnumId: string;
-  fromFacilityId: string;
-  facilityId: string;
-  changeUserLogin: string;
-  comments: string;
-  routingRuleId: string;
-  itemCount: number;
-  value: number;
-}
-
-/**
- * Collapse OrderFacilityChange rows into one event per operation — "3 items
- * released to Broadway" rather than three separate lines.
- */
-function clusterFacilityChanges(rows: any[]): FacilityChangeEvent[] {
-  return clusterEvents(
-    rows,
-    (row) => [row.changeReasonEnumId || "", row.fromFacilityId || "", row.facilityId || ""].join("|"),
-    (row) => eventMillis(row.changeDatetime)
-  ).map((cluster) => {
-    const first = cluster.rows[0];
-    // Actor and comment are per row; system-written rows leave both null, so take
-    // whichever row in the cluster carried one.
-    return {
-      id: cluster.id,
-      changeReasonEnumId: first.changeReasonEnumId || "",
-      fromFacilityId: first.fromFacilityId || "",
-      facilityId: first.facilityId || "",
-      changeUserLogin: cluster.rows.find((row: any) => row.changeUserLogin)?.changeUserLogin || "",
-      comments: cluster.rows.find((row: any) => row.comments)?.comments || "",
-      routingRuleId: first.routingRuleId || "",
-      itemCount: clusterItemCount(cluster),
-      value: cluster.value
-    };
-  });
-}
-
-// Item statuses worth a header-timeline entry. ITEM_CREATED/ITEM_APPROVED and the
-// pending-fulfillment steps only restate what the header status rows and the ship
-// group timeline already show.
-const TIMELINE_ITEM_STATUSES = new Set(["ITEM_CANCELLED", "ITEM_REJECTED", "ITEM_REQ_CANCELATN"]);
-
-export interface ItemStatusEvent {
-  id: string;
-  statusId: string;
-  changeReason: string;
-  statusUserLogin: string;
-  itemCount: number;
-  value: number;
-}
-
-/** Collapse item cancel/reject status rows into one event per action. */
-function clusterItemStatuses(rows: any[]): ItemStatusEvent[] {
-  return clusterEvents(
-    rows.filter((row: any) => TIMELINE_ITEM_STATUSES.has(row.statusId)),
-    (row) => `${row.statusId}|${row.changeReason || ""}`,
-    (row) => eventMillis(row.statusDatetime)
-  ).map((cluster) => {
-    const first = cluster.rows[0];
-    return {
-      id: cluster.id,
-      statusId: first.statusId || "",
-      changeReason: first.changeReason || "",
-      statusUserLogin: cluster.rows.find((row: any) => row.statusUserLogin)?.statusUserLogin || "",
-      itemCount: clusterItemCount(cluster),
-      value: cluster.value
-    };
-  });
 }
 
 export interface ItemIssuanceSummary {
@@ -216,14 +195,6 @@ function summariseIssuance(rows: any[]): Record<string, ItemIssuanceSummary> {
   return summary;
 }
 
-export interface UnfillableSummary {
-  /** Brokering runs that failed, not rows: one run writes a row per unfillable item. */
-  count: number;
-  /** True when `count` is a floor — the sample filled its page, so older runs are unseen. */
-  atLeast: boolean;
-  lastAttemptDate: string;
-}
-
 /**
  * Count failed brokering attempts from UNFILLABLE rows.
  *
@@ -266,41 +237,80 @@ function cancellableOrderItems(order: any) {
 export const useOrderDetailStore = defineStore("orderDetail", {
   state: () => ({
     byOrderId: {} as Record<string, OrderEntry>,
-    currentOrderId: "",
-    orderHeaderWorkEfforts: [] as any[],
-    orderHeaderWorkEffortsByOrderId: {} as Record<string, any[]>,
     riskAssessmentsByOrderId: {} as Record<string, any[]>,
     riskAssessmentsStatusByOrderId: {} as Record<string, LoadStatus>,
-    riskAssessmentsErrorByOrderId: {} as Record<string, string>,
-    commEvents: [] as any[],
     commEventsByOrderId: {} as Record<string, any[]>,
     shippingMethods: [] as any[],
-    /** Reference rows this store owns, read from the local database on order load. */
-    orderAdjustmentTypes: [] as any[],
-    carrierShipmentMethods: [] as any[],
     carrierParties: [] as any[],
-    fulfillmentTimeline: [] as any[],
+    /**
+     * Seed reference rows the order page's getters read synchronously, read from the local
+     * database on each order load. See utils/seedLookup.
+     */
+    seedRows: {} as SeedLookupRows,
+    seedRowsReady: false,
     fulfillmentTimelineByOrderId: {} as Record<string, any[]>,
-    // Order event sources behind the header timeline. OrderStatus and
-    // OrderFacilityChange are the only places OMS records who changed what and why;
-    // the order master-detail document carries neither.
+    // Order event sources behind the timeline. OrderStatus rows arrive on the order document;
+    // OrderFacilityChange rows are the only other place OMS records who moved what and why.
     facilityChangesByOrderId: {} as Record<string, any[]>,
+    facilityChangesTruncatedByOrderId: {} as Record<string, boolean>,
     unfillableByOrderId: {} as Record<string, UnfillableSummary>,
-    orderEventsStatusByOrderId: {} as Record<string, LoadStatus>,
+    historyStatusByOrderId: {} as Record<string, { loading: number; failed: boolean }>,
     // What inventory issuance did to each order item, keyed orderId -> orderItemSeqId.
     // Only loaded for orders that need it.
     issuanceByOrderId: {} as Record<string, Record<string, ItemIssuanceSummary>>,
     issuanceStatusByOrderId: {} as Record<string, LoadStatus>,
+    exchangeChildrenByOrderId: {} as Record<string, ExchangeChild[]>,
+    returnHeadersById: {} as Record<string, any | null>,
+    // Inventory transfers requested for the order's items, by Order Manager, the Transfers app
+    // or the regional broker.
+    inventoryTransfersByOrderId: {} as Record<string, any[]>,
   }),
   getters: {
-    current: (state) => state.byOrderId[state.currentOrderId]?.payload || null,
-    currentEntry: (state) => state.byOrderId[state.currentOrderId] || null,
-    isLoading: (state) => state.byOrderId[state.currentOrderId]?.status === "loading",
-    error: (state) => state.byOrderId[state.currentOrderId]?.error || "",
+    /** Sync seed lookups over seedRows; rebuilt only when a new read lands. */
+    seedLookup: (state): SeedLookup => buildSeedLookup(state.seedRows, state.seedRowsReady),
+    /**
+     * The order page's view model: the raw order document joined with the loaded auxiliary
+     * sources (order events, issuance, risk, returns, transfers) and the seed,
+     * product and customer caches. See utils/orderDetailEnrichment.
+     */
+    enrichedOrderByOrderId(): (orderId: string) => EnrichedOrder | null {
+      return (orderId: string) => {
+        const raw = this.orderById(orderId);
+        if (!raw) return null;
+        const customerPartyId = this.customerPartyIdByOrderId(orderId);
+        return enrichOrder(raw, {
+          totals: this.orderTotalsByOrderId(orderId),
+          groupAdjustments: this.adjustmentsByExternalIdByOrderId(orderId),
+          customerPartyId,
+          customerName: this.customerNameByOrderId(orderId),
+          customerProfile: customerPartyId ? useCustomerStore().getCustomer(customerPartyId) : null,
+          events: this.orderEventsByOrderId(orderId),
+          issuanceByItem: this.issuanceByItemSeqIdByOrderId(orderId),
+          riskAssessments: this.riskAssessmentsForOrder(orderId),
+          returnedQtyBySeqId: this.returnedQtyByItemSeqIdByOrderId(orderId),
+          inventoryTransfers: this.inventoryTransfersByOrderId[orderId] || [],
+        }, { seed: this.seedLookup, productCache: useProductCacheStore() });
+      };
+    },
 
     orderById: (state) => (orderId: string) => state.byOrderId[orderId]?.payload || null,
+    /**
+     * Whether an order's transfers have loaded. Until they have, every item looks like it has none,
+     * so anything that must not duplicate a transfer waits for this.
+     */
+    inventoryTransfersLoaded: (state) => (orderId: string) => Array.isArray(state.inventoryTransfersByOrderId[orderId]),
     loadingById: (state) => (orderId: string) => state.byOrderId[orderId]?.status === "loading",
     errorById: (state) => (orderId: string) => state.byOrderId[orderId]?.error || "",
+    /**
+     * The order has not been answered yet: never requested, queued or in flight. Unlike
+     * loadingById, a missing entry counts too, because callers ask before the fetch has started.
+     */
+    pendingById: (state) => (orderId: string) => {
+      const status = state.byOrderId[orderId]?.status;
+      return !status || status === "idle" || status === "loading";
+    },
+    commEventsForOrder: (state) => (orderId: string): any[] => state.commEventsByOrderId[orderId] || [],
+    riskAssessmentsForOrder: (state) => (orderId: string): any[] => state.riskAssessmentsByOrderId[orderId] || [],
 
     placingCustomerRoleByOrderId: (state) => (orderId: string) => {
       const current = state.byOrderId[orderId]?.payload;
@@ -329,38 +339,30 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     },
 
     /**
-     * Every OrderStatus row for the order, newest first — header and item level, with
-     * statusDatetime, statusUserLogin and changeReason.
-     *
-     * These come from the order document itself: the OrderHeader `default` master
-     * declares `<detail relationship="statuses"/>` with no field restriction, so the
-     * rows arrive complete. Verified against rails-uat — identical to what
-     * `GET oms/orders/{id}/status` returns, so there is nothing to fetch separately.
+     * The order's history as typed events, oldest first: the OrderStatus rows on the order
+     * document plus the facility changes, unfillable attempts, fulfillment dates, returns and
+     * exchanges loaded beside it. See utils/orderEvents.
      */
-    statusHistoryByOrderId: (state) => (orderId: string) =>
-      (state.byOrderId[orderId]?.payload?.statuses || [])
-        .slice()
-        .sort((left: any, right: any) => eventMillis(right.statusDatetime) - eventMillis(left.statusDatetime)),
-
-    headerStatusesByOrderId(): (orderId: string) => any[] {
-      return (orderId: string) => this.statusHistoryByOrderId(orderId)
-        .filter((status: any) => (status.orderItemSeqId || HEADER_SEQ_ID) === HEADER_SEQ_ID);
+    orderEventsByOrderId(): (orderId: string) => OrderEvent[] {
+      const seed = this.seedLookup;
+      return (orderId: string): OrderEvent[] => buildOrderEvents({
+        order: this.byOrderId[orderId]?.payload || null,
+        facilityChanges: this.facilityChangesByOrderId[orderId] || [],
+        facilityChangesLoaded: Array.isArray(this.facilityChangesByOrderId[orderId]),
+        facilityChangesTruncated: !!this.facilityChangesTruncatedByOrderId[orderId],
+        unfillable: this.unfillableByOrderId[orderId] || null,
+        fulfillment: this.fulfillmentTimelineByOrderId[orderId] || [],
+        returnHeadersById: this.returnHeadersById,
+        exchangeChildren: this.exchangeChildrenByOrderId[orderId] || [],
+        isVirtualFacility: (facilityId: string) => isVirtualFacilityId(facilityId, seed),
+      });
     },
 
-    /** Item-scoped status rows — the per-item cancel/reject history the header rows never show. */
-    itemStatusesByOrderId(): (orderId: string) => any[] {
-      return (orderId: string) => this.statusHistoryByOrderId(orderId)
-        .filter((status: any) => (status.orderItemSeqId || HEADER_SEQ_ID) !== HEADER_SEQ_ID);
-    },
-
-    /** Item cancel/reject status rows collapsed to one event per action, oldest first. */
-    itemStatusEventsByOrderId(): (orderId: string) => ItemStatusEvent[] {
-      return (orderId: string) => clusterItemStatuses(this.itemStatusesByOrderId(orderId));
-    },
-
-    /** OrderFacilityChange rows collapsed to one event per operation, oldest first. */
-    facilityChangeEventsByOrderId: (state) => (orderId: string) =>
-      clusterFacilityChanges(state.facilityChangesByOrderId[orderId] || []),
+    orderHistoryStatus: (state) => (orderId: string): OrderHistoryStatus => ({
+      loading: (state.historyStatusByOrderId[orderId]?.loading || 0) > 0,
+      failed: !!state.historyStatusByOrderId[orderId]?.failed,
+      truncated: !!state.facilityChangesTruncatedByOrderId[orderId],
+    }),
 
     /** Count and last date of the UNFILLABLE brokering attempts, or null when there were none. */
     unfillableAttemptsByOrderId: (state) => (orderId: string) =>
@@ -374,24 +376,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     issuanceByItemSeqIdByOrderId: (state) => (orderId: string) =>
       state.issuanceStatusByOrderId[orderId] === "loaded" ? (state.issuanceByOrderId[orderId] || {}) : null,
 
-    contactMechsByPurposeByOrderId: (state) => (orderId: string) => {
-      const current = state.byOrderId[orderId]?.payload;
-      const index: Record<string, any> = {};
-      (current?.contactMechs || []).forEach((mech: any) => {
-        if (mech.contactMechPurposeTypeId) index[mech.contactMechPurposeTypeId] = mech;
-      });
-      return index;
-    },
-
-    contactMechsByIdByOrderId: (state) => (orderId: string) => {
-      const current = state.byOrderId[orderId]?.payload;
-      const index: Record<string, any> = {};
-      (current?.contactMechs || []).forEach((mech: any) => {
-        if (mech.contactMechId) index[mech.contactMechId] = mech;
-      });
-      return index;
-    },
-
     returnedQtyByItemSeqIdByOrderId: (state) => (orderId: string) => {
       const current = state.byOrderId[orderId]?.payload;
       const totals: Record<string, number> = {};
@@ -402,52 +386,8 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       return totals;
     },
 
-    orderTotalsByOrderId: (state) => (orderId: string) => {
-      const current = state.byOrderId[orderId]?.payload;
-      if (!current) return { subtotal: 0, adjustments: {}, total: 0 };
-
-      let subtotal = 0;
-      (current.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          subtotal += Number(item.unitPrice || 0) * Number(item.quantity || 0);
-        });
-      });
-
-      const adjustments: Record<string, number> = {};
-      let adjustmentsTotal = 0;
-      const seenAdjustments = new Set<string>();
-
-      const recordAdjustment = (adj: any, fallbackSeqId = "") => {
-        const uniqueKey = adjustmentUniqueKey(adj, state.orderAdjustmentTypes, fallbackSeqId);
-        if (seenAdjustments.has(uniqueKey)) return;
-        seenAdjustments.add(uniqueKey);
-
-        const amount = Number(adj.amount || 0);
-        adjustmentsTotal += amount;
-
-        const label = adjustmentDisplayLabel(adj, state.orderAdjustmentTypes);
-        adjustments[label] = (adjustments[label] || 0) + amount;
-      };
-
-      (current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
-
-      (current.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          (item.adjustments || []).forEach((adj: any) => recordAdjustment(adj, item.orderItemSeqId));
-        });
-      });
-
-      // Filter out zero-sum adjustments
-      Object.keys(adjustments).forEach((key) => {
-        if (adjustments[key] === 0) {
-          delete adjustments[key];
-        }
-      });
-
-      const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
-      const total = computedTotal || current.grandTotal || 0;
-
-      return { subtotal, adjustments, total };
+    orderTotalsByOrderId(): (orderId: string) => ReturnType<typeof orderTotals> {
+      return (orderId: string) => orderTotals(this.byOrderId[orderId]?.payload, this.seedLookup);
     },
 
     allItemsByOrderId: (state) => (orderId: string) => {
@@ -461,275 +401,76 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       );
     },
 
-    timelineByShipGroupByOrderId: (state) => (orderId: string) => {
-      const index: Record<string, any> = {};
-      const timeline = state.fulfillmentTimelineByOrderId[orderId] || [];
-      timeline.forEach((entry: any) => {
-        if (entry.shipGroupSeqId) index[entry.shipGroupSeqId] = entry;
-      });
-      return index;
-    },
-
-    /** Order-header timeline: status rows that are NOT item-scoped, newest first. */
-    headerStatuses(): any[] {
-      return this.headerStatusesByOrderId(this.currentOrderId);
-    },
-
-    /** Item cancel/reject events for the current order, oldest first. */
-    itemStatusEvents(): ItemStatusEvent[] {
-      return this.itemStatusEventsByOrderId(this.currentOrderId);
-    },
-
-    /** Facility-change events for the current order, oldest first. */
-    facilityChangeEvents(): FacilityChangeEvent[] {
-      return this.facilityChangeEventsByOrderId(this.currentOrderId);
-    },
-
-    /** Unfillable brokering summary for the current order, or null. */
-    unfillableAttempts(): UnfillableSummary | null {
-      return this.unfillableAttemptsByOrderId(this.currentOrderId);
-    },
-
-    /** Contact mechs indexed by purpose (ORDER_EMAIL, SHIPPING_LOCATION, BILLING_LOCATION, …). */
-    contactMechsByPurpose(): Record<string, any> {
-      const index: Record<string, any> = {};
-      (this.current?.contactMechs || []).forEach((mech: any) => {
-        if (mech.contactMechPurposeTypeId) index[mech.contactMechPurposeTypeId] = mech;
-      });
-      return index;
-    },
-
-    /** Contact mechs indexed by contactMechId — used to resolve a ship group's address. */
-    contactMechsById(): Record<string, any> {
-      const index: Record<string, any> = {};
-      (this.current?.contactMechs || []).forEach((mech: any) => {
-        if (mech.contactMechId) index[mech.contactMechId] = mech;
-      });
-      return index;
-    },
-
-    /** The placing-customer order role (carries party + joined person/partyGroup). */
-    placingCustomerRole(): any {
-      return (this.current?.roles || []).find((role: any) => role.roleTypeId === "PLACING_CUSTOMER") || null;
-    },
-
-    /** partyId of the placing customer, for any party-scoped UI. */
-    customerPartyId(): string {
-      return this.placingCustomerRole?.partyId || "";
+    /** Maps orderItemSeqId to its orderItemExternalId. */
+    itemExternalIdBySeqIdByOrderId(): (orderId: string) => Record<string, string> {
+      return (orderId: string) => {
+        const map: Record<string, string> = {};
+        const productCache = useProductCacheStore();
+        (this.orderById(orderId)?.shipGroups || []).forEach((sg: any) => {
+          (sg.items || []).forEach((item: any) => {
+            const seqId = item.orderItemSeqId;
+            if (!seqId) return;
+            const sku = productCache.getProduct(item.productId)?.sku || item.productId;
+            map[seqId] = item.externalId || sku || seqId;
+          });
+        });
+        return map;
+      };
     },
 
     /**
-     * Customer name from the joined Person/PartyGroup on the placing-customer role
-     * (requires the extended OrderRole master — see docs/MoquiChanges.md). Falls back to
-     * the shipping address `toName` until that master change is deployed, then "".
+     * Adjustments grouped by orderItemExternalId, summing their amounts. Inclusion is carried
+     * as metadata rather than baked into the label so the view can translate it at render time,
+     * and so an included and an ordinary adjustment sharing a label stay separate rows.
      */
-    customerName(): string {
-      const role = this.placingCustomerRole;
-      const person = role?.person;
-      if (person && (person.firstName || person.lastName)) {
-        return [person.firstName, person.lastName].filter(Boolean).join(" ");
-      }
-      if (role?.partyGroup?.groupName) return role.partyGroup.groupName;
+    adjustmentsByExternalIdByOrderId(): (orderId: string) => Record<string, Array<{ label: string; amount: number; isIncluded: boolean }>> {
+      return (orderId: string) => {
+        const current = this.orderById(orderId);
+        const index: Record<string, Record<string, { label: string; amount: number; isIncluded: boolean }>> = {};
+        const seqIdToExtId = this.itemExternalIdBySeqIdByOrderId(orderId);
+        const seenAdjustments = new Set<string>();
 
-      const shipping = (this.current?.contactMechs || []).find(
-        (mech: any) => mech.contactMechPurposeTypeId === "SHIPPING_LOCATION"
-      );
-      return shipping?.postalAddress?.toName || "";
-    },
+        const recordAdj = (seqId: string, adj: any) => {
+          const extId = seqIdToExtId[seqId] || seqId;
+          if (!extId) return;
+          const uniqueKey = `${extId}:${adjustmentUniqueKey(adj, this.seedLookup, seqId)}`;
+          if (seenAdjustments.has(uniqueKey)) return;
+          seenAdjustments.add(uniqueKey);
 
-    /** Returned quantity summed by orderItemSeqId — crosses the top-level returnItems array. */
-    returnedQtyByItemSeqId(): Record<string, number> {
-      const totals: Record<string, number> = {};
-      (this.current?.returnItems || []).forEach((item: any) => {
-        const seqId = item.orderItemSeqId;
-        if (!seqId) return;
-        totals[seqId] = (totals[seqId] || 0) + Number(item.returnQuantity || 0);
-      });
-      return totals;
-    },
+          const { amount, isIncluded } = adjustmentAmount(adj);
+          const label = adjustmentDisplayLabel(adj, this.seedLookup);
+          const bucketKey = isIncluded ? `${label}\u0000included` : label;
+          const buckets = index[extId] ||= {};
+          const bucket = buckets[bucketKey] ||= { label, amount: 0, isIncluded };
+          bucket.amount += amount;
+        };
 
-    /** Maps orderItemSeqId to its orderItemExternalId. */
-    itemExternalIdBySeqId(): Record<string, string> {
-      const map: Record<string, string> = {};
-      const productCache = useProductCacheStore();
-      
-      (this.current?.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          const seqId = item.orderItemSeqId;
-          if (seqId) {
-            const product = productCache.getProduct(item.productId);
-            const sku = product?.sku || item.productId;
-            map[seqId] = item.externalId || sku || seqId;
-          }
+        // 1. Top-level adjustments carry their orderItemSeqId
+        (current?.adjustments || []).forEach((adj: any) => {
+          const seqId = adj.orderItemSeqId;
+          if (seqId && seqId !== HEADER_SEQ_ID) recordAdj(seqId, adj);
         });
-      });
-      return map;
-    },
 
-    /** Adjustments grouped by orderItemExternalId and comment, summing their amounts. */
-    adjustmentsByExternalId(): Record<string, Record<string, number>> {
-      const index: Record<string, Record<string, number>> = {};
-      const seqIdToExtId = this.itemExternalIdBySeqId;
-      const seenAdjustments = new Set<string>();
-
-      const recordAdj = (seqId: string, adj: any) => {
-        const extId = seqIdToExtId[seqId] || seqId;
-        if (!extId) return;
-        const uniqueKey = `${extId}:${adjustmentUniqueKey(adj, this.orderAdjustmentTypes, seqId)}`;
-        if (seenAdjustments.has(uniqueKey)) return;
-        seenAdjustments.add(uniqueKey);
-        const comment = adjustmentDisplayLabel(adj, this.orderAdjustmentTypes);
-        if (!index[extId]) index[extId] = {};
-        index[extId][comment] = (index[extId][comment] || 0) + Number(adj.amount || 0);
-      };
-
-      // 1. Process top-level adjustments (which carry orderItemSeqId)
-      (this.current?.adjustments || []).forEach((adj: any) => {
-        const seqId = adj.orderItemSeqId;
-        if (!seqId || seqId === HEADER_SEQ_ID) return;
-        recordAdj(seqId, adj);
-      });
-
-      // 2. Process nested ship group item adjustments
-      (this.current?.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          const seqId = item.orderItemSeqId;
-          if (!seqId) return;
-          (item.adjustments || []).forEach((adj: any) => {
-            recordAdj(seqId, adj);
+        // 2. Adjustments nested under each ship group item
+        (current?.shipGroups || []).forEach((sg: any) => {
+          (sg.items || []).forEach((item: any) => {
+            const seqId = item.orderItemSeqId;
+            if (seqId) (item.adjustments || []).forEach((adj: any) => recordAdj(seqId, adj));
           });
         });
-      });
 
-      return index;
-    },
-
-    /** Rolled up item price totals (sum of unitPrice * quantity) grouped by orderItemExternalId */
-    totalsByExternalId(): Record<string, number> {
-      const totals: Record<string, number> = {};
-      const seqIdToExtId = this.itemExternalIdBySeqId;
-
-      (this.current?.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          const seqId = item.orderItemSeqId;
-          const extId = seqIdToExtId[seqId] || seqId;
-          if (!extId) return;
-          const unitPrice = Number(item.unitPrice || 0);
-          const quantity = Number(item.quantity || 0);
-          totals[extId] = (totals[extId] || 0) + (unitPrice * quantity);
-        });
-      });
-
-      return totals;
-    },
-
-    /** Rolled up item quantities grouped by orderItemExternalId */
-    quantitiesByExternalId(): Record<string, number> {
-      const quantities: Record<string, number> = {};
-      const seqIdToExtId = this.itemExternalIdBySeqId;
-
-      (this.current?.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          const seqId = item.orderItemSeqId;
-          const extId = seqIdToExtId[seqId] || seqId;
-          if (!extId) return;
-          quantities[extId] = (quantities[extId] || 0) + Number(item.quantity || 0);
-        });
-      });
-
-      return quantities;
-    },
-
-    /** Order totals (subtotal, adjustments grouped by comment/type, total) */
-    totals(): { subtotal: number; adjustments: Record<string, number>; total: number } {
-      if (!this.current) return { subtotal: 0, adjustments: {}, total: 0 };
-
-      let subtotal = 0;
-      (this.current.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          subtotal += Number(item.unitPrice || 0) * Number(item.quantity || 0);
-        });
-      });
-
-      const adjustments: Record<string, number> = {};
-      let adjustmentsTotal = 0;
-      const seenAdjustments = new Set<string>();
-
-      const recordAdjustment = (adj: any, fallbackSeqId = "") => {
-        const uniqueKey = adjustmentUniqueKey(adj, this.orderAdjustmentTypes, fallbackSeqId);
-        if (seenAdjustments.has(uniqueKey)) return;
-        seenAdjustments.add(uniqueKey);
-
-        const amount = Number(adj.amount || 0);
-        adjustmentsTotal += amount;
-
-        const label = adjustmentDisplayLabel(adj, this.orderAdjustmentTypes);
-        adjustments[label] = (adjustments[label] || 0) + amount;
+        return Object.fromEntries(
+          Object.entries(index).map(([extId, buckets]) => [extId, Object.values(buckets)])
+        );
       };
-
-      (this.current.adjustments || []).forEach((adj: any) => recordAdjustment(adj));
-
-      (this.current.shipGroups || []).forEach((sg: any) => {
-        (sg.items || []).forEach((item: any) => {
-          (item.adjustments || []).forEach((adj: any) => recordAdjustment(adj, item.orderItemSeqId));
-        });
-      });
-
-      // Filter out zero-sum adjustments
-      Object.keys(adjustments).forEach((key) => {
-        if (adjustments[key] === 0) {
-          delete adjustments[key];
-        }
-      });
-
-      // Sum the rows actually displayed (subtotal + every adjustment, including tax) rather than
-      // trusting the backend's grandTotal, which has been observed to exclude tax. Round to avoid
-      // floating-point drift (e.g. 59 + 1.53 + 0.59 + 2.86 = 63.980000000000004).
-      const computedTotal = Math.round((subtotal + adjustmentsTotal) * 100) / 100;
-      const total = computedTotal || this.current.grandTotal || 0;
-
-      return { subtotal, adjustments, total };
     },
-
-    /** Flat list of all items across ship groups, each carrying its ship group context. */
-    allItems(): any[] {
-      return (this.current?.shipGroups || []).flatMap((shipGroup: any) =>
-        (shipGroup.items || []).map((item: any) => ({
-          ...item,
-          shipGroupSeqId: shipGroup.shipGroupSeqId,
-          facilityId: shipGroup.facilityId
-        }))
-      );
-    },
-
-    /** Fulfillment timeline indexed by shipGroupSeqId for O(1) lookup in the template. */
-    timelineByShipGroup: (state): Record<string, any> => {
-      const index: Record<string, any> = {};
-      state.fulfillmentTimeline.forEach((entry: any) => {
-        if (entry.shipGroupSeqId) index[entry.shipGroupSeqId] = entry;
-      });
-      return index;
-    },
-
-    openHolds: (state) => state.orderHeaderWorkEfforts,
-
-    hasOpenHolds(): boolean {
-      return this.openHolds.length > 0;
-    },
-
-    riskAssessments: (state): any[] => state.riskAssessmentsByOrderId[state.currentOrderId] || [],
-    riskAssessmentsStatus: (state): LoadStatus => state.riskAssessmentsStatusByOrderId[state.currentOrderId] || "idle",
-    riskAssessmentsError: (state): string => state.riskAssessmentsErrorByOrderId[state.currentOrderId] || "",
 
     /** Shipping methods for a given carrier partyId, derived from the fetched carrierShipmentMethods list or the local database. */
-    shippingMethodsByCarrier: (state) => (carrierPartyId: string) => {
-      const fromDetail = state.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId);
-      if (fromDetail.length) return fromDetail;
-      try {
-        return state.carrierShipmentMethods.filter((m: any) => m.partyId === carrierPartyId);
-      } catch {
-        return [];
-      }
+    shippingMethodsByCarrier(): (carrierPartyId: string) => any[] {
+      return (carrierPartyId: string) => {
+        const fromDetail = this.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId);
+        return fromDetail.length ? fromDetail : this.seedLookup.shippingMethodsByCarrier(carrierPartyId);
+      };
     },
   },
   actions: {
@@ -771,81 +512,94 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       } catch (error: any) {
         logger.error(`Failed to load order detail for [${orderId}]`, error);
         entry.status = "error";
-        entry.error = error?.message || "Failed to load order";
+        entry.error = error?.message || translate("Failed to load order");
       }
     },
-    async fetchOrderHeaderWorkEfforts(orderId: string) {
-      if (!orderId) return;
+    /** Run one of the order's history loads, counting it in the history status. It says whether it worked. */
+    async trackHistory(orderId: string, load: () => Promise<boolean>) {
+      if (!this.historyStatusByOrderId[orderId]) this.historyStatusByOrderId[orderId] = { loading: 0, failed: false };
+      const status = this.historyStatusByOrderId[orderId];
+      status.loading++;
       try {
-        const resp = await useOrderDetail().getWorkEfforts(orderId);
-        if (commonUtil.hasError(resp)) throw resp.data;
-        const docs = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
-        this.orderHeaderWorkEffortsByOrderId[orderId] = docs;
-        this.orderHeaderWorkEfforts = docs;
-      } catch (error: any) {
-        logger.error("Failed to load work efforts", error);
+        if (!(await load())) status.failed = true;
+      } finally {
+        status.loading--;
       }
     },
 
-    async fetchFulfillmentTimeline(orderId: string) {
+    /** Picked, packed and shipped dates per ship group, from `get#OrderFulfillmentTimeline`. */
+    async fetchFulfillmentTimeline(orderId: string, force = false) {
       if (!orderId) return;
-      try {
-        const resp = await api({ url: `oms/orders/${orderId}/fulfillmentTimeline`, method: 'GET' });
-        if (commonUtil.hasError(resp)) throw resp.data;
-        const docs = Array.isArray(resp.data) ? resp.data : (resp.data?.timeline ?? resp.data?.docs ?? []);
-        this.fulfillmentTimelineByOrderId[orderId] = docs;
-        this.fulfillmentTimeline = docs;
-      } catch (error: any) {
-        logger.error('Failed to load fulfillment timeline', error);
-      }
+      return singleFlight(`fulfillment:${orderId}`, force, () => this.trackHistory(orderId, async () => {
+        try {
+          const resp = await api({ url: `oms/orders/${orderId}/fulfillmentTimeline`, method: 'GET' });
+          if (commonUtil.hasError(resp)) throw resp.data;
+          this.fulfillmentTimelineByOrderId[orderId] = Array.isArray(resp.data) ? resp.data : (resp.data?.timeline ?? resp.data?.docs ?? []);
+          return true;
+        } catch (error: any) {
+          logger.error('Failed to load fulfillment timeline', error);
+          return false;
+        }
+      }));
     },
 
     /**
-     * Load the order's event history: OrderStatus rows, OrderFacilityChange rows,
-     * and the UNFILLABLE attempt summary. Each call is settled independently so a
-     * failure in one source only costs the timeline that source's entries.
+     * Load the order's facility changes and the UNFILLABLE attempt summary. Each call is settled
+     * independently, so a failure in one source only costs the timeline that source's entries.
+     * OrderStatus rows are not fetched here — they arrive complete on the order document.
      */
     async fetchOrderEvents(orderId: string, force = false) {
       if (!orderId) return;
-      if (this.orderEventsStatusByOrderId[orderId] === "loaded" && !force) return;
-      if (this.orderEventsStatusByOrderId[orderId] === "loading") return;
+      if (!force && Array.isArray(this.facilityChangesByOrderId[orderId])) return;
 
-      this.orderEventsStatusByOrderId[orderId] = "loading";
-      const orderDetail = useOrderDetail();
+      return singleFlight(`events:${orderId}`, force, () => this.trackHistory(orderId, async () => {
+        const orderDetail = useOrderDetail();
+        const [facilityChanges, unfillable] = await Promise.allSettled([
+          orderDetail.getFacilityChanges(orderId),
+          orderDetail.getUnfillableAttempts(orderId)
+        ]);
 
-      // OrderStatus rows are not fetched here — they already arrive complete on the
-      // order document. See statusHistoryByOrderId.
-      const [facilityChanges, unfillable] = await Promise.allSettled([
-        orderDetail.getFacilityChanges(orderId),
-        orderDetail.getUnfillableAttempts(orderId)
-      ]);
-
-      if (facilityChanges.status === "fulfilled" && !commonUtil.hasError(facilityChanges.value)) {
-        this.facilityChangesByOrderId[orderId] = responseList(facilityChanges.value.data);
-      } else {
-        logger.error(`Failed to load order facility changes for [${orderId}]`, facilityChanges);
-      }
-
-      if (unfillable.status === "fulfilled" && !commonUtil.hasError(unfillable.value)) {
-        const rows = responseList(unfillable.value.data);
-        // rows[0] is the newest, so it dates the last attempt. The count is of runs, not
-        // rows, and is a floor when the sample filled its page — X-Total-Count would not
-        // help here even when readable, since it counts rows.
-        const count = countUnfillableAttempts(rows);
-        if (count > 0) {
-          this.unfillableByOrderId[orderId] = {
-            count,
-            atLeast: rows.length >= UNFILLABLE_SAMPLE_SIZE,
-            lastAttemptDate: rows[0].changeDatetime
-          };
+        const changesLoaded = facilityChanges.status === "fulfilled" && !commonUtil.hasError(facilityChanges.value);
+        const unfillableLoaded = unfillable.status === "fulfilled" && !commonUtil.hasError(unfillable.value);
+        if (changesLoaded) {
+          const rows = responseList(facilityChanges.value.data);
+          this.facilityChangesByOrderId[orderId] = rows;
+          this.facilityChangesTruncatedByOrderId[orderId] = rows.length >= FACILITY_CHANGE_PAGE_SIZE;
         } else {
-          delete this.unfillableByOrderId[orderId];
+          logger.error(`Failed to load order facility changes for [${orderId}]`, facilityChanges);
         }
-      } else {
-        logger.error(`Failed to load unfillable brokering attempts for [${orderId}]`, unfillable);
-      }
 
-      this.orderEventsStatusByOrderId[orderId] = facilityChanges.status === "fulfilled" ? "loaded" : "error";
+        if (unfillableLoaded) {
+          const rows = responseList(unfillable.value.data);
+          // rows[0] is the newest, so it dates the last attempt. The count is of runs, not
+          // rows, and is a floor when the sample filled its page — X-Total-Count would not
+          // help here even when readable, since it counts rows.
+          const count = countUnfillableAttempts(rows);
+          if (count > 0) {
+            this.unfillableByOrderId[orderId] = {
+              count,
+              atLeast: rows.length >= UNFILLABLE_SAMPLE_SIZE,
+              lastAttemptDate: rows[0].changeDatetime
+            };
+          } else {
+            delete this.unfillableByOrderId[orderId];
+          }
+        } else {
+          logger.error(`Failed to load unfillable brokering attempts for [${orderId}]`, unfillable);
+        }
+        return changesLoaded && unfillableLoaded;
+      }));
+    },
+
+    /** Fetch the order's history again after a load failed. */
+    async retryOrderHistory(orderId: string) {
+      if (this.historyStatusByOrderId[orderId]) this.historyStatusByOrderId[orderId].failed = false;
+      await Promise.all([
+        this.fetchOrderEvents(orderId, true),
+        this.fetchFulfillmentTimeline(orderId, true),
+        this.fetchReturnHeaders(orderId, true),
+        this.fetchExchangeChildren(orderId, true),
+      ]);
     },
 
     /**
@@ -860,10 +614,11 @@ export const useOrderDetailStore = defineStore("orderDetail", {
 
       this.issuanceStatusByOrderId[orderId] = "loading";
       try {
-        const resp = await useOrderDetail().getInventoryIssuance(orderId);
-        if (commonUtil.hasError(resp)) throw resp.data;
-
-        this.issuanceByOrderId[orderId] = summariseIssuance(responseList(resp.data));
+        const lines = (this.orderById(orderId)?.shipGroups || [])
+          .filter(isPosCompletedShipGroup)
+          .flatMap((shipGroup: any) => (shipGroup.items || []).map((item: any) => ({ productId: item.productId, facilityId: shipGroup.facilityId })))
+          .filter((line: IssuanceLine) => line.productId && line.facilityId);
+        this.issuanceByOrderId[orderId] = summariseIssuance(await useOrderDetail().getInventoryIssuance(orderId, lines));
         this.issuanceStatusByOrderId[orderId] = "loaded";
       } catch (error: any) {
         logger.error(`Failed to load inventory issuance for [${orderId}]`, error);
@@ -878,7 +633,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         if (commonUtil.hasError(resp)) throw resp.data;
         const docs = Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
         this.commEventsByOrderId[orderId] = docs;
-        this.commEvents = docs;
       } catch (error: any) {
         logger.error("Failed to load communication events", error);
       }
@@ -890,7 +644,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       if (this.riskAssessmentsStatusByOrderId[orderId] === "loading") return;
 
       this.riskAssessmentsStatusByOrderId[orderId] = "loading";
-      this.riskAssessmentsErrorByOrderId[orderId] = "";
 
       try {
         const resp = await useOrderDetail().getRiskAssessments(orderId);
@@ -900,21 +653,26 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       } catch (error: any) {
         logger.error("Failed to load order risk assessments", error);
         this.riskAssessmentsStatusByOrderId[orderId] = "error";
-        this.riskAssessmentsErrorByOrderId[orderId] = error?.message || "Failed to load order risk assessments";
       }
     },
 
-    /** Reference rows the getters above read synchronously. Read from the local database. */
-    async loadReferenceRows() {
+    async fetchInventoryTransfers(orderId: string) {
+      if (!orderId) return;
       try {
-        const [adjustmentTypes, carrierMethods] = await Promise.all([
-          omDb().all("orderAdjustmentTypes"),
-          omDb().all("carrierShipmentMethods"),
-        ]);
-        this.orderAdjustmentTypes = adjustmentTypes;
-        this.carrierShipmentMethods = carrierMethods;
+        this.inventoryTransfersByOrderId[orderId] = await fetchOrderInventoryTransfers(orderId);
+      } catch (error: any) {
+        logger.error(`Failed to load inventory transfers for [${orderId}]`, error);
+      }
+    },
+
+    /** Read the seed tables behind seedLookup from the local database. */
+    async loadSeedRows() {
+      try {
+        this.seedRows = await readSeedLookupRows((table) => omDb().all(table));
       } catch (error: any) {
         logger.warn("Failed to read order reference rows from the local database", error);
+      } finally {
+        this.seedRowsReady = true;
       }
     },
 
@@ -934,13 +692,12 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         logger.error('Failed to load carrier parties', error);
       }
     },
+    async updateShipGroup(orderId: string, shipGroupSeqId: string, data: Record<string, any>) {
+      return api({ url: `oms/orders/${orderId}/shipGroups/${shipGroupSeqId}`, method: 'PUT', data });
+    },
     async updateShipmentCarrierAndMethod(orderId: string, shipGroupSeqId: string, shipmentMethodTypeId: string, carrierPartyId: string) {
       try {
-        await api({
-          url: `oms/orders/${orderId}/shipGroups/${shipGroupSeqId}`,
-          method: 'PUT',
-          data: { shipmentMethodTypeId, carrierPartyId },
-        });
+        await this.updateShipGroup(orderId, shipGroupSeqId, { shipmentMethodTypeId, carrierPartyId });
       } catch (error: any) {
         logger.error('Failed to update carrier/method', error);
         throw error;
@@ -997,10 +754,106 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         )
       );
     },
-    async setCurrentOrder(orderId: string) {
-      this.currentOrderId = orderId;
-      await this.fetchOrder(orderId);
-      this.fetchFulfillmentTimeline(orderId);
+    /** Exchange orders created from this one, found by the `EXC-{orderName}-` name OMS gives them. */
+    async fetchExchangeChildren(orderId: string, force = false) {
+      const raw = this.orderById(orderId);
+      if (!raw?.orderName) return;
+      if (!force && orderId in this.exchangeChildrenByOrderId) return;
+
+      return singleFlight(`exchanges:${orderId}`, force, () => this.trackHistory(orderId, async () => {
+        try {
+          const response = await useSolrSearch().runSolrQuery({
+            json: {
+              params: { rows: 50, q: '*:*' },
+              filter: ['docType: ORDER', `orderName: ${escapeSolrValue(`EXC-${raw.orderName}-`)}*`]
+            }
+          });
+          if (commonUtil.hasError(response)) throw response.data;
+          const candidateIds = [...new Set(
+            (response.data?.response?.docs || [])
+              .map((doc: any) => String(doc.orderId || ''))
+              .filter((candidateId: string) => candidateId && candidateId !== orderId)
+          )] as string[];
+
+          const children: ExchangeChild[] = [];
+          await Promise.all(candidateIds.map(async (candidateId) => {
+            await this.fetchOrder(candidateId);
+            const payload = this.byOrderId[candidateId]?.payload;
+            const assoc = (payload?.itemAssocs || []).find(
+              (row: any) => row.orderItemAssocTypeId === 'EXCHANGE' && row.toOrderId === orderId
+            );
+            if (!assoc) return;
+
+            const itemCount = (payload.shipGroups || [])
+              .flatMap((shipGroup: any) => shipGroup.items || [])
+              .reduce((sum: number, item: any) => sum + Number(item.quantity || 0), 0);
+            children.push({
+              orderId: candidateId,
+              itemCount,
+              facilityId: payload.originFacilityId && payload.originFacilityId !== QUEUE_FACILITY_ID ? payload.originFacilityId : '',
+              value: toMillis(assoc.createdStamp) || toMillis(payload.orderDate) || 0
+            });
+          }));
+          this.exchangeChildrenByOrderId[orderId] = children;
+          return true;
+        } catch (error) {
+          logger.error('Failed to discover exchange orders for timeline', error);
+          return false;
+        }
+      }));
+    },
+    /**
+     * Return headers carry the return's own date (returnDate) and the facility it was processed at
+     * (destinationFacilityId); the ReturnItem rows on the order document carry neither. null means
+     * the header could not be loaded, and the timeline falls back to when the return was recorded.
+     * Only users who may open the Returns pages (APP_ORDER_RETURN_VIEW) load them.
+     */
+    async fetchReturnHeaders(orderId: string, force = false) {
+      if (!useUserStore().hasPermission(Actions.APP_ORDER_RETURN_VIEW)) return;
+      const returnIds = [...new Set((this.orderById(orderId)?.returnItems || []).map((item: any) => item.returnId).filter(Boolean))] as string[];
+      const pending = returnIds.filter((returnId) => force ? this.returnHeadersById[returnId] == null : !(returnId in this.returnHeadersById));
+      if (!pending.length) return;
+
+      return singleFlight(`returns:${orderId}`, force, () => this.trackHistory(orderId, async () => {
+        let failed = false;
+        await Promise.all(pending.map(async (returnId) => {
+          this.returnHeadersById[returnId] = null;
+          try {
+            const header = await getReturn(returnId);
+            if (header) this.returnHeadersById[returnId] = header;
+          } catch (error) {
+            failed = true;
+            logger.debug(`Return header ${returnId} unavailable for the timeline`, error);
+          }
+        }));
+        return !failed;
+      }));
+    },
+    /**
+     * Load an order and the sources behind its page. Only the order document is awaited; the
+     * rest is fire-and-forget, so the page renders as soon as the order does and each section
+     * fills in as its source lands.
+     */
+    async loadOrderAggregate(orderId: string, force = false) {
+      if (!orderId) return;
+      // Seed labels fill in as the read lands; the order fetch never waits on it.
+      this.loadSeedRows();
+      await this.fetchOrder(orderId, force);
+      const raw = this.orderById(orderId);
+
+      // A forced reload starts the history over, so an earlier failure stops showing.
+      if (force && this.historyStatusByOrderId[orderId]) this.historyStatusByOrderId[orderId].failed = false;
+      this.fetchFulfillmentTimeline(orderId, force);
+      this.fetchOrderEvents(orderId, force);
+      // A counter sale's only remaining question is whether inventory actually left the
+      // books, so load the issuance rows for those orders and no others.
+      if ((raw?.shipGroups || []).some(isPosCompletedShipGroup)) this.fetchInventoryIssuance(orderId, force);
+      // Risk facts up front for risk-flagged orders, so the header Fraud risk card can show
+      // its sentiment chips without waiting for the Holds tab.
+      if (raw?.riskRecommendationEnumId || raw?.riskLevelEnumId) this.fetchRiskAssessments(orderId);
+      this.fetchExchangeChildren(orderId);
+      this.fetchReturnHeaders(orderId);
+      this.fetchInventoryTransfers(orderId);
     },
     reset() {
       this.$reset();

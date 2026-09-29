@@ -1,4 +1,4 @@
-import { createApp } from 'vue'
+import { createApp, watchEffect } from 'vue'
 import App from './App.vue'
 import router from './router';
 import { IonicVue } from '@ionic/vue';
@@ -30,7 +30,7 @@ import "@common/css/theme.css"
 
 import { createPinia } from 'pinia';
 import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
-import { commonUtil, createDxpI18n, imagePreview, initialiseConfig, logger } from '@common';
+import { commonUtil, cookieHelper, createDxpI18n, imagePreview, initialiseConfig, logger } from '@common';
 import { commonDomains, registerDomains } from '@common/db';
 import { orderManagerDb, setOmsInstanceResolver } from './db/orderManagerDb';
 import { useUserStore } from './store/user';
@@ -43,6 +43,11 @@ setOmsInstanceResolver(() => commonUtil.getOMSInstanceName());
 
 const pinia = createPinia().use(piniaPluginPersistedstate);
 const i18n = createDxpI18n(localeMessages)
+// Settings saves the chosen language in a cookie; start in it, and keep <html lang> in step so
+// screen readers and the browser's spellcheck and hyphenation use the same language.
+const savedLocale = cookieHelper().get('locale');
+if(savedLocale && savedLocale in localeMessages) {i18n.global.locale.value = savedLocale;}
+watchEffect(() => { document.documentElement.lang = i18n.global.locale.value; });
 
 const app = createApp(App)
   .use(IonicVue, {
@@ -72,8 +77,4 @@ app.use(router)
 router.isReady().then(async () => {
   app.directive('image-preview', imagePreview)
   app.mount('#app');
-
-  if (import.meta.env.DEV) {
-    import('./dev/autoLogin').then(({ tryDevAutoLogin }) => tryDevAutoLogin());
-  }
 });

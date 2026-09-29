@@ -2,11 +2,11 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button data-testid="viewmore-close-modal" @click="closeModal" :aria-label="translate('Close')">
+        <ion-button data-testid="viewmore-close-modal" @click="closeModal" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate("Find Customer") }}</ion-title>
+      <ion-title>{{ translate("Find customer") }}</ion-title>
     </ion-toolbar>
     <ion-toolbar>
       <ion-segment v-model="selectedSection" @ionChange="segmentChange($event.target.value)">
@@ -42,42 +42,42 @@
       <ion-segment-content id="create">
         <div v-if="step === 'info'">
           <ion-item>
-            <ion-input label="First Name" v-model="customerForm.firstName" />
+            <ion-input label-placement="stacked" :label="translate('First name')" v-model="customerForm.firstName" />
           </ion-item>
           <ion-item>
-            <ion-input label="Last Name" v-model="customerForm.lastName" />
+            <ion-input label-placement="stacked" :label="translate('Last name')" v-model="customerForm.lastName" />
           </ion-item>
           <ion-item>
-            <ion-input label="Phone" v-model="customerForm.phone" />
+            <ion-input label-placement="stacked" :label="translate('Phone')" v-model="customerForm.phone" />
           </ion-item>
           <ion-item>
-            <ion-input label="Email" v-model="customerForm.email" />
+            <ion-input label-placement="stacked" :label="translate('Email')" v-model="customerForm.email" />
           </ion-item>
         </div>
         <div v-if="step === 'shipping'">
           <ion-item>
-            <ion-input label="Country" v-model="customerForm.address.country" />
+            <ion-input label-placement="stacked" :label="translate('Country')" v-model="customerForm.address.country" />
           </ion-item>
           <ion-item>
-            <ion-input label="Address line 1" v-model="customerForm.address.address1" />
+            <ion-input label-placement="stacked" :label="translate('Address line 1')" v-model="customerForm.address.address1" />
           </ion-item>
           <ion-item>
-            <ion-input label="Address line 2" v-model="customerForm.address.address2" />
+            <ion-input label-placement="stacked" :label="translate('Address line 2')" v-model="customerForm.address.address2" />
           </ion-item>
           <ion-item>
-            <ion-input label="City" v-model="customerForm.address.city" />
+            <ion-input label-placement="stacked" :label="translate('City')" v-model="customerForm.address.city" />
           </ion-item>
           <ion-item>
-            <ion-input label="Province" v-model="customerForm.address.province" />
+            <ion-input label-placement="stacked" :label="translate('Province')" v-model="customerForm.address.province" />
           </ion-item>
           <ion-item>
-            <ion-input label="Zip" v-model="customerForm.address.zip" />
+            <ion-input label-placement="stacked" :label="translate('Postal code')" v-model="customerForm.address.zip" />
           </ion-item>
           <ion-item>
-            <ion-input label="Phone" v-model="customerForm.address.phone" />
+            <ion-input label-placement="stacked" :label="translate('Phone')" v-model="customerForm.address.phone" />
           </ion-item>
           <ion-item>
-            <ion-input label="Email" v-model="customerForm.address.email" />
+            <ion-input label-placement="stacked" :label="translate('Email')" v-model="customerForm.address.email" />
           </ion-item>
         </div>
       </ion-segment-content>
@@ -151,7 +151,7 @@ async function searchCustomers() {
   try {
     customers.value = await searchShopifyCustomers(props.shopId, query);
   } catch (err: any) {
-    showToast(`${translate("Failed to search customers:")} ${err.message || err}`);
+    showToast(translate("Failed to search customers: {message}", { message: String(err.message || err) }, { escapeParameter: true }));
   } finally {
     isLoading.value = false;
   }
@@ -178,7 +178,7 @@ async function handleCreateCustomer() {
     emitter.emit('dismissLoader');
 
     if (res.hasShopifyError === 'Y') {
-      showToast(`${translate("Shopify Error:")} ${res.shopifyErrorMessage}`);
+      showToast(translate("Shopify error: {message}", { message: String(res.shopifyErrorMessage) }, { escapeParameter: true }));
       return;
     }
     if (!res.customerId) {
@@ -199,7 +199,7 @@ async function handleCreateCustomer() {
     showToast(translate("Customer created and selected successfully!"));
   } catch (err: any) {
     emitter.emit('dismissLoader');
-    showToast(`${translate("Failed to create customer:")} ${err.message || err}`);
+    showToast(translate("Failed to create customer: {message}", { message: String(err.message || err) }, { escapeParameter: true }));
   }
 }
 

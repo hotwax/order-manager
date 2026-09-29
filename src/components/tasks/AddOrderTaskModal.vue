@@ -2,11 +2,11 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')">
+        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ title || translate('Add Task') }}</ion-title>
+      <ion-title>{{ title || translate('Add task') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -29,7 +29,7 @@
       </ion-item>
       <ion-item>
         <ion-input
-          :label="requiredLabel('Task Name')"
+          :label="requiredLabel('Task name')"
           label-placement="stacked"
           :placeholder="translate('Enter task name')"
           :value="form.workEffortName"
@@ -43,9 +43,9 @@
       <!-- Task purpose picker with workflow icons: ion-select-option can't render
            icons, so use an anchored popover list (icons centralized in taskPurposeIcons).
            #391 fixes the work-effort type to a constant, so no type selector is shown. -->
-      <ion-item button detail="false" id="task-purpose-trigger">
+      <ion-item button :detail="false" id="task-purpose-trigger">
         <ion-label>
-          <p>{{ requiredLabel('Task Purpose') }}</p>
+          <p>{{ requiredLabel('Task purpose') }}</p>
           <span :class="{ 'task-purpose-placeholder': !form.workEffortPurposeTypeId }">{{ selectedPurposeLabel }}</span>
         </ion-label>
       </ion-item>
@@ -56,7 +56,7 @@
               v-for="option in taskPurposes"
               :key="option.enumId"
               button
-              detail="false"
+              :detail="false"
               @click="form.workEffortPurposeTypeId = option.enumId"
             >
               <ion-icon v-if="getTaskPurposeIcon(option.enumId)" slot="start" :icon="getTaskPurposeIcon(option.enumId)" />
@@ -78,7 +78,7 @@
     </ion-list>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!isValid" :aria-label="translate('Confirm')" @click="confirm()">
+      <ion-fab-button :disabled="!isValid" :aria-label="translate('Save')" @click="confirm()">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>
@@ -109,12 +109,13 @@ import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
 import { useSeedData } from '@common/db';
+import { requiredLabel } from '@/utils';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
 
 const seed = useSeedData();
 
 const props = defineProps<{
-  // Optional modal title (already localized by the caller); defaults to "Add Task".
+  // Optional modal title (already localized by the caller); defaults to "Add task".
   title?: string;
   // When provided, the user can scope the task to one or more ship groups of an
   // order. Omitted for the generic bulk "Add task" flow, which keeps its old shape.
@@ -150,7 +151,7 @@ const selectedPurpose = computed(() => taskPurposes.value.find((option) => optio
 const selectedPurposeLabel = computed(() =>
   selectedPurpose.value
     ? (selectedPurpose.value.description || selectedPurpose.value.enumName || selectedPurpose.value.enumId)
-    : translate('Select Task Purpose')
+    : translate('Select task purpose')
 );
 const generatedTaskName = computed(() => {
   if (!props.autoGenerateTaskName) return '';
@@ -180,10 +181,6 @@ function dismiss() {
 function handleTaskNameInput(value: string | null | undefined) {
   taskNameEdited.value = true;
   form.workEffortName = value ?? '';
-}
-
-function requiredLabel(label: string) {
-  return `${translate(label)} *`;
 }
 
 function confirm() {

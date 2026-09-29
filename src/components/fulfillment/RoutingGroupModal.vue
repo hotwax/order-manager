@@ -2,11 +2,11 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="closeModal()" :aria-label="translate('Close')">
+        <ion-button @click="closeModal()" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
-      <ion-title>{{ translate('Select Routing Group') }}</ion-title>
+      <ion-title>{{ translate('Select routing group') }}</ion-title>
     </ion-toolbar>
   </ion-header>
 
@@ -93,8 +93,3 @@ onMounted(() => {
 });
 </script>
 
-<style scoped>
-ion-content {
-  --padding-bottom: 80px;
-}
-</style>

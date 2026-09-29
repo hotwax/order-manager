@@ -2,7 +2,7 @@
   <TaskCardShell
     :title="taskOrderTitle(task)"
     :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
-    :amount="formatTaskAmount(task.grandTotal)"
+    :amount="formatTaskAmount(task.grandTotal, task.currencyUom)"
     :task-created-date="task.workEffortCreatedDate"
     :contact-name="getCustomerName(task.customer)"
     :contact-phone="getPhoneNumber(task)"
@@ -19,8 +19,8 @@
     <template #content-start>
       <ion-item lines="full">
         <ion-label>
-          {{ translate('Facility') }}: {{ brokeredFacilityName(task) }}
-          <p>{{ translate('Shipping method') }}: {{ carrierShippingMethodLabel(task) }}</p>
+          {{ translate('Facility: {facility}', { facility: brokeredFacilityName(task) }) }}
+          <p>{{ translate('Shipping method: {method}', { method: carrierShippingMethodLabel(task) }) }}</p>
         </ion-label>
       </ion-item>
     </template>
@@ -29,7 +29,7 @@
       <ion-list class="ion-no-padding" lines="full">
         <ion-list-header>
           <ion-label>{{ translate('Original address') }}</ion-label>
-          <ion-radio class="ion-margin-end" value="original" label-placement="start">{{ translate('keep original') }}</ion-radio>
+          <ion-radio class="ion-margin-end" value="original" label-placement="start">{{ translate('Keep original') }}</ion-radio>
         </ion-list-header>
         <ion-item>
           <ion-input :label="translate('Address line 1')" label-placement="stacked" :value="addressState.original.address1" readonly />
@@ -60,7 +60,7 @@
       <ion-list class="ion-no-padding" lines="full">
         <ion-list-header>
           <ion-label>{{ translate('Suggested address') }}</ion-label>
-          <ion-radio class="ion-margin-end" value="suggested" label-placement="start">{{ translate('use suggested') }}</ion-radio>
+          <ion-radio class="ion-margin-end" value="suggested" label-placement="start">{{ translate('Use suggested') }}</ion-radio>
         </ion-list-header>
         <ion-item>
           <ion-input :label="translate('Address line 1')" label-placement="stacked" v-model="addressState.suggested.address1" />
@@ -224,14 +224,14 @@ function brokeredFacilityName(task: any): string {
   return task.facilityName
     || facilityLabel.value
     || task.facilityId
-    || '-';
+    || translate('Facility not assigned');
 }
 
 function carrierShippingMethodLabel(task: any): string {
   const carrier = carrierLabel.value;
   const methodId = task.shipmentMethodTypeId || task.shippingMethodTypeId;
   const method = methodLabel.value;
-  return [carrier, method].filter(Boolean).join(' - ') || '-';
+  return [carrier, method].filter(Boolean).join(' - ') || translate('Shipping method not set');
 }
 
 async function openCountryPicker(address: AddressState['original']) {
@@ -422,7 +422,7 @@ defineExpose({
 .geo-picker-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacer-2xs);
 }
 
 .geo-picker-label {
@@ -440,8 +440,8 @@ defineExpose({
 }
 
 .bad-address-skeleton-item ion-label {
-  margin-top: 8px;
-  margin-bottom: 8px;
+  margin-top: var(--spacer-xs);
+  margin-bottom: var(--spacer-xs);
 }
 
 .bad-address-skeleton-label {

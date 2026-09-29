@@ -17,7 +17,7 @@
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(Actions.APP_ORDERS_VIEW)" button router-link="/orders" router-direction="root" :class="{ selected: selectedPage === '/orders' }">
             <ion-icon slot="start" :icon="searchOutline" />
-            <ion-label>{{ translate("Find order") }}</ion-label>
+            <ion-label>{{ translate("Find orders") }}</ion-label>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
@@ -39,35 +39,35 @@
           <ion-item v-if="hasPermission(Actions.APP_ORDERS_VIEW)" button router-link="/unfillable" router-direction="root" :class="{ selected: selectedPage === '/unfillable' }">
             <ion-icon slot="start" :icon="banOutline" />
             <ion-label>{{ translate("Unfillable") }}</ion-label>
-            <ion-badge v-if="rollupCounts.unfillable !== undefined" slot="end" color="medium">{{ rollupCounts.unfillable }}</ion-badge>
+            <ion-badge v-if="rollupCounts.unfillable !== undefined" slot="end" color="medium">{{ formatNumber(rollupCounts.unfillable) }}</ion-badge>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(Actions.APP_SWAP_ORDER)" button router-link="/swap" router-direction="root" :class="{ selected: selectedPage === '/swap' }">
             <ion-icon slot="start" :icon="alertCircleOutline" />
             <ion-label>{{ translate("Swap") }}</ion-label>
-            <ion-badge v-if="rollupCounts.swap !== undefined" slot="end" color="medium">{{ rollupCounts.swap }}</ion-badge>
+            <ion-badge v-if="rollupCounts.swap !== undefined" slot="end" color="medium">{{ formatNumber(rollupCounts.swap) }}</ion-badge>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(Actions.APP_ORDER_UPDATE)" button router-link="/bad-address" router-direction="root" :class="{ selected: selectedPage === '/bad-address' }">
             <ion-icon slot="start" :icon="locationOutline" />
             <ion-label>{{ translate("Bad address") }}</ion-label>
-            <ion-badge v-if="rollupCounts.badAddress !== undefined" slot="end" color="medium">{{ rollupCounts.badAddress }}</ion-badge>
+            <ion-badge v-if="rollupCounts.badAddress !== undefined" slot="end" color="medium">{{ formatNumber(rollupCounts.badAddress) }}</ion-badge>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(Actions.APP_ORDER_CANCEL)" button router-link="/fraud" router-direction="root" :class="{ selected: selectedPage === '/fraud' }">
             <ion-icon slot="start" :icon="shieldHalfOutline" />
             <ion-label>{{ translate("Fraud") }}</ion-label>
-            <ion-badge v-if="rollupCounts.fraud !== undefined" slot="end" color="medium">{{ rollupCounts.fraud }}</ion-badge>
+            <ion-badge v-if="rollupCounts.fraud !== undefined" slot="end" color="medium">{{ formatNumber(rollupCounts.fraud) }}</ion-badge>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(Actions.APP_ORDER_UPDATE)" button router-link="/hold" router-direction="root" :class="{ selected: selectedPage === '/hold' }">
             <ion-icon slot="start" :icon="pauseCircleOutline" />
             <ion-label>{{ translate("Hold") }}</ion-label>
-            <ion-badge v-if="rollupCounts.hold !== undefined" slot="end" color="medium">{{ rollupCounts.hold }}</ion-badge>
+            <ion-badge v-if="rollupCounts.hold !== undefined" slot="end" color="medium">{{ formatNumber(rollupCounts.hold) }}</ion-badge>
           </ion-item>
         </ion-menu-toggle>
         <ion-item-divider color="light" v-if="hasPermission(Actions.APP_ORDERS_VIEW)">
@@ -77,28 +77,28 @@
           <ion-item v-if="hasPermission(Actions.APP_ORDERS_VIEW)" button router-link="/brokering" router-direction="root" :class="{ selected: selectedPage === '/brokering' }">
             <ion-icon slot="start" :icon="gitNetworkOutline" />
             <ion-label>{{ translate("Brokering queue") }}</ion-label>
-            <ion-badge v-if="rollupCounts.brokering !== undefined" slot="end" color="medium">{{ rollupCounts.brokering }}</ion-badge>
+            <ion-badge v-if="rollupCounts.brokering !== undefined" slot="end" color="medium">{{ formatNumber(rollupCounts.brokering) }}</ion-badge>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(Actions.APP_ORDERS_VIEW)" button router-link="/open" router-direction="root" :class="{ selected: selectedPage.includes('/open') }">
             <ion-icon slot="start" :icon="playCircleOutline" />
             <ion-label>{{ translate("Open") }}</ion-label>
-            <ion-badge v-if="rollupCounts.open !== undefined" slot="end" color="medium">{{ rollupCounts.open }}</ion-badge>
+            <ion-badge v-if="rollupCounts.open !== undefined" slot="end" color="medium">{{ formatNumber(rollupCounts.open) }}</ion-badge>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(Actions.APP_ORDERS_VIEW)" button router-link="/inflight" router-direction="root" :class="{ selected: selectedPage.includes('/inflight') }">
             <ion-icon slot="start" :icon="airplaneOutline" />
-            <ion-label>{{ translate("Inflight") }}</ion-label>
-            <ion-badge v-if="rollupCounts.inflight !== undefined" slot="end" color="medium">{{ rollupCounts.inflight }}</ion-badge>
+            <ion-label>{{ translate("In flight") }}</ion-label>
+            <ion-badge v-if="rollupCounts.inflight !== undefined" slot="end" color="medium">{{ formatNumber(rollupCounts.inflight) }}</ion-badge>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
           <ion-item v-if="hasPermission(Actions.APP_ORDERS_VIEW)" button router-link="/packed" router-direction="root" :class="{ selected: selectedPage.includes('/packed') }">
             <ion-icon slot="start" :icon="cubeOutline" />
             <ion-label>{{ translate("Packed") }}</ion-label>
-            <ion-badge v-if="rollupCounts.packed !== undefined" slot="end" color="medium">{{ rollupCounts.packed }}</ion-badge>
+            <ion-badge v-if="rollupCounts.packed !== undefined" slot="end" color="medium">{{ formatNumber(rollupCounts.packed) }}</ion-badge>
           </ion-item>
         </ion-menu-toggle>
         <ion-menu-toggle :auto-hide="false">
@@ -146,6 +146,7 @@ import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
 import { computed, onMounted } from 'vue';
 import Actions from "@/authorization/actions";
+import { formatNumber } from "@/utils/format";
 
 const HOTWAX_HOST_SUFFIX = ".hotwax.io";
 

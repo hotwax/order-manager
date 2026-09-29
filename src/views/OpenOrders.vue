@@ -5,7 +5,7 @@
         <ion-buttons slot="start">
           <ion-menu-button />
         </ion-buttons>
-        <ion-title>{{ translate('Open orders') }}</ion-title>
+        <ion-title>{{ translate('Open') }}</ion-title>
       </ion-toolbar>
     </ion-header>
 
@@ -19,12 +19,14 @@
       />
 
       <ion-list>
-        <ion-list-header>
+        <!-- Hidden at zero, where the empty state says it better than "0 of 0". -->
+        <ion-list-header v-if="orders.length">
           <ion-checkbox
             class="ion-margin-end"
             v-if="selectMode"
             :checked="allCurrentPageSelected"
             :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
+            :aria-label="translate('Select all loaded orders')"
             @ion-change="toggleCurrentPageSelection($event.detail.checked)"
           />
           <ion-label>{{ resultsSummary }}</ion-label>
@@ -42,8 +44,6 @@
           v-for="order in orders"
           :key="order.orderId"
           :model="orderRow(order)"
-          row-class="open-order-row"
-          deadline-class="open-order-total ion-text-end"
           :select-mode="selectMode"
           :selected="selectedIds.has(order.orderId)"
           @activate="handleOrderRowClick(order)"
@@ -54,6 +54,13 @@
       <div v-if="isLoading && !orders.length" class="ion-text-center ion-padding">
         <ion-spinner name="crescent" />
       </div>
+      <ErrorState
+        v-else-if="loadError"
+        :title="translate('Could not load open orders')"
+        :message="loadError"
+        retryable
+        @retry="loadWorkflowOrders()"
+      />
       <EmptyState
         v-else-if="!isLoading && !orders.length"
         :title="translate('No open orders')"
@@ -71,27 +78,21 @@
 
     <ion-footer v-if="selectMode && actions.length">
       <ion-toolbar>
-        <ion-title size="small">{{ selectedIds.size }} {{ translate('selected') }}</ion-title>
+        <ion-title size="small">{{ translate('{count} selected', { count: selectedIds.size }) }}</ion-title>
         <ion-buttons slot="end">
           <ion-button
             v-for="action in actions"
             :key="action.id"
+            :fill="action.destructive ? 'outline' : 'solid'"
+            :color="action.destructive ? 'danger' : 'primary'"
             :disabled="!selectedIds.size"
             @click="runAction(action)"
           >
-            {{ action.label }}
+            {{ translate(action.label) }}
           </ion-button>
         </ion-buttons>
       </ion-toolbar>
     </ion-footer>
-
-    <ion-toast
-      :is-open="!!toastMessage"
-      :message="toastMessage"
-      :duration="2000"
-      position="top"
-      @did-dismiss="toastMessage = ''"
-    />
   </ion-page>
 </template>
 
@@ -112,7 +113,6 @@ import {
   IonPage,
   IonSpinner,
   IonTitle,
-  IonToast,
   IonToolbar,
   alertController,
   useIonRouter
@@ -125,6 +125,7 @@ import { useSeedData } from '@common/db';
 import type { BulkActionDefinition, WorkflowOrder } from '@/types/customerService';
 import { WORKFLOW_ORDER_SORT_OPTIONS } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
+import ErrorState from '@/components/common/ErrorState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
@@ -133,6 +134,7 @@ const seed = useSeedData();
 import { toWorkflowOrderRowViewModel } from '@/utils/orderRows';
 import { api, translate } from '@common';
 import router from '@/router';
+import { showToast } from '@/utils';
 
 const bucket = 'open';
 const VIRTUAL_FACILITY_TYPE_ID = 'VIRTUAL_FACILITY';
@@ -140,7 +142,6 @@ const store = useCustomerServiceStore();
 const orderStore = useOrderStore();
 const productStore = useProductStore();
 const ionRouter = useIonRouter();
-const toastMessage = ref('');
 
 const filters = computed({
   get: () => store.filters[bucket],
@@ -177,10 +178,11 @@ const allCurrentPageSelected = computed(() => {
 });
 const someCurrentPageSelected = computed(() => currentPageOrderIds.value.some((orderId) => selectedIds.value.has(orderId)));
 const isLoading = computed(() => orderStore.workflowOrdersLoading[bucket]);
+const loadError = computed(() => orderStore.workflowOrdersError[bucket]);
 const orderTotal = computed(() => orderStore.workflowOrdersTotal[bucket]);
 const hasMore = computed(() => orderStore.workflowOrders[bucket].length < orderStore.workflowOrdersTotal[bucket]);
 const resultsSummary = computed(() =>
-  `${orders.value.length} of ${orderTotal.value} ${orderTotal.value === 1 ? translate('order') : translate('orders')}`
+  translate('{shown} of {count} orders', { shown: orders.value.length, count: orderTotal.value })
 );
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const sortOptions = WORKFLOW_ORDER_SORT_OPTIONS;
@@ -351,11 +353,12 @@ async function runAction(action: BulkActionDefinition) {
 
   if (action.confirmText) {
     const alert = await alertController.create({
-      header: action.label,
-      message: action.confirmText,
+      header: translate(action.label),
+      message: translate(action.confirmText),
       buttons: [
-        { text: translate('Cancel'), role: 'cancel' },
-        { text: translate('Confirm'), role: 'confirm' }
+        // The confirm button repeats the action, so backing out cannot read as "Cancel" too.
+        { text: translate(action.destructive ? 'Keep orders' : 'Cancel'), role: 'cancel' },
+        { text: translate(action.label), role: 'confirm' }
       ]
     });
     await alert.present();
@@ -366,9 +369,9 @@ async function runAction(action: BulkActionDefinition) {
   const count = selectedIds.value.size;
   try {
     await store.runBulkAction(bucket, action.id);
-    toastMessage.value = `${action.label}: ${count} ${count === 1 ? translate('order') : translate('orders')}`;
+    await showToast(translate('{action}: {count} orders', { action: translate(action.label), count }));
   } catch {
-    toastMessage.value = translate('Failed to complete bulk action. Please try again.');
+    await showToast(translate('Failed to complete bulk action. Please try again.'));
   }
 }
 
@@ -382,26 +385,3 @@ function formatChannel(channel: string) {
 }
 
 </script>
-
-<style scoped>
-.open-order-row {
-  --columns-desktop: 5;
-  --columns-tablet: 5;
-  min-height: 5rem;
-  border-block-start: var(--border-medium);
-  padding-inline-end: var(--spacer-sm);
-}
-
-.open-order-row > ion-label {
-  width: 100%;
-}
-
-.open-order-row > ion-label.open-order-total {
-  display: block;
-  justify-self: end;
-  max-width: 7rem;
-  min-width: 7rem;
-  width: 7rem;
-}
-
-</style>

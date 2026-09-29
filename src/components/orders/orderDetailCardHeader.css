@@ -1,0 +1,22 @@
+/* Order page card headers: title and subtitle on the left, a note or button in an actions column
+   on the right. Imported as scoped styles by each order detail component that renders cards. */
+ion-card-header {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "title actions" "subtitle actions";
+}
+
+ion-card-header ion-card-title {
+  grid-area: title;
+}
+
+ion-card-header ion-card-subtitle {
+  grid-area: subtitle;
+}
+
+ion-card-header ion-note,
+ion-card-header ion-button,
+ion-card-header ion-buttons {
+  grid-area: actions;
+  align-self: center;
+}

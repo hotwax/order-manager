@@ -1,4 +1,4 @@
-import { api } from "@common";
+import { api, commonUtil } from "@common";
 
 /**
  * OrderFacilityChange reason written for every failed brokering attempt. A single
@@ -18,6 +18,24 @@ export const UNFILLABLE_REASON_ID = "UNFILLABLE";
  * as "N+".
  */
 export const UNFILLABLE_SAMPLE_SIZE = 100;
+
+/**
+ * How many facility-change rows to read per order, newest first. A page that fills means older
+ * moves exist beyond it; the count header that would say how many is hidden from the browser.
+ */
+export const FACILITY_CHANGE_PAGE_SIZE = 200;
+
+/** A product issued at a facility: one order line of a POS-completed ship group. */
+export interface IssuanceLine {
+  productId: string;
+  facilityId: string;
+}
+
+async function listOf(request: Promise<any>): Promise<any[]> {
+  const resp = await request;
+  if (commonUtil.hasError(resp)) throw resp.data;
+  return Array.isArray(resp.data) ? resp.data : (resp.data?.docs || []);
+}
 
 /**
  * Order-domain API calls for the order detail page.
@@ -42,13 +60,6 @@ export function useOrderDetail() {
     });
   }
 
-  async function getWorkEfforts(orderId: string): Promise<any> {
-    return api({
-      url: `oms/orders/${orderId}/workEfforts`,
-      method: "GET"
-    });
-  }
-
   async function getCommunicationEvents(orderId: string): Promise<any> {
     return api({
       url: `oms/orders/${orderId}/communicationEvents`,
@@ -67,7 +78,8 @@ export function useOrderDetail() {
   /**
    * OrderFacilityChange rows (brokered, released, parked, rejected) for the order,
    * excluding UNFILLABLE. `_op=in` plus `_not=Y` builds `NOT IN ('UNFILLABLE') OR
-   * changeReasonEnumId IS NULL`, so the reason-less rows are still returned.
+   * changeReasonEnumId IS NULL`, so the reason-less rows are still returned. Newest first,
+   * so an order with more moves than one page loses its oldest rows, not its latest.
    */
   async function getFacilityChanges(orderId: string): Promise<any> {
     return api({
@@ -77,8 +89,8 @@ export function useOrderDetail() {
         changeReasonEnumId: UNFILLABLE_REASON_ID,
         changeReasonEnumId_op: "in",
         changeReasonEnumId_not: "Y",
-        orderByField: "changeDatetime",
-        pageSize: 200
+        orderByField: "-changeDatetime",
+        pageSize: FACILITY_CHANGE_PAGE_SIZE
       }
     });
   }
@@ -101,32 +113,47 @@ export function useOrderDetail() {
   }
 
   /**
-   * InventoryItemDetail rows for the order that record an inventory issuance.
+   * InventoryItemDetail rows that record an inventory issuance against the order.
    *
    * Issuing inventory writes a detail row carrying `itemIssuanceId` and a negative
    * `quantityOnHandDiff`; the reservation that precedes it writes a separate row with
    * `reasonEnumId` and no issuance id. `itemIssuanceId_op=empty` + `_not=Y` keeps only
    * the issuance rows, so the response is one row per issued line rather than two.
    *
-   * There is no REST resource for ItemIssuance itself — this view is the only exposed
-   * path to the same fact.
+   * There is no REST resource for ItemIssuance, and the order-wide `oms/inventoryItem/detail`
+   * list is not mounted (405), so the rows are read per inventory item: ProductFacility names
+   * the inventory item of each product at each facility, and `inventoryItem/{id}/detail`
+   * filters by order. A component issued for a marketing package is not an order line, so it
+   * is not found this way.
    */
-  async function getInventoryIssuance(orderId: string): Promise<any> {
-    return api({
-      url: "oms/inventoryItem/detail",
+  async function getInventoryIssuance(orderId: string, lines: IssuanceLine[]): Promise<any[]> {
+    const lineKeys = new Set(lines.map((line) => `${line.productId}|${line.facilityId}`));
+    if (!lineKeys.size) return [];
+    const productFacilities = await listOf(api({
+      url: "oms/productFacilities",
       method: "GET",
       params: {
-        orderId,
-        itemIssuanceId_op: "empty",
-        itemIssuanceId_not: "Y",
-        pageSize: 500
+        productId: [...new Set(lines.map((line) => line.productId))].join(","),
+        productId_op: "in",
+        facilityId: [...new Set(lines.map((line) => line.facilityId))].join(","),
+        facilityId_op: "in",
+        pageSize: 100
       }
-    });
+    }));
+    // The two `in` filters cross every product with every facility; keep only the real pairs.
+    const inventoryItemIds = [...new Set(productFacilities
+      .filter((row) => row.inventoryItemId && lineKeys.has(`${row.productId}|${row.facilityId}`))
+      .map((row) => row.inventoryItemId))];
+    const details = await Promise.all(inventoryItemIds.map((inventoryItemId) => listOf(api({
+      url: `oms/inventoryItem/${inventoryItemId}/detail`,
+      method: "GET",
+      params: { orderId, itemIssuanceId_op: "empty", itemIssuanceId_not: "Y", pageSize: 100 }
+    }))));
+    return details.flat();
   }
 
   return {
     getOrder,
-    getWorkEfforts,
     getCommunicationEvents,
     getRiskAssessments,
     getFacilityChanges,

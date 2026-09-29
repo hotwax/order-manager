@@ -2,7 +2,7 @@
   <ion-header>
     <ion-toolbar>
       <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')">
+        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
           <ion-icon slot="icon-only" :icon="closeOutline" />
         </ion-button>
       </ion-buttons>
@@ -18,7 +18,7 @@
       <div class="selected-chips-container">
         <ion-chip v-for="product in selectedProducts" :key="product.productId" @click="removeSelected(product.productId)">
           <ion-label>{{ productLabel(product) }}</ion-label>
-          <ion-icon :icon="closeCircle" />
+          <ion-icon :icon="closeCircleOutline" />
         </ion-chip>
       </div>
     </ion-list>
@@ -49,7 +49,7 @@
         </ion-thumbnail>
         <ion-label>
           {{ productLabel(product) }}
-          <p>{{ product.sku || product.productId }}</p>
+          <p>{{ productMaster.secondaryId(product, [product.sku, product.productId]) }}</p>
         </ion-label>
         <ion-checkbox slot="end" :checked="selectedIds.has(product.productId)" />
       </ion-item>
@@ -98,7 +98,7 @@ import {
   IonToolbar,
   modalController,
 } from '@ionic/vue';
-import { closeCircle, closeOutline, saveOutline } from 'ionicons/icons';
+import { closeCircleOutline, closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, ref } from 'vue';
 import { DxpShopifyImg, translate } from '@common';
 import { useSolrSearch } from '@common/composables/useSolrSearch';
@@ -120,6 +120,14 @@ interface SelectableProduct {
   internalName?: string;
   sku?: string;
   mainImageUrl?: string;
+  // The operator's identifier can be any static option or a fetched good-identification type
+  // (UPC and friends). Solr returns them on the search doc, so they are carried through rather
+  // than normalized away — otherwise this picker alone would ignore the configured choice.
+  groupId?: string;
+  groupName?: string;
+  primaryProductCategoryName?: string;
+  title?: string;
+  goodIdentifications?: any[];
 }
 
 const props = defineProps<{
@@ -147,7 +155,12 @@ const dirty = computed(() => {
 });
 
 function productLabel(product: SelectableProduct) {
-  return product.productName || product.parentProductName || product.internalName || product.productId;
+  return productMaster.primaryId(product, [
+    product.productName,
+    product.parentProductName,
+    product.internalName,
+    product.productId
+  ]);
 }
 
 function normalizeProduct(product: any): SelectableProduct {
@@ -158,6 +171,11 @@ function normalizeProduct(product: any): SelectableProduct {
     internalName: product.internalName,
     sku: product.sku,
     mainImageUrl: product.mainImageUrl,
+    groupId: product.groupId,
+    groupName: product.groupName,
+    primaryProductCategoryName: product.primaryProductCategoryName,
+    title: product.title,
+    goodIdentifications: product.goodIdentifications,
   };
 }
 
@@ -265,7 +283,7 @@ ion-chip ion-label {
 
 ion-chip ion-icon {
   flex-shrink: 0;
-  margin-inline-start: 4px;
+  margin-inline-start: var(--spacer-2xs);
   font-size: 18px;
   cursor: pointer;
 }

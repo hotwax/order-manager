@@ -175,4 +175,21 @@ describe('order workflow store', () => {
     expect(store.workflowOrderEnrichment.open).toEqual({});
     expect(fetchOrderRowEnrichment).not.toHaveBeenCalled();
   });
+
+  // Without the error the view has nothing but an empty list, and says "No open orders".
+  it('keeps a failed first page\'s error until the next fetch', async () => {
+    const store = useOrderStore();
+    const filters = {
+      query: '', customerName: '', productStoreId: 'All', salesChannelEnumId: 'All',
+      facilityId: 'All', shipmentMethodTypeId: 'All', priority: null, dateFrom: '', dateThru: ''
+    } as any;
+    vi.mocked(api).mockRejectedValueOnce(new Error('Network Error'));
+
+    await store.fetchWorkflowOrders('open', filters);
+    expect(store.workflowOrdersError.open).toBe('Network Error');
+
+    vi.mocked(api).mockResolvedValueOnce({ data: { ordersCount: 0, orders: [] } });
+    await store.fetchWorkflowOrders('open', filters);
+    expect(store.workflowOrdersError.open).toBe('');
+  });
 });
