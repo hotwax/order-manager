@@ -1,32 +1,24 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="closeModal()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ translate('Custom swap') }}</ion-title>
-    </ion-toolbar>
-    <ion-toolbar>
-      <ion-segment v-model="selectedSegment">
-        <ion-segment-button value="substitute">
-          <ion-label>{{ translate('Substitute products') }}</ion-label>
-        </ion-segment-button>
-        <ion-segment-button value="search">
-          <ion-label>{{ translate('Product search') }}</ion-label>
-        </ion-segment-button>
-      </ion-segment>
-    </ion-toolbar>
-    <ion-toolbar v-if="selectedSegment === 'substitute'">
-      <ion-searchbar
-        v-model="substituteKeyword"
-        :placeholder="translate('Search substitutes')"
-      />
-    </ion-toolbar>
-  </ion-header>
+  <DxpModal :state="swapModal" :title="translate('Custom swap')">
+    <template #toolbar>
+      <ion-toolbar>
+        <ion-segment v-model="selectedSegment">
+          <ion-segment-button value="substitute">
+            <ion-label>{{ translate('Substitute products') }}</ion-label>
+          </ion-segment-button>
+          <ion-segment-button value="search">
+            <ion-label>{{ translate('Product search') }}</ion-label>
+          </ion-segment-button>
+        </ion-segment>
+      </ion-toolbar>
+      <ion-toolbar v-if="selectedSegment === 'substitute'">
+        <ion-searchbar
+          v-model="substituteKeyword"
+          :placeholder="translate('Search substitutes')"
+        />
+      </ion-toolbar>
+    </template>
 
-  <ion-content>
     <!-- Substitute Products Segment -->
     <ion-list v-if="selectedSegment === 'substitute'">
       <div class="empty-state" v-if="!substituteProducts.length">
@@ -112,20 +104,13 @@
         <ion-infinite-scroll-content loading-spinner="crescent" :loading-text="translate('Loading')" />
       </ion-infinite-scroll>
     </div>
-
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedProductId" :aria-label="translate('Save')" @click="save">
-        <ion-icon :icon="saveOutline" />
-      </ion-fab-button>
-    </ion-fab>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonRadio, IonRadioGroup, IonSearchbar, IonSegment, IonSegmentButton, IonSpinner, IonThumbnail, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
-import { api, DxpShopifyImg, translate } from '@common';
+import { IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonRadio, IonRadioGroup, IonSearchbar, IonSegment, IonSegmentButton, IonSpinner, IonThumbnail, IonToolbar } from '@ionic/vue';
+import { api, DxpModal, DxpShopifyImg, translate, useDxpModal } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
@@ -279,14 +264,11 @@ async function loadMoreResults(event: any) {
   await event.target.complete();
 }
 
-function closeModal(data?: any) {
-  modalController.dismiss(data);
-}
-
-function save() {
-  if (!selectedProductId.value || !selectedProductData.value) return;
-  closeModal(selectedProductData.value);
-}
+// Save hands back the chosen product; the swap task card puts it on the item.
+const swapModal = useDxpModal({
+  canConfirm: () => !!selectedProductId.value && !!selectedProductData.value,
+  confirm: () => selectedProductData.value,
+});
 
 onMounted(async () => {
   const productIds = props.substituteProducts.map((p: any) => p.productId).filter(Boolean);

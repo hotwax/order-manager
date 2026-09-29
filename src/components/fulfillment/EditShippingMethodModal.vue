@@ -1,16 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ translate('Edit shipping method') }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
-
-  <ion-content>
+  <DxpModal :state="shippingMethodModal" :title="translate('Edit shipping method')">
     <ion-list>
       <ion-item>
         <ion-select
@@ -44,35 +33,18 @@
         </ion-select>
       </ion-item>
     </ion-list>
-
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedCarrierId || !selectedMethodId" :aria-label="translate('Save')" @click="confirm()">
-        <ion-icon :icon="saveOutline" />
-      </ion-fab-button>
-    </ion-fab>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
 import {
-  IonButton,
-  IonButtons,
-  IonContent,
-  IonFab,
-  IonFabButton,
-  IonHeader,
-  IonIcon,
   IonItem,
   IonList,
   IonSelect,
   IonSelectOption,
-  IonTitle,
-  IonToolbar,
-  modalController,
 } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, ref } from 'vue';
-import { translate } from '@common';
+import { DxpModal, translate, useDxpModal } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useSeedStore } from '@/store/seed';
 
@@ -109,14 +81,10 @@ function onCarrierChange(carrierId: string) {
   selectedMethodId.value = '';
 }
 
-function dismiss() {
-  modalController.dismiss(null, 'cancel');
-}
-
-function confirm() {
-  modalController.dismiss(
-    { carrierPartyId: selectedCarrierId.value, shipmentMethodTypeId: selectedMethodId.value },
-    'confirm'
-  );
-}
+// Save hands back the carrier and method; the screen that opened the modal updates the orders.
+const shippingMethodModal = useDxpModal({
+  dirty: () => !!selectedCarrierId.value,
+  canConfirm: () => !!selectedCarrierId.value && !!selectedMethodId.value,
+  confirm: () => ({ carrierPartyId: selectedCarrierId.value, shipmentMethodTypeId: selectedMethodId.value }),
+});
 </script>

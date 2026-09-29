@@ -1,16 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ translate('Reject items') }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
-
-  <ion-content>
+  <DxpModal :state="rejectModal" :title="translate('Reject items')">
     <div v-if="isLoading" class="empty-state">
       <ion-spinner name="crescent" />
     </div>
@@ -28,20 +17,13 @@
         </ion-item>
       </ion-list>
     </ion-radio-group>
-
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedReasonId" @click="confirm()" :aria-label="translate('Save')">
-        <ion-icon :icon="saveOutline" />
-      </ion-fab-button>
-    </ion-fab>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
+import { IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSpinner } from '@ionic/vue';
 import { onMounted, ref } from 'vue';
-import { translate } from '@common';
+import { DxpModal, translate, useDxpModal } from '@common';
 import { useSeedStore } from '@/store/seed';
 
 const seed = useSeedStore();
@@ -50,14 +32,11 @@ const isLoading = ref(false);
 const rejectionReasons = ref<any[]>([]);
 const selectedReasonId = ref('');
 
-function dismiss() {
-  modalController.dismiss(null, 'cancel');
-}
-
-function confirm() {
-  if (!selectedReasonId.value) return;
-  modalController.dismiss({ rejectionReasonId: selectedReasonId.value }, 'confirm');
-}
+// Save hands back the chosen reason; the screen that opened the modal rejects the items.
+const rejectModal = useDxpModal({
+  canConfirm: () => !!selectedReasonId.value,
+  confirm: () => ({ rejectionReasonId: selectedReasonId.value }),
+});
 
 async function loadRejectionReasons() {
   const cachedReasons = [

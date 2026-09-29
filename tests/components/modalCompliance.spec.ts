@@ -36,6 +36,8 @@ function extractIonModalBlocks(source: string) {
 }
 
 function hasStartSlotCloseButton(source: string) {
+  // DxpModal draws the close button, wired to the modal flow's exit path.
+  if (/<DxpModal\b/.test(source)) return true;
   const header = source.match(/<ion-header\b[\s\S]*?<\/ion-header>/)?.[0] ?? '';
   const closeIcon = /<ion-icon\b(?=[^>]*\bslot=["']icon-only["'])(?=[^>]*:icon=["']closeOutline["'])[^>]*\/?>/;
 
@@ -43,6 +45,8 @@ function hasStartSlotCloseButton(source: string) {
 }
 
 function hasFixedEndFab(source: string) {
+  // DxpModal draws the bottom-end FAB, wired to the modal flow's confirm path.
+  if (/<DxpModal\b/.test(source)) return true;
   const fixedEndFab = /<ion-fab\b(?=[^>]*\bvertical=["']bottom["'])(?=[^>]*\bhorizontal=["']end["'])(?=[^>]*\bslot=["']fixed["'])[^>]*>/;
   return fixedEndFab.test(source) && /<ion-fab-button\b/.test(source);
 }

@@ -1,16 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ title || translate('Add task') }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
-
-  <ion-content>
+  <DxpModal :state="taskModal" :title="title || translate('Add task')">
     <ion-list>
       <ion-item v-if="props.shipGroups && props.shipGroups.length > 1">
         <ion-select
@@ -76,23 +65,12 @@
         />
       </ion-item>
     </ion-list>
-
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!isValid" :aria-label="translate('Save')" @click="confirm()">
-        <ion-icon :icon="saveOutline" />
-      </ion-fab-button>
-    </ion-fab>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
 import {
-  IonButton,
-  IonButtons,
   IonContent,
-  IonFab,
-  IonFabButton,
-  IonHeader,
   IonIcon,
   IonInput,
   IonItem,
@@ -101,13 +79,9 @@ import {
   IonSelect,
   IonSelectOption,
   IonTextarea,
-  IonTitle,
-  IonToolbar,
-  modalController,
 } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
-import { translate } from '@common';
+import { DxpModal, translate, useDxpModal } from '@common';
 import { requiredLabel } from '@/utils';
 import { useSeedStore } from '@/store/seed';
 import { getTaskPurposeIcon } from '@/utils/taskPurposeIcons';
@@ -175,20 +149,27 @@ watch(generatedTaskName, (taskName) => {
   if (!taskNameEdited.value) form.workEffortName = taskName;
 }, { immediate: true });
 
-function dismiss() {
-  modalController.dismiss(null, 'cancel');
-}
-
 function handleTaskNameInput(value: string | null | undefined) {
   taskNameEdited.value = true;
   form.workEffortName = value ?? '';
 }
 
-function confirm() {
-  const payload: Record<string, any> = { ...form };
-  if (props.shipGroups) payload.shipGroupSeqIds = [...selectedShipGroupSeqIds.value];
-  modalController.dismiss(payload, 'confirm');
-}
+// Anything the operator typed or picked. A name the modal generated itself isn't theirs to lose.
+const isDirty = computed(() => (taskNameEdited.value && !!form.workEffortName.trim())
+  || !!form.description.trim()
+  || form.workEffortPurposeTypeId !== (props.defaultWorkEffortPurposeTypeId || '')
+  || selectedShipGroupSeqIds.value.length !== (props.shipGroups?.length ?? 0));
+
+// Save hands the task back; the screen that opened the modal creates it, as before.
+const taskModal = useDxpModal({
+  dirty: isDirty,
+  canConfirm: isValid,
+  confirm() {
+    const payload: Record<string, any> = { ...form };
+    if (props.shipGroups) payload.shipGroupSeqIds = [...selectedShipGroupSeqIds.value];
+    return payload;
+  },
+});
 </script>
 
 <style scoped>

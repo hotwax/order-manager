@@ -1,16 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="closeModal()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ product?.internalName || productId }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
-
-  <ion-content>
+  <DxpModal :title="product?.internalName || productId">
     <div class="empty-state" v-if="isLoading">
       <ion-item lines="none">
         <ion-spinner color="secondary" name="crescent" slot="start" />
@@ -32,14 +21,13 @@
         <ion-label slot="end" class="stock-col">{{ entry.lastInventoryCount ?? 0 }}</ion-label>
       </ion-item>
     </ion-list>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline } from 'ionicons/icons';
+import { IonItem, IonLabel, IonList, IonListHeader, IonSpinner } from '@ionic/vue';
 import { ref, onMounted } from 'vue';
-import { api, logger, translate } from '@common';
+import { api, DxpModal, logger, translate } from '@common';
 import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
 
@@ -50,10 +38,6 @@ const product = useProductCacheStore().getProduct(props.productId);
 
 const isLoading = ref(false);
 const facilityStock = ref<any[]>([]);
-
-function closeModal() {
-  modalController.dismiss();
-}
 
 async function fetchProductFacilities() {
   isLoading.value = true;

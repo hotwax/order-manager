@@ -1,43 +1,35 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="modalController.dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ title || translate('Select facility') }}</ion-title>
-    </ion-toolbar>
-    <!-- The strip names every item being placed. With more than one it also picks which item the
-         list details, so the operator can go from "can this facility cover all three" to the full
-         inventory of one item without reopening the modal. -->
-    <ion-toolbar v-if="items.length">
-      <div class="item-chips">
-        <ion-chip
-          v-for="(item, index) in items"
-          :key="item.orderItemSeqId"
-          :outline="!isDetailedItem(index)"
-          :aria-label="chipLabel(item)"
-          @click="toggleDetailedItem(index)"
-        >
-          <ion-avatar v-if="item.imageUrl">
-            <DxpShopifyImg :src="item.imageUrl" :key="item.imageUrl" size="small" />
-          </ion-avatar>
-          <ion-label>{{ chipLabel(item) }}</ion-label>
-        </ion-chip>
-      </div>
-    </ion-toolbar>
-    <ion-toolbar>
-      <ion-searchbar
-        v-model="queryString"
-        :placeholder="translate('Search facilities')"
-        @ionInput="filterFacilities"
-        @ionFocus="selectSearchBarText($event)"
-      />
-    </ion-toolbar>
-  </ion-header>
+  <DxpModal :state="facilityModal" :title="title || translate('Select facility')">
+    <template #toolbar>
+      <!-- The strip names every item being placed. With more than one it also picks which item the
+           list details, so the operator can go from "can this facility cover all three" to the full
+           inventory of one item without reopening the modal. -->
+      <ion-toolbar v-if="items.length">
+        <div class="item-chips">
+          <ion-chip
+            v-for="(item, index) in items"
+            :key="item.orderItemSeqId"
+            :outline="!isDetailedItem(index)"
+            :aria-label="chipLabel(item)"
+            @click="toggleDetailedItem(index)"
+          >
+            <ion-avatar v-if="item.imageUrl">
+              <DxpShopifyImg :src="item.imageUrl" :key="item.imageUrl" size="small" />
+            </ion-avatar>
+            <ion-label>{{ chipLabel(item) }}</ion-label>
+          </ion-chip>
+        </div>
+      </ion-toolbar>
+      <ion-toolbar>
+        <ion-searchbar
+          v-model="queryString"
+          :placeholder="translate('Search facilities')"
+          @ionInput="filterFacilities"
+          @ionFocus="selectSearchBarText($event)"
+        />
+      </ion-toolbar>
+    </template>
 
-  <ion-content>
     <template v-if="isLoading">
       <div class="empty-state">
         <ion-item lines="none">
@@ -177,20 +169,13 @@
         </div>
       </ion-list>
     </ion-radio-group>
-
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedFacilityId" :aria-label="translate('Save')" @click="save">
-        <ion-icon :icon="saveOutline" />
-      </ion-fab-button>
-    </ion-fab>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
-import { IonAccordion, IonAccordionGroup, IonAvatar, IonButton, IonButtons, IonChip, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonRadio, IonRadioGroup, IonSearchbar, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
+import { IonAccordion, IonAccordionGroup, IonAvatar, IonChip, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonRadio, IonRadioGroup, IonSearchbar, IonSpinner, IonToolbar } from '@ionic/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { api, DxpShopifyImg, logger, translate } from '@common';
+import { api, DxpModal, DxpShopifyImg, logger, translate, useDxpModal } from '@common';
 import { formatNumber } from '@/utils/format';
 import { useSeedStore } from '@/store/seed';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
@@ -228,11 +213,11 @@ let mobileMediaQuery: MediaQueryList | null = null;
 
 const productIds = computed(() => Array.from(new Set(props.items.map((item) => item.productId).filter(Boolean))));
 
-function save() {
-  if (selectedFacilityId.value) {
-    modalController.dismiss(selectedFacilityId.value);
-  }
-}
+// Save hands back the chosen facility; the screen that opened the modal releases the items to it.
+const facilityModal = useDxpModal({
+  canConfirm: () => !!selectedFacilityId.value,
+  confirm: () => selectedFacilityId.value,
+});
 
 function filterFacilities() {
   filteredFacilities.value = filterFacilityCoverageRows(allFacilities.value, queryString.value);

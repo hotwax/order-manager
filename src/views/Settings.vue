@@ -156,22 +156,14 @@
         </ion-card>
       </section>
 
-      <ion-modal ref="timeZoneModal" trigger="time-zone-modal" @didPresent="search()" @didDismiss="clearSearch()">
-        <ion-header>
-          <ion-toolbar>
-            <ion-buttons slot="start">
-              <ion-button @click="closeModal" :aria-label="translate('Close')" :title="translate('Close')">
-                <ion-icon slot="icon-only" :icon="closeOutline" />
-              </ion-button>
-            </ion-buttons>
-            <ion-title>{{ translate("Select time zone") }}</ion-title>
-          </ion-toolbar>
-          <ion-toolbar>
-            <ion-searchbar @ionFocus="selectSearchBarText($event)" :placeholder="translate('Search time zones')" v-model="queryString" @keyup.enter="findTimeZone()" />
-          </ion-toolbar>
-        </ion-header>
+      <ion-modal trigger="time-zone-modal" @didPresent="search()" @didDismiss="clearSearch()">
+        <DxpModal :state="timeZoneModal" :title="translate('Select time zone')">
+          <template #toolbar>
+            <ion-toolbar>
+              <ion-searchbar @ionFocus="selectSearchBarText($event)" :placeholder="translate('Search time zones')" v-model="queryString" @keyup.enter="findTimeZone()" />
+            </ion-toolbar>
+          </template>
 
-        <ion-content>
           <ion-radio-group v-model="timeZoneId">
             <ion-list v-if="showBrowserTimeZone">
               <ion-list-header><ion-label>{{ translate("Browser time zone") }}</ion-label></ion-list-header>
@@ -206,23 +198,17 @@
               </template>
             </ion-list>
           </ion-radio-group>
-
-          <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-            <ion-fab-button :disabled="!timeZoneId" @click="saveUserTimeZone" :aria-label="translate('Save')">
-              <ion-icon :icon="saveOutline" />
-            </ion-fab-button>
-          </ion-fab>
-        </ion-content>
+        </DxpModal>
       </ion-modal>
     </ion-content>
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { IonAvatar, IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonPage, IonRadio, IonRadioGroup, IonSearchbar, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToolbar } from '@ionic/vue';
-import { checkmarkCircle, closeCircle, closeOutline, openOutline, saveOutline, syncOutline } from 'ionicons/icons';
+import { IonAvatar, IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle, IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonPage, IonRadio, IonRadioGroup, IonSearchbar, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToolbar } from '@ionic/vue';
+import { checkmarkCircle, closeCircle, openOutline, syncOutline } from 'ionicons/icons';
 import { computed, onBeforeMount, ref } from 'vue';
-import { api, commonUtil, cookieHelper, i18n, translate } from '@common';
+import { api, commonUtil, cookieHelper, DxpModal, i18n, translate, useDxpModal } from '@common';
 import { useDbStatus } from '@common/db';
 import { useAuth } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';
@@ -266,7 +252,6 @@ const props = defineProps({
 
 const isLoading = ref(true);
 const isOmsOffline = ref(false);
-const timeZoneModal = ref();
 const queryString = ref('');
 const filteredTimeZones = ref<any[]>([]);
 const timeZoneId = ref(currentTimeZone.value);
@@ -316,10 +301,11 @@ function setCurrentProductStore(event: CustomEvent) {
   }
 }
 
-async function saveUserTimeZone() {
-  await userStore.setUserTimeZone(timeZoneId.value);
-  closeModal();
-}
+// Save stores the chosen time zone; the modal closes once it is stored.
+const timeZoneModal = useDxpModal({
+  canConfirm: () => !!timeZoneId.value,
+  confirm: () => userStore.setUserTimeZone(timeZoneId.value),
+});
 
 function logout() {
   useAuth().logout({ isUserUnauthorised: false });
@@ -327,10 +313,6 @@ function logout() {
 
 function goToLaunchpad() {
   window.location.href = `${import.meta.env.VITE_LAUNCHPAD_URL}`;
-}
-
-function closeModal() {
-  timeZoneModal.value?.$el?.dismiss(null, 'cancel');
 }
 
 function findTimeZone() {

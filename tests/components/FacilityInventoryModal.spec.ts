@@ -47,7 +47,8 @@ describe('facility inventory modal', () => {
 
   it('keeps the whole row tappable and the save action reachable', () => {
     expect(source).toContain('@click="selectedFacilityId = facility.facilityId"');
-    expect(source).toContain('<ion-fab vertical="bottom" horizontal="end" slot="fixed">');
-    expect(source).toContain(':disabled="!selectedFacilityId"');
+    // DxpModal draws the save action; it is enabled once a facility is chosen.
+    expect(source).toContain('<DxpModal :state="facilityModal"');
+    expect(source).toContain('canConfirm: () => !!selectedFacilityId.value');
   });
 });
