@@ -74,10 +74,11 @@ import { closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, ref } from 'vue';
 import { translate } from '@common';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
+
+const seed = useSeedData();
 
 const orderDetailStore = useOrderDetailStore();
-const seed = useSeedStore();
 
 const selectedCarrierId = ref('');
 const selectedMethodId = ref('');
@@ -85,7 +86,7 @@ const selectedMethodId = ref('');
 const availableCarriers = computed(() => {
   const list = orderDetailStore.carrierParties.length
     ? orderDetailStore.carrierParties
-    : seed.carriers.ids.map((id) => seed.carriers.byId[id]);
+    : seed.carriers();
   return [...list].sort((a, b) => {
     const nameA = [a.firstName, a.lastName].filter(Boolean).join(' ') || a.groupName || a.partyId;
     const nameB = [b.firstName, b.lastName].filter(Boolean).join(' ') || b.groupName || b.partyId;

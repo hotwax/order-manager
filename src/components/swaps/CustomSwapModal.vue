@@ -122,15 +122,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonRadio, IonRadioGroup, IonSearchbar, IonSegment, IonSegmentButton, IonSpinner, IonThumbnail, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { api, DxpShopifyImg, translate } from '@common';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductMaster } from '@/composables/useProductMaster';
 import { useStockStore } from '@/store/stock';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { formatMoney } from '@/utils/format';
+
+const seed = useSeedData();
 
 const props = defineProps<{
   substituteProducts: any[];
@@ -168,13 +170,12 @@ const searchResults = ref<any[]>([]);
 const isSearching = ref(false);
 const searchPageIndex = ref(0);
 const searchTotalCount = ref(0);
-const seedStore = useSeedStore();
 
 const isSearchScrollable = computed(() =>
   searchResults.value.length > 0 && searchResults.value.length < searchTotalCount.value
 );
 
-const facilityLabel = computed(() => seedStore.facilityName(props.facilityId) || props.facilityId);
+const facilityLabel = computed(() => seed.facilityName(props.facilityId ?? ''));
 
 const productMaster = useProductMaster();
 
@@ -291,7 +292,6 @@ function save() {
 onMounted(async () => {
   const productIds = props.substituteProducts.map((p: any) => p.productId).filter(Boolean);
   await Promise.all([
-    seedStore.loadFacilities(),
     productIds.length
       ? (async () => {
           useProductMaster().init();

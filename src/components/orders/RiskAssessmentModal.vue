@@ -17,7 +17,7 @@
           <ion-icon slot="start" :icon="shieldOutline" :color="riskLevelColor(risk.riskLevelEnumId)" />
           <ion-label>
             {{ risk.providerName || risk.providerId || translate('Risk provider') }}
-            <p>{{ translate('Risk level: {level}', { level: seedStore.enumDescription(risk.riskLevelEnumId) }) }}</p>
+            <p>{{ translate('Risk level: {level}', { level: seed.enumDescription(risk.riskLevelEnumId) }) }}</p>
           </ion-label>
           <ion-note v-if="risk.createdDate" slot="end">{{ formatDateTime(risk.createdDate) }}</ion-note>
         </ion-item>
@@ -25,7 +25,7 @@
           <ion-icon slot="start" :icon="factSentimentIcon(fact.sentimentEnumId)" :color="factSentimentColor(fact.sentimentEnumId)" />
           <ion-label class="ion-text-wrap">
             {{ fact.description }}
-            <p>{{ seedStore.enumDescription(fact.sentimentEnumId) }}</p>
+            <p>{{ seed.enumDescription(fact.sentimentEnumId) }}</p>
           </ion-label>
         </ion-item>
       </ion-list>
@@ -43,14 +43,15 @@ import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabe
 import { closeOutline, shieldOutline } from 'ionicons/icons';
 import { formatDateTime } from '@/utils/format';
 import { translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { factSentimentColor, factSentimentIcon, riskLevelColor, sortFactsBySentiment } from '@/utils';
+
+const seed = useSeedData();
 
 withDefaults(defineProps<{ risks?: any[] }>(), {
   risks: () => [],
 });
 
-const seedStore = useSeedStore();
 
 function dismiss() {
   modalController.dismiss();

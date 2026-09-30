@@ -157,7 +157,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { IonBackButton, IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonItem, IonLabel, IonList, IonMenuButton, IonPage, IonProgressBar, IonSegment, IonSegmentButton, IonTitle, IonToolbar, onIonViewWillEnter } from '@ionic/vue';
-import { logger, translate } from '@common';
+import { translate } from '@common';
 import router from '@/router';
 import Actions from '@/authorization/actions';
 import EmptyState from '@/components/common/EmptyState.vue';
@@ -173,7 +173,6 @@ import { useProductMaster } from '@/composables/useProductMaster';
 import { useCustomerStore } from '@/store/customer';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
 import { useUserStore } from '@/store/user';
 import type { ShipGroupActionId } from '@/utils/OrderActionValidator';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
@@ -188,7 +187,6 @@ const props = defineProps<{
 const orderDetailStore = useOrderDetailStore();
 const orderTaskStore = useOrderTaskStore();
 const customerStore = useCustomerStore();
-const seed = useSeedStore();
 const userStore = useUserStore();
 const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW));
 const canRequestInventoryTransfer = computed(() => userStore.hasPermission(Actions.APP_INVENTORY_TRANSFER_CREATE));
@@ -204,9 +202,6 @@ const expandedShipGroupIds = ref<Set<string>>(new Set());
 
 async function loadOrder(orderId: string, force = false) {
   await orderDetailStore.loadOrderAggregate(orderId, force);
-  loadRejectionReasonEnums();
-  // Shops load at boot; this retries a failed boot load (a no-op once loaded) without waiting on it.
-  if (shopifyOrderId.value) seed.loadShopifyShops();
   const partyId = orderDetailStore.customerPartyIdByOrderId(orderId);
   if (partyId) await customerStore.loadCustomerProfile(partyId, force);
   // Rich product data (name/SKU/image): fetch only uncached products, never refetch.
@@ -339,28 +334,14 @@ const shopifyOrderId = computed(() =>
   (orderDetailStore.orderById(props.orderId)?.identifications || [])
     .find((identification: any) => identification.orderIdentificationTypeId === 'SHOPIFY_ORD_ID')?.idValue ?? '');
 
-// Reactive over the seed dataset, so the link appears even when the shops finish loading after the
-// order renders.
+// Reactive over the store's seed rows, so the link appears even when the shops are read from the
+// local database after the order renders.
 const shopifyAdminUrl = computed(() => {
   const productStoreId = orderDetailStore.orderById(props.orderId)?.productStoreId;
   if (!shopifyOrderId.value || !productStoreId) return '';
-  const shopId = singleShopIdForProductStore(seed.shopifyShops.ids.map((id: string) => seed.shopifyShops.byId[id]), productStoreId);
-  const shop: any = shopId ? seed.shopifyShops.byId[shopId] : null;
+  const shops = orderDetailStore.seedLookup.shopifyShops;
+  const shopId = singleShopIdForProductStore(shops, productStoreId);
+  const shop: any = shopId ? shops.find((entry: any) => entry.shopId === shopId) : null;
   return shop ? shopifyAdminOrderUrl(shop.myshopifyDomain || shop.domain, shopifyOrderId.value) : '';
 });
-
-// Rejection reasons live under these two enum parent types and are otherwise only loaded when the
-// Reject items modal opens — without them a timeline rejection reads as its raw id
-// ("REJ_RSN_DAMAGED"). Loading is idempotent per enum type; the filter just avoids re-listing.
-const REJECTION_REASON_PARENT_TYPES = ['REPORT_AN_ISSUE', 'RPRT_NO_VAR_LOG'];
-
-function loadRejectionReasonEnums() {
-  REJECTION_REASON_PARENT_TYPES
-    .filter((parentTypeId) => !seed.getEnumsByParentType(parentTypeId).length)
-    .forEach((parentTypeId) => {
-      seed.loadEnumsByParentType(parentTypeId).catch((error: any) =>
-        logger.debug(`Rejection reason enums for ${parentTypeId} unavailable`, error)
-      );
-    });
-}
 </script>

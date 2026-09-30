@@ -37,10 +37,10 @@
   },
   "devDependencies": {
     "@capacitor/cli": "catalog:",
-    "@vitejs/plugin-legacy": "catalog:",
     "@types/file-saver": "catalog:",
     "@types/luxon": "catalog:",
     "@types/papaparse": "catalog:",
+    "@vitejs/plugin-legacy": "catalog:",
     "@vitejs/plugin-vue": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",

@@ -7,7 +7,7 @@ import { sentimentCounts } from './index';
 import { toMillis } from './format';
 import { shipGroupMilestones, type OrderEvent } from './orderEvents';
 import { adjustmentAmount, adjustmentKey, adjustmentLabel } from './orderAdjustments';
-import type { useSeedStore } from '@/store/seed';
+import type { SeedLookup } from './seedLookup';
 import type { useProductCacheStore } from '@/store/productCache';
 import type { ItemIssuanceSummary } from '@/store/orderDetail';
 import type {
@@ -38,7 +38,7 @@ export interface EnrichmentAuxiliaryData {
 }
 
 export interface EnrichmentStores {
-  seed: ReturnType<typeof useSeedStore>;
+  seed: SeedLookup;
   productCache: ReturnType<typeof useProductCacheStore>;
 }
 

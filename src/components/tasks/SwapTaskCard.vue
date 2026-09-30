@@ -142,7 +142,7 @@ import SuggestedProductActionPopover from '@/components/swaps/SuggestedProductAc
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { useStockStore } from '@/store/stock';
@@ -150,6 +150,8 @@ import { isSwapItemUnavailable } from '@/utils/swapItems';
 import { currencySymbol, formatDateTime, formatMoney } from '@/utils/format';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import type { TaskCardAction } from '@/types/taskCard';
+
+const seed = useSeedData();
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean; showViewOrderAction?: boolean }>(), {
   selectable: false,
@@ -160,7 +162,6 @@ const props = withDefaults(defineProps<{ task: any; selectable?: boolean; select
 const emit = defineEmits<{ (e: 'update:selected', value: boolean): void; (e: 'completed'): void }>();
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedStore();
 
 const cardActions = computed<TaskCardAction[]>(() => ([
   { id: 'release', label: translate('Release updated order'), kind: 'primary' },
@@ -175,7 +176,8 @@ function getCustomerName(customer: any): string {
 }
 
 function routingFacilityName(task: any): string {
-  return seedStore.facilityName(task.facilityId)
+  const facilityLabel = seed.facilityName(task.facilityId ?? '');
+  return (facilityLabel !== task.facilityId && facilityLabel)
     || task.routingFacilityName
     || task.facilityName
     || task.facilityId

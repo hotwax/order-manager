@@ -9,7 +9,6 @@ import { useCustomerStore } from '@/store/customer';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useProductStore } from '@/store/productStore';
-import { useSeedStore } from '@/store/seed';
 import type { EnrichedOrder, EnrichedOrderItem, EnrichedShipGroup, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 
 import AddContactModal from '@/components/AddContactModal.vue';
@@ -64,7 +63,6 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
   const orderDetailStore = useOrderDetailStore();
   const orderTaskStore = useOrderTaskStore();
   const customerStore = useCustomerStore();
-  const seed = useSeedStore();
   const { getProduct, primaryIdentifier } = useProductIdentity();
 
   const allItems = computed(() => (order.value?.groupedItems || []).flatMap((group) => group.items));
@@ -92,7 +90,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
   function itemActionContext(item: EnrichedOrderItem) {
     return {
       isVirtual: isVirtualForItem(item),
-      itemAllowedToStatusIds: new Set<string>(seed.allowedTransitions(item.statusId).map((transition: any) => transition.toStatusId))
+      itemAllowedToStatusIds: new Set<string>(orderDetailStore.seedLookup.allowedTransitions(item.statusId).map((transition: any) => transition.toStatusId))
     };
   }
 
@@ -563,7 +561,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
    */
   const footerActions = computed(() => {
     if (!order.value) return [];
-    const allowedTransitions = seed.allowedTransitions(order.value.statusId);
+    const allowedTransitions = orderDetailStore.seedLookup.allowedTransitions(order.value.statusId);
     const orderAllowedToStatusIds = new Set<string>(allowedTransitions.map((transition: any) => transition.toStatusId));
     // The validator only offers "Cancel N items" for items it could cancel, so hand it those.
     const actions = OrderActionValidator.getOrderFooterActions(order.value, allowedTransitions, cancellableSelectedItems.value, { orderAllowedToStatusIds });

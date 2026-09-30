@@ -6,7 +6,6 @@ import { alertController, modalController } from '@ionic/vue';
 import { useOrderActions } from '@/composables/useOrderActions';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
 import type { EnrichedOrder, EnrichedOrderItem, EnrichedShipGroup } from '@/types/orderDetail';
 
 // Like the app's i18n: named placeholders are filled from the params, and render empty without them.
@@ -160,9 +159,7 @@ describe('footer bulk cancel', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     // In this status flow only an approved item can move to ITEM_CANCELLED.
-    const seed = useSeedStore();
-    seed.statusFlowTransitions.ids = ['T1'];
-    seed.statusFlowTransitions.byId = { T1: { statusId: 'ITEM_APPROVED', toStatusId: 'ITEM_CANCELLED' } };
+    useOrderDetailStore().seedRows = { statusFlowTransitions: [{ statusId: 'ITEM_APPROVED', toStatusId: 'ITEM_CANCELLED' }] };
     // Confirm every alert as soon as it is presented.
     vi.mocked(alertController.create).mockImplementation(async (options: any) => ({
       present: vi.fn(async () => options.buttons.find((button: any) => button.role === 'confirm').handler()),

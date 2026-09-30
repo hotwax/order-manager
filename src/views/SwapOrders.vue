@@ -126,7 +126,7 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
-import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
+import { defaultOrderTaskFilters, taskSortOptions } from '@/types/orderTaskFilters';
 import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import SubstituteRelationshipModal from '@/components/swaps/SubstituteRelationshipModal.vue';
 import SwapSetupPanel, { type SwapSetupCandidate } from '@/components/swaps/SwapSetupPanel.vue';
@@ -137,15 +137,16 @@ import { useProductStore } from '@/store/productStore';
 import { useUserStore } from '@/store/user';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { fetchUnfillableProductCandidates, fetchUnfillableShipGroupsForProduct } from '@/services/order';
 import { fetchActiveSubstitutes } from '@/services/productAssociations';
 import { showToast } from '@/utils';
 import { countTaskTargets, runGroupedTaskMutation, shipGroupTaskTarget } from '@/utils/orderTaskBulk';
 import Actions from "@/authorization/actions";
 
+const seed = useSeedData();
+
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedStore();
 const productStore = useProductStore();
 const userStore = useUserStore();
 const productCache = useProductCacheStore();
@@ -154,11 +155,9 @@ const productMaster = useProductMaster();
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'swap');
 const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
-const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({
-  id: channel.enumId,
-  label: channel.description || channel.enumId,
-})));
-const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions);
+const channelOptions = computed(() => seed.enumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
+const shipmentMethodOptions = computed(() => seed.shipmentMethodOptions());
+
 const sortOptions = taskSortOptions('swap');
 const selectMode = ref(false);
 const selectedTasks = ref<Record<string, boolean>>({});

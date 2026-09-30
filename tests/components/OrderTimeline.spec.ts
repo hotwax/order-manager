@@ -5,7 +5,7 @@ import OrderTimeline from '@/components/orders/OrderTimeline.vue';
 import type { OrderHistoryStatus } from '@/store/orderDetail';
 import { buildOrderEvents } from '@/utils/orderEvents';
 
-const seedFacilities = vi.hoisted(() => ({ ids: ['WH'], status: 'loaded' }));
+const seedRows = vi.hoisted(() => ({ ready: true }));
 const FACILITIES: Record<string, string> = { WH: 'Main Warehouse', PARKING: 'Rejected Item Parking' };
 
 vi.mock('@common', () => ({
@@ -32,15 +32,17 @@ vi.mock('@/composables/useOrderDetail', () => ({ FACILITY_CHANGE_PAGE_SIZE: 200 
 vi.mock('@/composables/useProductIdentity', () => ({ useProductIdentity: () => ({ primaryIdentifier: () => 'TEE-M' }) }));
 vi.mock('@/store/orderDetail', () => ({
   isVirtualFacilityId: (facilityId: string) => facilityId === 'PARKING',
-  useOrderDetailStore: () => ({ orderById: () => null }),
-}));
-vi.mock('@/store/seed', () => ({
-  useSeedStore: () => ({
-    facilities: seedFacilities,
-    facilityName: (facilityId: string) => FACILITIES[facilityId] ?? facilityId,
-    statusDescription: (statusId: string) => statusId,
-    describe: (value: string) => value,
-    enumDescription: (enumId: string) => enumId,
+  useOrderDetailStore: () => ({
+    orderById: () => null,
+    get seedLookup() {
+      return {
+        ready: seedRows.ready,
+        facilityName: (facilityId: string) => FACILITIES[facilityId] ?? facilityId,
+        statusDescription: (statusId: string) => statusId,
+        describe: (value: string) => value,
+        enumDescription: (enumId: string) => enumId,
+      };
+    },
   }),
 }));
 
@@ -94,11 +96,9 @@ describe('OrderTimeline', () => {
 
   it('shows loading until the facility list is known, and a retry when history failed', async () => {
     expect(mountTimeline({ ...idle, loading: true }).find('.skeleton').exists()).toBe(true);
-    seedFacilities.ids = [];
-    seedFacilities.status = 'loading';
+    seedRows.ready = false;
     const waiting = mountTimeline();
-    seedFacilities.ids = ['WH'];
-    seedFacilities.status = 'loaded';
+    seedRows.ready = true;
     expect(waiting.findAll('.divider')).toHaveLength(0);
 
     const failed = mountTimeline({ ...idle, failed: true });

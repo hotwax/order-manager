@@ -74,7 +74,6 @@ import OrderTimelineEntry from '@/components/orders/OrderTimelineEntry.vue';
 import { FACILITY_CHANGE_PAGE_SIZE } from '@/composables/useOrderDetail';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { isVirtualFacilityId, useOrderDetailStore, type OrderHistoryStatus } from '@/store/orderDetail';
-import { useSeedStore } from '@/store/seed';
 import type { EnrichedOrder } from '@/types/orderDetail';
 import { formatTime } from '@/utils/format';
 import type { OrderEvent, OrderEventLink } from '@/utils/orderEvents';
@@ -90,11 +89,11 @@ const props = defineProps<{
 
 const emit = defineEmits<{ retry: [] }>();
 
-const seed = useSeedStore();
 const orderDetailStore = useOrderDetailStore();
 const { primaryIdentifier } = useProductIdentity();
 
 const context = computed<TimelineContext>(() => {
+  const seed = orderDetailStore.seedLookup;
   const shipGroupOfItem: Record<string, string> = {};
   const productOfItem: Record<string, string> = {};
   props.order.shipGroups.forEach((shipGroup) => shipGroup.items.forEach((item) => {
@@ -107,7 +106,7 @@ const context = computed<TimelineContext>(() => {
     statusDescription: (statusId: string) => seed.statusDescription(statusId),
     describe: (value: string) => seed.describe(value),
     enumDescription: (enumId: string) => seed.enumDescription(enumId),
-    isVirtualFacility: isVirtualFacilityId,
+    isVirtualFacility: (facilityId: string) => isVirtualFacilityId(facilityId, seed),
     itemTotal: Object.keys(shipGroupOfItem).length,
     shipGroupOfItem,
     posShipGroupIds: new Set(props.order.shipGroups.filter((shipGroup) => shipGroup.isPosCompleted).map((shipGroup) => shipGroup.id)),
@@ -123,7 +122,7 @@ const context = computed<TimelineContext>(() => {
 
 // Whether a facility is parking decides how a move reads — the move a cancellation makes into
 // Rejected Item Parking, or a rejection — so the rows wait for the facility list on a cold load.
-const facilitiesReady = computed(() => seed.facilities.ids.length > 0 || ['loaded', 'error'].includes(seed.facilities.status));
+const facilitiesReady = computed(() => orderDetailStore.seedLookup.ready);
 const loading = computed(() => props.status.loading || !facilitiesReady.value);
 
 const days = computed(() => (facilitiesReady.value ? timelineDays(groupTransactions(props.events, context.value), context.value) : []));

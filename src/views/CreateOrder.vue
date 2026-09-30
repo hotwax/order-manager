@@ -304,7 +304,9 @@ import AddressModal from '@/components/AddressModal.vue';
 import AddCustomerModal from '@/components/AddCustomerModal.vue';
 import AddProductModal from '@/components/AddProductModal.vue';
 import AddCustomLineModal from '@/components/AddCustomLineModal.vue';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
+
+const seed = useSeedData();
 
 const currencies = ref([]) as any;
 const shopsList = ref<any[]>([]);
@@ -322,20 +324,20 @@ const isItemInOrder = computed(() => orderForm.value.lineItems.some((lineItem: a
 
 let timeoutId: any = null;
 const productSearchCount = ref(0);
+
+const currentStoreId = computed(() => useProductStore().getCurrentProductStore?.productStoreId ?? '');
+
 const facilities = computed(() => {
-  const productStoreId = useProductStore().getCurrentProductStore?.productStoreId;
-  if (!productStoreId) return [];
+  if (!currentStoreId.value) return [];
 
-  const storeFacilitiesMap = useSeedStore().productStoreFacilitiesByStoreId[productStoreId]?.byId;
-  if (!storeFacilitiesMap) return [];
-
-  const storeFacilities = Object.values(storeFacilitiesMap);
+  const storeFacilities = seed.productStoreFacilities(currentStoreId.value);
+  if (!storeFacilities.length) return [];
 
   if (!orderForm.value.shopId) {
     return storeFacilities;
   }
 
-  const shopLocations = Object.values(useSeedStore().shopifyShopLocations?.byId || {});
+  const shopLocations = seed.shopifyShopLocations();
   const allowedFacilityIds = shopLocations
     .filter((loc: any) => loc.shopId === orderForm.value.shopId)
     .map((loc: any) => loc.facilityId);

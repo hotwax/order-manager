@@ -315,7 +315,7 @@
                     <ion-select :label="translate('Country')" label-placement="stacked" interface="popover"
                       :placeholder="translate('Select country')" v-model="shippingAddressForm.countryGeoId"
                       @ionChange="shippingAddressForm.stateProvinceGeoId = ''">
-                      <ion-select-option v-for="country in seed.getCountries" :key="country.geoId" :value="country.geoId">
+                      <ion-select-option v-for="country in seed.countries" :key="country.geoId" :value="country.geoId">
                         {{ country.geoName }}
                       </ion-select-option>
                     </ion-select>
@@ -325,7 +325,7 @@
                       interface="popover" :placeholder="translate('Select State / Province')"
                       :disabled="!shippingAddressForm.countryGeoId"
                       v-model="shippingAddressForm.stateProvinceGeoId">
-                      <ion-select-option v-for="state in seed.getStates" :key="state.geoId" :value="state.geoId">
+                      <ion-select-option v-for="state in seed.states" :key="state.geoId" :value="state.geoId">
                         {{ state.geoName }}
                       </ion-select-option>
                     </ion-select>
@@ -477,7 +477,6 @@ import {
 import { DxpShopifyImg, translate } from '@common';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useOrderDetailStore } from '@/store/orderDetail';
-import { useSeedStore } from '@/store/seed';
 import { confirmAction, isKit } from '@/utils';
 import type { ShipGroupMilestones } from '@/utils/orderEvents';
 import { formatDateTime, formatElapsed, formatNumber, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
@@ -522,8 +521,8 @@ const emit = defineEmits<{
   'save-address': [address: ShipGroupAddressEdit];
 }>();
 
-const seed = useSeedStore();
 const orderDetailStore = useOrderDetailStore();
+const seed = computed(() => orderDetailStore.seedLookup);
 const { getProduct, imagePreview, primaryIdentifier, secondaryIdentifier, featureLabel } = useProductIdentity();
 
 const ISSUANCE_LABELS: Record<ItemIssuance['kind'], string> = {
@@ -610,7 +609,7 @@ const carrierName = computed(() => {
   const carrier = props.carriers.find((party: any) => party.partyId === carrierId.value);
   return carrier ? partyName(carrier) : '';
 });
-const methodLabel = computed(() => methodId.value ? seed.shipmentMethodDescription(methodId.value) : '');
+const methodLabel = computed(() => methodId.value ? seed.value.shipmentMethodDescription(methodId.value) : '');
 const carrierMethods = computed(() => [...orderDetailStore.shippingMethodsByCarrier(carrierId.value)]
   .sort((a, b) => Number(a.sequenceNumber ?? Infinity) - Number(b.sequenceNumber ?? Infinity)));
 
