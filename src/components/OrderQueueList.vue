@@ -238,18 +238,8 @@ const debounceTimer = ref<ReturnType<typeof setTimeout>>();
 const selectMode = ref(false);
 const selectedOrderIds = ref<string[]>([]);
 
-// Seed labels live in the local database, so they resolve after mount, not in a computed.
-const salesChannels = ref<any[]>([]);
-const shipmentMethodOptions = ref<Array<{ id: string; label: string }>>([]);
-
-async function loadSeedData() {
-  const [channels, methods] = await Promise.all([
-    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
-    seed.getShipmentMethodOptions(),
-  ]);
-  salesChannels.value = channels;
-  shipmentMethodOptions.value = methods;
-}
+const salesChannels = computed(() => seed.enumsByType('ORDER_SALES_CHANNEL'));
+const shipmentMethodOptions = computed(() => seed.shipmentMethodOptions());
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const hasMore = computed(() => searchResults.value.length < searchTotal.value);
 
@@ -266,7 +256,6 @@ function hasGlobalAction(action: QueueGlobalAction): boolean {
 }
 
 onMounted(() => {
-  loadSeedData();
   runSearch();
 });
 

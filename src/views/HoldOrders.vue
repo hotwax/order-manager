@@ -142,21 +142,10 @@ const userStore = useUserStore();
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'hold');
 const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
-// Seed labels live in the local database, so they resolve after mount, not in a computed.
-const channelOptions = ref<TaskFilterOption[]>([]);
-const shipmentMethodOptions = ref<TaskFilterOption[]>([]);
-const purposeOptionRows = ref<any[]>([]);
+const channelOptions = computed(() => seed.enumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
+const shipmentMethodOptions = computed(() => seed.shipmentMethodOptions());
+const purposeOptionRows = computed(() => seed.enumsByType(HOLD_TASK_PURPOSE_ENUM_TYPE_ID));
 
-async function loadSeedData() {
-  const [channels, methods, purposes] = await Promise.all([
-    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
-    seed.getShipmentMethodOptions(),
-    seed.getEnumsByType(HOLD_TASK_PURPOSE_ENUM_TYPE_ID),
-  ]);
-  channelOptions.value = channels.map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId }));
-  shipmentMethodOptions.value = methods;
-  purposeOptionRows.value = purposes;
-}
 const sortOptions = taskSortOptions('hold');
 // Only purposes without a dedicated queue page are offered — picking Bad Address,
 // Swap or Fraud here would show tasks that belong on those pages.
@@ -323,7 +312,6 @@ async function loadMoreHoldTasks(event: any) {
 }
 
 onIonViewWillEnter(() => {
-  loadSeedData();
   loadPhysicalFacilities();
   // No-op once loaded; guarantees the purpose filter has options even when the
   // page is opened directly rather than after a full seed load.

@@ -109,7 +109,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import {
   IonIcon,
   IonInput,
@@ -170,26 +170,6 @@ const cardActions = computed<TaskCardAction[]>(() => ([
 const addressState = ref<AddressState | null>(null);
 
 // Seed labels come from the local database; each resolves when the task changes.
-const facilityLabel = ref('');
-const carrierLabel = ref('');
-const methodLabel = ref('');
-const statesByCountry = ref<Record<string, any[]>>({});
-
-watch(() => props.task, async (task) => {
-  const methodId = task?.shipmentMethodTypeId || task?.shipGroup?.shipmentMethodTypeId || '';
-  [facilityLabel.value, carrierLabel.value, methodLabel.value] = await Promise.all([
-    seed.getFacilityName(task?.facilityId ?? ''),
-    task?.carrierPartyId ? seed.getCarrierName(task.carrierPartyId) : Promise.resolve(''),
-    methodId ? seed.getShipmentMethodDescription(methodId) : Promise.resolve(''),
-  ]);
-}, { immediate: true, deep: true });
-
-// The state name shown next to each address needs its country's states in hand.
-watch(addressState, async (state) => {
-  const countryIds = [state?.original?.countryGeoId, state?.suggested?.countryGeoId].filter(Boolean) as string[];
-  const resolved = await Promise.all(countryIds.map((id) => seed.getStatesForCountry(id)));
-  statesByCountry.value = Object.fromEntries(countryIds.map((id, i) => [id, resolved[i]]));
-}, { deep: true });
 
 // buildAddressState resolves geo codes to ids and the result is STAMPED into addressState,
 // so a cold slice would leave raw codes there permanently. Already deferred past first
@@ -213,7 +193,7 @@ function countryName(geoId: string): string {
 
 function stateName(address: AddressState['original']): string {
   if (!address.countryGeoId || !address.stateProvinceGeoId) return '';
-  return (statesByCountry.value[address.countryGeoId] || []).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
+  return seed.statesForCountry(address.countryGeoId).find((s: any) => s.geoId === address.stateProvinceGeoId)?.geoName || '';
 }
 
 function readOnlyAddressValue(value: string): string {
@@ -222,15 +202,15 @@ function readOnlyAddressValue(value: string): string {
 
 function brokeredFacilityName(task: any): string {
   return task.facilityName
-    || facilityLabel.value
+    || seed.facilityName(task.facilityId ?? '')
     || task.facilityId
     || translate('Facility not assigned');
 }
 
 function carrierShippingMethodLabel(task: any): string {
-  const carrier = carrierLabel.value;
-  const methodId = task.shipmentMethodTypeId || task.shippingMethodTypeId;
-  const method = methodLabel.value;
+  const carrier = task.carrierPartyId ? seed.carrierName(task.carrierPartyId) : '';
+  const methodId = task.shipmentMethodTypeId || task.shipGroup?.shipmentMethodTypeId || '';
+  const method = methodId ? seed.shipmentMethodDescription(methodId) : '';
   return [carrier, method].filter(Boolean).join(' - ') || translate('Shipping method not set');
 }
 

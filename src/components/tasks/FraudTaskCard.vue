@@ -88,7 +88,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { IonButton, IonChip, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController, modalController } from '@ionic/vue';
 import { alertCircleOutline, checkmarkCircleOutline, hardwareChipOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
@@ -129,20 +129,6 @@ const taskFacts = computed<any[]>(() => (props.task.risks || []).flatMap((risk: 
 const negativeFacts = computed(() => taskFacts.value.filter((fact) => fact.sentimentEnumId === 'SENT_NEGATIVE'));
 const counts = computed(() => sentimentCounts(taskFacts.value));
 
-// Seed labels come from the local database; one read per table when the task changes.
-const paymentLabels = ref<Record<string, string>>({});
-const statusLabels = ref<Record<string, string>>({});
-const recommendationLabel = ref('');
-
-watch(() => props.task, async (task) => {
-  const payments = task?.payments || [];
-  [paymentLabels.value, statusLabels.value, recommendationLabel.value] = await Promise.all([
-    seed.getPaymentMethodDescriptions(payments.map((payment: any) => payment.paymentMethodTypeId)),
-    seed.getStatusDescriptions(payments.map((payment: any) => payment.statusId)),
-    seed.getEnumDescription(task?.riskRecommendationEnumId ?? ''),
-  ]);
-}, { immediate: true, deep: true });
-
 async function openRiskDetails() {
   const modal = await modalController.create({
     component: RiskAssessmentModal,
@@ -174,14 +160,12 @@ function orderedItemSecondary(item: any): string {
 
 function paymentMethodLabel(payment: any): string {
   return payment.paymentMethodDescription
-    || paymentLabels.value[payment.paymentMethodTypeId]
-    || payment.paymentMethodTypeId;
+    || seed.paymentMethodDescription(payment.paymentMethodTypeId);
 }
 
 function paymentStatusLabel(payment: any): string {
   return payment.statusDescription
-    || statusLabels.value[payment.statusId]
-    || payment.statusId;
+    || seed.statusDescription(payment.statusId);
 }
 
 function paymentStatusColor(payment: any): string | undefined {
@@ -195,8 +179,8 @@ function paymentStatusColor(payment: any): string | undefined {
 
 function suggestedActionLabel(task: any): string {
   return task.suggestedAction
-    || recommendationLabel.value
-    || enumDescription(enums.value, task.recommendationEnumId)
+    || seed.enumDescription(task.riskRecommendationEnumId ?? '')
+    || seed.enumDescription(task.recommendationEnumId ?? '')
     || translate('Review');
 }
 

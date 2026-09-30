@@ -53,7 +53,7 @@
       <IdentificationListItem
         v-for="identification in localIdentifications"
         :key="`${identification.orderIdentificationTypeId}::${identification.fromDate}`"
-        :label="identificationLabels[identification.orderIdentificationTypeId] ?? identification.orderIdentificationTypeId"
+        :label="seed.enumDescription(identification.orderIdentificationTypeId)"
         :value="identification.idValue"
         :hide-value="editingKey === rowKey(identification)"
         :is-updatable="isRowUpdatable(identification)"
@@ -110,7 +110,7 @@ import {
   modalController
 } from '@ionic/vue';
 import { addOutline, checkmarkDoneOutline, closeOutline, createOutline, trashOutline } from 'ionicons/icons';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { DateTime } from 'luxon';
 import { api, commonUtil, translate } from '@common';
 import { useSeedData } from '@common/db';
@@ -159,19 +159,7 @@ function isRowUpdatable(identification: Identification) {
 
 const localIdentifications = ref<Identification[]>([...props.identifications]);
 
-// One read per list change resolves every identification type label.
-const identificationLabels = ref<Record<string, string>>({});
-const identificationTypeOptions = ref<Array<{ enumId: string; description: string }>>([]);
-
-watch(localIdentifications, async (rows) => {
-  identificationLabels.value = await seed.getEnumDescriptions(
-    rows.map((identification: any) => identification.orderIdentificationTypeId),
-  );
-}, { immediate: true, deep: true });
-
-onMounted(async () => {
-  identificationTypeOptions.value = await seed.getOrderIdentificationTypeOptions();
-});
+const identificationTypeOptions = computed(() => seed.orderIdentificationTypeOptions());
 const typeOptions = computed(() => {
   const existingTypeIds = new Set(localIdentifications.value.map((identification) => identification.orderIdentificationTypeId));
   return identificationTypeOptions.value.filter((type) => {

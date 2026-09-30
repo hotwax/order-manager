@@ -149,21 +149,11 @@ const filters = computed({
 });
 const physicalFacilities = ref<FacilityOption[]>([]);
 
-// Seed labels live in the local database, so they resolve after mount rather than in a computed.
-const channelOptions = ref<string[]>([]);
+const channelOptions = computed(() => seed.enumsByType('ORDER_SALES_CHANNEL').map((enumeration: any) => enumeration.enumId));
 
 const facilityOptions = computed(() => physicalFacilities.value);
 
-const shipmentMethodOptions = ref<Array<{ id: string; label: string }>>([]);
-
-async function loadSeedData() {
-  const [channels, methods] = await Promise.all([
-    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
-    seed.getShipmentMethodOptions(),
-  ]);
-  channelOptions.value = channels.map((enumeration: any) => enumeration.enumId);
-  shipmentMethodOptions.value = methods;
-}
+const shipmentMethodOptions = computed(() => seed.shipmentMethodOptions());
 
 const channelFilterOptions = computed(() => channelOptions.value.map((channel) => ({ id: channel, label: formatChannel(channel) })));
 const facilityFilterOptions = computed(() => facilityOptions.value.map((facility) => ({ id: facility.id, label: facility.name })));
@@ -254,7 +244,6 @@ async function loadMore(event: any) {
 }
 
 onMounted(() => {
-  loadSeedData();
   loadWorkflowOrders();
   loadPhysicalFacilities();
 });

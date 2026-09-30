@@ -1,16 +1,11 @@
 import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { computed } from 'vue';
 import { BaseDB, commonSchema, dbClient, ensureDbReady } from '@common/db';
 import { setOmsInstanceResolver } from '@/db/orderManagerDb';
 
 let oms = '';
 let n = 0;
-
-// Only getStatusColor is still needed from @common; the OMS instance arrives via the
-// resolver the app registers at boot.
-vi.mock('@common', () => ({
-  commonUtil: { getStatusColor: () => 'medium' },
-}));
 
 async function seedDb(): Promise<void> {
   oms = `useSeedDataTest-${n++}`;
@@ -39,10 +34,13 @@ async function seedDb(): Promise<void> {
     { geoId: 'IND', geoName: 'India', geoCodeAlpha2: 'IN', geoTypeEnumId: 'GEOT_COUNTRY', syncedAt: 1 },
     { geoId: 'USA_CA', geoName: 'California', geoCode: 'CA', geoTypeEnumId: 'GEOT_STATE', syncedAt: 1 },
     { geoId: 'USA_AL', geoName: 'Alabama', geoCode: 'AL', geoTypeEnumId: 'GEOT_STATE', syncedAt: 1 },
+    { geoId: 'DBIC', geoName: 'Doing business in countries', geoTypeEnumId: 'GEOT_GROUP', syncedAt: 1 },
   ]);
   await c.entity('geoAssocs').bulkPut([
-    { geoAssocKey: 'USA|USA_CA', geoId: 'USA', toGeoId: 'USA_CA', syncedAt: 1 },
-    { geoAssocKey: 'USA|USA_AL', geoId: 'USA', toGeoId: 'USA_AL', syncedAt: 1 },
+    { geoAssocKey: 'USA|USA_CA', geoId: 'USA', toGeoId: 'USA_CA', geoAssocTypeEnumId: 'GAT_REGIONS', syncedAt: 1 },
+    { geoAssocKey: 'USA|USA_AL', geoId: 'USA', toGeoId: 'USA_AL', geoAssocTypeEnumId: 'GAT_REGIONS', syncedAt: 1 },
+    // A group membership, not a region: must never show up as one of USA's states.
+    { geoAssocKey: 'USA|DBIC', geoId: 'USA', toGeoId: 'DBIC', geoAssocTypeEnumId: 'GAT_GROUP_MEMBER', syncedAt: 1 },
   ]);
   await c.entity('carriers').bulkPut([
     { partyId: 'UPS', groupName: 'UPS', syncedAt: 1 },
@@ -65,101 +63,171 @@ async function seedDb(): Promise<void> {
 }
 
 let seed: ReturnType<typeof import('@common/db').useSeedData>;
+let __seedTableCount: () => number;
+
+/** Reactive getters answer from the table's ref, so wait for the read to land. */
+const eventually = (check: () => void) => vi.waitFor(check, { timeout: 2000, interval: 5 });
 
 describe('useSeedData', () => {
   beforeEach(async () => {
     await seedDb();
+    ({ __seedTableCount } = await import('@common/db'));
     seed = (await import('@common/db')).useSeedData();
   });
-  afterEach(() => { oms = ''; });
-
-  it('resolves single labels and falls back to the raw id', async () => {
-    expect(await seed.getStatusDescription('ORDER_APPROVED')).toBe('Approved');
-    expect(await seed.getStatusDescription('NOPE')).toBe('NOPE');
-    expect(await seed.getStatusDescription('')).toBe('');
-    expect(await seed.getFacilityName('F1')).toBe('Main Warehouse');
-    expect(await seed.getEnumDescription('WEB_CHANNEL')).toBe('Web');
-    expect(await seed.getProductStoreName('STORE')).toBe('Demo store');
+  afterEach(async () => {
+    (await import('@common/db')).clearSeedTables();
+    oms = '';
   });
 
-  it('resolves many labels in one call, keeping unknown ids as themselves', async () => {
-    expect(await seed.getStatusDescriptions(['ORDER_APPROVED', 'ORDER_CREATED', 'NOPE']))
-      .toEqual({ ORDER_APPROVED: 'Approved', ORDER_CREATED: 'Created', NOPE: 'NOPE' });
-    expect(await seed.getStatusDescriptions([])).toEqual({});
-    expect(await seed.getFacilityNames(['F1', 'F1'])).toEqual({ F1: 'Main Warehouse' });
+  it('answers a cold table with the raw id, then the label once the read lands', async () => {
+    expect(seed.statusDescription('ORDER_APPROVED')).toBe('ORDER_APPROVED');
+    await eventually(() => expect(seed.statusDescription('ORDER_APPROVED')).toBe('Approved'));
+    expect(seed.statusDescription('NOPE')).toBe('NOPE');
+    expect(seed.statusDescription('')).toBe('');
   });
 
-  it('reads status ages, singly and in bulk', async () => {
-    expect(await seed.getStatusAge('ORDER_APPROVED')).toBe(5);
-    expect(await seed.getStatusAge('ORDER_CREATED')).toBe(0);
-    expect(await seed.getStatusAges(['ORDER_APPROVED', 'ORDER_CREATED']))
-      .toEqual({ ORDER_APPROVED: 5, ORDER_CREATED: 0 });
+  it('re-runs a computed when its table loads', async () => {
+    const label = computed(() => seed.facilityName('F1'));
+    expect(label.value).toBe('F1');
+    await eventually(() => expect(label.value).toBe('Main Warehouse'));
+  });
+
+  it('resolves labels by table', async () => {
+    await eventually(() => {
+      expect(seed.enumDescription('WEB_CHANNEL')).toBe('Web');
+      expect(seed.shipmentMethodDescription('GROUND')).toBe('Ground');
+    });
   });
 
   it('filters by type', async () => {
-    expect(await seed.getStatusItemsByType('ORDER_STATUS')).toHaveLength(2);
-    expect(await seed.getEnumsByType('ORDER_SALES_CHANNEL')).toHaveLength(2);
-    expect(await seed.getEnumsByType('MISSING')).toEqual([]);
+    await eventually(() => {
+      expect(seed.statusItemsByType('ORDER_STATUS')).toHaveLength(2);
+      expect(seed.enumsByType('ORDER_SALES_CHANNEL')).toHaveLength(2);
+    });
+    expect(seed.enumsByType('MISSING')).toEqual([]);
   });
 
   it('joins enumTypes to enums for a parent type', async () => {
-    expect((await seed.getEnumsByParentType('WorkEffortPurposeType')).map((e) => e.enumId)).toEqual(['WE_PICK']);
-    expect(await seed.getEnumsByParentType('Unknown')).toEqual([]);
+    await eventually(() => expect(seed.enumsByParentType('WorkEffortPurposeType').map((e) => e.enumId)).toEqual(['WE_PICK']));
+    expect(seed.enumsByParentType('Unknown')).toEqual([]);
   });
 
   it('builds carrier names from either name shape', async () => {
-    expect(await seed.getCarrierName('UPS')).toBe('UPS');
-    expect(await seed.getCarrierName('P1')).toBe('Ada Lovelace');
-    expect(await seed.getCarrierName('ZZZ')).toBe('ZZZ');
-  });
-
-  it('scopes shipping methods to a carrier', async () => {
-    expect(await seed.getShippingMethodsByCarrier('UPS')).toHaveLength(1);
-    expect(await seed.getShippingMethodsByCarrier('')).toEqual([]);
+    await eventually(() => {
+      expect(seed.carrierName('UPS')).toBe('UPS');
+      expect(seed.carrierName('P1')).toBe('Ada Lovelace');
+    });
+    expect(seed.carrierName('ZZZ')).toBe('ZZZ');
   });
 
   it('scopes store facilities to a product store', async () => {
+    await eventually(() => expect(seed.productStoreFacilities('STORE').map((f) => f.facilityId)).toEqual(['F1']));
+    expect(seed.productStoreFacilities('')).toEqual([]);
     expect((await seed.getProductStoreFacilities('STORE')).map((f) => f.facilityId)).toEqual(['F1']);
     expect(await seed.getProductStoreFacilities('')).toEqual([]);
   });
 
   it('sorts geography and joins geoAssocs for a country', async () => {
-    expect((await seed.getCountries()).map((g) => g.geoId)).toEqual(['IND', 'USA']);
-    expect((await seed.getStates()).map((g) => g.geoId)).toEqual(['USA_AL', 'USA_CA']);
+    await eventually(() => {
+      expect(seed.countries().map((g) => g.geoId)).toEqual(['IND', 'USA']);
+      expect(seed.states().map((g) => g.geoId)).toEqual(['USA_AL', 'USA_CA']);
+      expect(seed.statesForCountry('USA').map((g) => g.geoId)).toEqual(['USA_AL', 'USA_CA']);
+    });
+    expect(seed.statesForCountry('IND')).toEqual([]);
+    expect(seed.dbicCountries().map((g) => g.geoId)).toEqual(['USA']);
+    expect(seed.statesForCountry('')).toEqual([]);
     expect((await seed.getStatesForCountry('USA')).map((g) => g.geoId)).toEqual(['USA_AL', 'USA_CA']);
-    expect(await seed.getStatesForCountry('IND')).toEqual([]);
-    expect(await seed.getStatesForCountry('')).toEqual([]);
-    expect(await seed.getGeoIdByCode('US')).toBe('USA');
-    expect(await seed.getGeoIdByCode('XX')).toBe('');
-    expect(await seed.getGeoIdsByCode(['US', 'CA'])).toEqual({ US: 'USA', CA: 'USA_CA' });
   });
 
-  it('orders transitions by sequence and joins the destination status', async () => {
-    const transitions = await seed.getAllowedTransitions('ORDER_CREATED');
-    expect(transitions.map((t) => t.toStatusId)).toEqual(['RETURN_ACCEPTED', 'ORDER_APPROVED']);
-    expect(transitions[0].toStatusDescription).toBe('Accepted');
-    expect(transitions[0].toStatusColor).toBe('medium');
-    expect(await seed.getAllowedTransitions('ORDER_APPROVED')).toEqual([]);
-    expect(await seed.getAllowedTransitions('')).toEqual([]);
-  });
-
-  it('resolves facility parent types for the virtual-facility checks', async () => {
-    expect(await seed.getFacilityParentTypeId('WAREHOUSE')).toBe('PHYSICAL');
-    expect(await seed.getFacilityParentTypeId('NOPE')).toBe('');
-    expect(await seed.getFacilityParentTypeIds(['WAREHOUSE'])).toEqual({ WAREHOUSE: 'PHYSICAL' });
+  it('serves whole tables and their async forms', async () => {
+    await eventually(() => {
+      expect(seed.statuses()).toHaveLength(3);
+      expect(seed.enums()).toHaveLength(4);
+      expect(seed.enumTypes()).toHaveLength(1);
+      expect(seed.shipmentMethodTypes().map((m) => m.shipmentMethodTypeId)).toEqual(['GROUND']);
+    });
+    expect((await seed.getEnumsByType('ORDER_SALES_CHANNEL')).map((e) => e.enumId).sort()).toEqual(['POS', 'WEB_CHANNEL']);
+    expect(await seed.getPaymentMethodTypes()).toEqual([]);
   });
 
   it('builds option lists', async () => {
-    expect(await seed.getShipmentMethodOptions()).toEqual([{ id: 'GROUND', label: 'Ground' }]);
-    expect(await seed.getOrderIdentificationTypeOptions())
-      .toEqual([{ enumId: 'ID_SHOPIFY', description: 'Shopify order' }]);
+    await eventually(() => {
+      expect(seed.shipmentMethodOptions()).toEqual([{ id: 'GROUND', label: 'Ground' }]);
+      expect(seed.orderIdentificationTypeOptions()).toEqual([{ enumId: 'ID_SHOPIFY', description: 'Shopify order' }]);
+    });
+  });
+
+  it('waits for the rows in the async getters', async () => {
+    expect((await seed.getFacilities()).map((f) => f.facilityId)).toEqual(['F1']);
+    expect((await seed.getProductStores()).map((s) => s.productStoreId)).toEqual(['STORE']);
+    expect(await seed.getGeos()).toHaveLength(5);
+    expect(await seed.getFacilityParentTypeIds(['WAREHOUSE', 'NOPE'])).toEqual({ WAREHOUSE: 'PHYSICAL', NOPE: '' });
+  });
+
+  it('serves a loaded table to the reactive getters without another read', async () => {
+    await seed.getFacilities();
+    expect(seed.facilityName('F1')).toBe('Main Warehouse');
+  });
+
+  /** A second connection to the same database, as the sync worker writes through its own. */
+  const otherConnection = () => dbClient(new BaseDB(`${oms}-OrderManagerDB`, commonSchema.stores));
+
+  it('picks up rows written after the first read, as the login sync fills an empty table', async () => {
+    const label = computed(() => seed.returnReasonDescription('RTN_DAMAGED'));
+    expect(label.value).toBe('RTN_DAMAGED');
+    expect(__seedTableCount()).toBe(1);
+    // Let the empty table's first read land, as it would before the sync reaches it.
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(label.value).toBe('RTN_DAMAGED');
+
+    await otherConnection().entity('returnReasons').put({ returnReasonId: 'RTN_DAMAGED', description: 'Damaged', syncedAt: 2 });
+    await eventually(() => expect(label.value).toBe('Damaged'));
+  });
+
+  it('updates in place when a row changes, and the async getters return the current rows', async () => {
+    const label = computed(() => seed.facilityName('F1'));
+    await eventually(() => expect(label.value).toBe('Main Warehouse'));
+
+    await otherConnection().entity('facilities').put({ facilityId: 'F1', facilityName: 'Renamed', facilityTypeId: 'WAREHOUSE', syncedAt: 2 });
+    await eventually(() => expect(label.value).toBe('Renamed'));
+    expect((await seed.getFacilities())[0].facilityName).toBe('Renamed');
+  });
+
+  it('keeps one live table per seed table however often it is read', async () => {
+    for (let i = 0; i < 50; i++) {
+      computed(() => seed.facilityName('F1')).value;
+      seed.statusDescription('ORDER_APPROVED');
+      seed.countries();
+      seed.statesForCountry('USA');
+    }
+    await seed.getFacilities();
+    // facilities, statuses, geos, geoAssocs
+    expect(__seedTableCount()).toBe(4);
+
+    // Writing a table nobody reads opens nothing.
+    await otherConnection().entity('carriers').put({ partyId: 'DHL', groupName: 'DHL', syncedAt: 2 });
+    await eventually(() => expect(seed.facilityName('F1')).toBe('Main Warehouse'));
+    expect(__seedTableCount()).toBe(4);
+  });
+
+  it('closes every live table on logout, and the next use opens a fresh one', async () => {
+    const { clearSeedTables } = await import('@common/db');
+    await seed.getFacilities();
+    seed.statusDescription('ORDER_APPROVED');
+    expect(__seedTableCount()).toBe(2);
+
+    clearSeedTables();
+    expect(__seedTableCount()).toBe(0);
+
+    expect((await seed.getFacilities()).map((f) => f.facilityId)).toEqual(['F1']);
+    expect(__seedTableCount()).toBe(1);
   });
 
   it('degrades to raw ids when no database can be opened', async () => {
     oms = '';
 
-    expect(await seed.getFacilityName('F1')).toBe('F1');
-    expect(await seed.getCountries()).toEqual([]);
-    expect(await seed.getStatusDescriptions(['ORDER_APPROVED'])).toEqual({ ORDER_APPROVED: 'ORDER_APPROVED' });
+    expect(seed.facilityName('F1')).toBe('F1');
+    expect(seed.countries()).toEqual([]);
+    expect(await seed.getFacilities()).toEqual([]);
   });
 });

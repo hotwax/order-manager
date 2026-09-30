@@ -56,7 +56,7 @@ vi.mock('@/store/orderDetail', () => ({
 vi.mock('@common/db', () => ({
   useSeedData: () => ({
     getFacilities: async () => Object.values(facilities),
-    getFacilityName: async (facilityId: string) => facilities[facilityId]?.facilityName || facilityId,
+    facilityName: (facilityId: string) => facilities[facilityId]?.facilityName || facilityId,
   }),
 }));
 vi.mock('@/composables/useProductIdentity', () => ({

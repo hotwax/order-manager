@@ -56,7 +56,7 @@
                   </ion-item>
                   <ion-item v-for="value in section.values" :key="value.contactMechId">
                     <ion-label>{{ value.display }}</ion-label>
-                    <ion-note slot="end">{{ contactPurposeLabels[value.contactMechPurposeTypeId] ?? value.contactMechPurposeTypeId }}</ion-note>
+                    <ion-note slot="end">{{ seed.contactPurposeDescription(value.contactMechPurposeTypeId) }}</ion-note>
                   </ion-item>
                   <ion-item v-if="!section.values.length" lines="none">
                     <ion-label color="medium"><em>{{ translate('None on file') }}</em></ion-label>
@@ -74,7 +74,7 @@
                 <ion-list lines="none">
                   <ion-item v-for="relationship in personalRelationships" :key="relationship.key">
                     <ion-label>
-                      <p class="overline">{{ relationshipLabels[relationship.partyRelationshipTypeId] ?? relationship.partyRelationshipTypeId }}</p>
+                      <p class="overline">{{ seed.partyRelationshipDescription(relationship.partyRelationshipTypeId) }}</p>
                       <h3>{{ relationship.relatedPartyName }}</h3>
                       <p>{{ relationship.relatedPartyId }}</p>
                     </ion-label>
@@ -333,10 +333,10 @@
             <ion-item lines="full">
               <ion-label>
                 <h2>{{ comm.subject || translate('(No subject)') }}</h2>
-                <p>{{ communicationTypeLabels[comm.communicationEventTypeId] ?? comm.communicationEventTypeId }}</p>
+                <p>{{ seed.communicationEventTypeDescription(comm.communicationEventTypeId) }}</p>
               </ion-label>
               <ion-chip slot="end" :color="commStatusColor(comm.statusId)" outline>
-                {{ statusLabels[comm.statusId] ?? comm.statusId }}
+                {{ seed.statusDescription(comm.statusId) }}
               </ion-chip>
             </ion-item>
 
@@ -605,43 +605,6 @@ const unfillableOrders = computed(() => recentOrdersSource.value
   .map((o: CustomerOrderSummary) => ({ ...mapOrder(o), progressColor: 'warning' })));
 const customerTaskCards = computed(() => openTasks.value.map(mapCustomerTaskCard));
 
-// Seed labels for everything this page renders, one read per table as the data arrives.
-const contactPurposeLabels = ref<Record<string, string>>({});
-const relationshipLabels = ref<Record<string, string>>({});
-const communicationTypeLabels = ref<Record<string, string>>({});
-const statusLabels = ref<Record<string, string>>({});
-const enumLabels = ref<Record<string, string>>({});
-const facilityLabels = ref<Record<string, string>>({});
-
-watch([customer, customerCommunications, customerReturns, openTasks], async () => {
-  const contactMechs = customer.value?.contactMechs || [];
-  const relationships = customer.value?.relationships || [];
-  const communications = customerCommunications.value || [];
-  const returns = customerReturns.value || [];
-  const tasks = openTasks.value || [];
-
-  [
-    contactPurposeLabels.value,
-    relationshipLabels.value,
-    communicationTypeLabels.value,
-    statusLabels.value,
-    enumLabels.value,
-    facilityLabels.value,
-  ] = await Promise.all([
-    seed.getContactPurposeDescriptions(contactMechs.map((mech: any) => mech.contactMechPurposeTypeId)),
-    seed.getPartyRelationshipDescriptions(relationships.map((rel: any) => rel.partyRelationshipTypeId)),
-    seed.getCommunicationEventTypeDescriptions(communications.map((comm: any) => comm.communicationEventTypeId)),
-    seed.getStatusDescriptions([
-      ...communications.map((comm: any) => comm.statusId),
-      ...returns.map((record: any) => record.statusId),
-    ]),
-    seed.getEnumDescriptions([
-      ...tasks.map((task: any) => task.workEffortPurposeTypeId || task.workEffortTypeId),
-      ...returns.map((record: any) => record.returnChannelEnumId),
-    ]),
-    seed.getFacilityNames(returns.map((record: any) => record.destinationFacilityId)),
-  ]);
-}, { immediate: true, deep: true });
 const dashboardTaskCards = computed(() => customerTaskCards.value.slice(0, 1));
 
 function mapCustomerTaskCard(task: CustomerTaskSummary) {
@@ -651,7 +614,7 @@ function mapCustomerTaskCard(task: CustomerTaskSummary) {
   return {
     ...task,
     grandTotal: Number(task.grandTotal || 0),
-    purposeDescription: enumLabels.value[task.workEffortPurposeTypeId || task.workEffortTypeId]
+    purposeDescription: seed.enumDescription(task.workEffortPurposeTypeId || task.workEffortTypeId || '')
       || task.workEffortPurposeTypeId
       || task.workEffortTypeId,
     estimatedCompletionDate: task.dueDate ? formatDate(task.dueDate) : '',
@@ -841,7 +804,7 @@ function openReturn(returnId: string) {
 }
 
 function returnStatusLabel(statusId: string) {
-  return statusLabels.value[statusId] || statusId || translate('Not specified');
+  return seed.statusDescription(statusId) || translate('Not specified');
 }
 
 function returnTypeLabel(returnHeaderTypeId?: string) {
@@ -853,11 +816,11 @@ function returnTypeLabel(returnHeaderTypeId?: string) {
 }
 
 function channelLabel(returnChannelEnumId?: string) {
-  return returnChannelEnumId ? enumLabels.value[returnChannelEnumId] || returnChannelEnumId : translate('No channel');
+  return returnChannelEnumId ? seed.enumDescription(returnChannelEnumId) : translate('No channel');
 }
 
 function facilityLabel(destinationFacilityId?: string) {
-  return destinationFacilityId ? facilityLabels.value[destinationFacilityId] || destinationFacilityId : translate('No destination facility');
+  return destinationFacilityId ? seed.facilityName(destinationFacilityId) : translate('No destination facility');
 }
 
 </script>

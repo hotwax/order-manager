@@ -131,7 +131,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed } from 'vue';
 import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
 import { arrowUndoOutline, chevronForwardOutline, closeCircleOutline, ellipsisVerticalOutline, gitBranchOutline } from 'ionicons/icons';
 import { commonUtil, DxpShopifyImg, translate } from '@common';
@@ -170,17 +170,14 @@ const cardActions = computed<TaskCardAction[]>(() => ([
 ] as TaskCardAction[]).filter((action) => !(HIDE_SHOPIFY_UNSYNCED_ACTIONS && action.id === 'cancel')));
 
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
-const facilityLabel = ref('');
-watch(() => props.task?.facilityId, async (facilityId) => {
-  facilityLabel.value = await seed.getFacilityName(facilityId ?? '');
-}, { immediate: true });
 
 function getCustomerName(customer: any): string {
   return [customer?.firstName, customer?.lastName].filter(Boolean).join(' ') || translate('Unknown');
 }
 
 function routingFacilityName(task: any): string {
-  return facilityLabel.value
+  const facilityLabel = seed.facilityName(task.facilityId ?? '');
+  return (facilityLabel !== task.facilityId && facilityLabel)
     || task.routingFacilityName
     || task.facilityName
     || task.facilityId

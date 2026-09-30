@@ -11,11 +11,7 @@
   </ion-header>
 
   <ion-content>
-    <div v-if="isLoading" class="empty-state">
-      <ion-spinner name="crescent" />
-    </div>
-
-    <div v-else-if="!rejectionReasons.length" class="empty-state">
+    <div v-if="!rejectionReasons.length" class="empty-state">
       <p>{{ translate('No rejection reasons found') }}</p>
     </div>
 
@@ -38,17 +34,15 @@
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
+import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
-import { onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { translate } from '@common';
 import { useSeedData } from '@common/db';
 
 const seed = useSeedData();
 
 
-const isLoading = ref(false);
-const rejectionReasons = ref<any[]>([]);
 const selectedReasonId = ref('');
 
 function dismiss() {
@@ -60,27 +54,14 @@ function confirm() {
   modalController.dismiss({ rejectionReasonId: selectedReasonId.value }, 'confirm');
 }
 
-async function loadRejectionReasons() {
-  isLoading.value = true;
-  try {
-    // Both buckets come from the local database; there is no cache to check first.
-    const [issues, noVariance] = await Promise.all([
-      seed.getEnumsByParentType('REPORT_AN_ISSUE'),
-      seed.getEnumsByParentType('RPRT_NO_VAR_LOG'),
-    ]);
+const rejectionReasons = computed(() => {
+  const seen = new Set<string>();
+  return [...seed.enumsByParentType('REPORT_AN_ISSUE'), ...seed.enumsByParentType('RPRT_NO_VAR_LOG')].filter((reason: any) => {
+    if (seen.has(reason.enumId)) return false;
+    seen.add(reason.enumId);
 
-    const seen = new Set<string>();
-    rejectionReasons.value = [...issues, ...noVariance].filter((reason: any) => {
-      if (seen.has(reason.enumId)) return false;
-      seen.add(reason.enumId);
-
-      return true;
-    });
-  } finally {
-    isLoading.value = false;
-  }
-}
-
-onMounted(loadRejectionReasons);
+    return true;
+  });
+});
 </script>
 

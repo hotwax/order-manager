@@ -123,27 +123,15 @@ const orderTaskStore = useOrderTaskStore();
 
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'fraud');
-// Seed labels live in the local database, so they resolve after mount, not in a computed.
-const channelOptions = ref<TaskFilterOption[]>([]);
-const orderStatusOptions = ref<TaskFilterOption[]>([]);
-const riskRecommendationOptions = ref<TaskFilterOption[]>([]);
-const riskLevelOptions = ref<TaskFilterOption[]>([]);
-
 const asEnumOptions = (rows: any[]): TaskFilterOption[] =>
   rows.map((row: any) => ({ id: row.enumId, label: row.description || row.enumId }));
 
-async function loadSeedData() {
-  const [channels, orderStatuses, recommendations, levels] = await Promise.all([
-    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
-    seed.getStatusItemsByType('ORDER_STATUS'),
-    seed.getEnumsByType('ORDER_RISK_RECOMMENDATION'),
-    seed.getEnumsByType('ORDER_RISK_LEVEL'),
-  ]);
-  channelOptions.value = asEnumOptions(channels);
-  orderStatusOptions.value = orderStatuses.map((status: any) => ({ id: status.statusId, label: status.description || status.statusId }));
-  riskRecommendationOptions.value = asEnumOptions(recommendations);
-  riskLevelOptions.value = asEnumOptions(levels);
-}
+const channelOptions = computed(() => asEnumOptions(seed.enumsByType('ORDER_SALES_CHANNEL')));
+const orderStatusOptions = computed(() => seed.statusItemsByType('ORDER_STATUS')
+  .map((status: any) => ({ id: status.statusId, label: status.description || status.statusId })));
+const riskRecommendationOptions = computed(() => asEnumOptions(seed.enumsByType('ORDER_RISK_RECOMMENDATION')));
+const riskLevelOptions = computed(() => asEnumOptions(seed.enumsByType('ORDER_RISK_LEVEL')));
+
 const sortOptions = taskSortOptions('fraud');
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
@@ -319,7 +307,6 @@ async function runBulkResults(getResults: () => Promise<PromiseSettledResult<unk
 }
 
 onIonViewWillEnter(() => {
-  loadSeedData();
   replaceFraudTasks();
 });
 </script>

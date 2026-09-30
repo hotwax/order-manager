@@ -64,8 +64,8 @@ vi.mock('@/store/user', () => ({
 
 vi.mock('@common/db', () => ({
   useSeedData: () => ({
-    getEnumsByType: async () => [],
-    getShipmentMethodOptions: async () => [],
+    enumsByType: () => [],
+    shipmentMethodOptions: () => [],
   }),
 }));
 

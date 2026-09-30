@@ -636,22 +636,6 @@ import { formatDate, formatNumber, formatRelative } from '@/utils/format';
 
 const store = useCustomerServiceStore();
 
-// Seed labels come from the local database. These maps are resolved by loadSeedLabels()
-// below so the computeds above can stay synchronous.
-const facilityLabels = ref<Record<string, string>>({});
-const methodLabels = ref<Record<string, string>>({});
-const sortParamEnums = ref<any[]>([]);
-
-async function loadSeedLabels(facilityIds: string[], shipmentMethodTypeIds: string[]) {
-  const [facilityEntries, methodEntries, sortParams] = await Promise.all([
-    Promise.all(facilityIds.map(async (id) => [id, await seed.getFacilityName(id)] as const)),
-    Promise.all(shipmentMethodTypeIds.map(async (id) => [id, await seed.getShipmentMethodDescription(id)] as const)),
-    seed.getEnumsByType('PP_SORT_PARAM_TYPE'),
-  ]);
-  facilityLabels.value = Object.fromEntries(facilityEntries);
-  methodLabels.value = Object.fromEntries(methodEntries);
-  sortParamEnums.value = sortParams;
-}
 const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
 const userStore = useUserStore();
@@ -805,7 +789,7 @@ const queueSegments = computed(() => {
 
     let runningMinutes = 0;
     segments = sortedCombinations.map((item, index) => {
-      const methodLabel = methodLabels.value[item.shipmentMethodTypeId];
+      const methodLabel = item.shipmentMethodTypeId ? seed.shipmentMethodDescription(String(item.shipmentMethodTypeId).trim()) : '';
       const label = translate("{count}d - {method}", { count: item.deliveryDays, method: methodLabel || item.shipmentMethodTypeId || translate("None") });
       const segmentMinutes = Math.ceil(item.count / batchSize) * cronIntervalMinutes;
       runningMinutes += segmentMinutes;
@@ -1112,22 +1096,6 @@ const fulfillmentStageMetrics = computed(() => {
   ];
 });
 
-// Every facility and shipment method the dashboard currently renders. Re-resolved whenever
-// the underlying data changes, so the synchronous computeds above always have their labels.
-watch([facilityOrderVolume, facilityFulfillmentVelocity, facilityRejections, fulfillmentSyncData], async () => {
-  const facilityIds = [
-    selectedFacilityId.value,
-    ...facilityOrderVolume.value.map((item: any) => item.facilityId),
-    ...facilityFulfillmentVelocity.value.map((item: any) => item.facilityId),
-    ...facilityRejections.value.map((item: any) => item.facilityId),
-  ].filter(Boolean);
-  const methodIds = (fulfillmentSyncData.value?.rawOrderCountRecords || [])
-    .map((record: any) => String(record.shipmentMethodTypeId || '').trim())
-    .filter(Boolean);
-
-  await loadSeedLabels([...new Set(facilityIds)], [...new Set(methodIds)]);
-}, { immediate: true, deep: true });
-
 onIonViewWillEnter(async () => {
   await productStore.initializeProductStore();
   refreshDashboardData();
@@ -1159,7 +1127,7 @@ function retrySyncData() {
 }
 
 function facilityLabelFor(facilityId: string) {
-  return facilityLabels.value[facilityId] ?? facilityId;
+  return seed.facilityName(facilityId) || facilityId;
 }
 
 const selectedFacilityName = computed(() => {
@@ -1280,7 +1248,7 @@ const handleReorder = (event: any) => {
 const availableSortOptions = computed(() => {
   const currentIds = sortRules.value.map(r => r.id);
 
-  return sortParamEnums.value.filter((e: any) => !currentIds.includes(e.enumCode));
+  return seed.enumsByType('PP_SORT_PARAM_TYPE').filter((e: any) => !currentIds.includes(e.enumCode));
 });
 
 function addSortRule(enumCode: string) {

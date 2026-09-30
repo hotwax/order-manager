@@ -243,21 +243,10 @@ const debounceTimer = ref<ReturnType<typeof setTimeout>>();
 const selectMode = ref(false);
 const selectedOrderIds = ref<string[]>([]);
 
-// Seed labels live in the local database, so they resolve after mount, not in a computed.
-const orderStatuses = ref<any[]>([]);
-const salesChannels = ref<any[]>([]);
-const shipmentMethodOptions = ref<Array<{ id: string; label: string }>>([]);
+const orderStatuses = computed(() => seed.statusItemsByType('ORDER_STATUS'));
+const salesChannels = computed(() => seed.enumsByType('ORDER_SALES_CHANNEL'));
+const shipmentMethodOptions = computed(() => seed.shipmentMethodOptions());
 
-async function loadSeedData() {
-  const [statusRows, channelRows, methods] = await Promise.all([
-    seed.getStatusItemsByType('ORDER_STATUS'),
-    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
-    seed.getShipmentMethodOptions(),
-  ]);
-  orderStatuses.value = statusRows;
-  salesChannels.value = channelRows;
-  shipmentMethodOptions.value = methods;
-}
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const selectedStatusIds = computed(() => {
   const status = searchFilters.value.status as string[] | string;
@@ -284,7 +273,6 @@ const canCreateOrderTasks = computed(() => userStore.hasPermission(Actions.APP_O
 const canUseBulkActions = computed(() => (!HIDE_SHOPIFY_UNSYNCED_ACTIONS && canCancelOrders.value) || canUpdateOrders.value || canCreateOrderTasks.value);
 
 onMounted(async () => {
-  await loadSeedData();
   orderStore.searchFilters.productStoreId = selectedProductStoreId.value;
   await orderStore.runSearch();
 });
@@ -448,8 +436,7 @@ function setStatusFilter(statusId: string, checked: boolean) {
 }
 
 function statusDescription(statusId: string) {
-  // orderStatuses is already loaded by loadSeedData; no second read needed.
-  return orderStatuses.value.find((status: any) => status.statusId === statusId)?.description || statusId;
+  return seed.statusDescription(statusId);
 }
 
 </script>

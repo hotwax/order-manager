@@ -106,7 +106,7 @@ import {
   modalController,
 } from '@ionic/vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
 import { useSeedData } from '@common/db';
 import { requiredLabel } from '@/utils';
@@ -142,9 +142,7 @@ const taskNameEdited = ref(false);
 
 // Address, reservation, and fraud purposes are created by their owning backend flows. In
 // particular, fraud is order-scoped and must never be fanned out through this ship-group modal.
-const workEffortEnums = ref<any[]>([]);
-onMounted(async () => { workEffortEnums.value = await seed.getEnumsByType(WORK_EFFORT_TYPE_ID); });
-const taskPurposes = computed(() => workEffortEnums.value
+const taskPurposes = computed(() => seed.enumsByType(WORK_EFFORT_TYPE_ID)
   .filter((purpose: any) => OPERATOR_HOLD_PURPOSE_IDS.has(purpose.enumId)));
 
 const selectedPurpose = computed(() => taskPurposes.value.find((option) => option.enumId === form.workEffortPurposeTypeId));

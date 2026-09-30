@@ -192,7 +192,7 @@ import {
   modalController
 } from '@ionic/vue';
 import { closeOutline, saveOutline, trashOutline } from 'ionicons/icons';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive } from 'vue';
 import { translate } from '@common';
 import { useSeedData } from '@common/db';
 import type { CustomerContactMech } from '@/types/customer';
@@ -236,16 +236,9 @@ const form = reactive<Record<string, string>>({
   countryGeoId: ''
 });
 
-// Geography comes from the local database, so it resolves after mount.
-const countries = ref<Array<{ geoId: string; geoName: string }>>([]);
-const allStates = ref<Array<{ geoId: string; geoName: string; geoCode?: string; geoCodeAlpha2?: string }>>([]);
-const stateOptions = ref<Array<{ geoId: string; geoName: string }>>([]);
-
-
-// The geo slices fill from the local database; there is no per-country fetch to wait on.
-watch(() => form.countryGeoId, async (countryGeoId) => {
-  stateOptions.value = countryGeoId ? await seed.getStatesForCountry(countryGeoId) as any : [];
-}, { immediate: true });
+const countries = computed(() => seed.countries());
+const allStates = computed(() => seed.states());
+const stateOptions = computed(() => seed.statesForCountry(form.countryGeoId));
 
 const isLoadingStates = computed(() => !!form.countryGeoId && stateOptions.value.length === 0);
 
@@ -253,8 +246,7 @@ function onCountryChange() {
   form.stateProvinceGeoId = '';
 }
 
-onMounted(async () => {
-  [countries.value, allStates.value] = await Promise.all([seed.getCountries(), seed.getStates()]) as any;
+onMounted(() => {
   if (props.existingContact) {
     const c = props.existingContact;
     if (props.contactMechTypeId === 'EMAIL_ADDRESS') {

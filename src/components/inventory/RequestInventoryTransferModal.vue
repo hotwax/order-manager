@@ -206,8 +206,6 @@ const product = computed(() => item.value && getProduct(item.value.productId));
 const quantity = computed(() => item.value?.quantity || 0);
 
 const facilities = ref<any[]>([]);
-// Seed lookups read IndexedDB per call, so the destination's label is resolved into a ref in load().
-const destinationFacilityName = ref("");
 // Unknown until loaded, and left unknown if a lookup fails, so a row shows "-" rather than a false 0.
 const stock = ref<Record<string, Stock> | null>(null);
 const velocity = ref<Record<string, number> | null>(null);
@@ -269,11 +267,7 @@ const shown = (value?: number, options?: Intl.NumberFormatOptions) => value === 
 async function load() {
   loading.value = true;
   try {
-    const [rows, destinationName] = await Promise.all([
-      seed.getFacilities(),
-      seed.getFacilityName(props.destinationFacilityId),
-    ]);
-    destinationFacilityName.value = destinationName;
+    const rows = await seed.getFacilities();
     facilities.value = rows
       .filter((facility) => facility && facility.facilityId !== props.destinationFacilityId && groupOf(facility));
   } catch (error) {
@@ -302,7 +296,7 @@ onMounted(load);
 // Out of the source, into the destination: each side's stock now, and once the transfer completes.
 const sides = computed(() => source.value ? [
   { title: translate("Transfer from"), facilityId: source.value.facilityId, facilityName: source.value.facilityName, change: -quantity.value },
-  { title: translate("Transfer to"), facilityId: props.destinationFacilityId, facilityName: destinationFacilityName.value, change: quantity.value },
+  { title: translate("Transfer to"), facilityId: props.destinationFacilityId, facilityName: seed.facilityName(props.destinationFacilityId), change: quantity.value },
 ] : []);
 
 

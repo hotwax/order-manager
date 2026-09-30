@@ -126,7 +126,7 @@ import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
-import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
+import { defaultOrderTaskFilters, taskSortOptions } from '@/types/orderTaskFilters';
 import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import SubstituteRelationshipModal from '@/components/swaps/SubstituteRelationshipModal.vue';
 import SwapSetupPanel, { type SwapSetupCandidate } from '@/components/swaps/SwapSetupPanel.vue';
@@ -155,18 +155,9 @@ const productMaster = useProductMaster();
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'swap');
 const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
-// Seed labels live in the local database, so they resolve after mount, not in a computed.
-const channelOptions = ref<TaskFilterOption[]>([]);
-const shipmentMethodOptions = ref<TaskFilterOption[]>([]);
+const channelOptions = computed(() => seed.enumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
+const shipmentMethodOptions = computed(() => seed.shipmentMethodOptions());
 
-async function loadSeedData() {
-  const [channels, methods] = await Promise.all([
-    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
-    seed.getShipmentMethodOptions(),
-  ]);
-  channelOptions.value = channels.map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId }));
-  shipmentMethodOptions.value = methods;
-}
 const sortOptions = taskSortOptions('swap');
 const selectMode = ref(false);
 const selectedTasks = ref<Record<string, boolean>>({});
@@ -408,7 +399,6 @@ async function loadMoreSwapTasks(event: any) {
 }
 
 onIonViewWillEnter(() => {
-  loadSeedData();
   loadPhysicalFacilities();
   replaceSwapTasks();
 });

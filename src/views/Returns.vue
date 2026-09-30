@@ -187,7 +187,7 @@ import {
   onIonViewWillEnter
 } from "@ionic/vue";
 import { storeToRefs } from "pinia";
-import { computed, nextTick, onMounted, ref, watch } from "vue";
+import { computed, nextTick } from "vue";
 import EmptyState from "@/components/common/EmptyState.vue";
 import ErrorState from "@/components/common/ErrorState.vue";
 import SearchFilterCard from "@/components/common/SearchFilterCard.vue";
@@ -203,30 +203,8 @@ const seed = useSeedData();
 const returnsStore = useReturnsStore();
 const { returns, total, query, loading, error, hasMore } = storeToRefs(returnsStore);
 
-// Seed data comes from the local database, so these resolve after mount.
-const returnStatuses = ref<any[]>([]);
-const returnChannels = ref<any[]>([]);
-
-// Per-row labels for the rendered page, resolved in one read per table.
-const statusLabels = ref<Record<string, string>>({});
-const channelLabels = ref<Record<string, string>>({});
-const facilityLabels = ref<Record<string, string>>({});
-
-watch(returns, async (rows) => {
-  const list = rows || [];
-  [statusLabels.value, channelLabels.value, facilityLabels.value] = await Promise.all([
-    seed.getStatusDescriptions(list.map((r: any) => r.statusId)),
-    seed.getEnumDescriptions(list.map((r: any) => r.returnChannelEnumId)),
-    seed.getFacilityNames(list.map((r: any) => r.destinationFacilityId)),
-  ]);
-}, { immediate: true, deep: true });
-
-onMounted(async () => {
-  [returnStatuses.value, returnChannels.value] = await Promise.all([
-    seed.getStatusItemsByType("ORDER_RETURN_STTS"),
-    seed.getEnumsByType("RETURN_CHANNEL"),
-  ]);
-});
+const returnStatuses = computed(() => seed.statusItemsByType("ORDER_RETURN_STTS"));
+const returnChannels = computed(() => seed.enumsByType("RETURN_CHANNEL"));
 const searchPlaceholder = computed(() => ({
   RETURN_ID: translate("Exact return ID"),
   ORDER_ID: translate("Exact internal order ID"),
@@ -269,7 +247,7 @@ function openReturn(returnId: string) {
 }
 
 function statusLabel(statusId: string) {
-  return statusLabels.value[statusId] || statusId || translate("Not specified");
+  return seed.statusDescription(statusId) || translate("Not specified");
 }
 
 function returnCustomerLabel(returnRecord: any) {
@@ -288,11 +266,11 @@ function returnTypeLabel(returnHeaderTypeId?: string) {
 }
 
 function channelLabel(returnChannelEnumId?: string) {
-  return returnChannelEnumId ? channelLabels.value[returnChannelEnumId] || returnChannelEnumId : translate("No channel");
+  return returnChannelEnumId ? seed.enumDescription(returnChannelEnumId) : translate("No channel");
 }
 
 function facilityLabel(destinationFacilityId?: string) {
-  return destinationFacilityId ? facilityLabels.value[destinationFacilityId] || destinationFacilityId : translate("No destination facility");
+  return destinationFacilityId ? seed.facilityName(destinationFacilityId) : translate("No destination facility");
 }
 
 </script>

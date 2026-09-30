@@ -116,28 +116,17 @@ import { countTaskTargets, groupTaskCardsByTarget, runGroupedTaskMutation, shipG
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 
 const seed = useSeedData();
-import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
+import { defaultOrderTaskFilters, taskSortOptions } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
 
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'badAddress');
 const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
-// Seed labels live in the local database, so they resolve after mount, not in a computed.
-const channelOptions = ref<TaskFilterOption[]>([]);
-const shipmentMethodOptions = ref<TaskFilterOption[]>([]);
-const countries = ref<any[]>([]);
+const channelOptions = computed(() => seed.enumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
+const shipmentMethodOptions = computed(() => seed.shipmentMethodOptions());
+const countries = computed(() => seed.countries());
 
-async function loadSeedData() {
-  const [channels, methods, countryRows] = await Promise.all([
-    seed.getEnumsByType('ORDER_SALES_CHANNEL'),
-    seed.getShipmentMethodOptions(),
-    seed.getCountries(),
-  ]);
-  channelOptions.value = channels.map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId }));
-  shipmentMethodOptions.value = methods;
-  countries.value = countryRows;
-}
 const sortOptions = taskSortOptions('badAddress');
 // Computed once here and passed as a prop — avoids N per-card reactive subscriptions.
 const companyCarrierUrl = buildAppUrl('company', '/carriers');
@@ -351,21 +340,6 @@ async function loadMoreAddressValidationTasks(event: any) {
 
 onIonViewWillEnter(async () => {
   loadPhysicalFacilities();
-
-  // The cards name a country from the geo rows, so the queue waits for the seed read. The page's
-  // own loading state has to be raised for that wait too: with nothing in the store yet, the
-  // template would otherwise render the "no addresses to review" empty state for the whole of
-  // the read, and a read that never settles would leave that false answer on screen.
-  // Only when there is nothing to show — a revisit keeps its hydrated cards, as the task fetch
-  // itself does. The fetch raises the flag again in the same tick, so there is no flicker.
-  const showFullLoading = !addressValidationTasks.value.length;
-  if (showFullLoading) loading.value = true;
-  try {
-    await loadSeedData();
-  } finally {
-    if (showFullLoading) loading.value = false;
-  }
-
   await replaceAddressValidationTasks();
 });
 </script>

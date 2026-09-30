@@ -325,28 +325,19 @@ const isItemInOrder = computed(() => orderForm.value.lineItems.some((lineItem: a
 let timeoutId: any = null;
 const productSearchCount = ref(0);
 
-// Read from the local database; both fill in shortly after mount.
 const currentStoreId = computed(() => useProductStore().getCurrentProductStore?.productStoreId ?? '');
-const storeFacilityRows = ref<any[]>([]);
-const shopLocationRows = ref<any[]>([]);
-
-watch(currentStoreId, async (productStoreId) => {
-  storeFacilityRows.value = productStoreId ? await seed.getProductStoreFacilities(productStoreId) : [];
-}, { immediate: true });
-
-onMounted(async () => { shopLocationRows.value = await seed.getShopifyShopLocations(); });
 
 const facilities = computed(() => {
   if (!currentStoreId.value) return [];
 
-  const storeFacilities = storeFacilityRows.value;
+  const storeFacilities = seed.productStoreFacilities(currentStoreId.value);
   if (!storeFacilities.length) return [];
 
   if (!orderForm.value.shopId) {
     return storeFacilities;
   }
 
-  const shopLocations = shopLocationRows.value;
+  const shopLocations = seed.shopifyShopLocations();
   const allowedFacilityIds = shopLocations
     .filter((loc: any) => loc.shopId === orderForm.value.shopId)
     .map((loc: any) => loc.facilityId);

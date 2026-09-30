@@ -21,7 +21,7 @@ describe('AddOrderTaskModal canonical hold WorkEffort model (#345)', () => {
   });
 
   it('scopes the purpose picker to the canonical hold purpose bucket', () => {
-    expect(modal).toContain('getEnumsByType(WORK_EFFORT_TYPE_ID)');
+    expect(modal).toContain('seed.enumsByType(WORK_EFFORT_TYPE_ID)');
     // Enums are synced by the worker; there is no per-type fetch to trigger.
     expect(modal).not.toContain('loadEnumType(');
     expect(modal).not.toContain("getEnumsByParentType('WorkEffortPurposeType')");
