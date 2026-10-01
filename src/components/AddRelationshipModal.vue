@@ -158,9 +158,12 @@ import {
   modalController
 } from '@ionic/vue';
 import { arrowBackOutline, arrowForwardOutline, closeOutline, saveOutline } from 'ionicons/icons';
-import { computed, onMounted, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { translate } from '@common';
+import { useSeedData } from '@common/db';
 import { searchCustomers } from '@/services/customer';
+
+const seed = useSeedData();
 
 interface RelatableParty {
   partyId: string;
@@ -186,19 +189,9 @@ const comments = ref('');
 // Guards against an earlier search resolving after a later one and overwriting it.
 let latestSearchId = 0;
 
-// Read from the local database; both fill in shortly after mount.
-const partyRelationshipTypes = ref<any[]>([]);
-const roleTypes = ref<any[]>([]);
-
-onMounted(async () => {
-  [partyRelationshipTypes.value, roleTypes.value] = await Promise.all([
-    getPartyRelationshipTypes(),
-    getRoleTypes(),
-  ]);
-});
-
-const relationshipTypes = computed(() => partyRelationshipTypes.value.filter(Boolean));
-const availableRoleTypes = computed(() => roleTypes.value.filter(Boolean));
+// Reactive reads from the local database; both fill in once their tables land.
+const relationshipTypes = computed(() => seed.partyRelationshipTypes().filter(Boolean));
+const availableRoleTypes = computed(() => seed.roleTypes().filter(Boolean));
 
 const hasSearchTerm = computed(() => queryString.value.trim().length > 0);
 

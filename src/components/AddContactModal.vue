@@ -238,9 +238,11 @@ const form = reactive<Record<string, string>>({
 
 const countries = computed(() => seed.countries());
 const allStates = computed(() => seed.states());
-const stateOptions = computed(() => seed.statesForCountry(form.countryGeoId));
-
-const isLoadingStates = computed(() => !!form.countryGeoId && stateOptions.value.length === 0);
+// A fresh login reads as empty for every country until the geo sync lands. Once synced, an empty
+// list means the country (SG, HK) has no states.
+const countryStates = computed(() => seed.statesForCountry.withSync(form.countryGeoId));
+const stateOptions = computed(() => countryStates.value.data);
+const isLoadingStates = computed(() => !!form.countryGeoId && !countryStates.value.synced);
 
 function onCountryChange() {
   form.stateProvinceGeoId = '';
