@@ -7,7 +7,7 @@ import { sentimentCounts } from './index';
 import { toMillis } from './format';
 import { shipGroupMilestones, type OrderEvent } from './orderEvents';
 import { adjustmentAmount, adjustmentKey, adjustmentLabel } from './orderAdjustments';
-import type { SeedLookup } from './seedLookup';
+import type { SeedData } from '@common/db';
 import type { useProductCacheStore } from '@/store/productCache';
 import type { ItemIssuanceSummary } from '@/store/orderDetail';
 import type {
@@ -38,7 +38,7 @@ export interface EnrichmentAuxiliaryData {
 }
 
 export interface EnrichmentStores {
-  seed: SeedLookup;
+  seed: SeedData;
   productCache: ReturnType<typeof useProductCacheStore>;
 }
 
@@ -493,7 +493,7 @@ export function enrichOrder(raw: any, aux: EnrichmentAuxiliaryData, stores: Enri
       .filter((identification: any) => !identification.thruDate || new Date(identification.thruDate).getTime() > Date.now())
       .map((identification: any) => ({
         orderIdentificationTypeId: identification.orderIdentificationTypeId,
-        typeLabel: seed.orderIdentificationTypeDescription(identification.orderIdentificationTypeId),
+        typeLabel: seed.enumDescription(identification.orderIdentificationTypeId),
         idValue: identification.idValue,
         fromDate: identification.fromDate,
       })),
