@@ -192,7 +192,7 @@ import {
   modalController
 } from '@ionic/vue';
 import { closeOutline, saveOutline, trashOutline } from 'ionicons/icons';
-import { computed, onMounted, reactive } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { translate } from '@common';
 import { useSeedData } from '@common/db';
 import type { CustomerContactMech } from '@/types/customer';
@@ -240,7 +240,17 @@ const countries = computed(() => seed.countries());
 const allStates = computed(() => seed.states());
 const stateOptions = computed(() => seed.statesForCountry(form.countryGeoId));
 
-const isLoadingStates = computed(() => !!form.countryGeoId && stateOptions.value.length === 0);
+// An empty state list is ambiguous: the geo tables may not have landed yet, or the country
+// (SG, HK) has no states. Only the async read can tell the two apart.
+const statesLoadedFor = ref('');
+const isLoadingStates = computed(() => !!form.countryGeoId && statesLoadedFor.value !== form.countryGeoId);
+
+watch(() => form.countryGeoId, async (countryGeoId) => {
+  if (!countryGeoId) return;
+  await seed.getStatesForCountry(countryGeoId);
+  // Ignore a read that settled after the country changed again.
+  if (countryGeoId === form.countryGeoId) statesLoadedFor.value = countryGeoId;
+}, { immediate: true });
 
 function onCountryChange() {
   form.stateProvinceGeoId = '';

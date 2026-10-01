@@ -1,6 +1,6 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('add relationship modal party picker', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/components/AddRelationshipModal.vue'), 'utf8');
@@ -35,5 +35,40 @@ describe('add relationship modal party picker', () => {
     expect(source).not.toContain('findParties');
     expect(source).not.toContain('ion-segment-button');
     expect(source).not.toContain('label="First name"');
+  });
+});
+
+describe('add relationship modal relationship step', () => {
+  it('offers the relationship and role types from the local database', async () => {
+    vi.resetModules();
+    vi.doMock('@common', () => ({ translate: (key: string) => key }));
+    vi.doMock('@/services/customer', () => ({ searchCustomers: vi.fn() }));
+    vi.doMock('@common/db', () => ({
+      useSeedData: () => ({
+        partyRelationshipTypes: () => [{ partyRelationshipTypeId: 'SPOUSE', partyRelationshipName: 'Spouse' }],
+        roleTypes: () => [{ roleTypeId: 'CUSTOMER', description: 'Customer' }],
+      }),
+    }));
+    vi.doMock('@ionic/vue', () => {
+      const component = { template: '<div><slot /></div>' };
+      const names = ['IonButton', 'IonButtons', 'IonContent', 'IonFab', 'IonFabButton', 'IonHeader', 'IonIcon', 'IonInput',
+        'IonItem', 'IonLabel', 'IonList', 'IonNote', 'IonRadio', 'IonRadioGroup', 'IonSearchbar', 'IonSelect', 'IonSpinner',
+        'IonTitle', 'IonToolbar'];
+      return {
+        ...Object.fromEntries(names.map((name) => [name, component])),
+        IonSelectOption: { template: '<div class="option"><slot /></div>' },
+        modalController: { dismiss: vi.fn() },
+      };
+    });
+    const { mount, flushPromises } = await import('@vue/test-utils');
+    const { default: AddRelationshipModal } = await import('@/components/AddRelationshipModal.vue');
+
+    const wrapper = mount(AddRelationshipModal, { props: { currentPartyId: 'P1' } });
+    (wrapper.vm as any).step = 'relationship';
+    await flushPromises();
+
+    const options = wrapper.findAll('.option').map((option) => option.text());
+    // One relationship select, then the role type twice: once per side of the relationship.
+    expect(options).toEqual(['Spouse', 'Customer', 'Customer']);
   });
 });
