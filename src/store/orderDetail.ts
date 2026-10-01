@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
-import { omDb } from "@/db/orderManagerDb";
 import { api, commonUtil, logger, translate, useSolrSearch } from "@common";
+import { seedData } from "@common/db";
 import { FACILITY_CHANGE_PAGE_SIZE, UNFILLABLE_SAMPLE_SIZE, useOrderDetail, type IssuanceLine } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useCustomerStore } from "./customer";
@@ -14,7 +14,6 @@ import { toMillis } from "@/utils/format";
 import { OrderActionValidator } from "@/utils/OrderActionValidator";
 import { buildOrderEvents, clusterEvents, type ExchangeChild, type OrderEvent, type UnfillableSummary } from "@/utils/orderEvents";
 import { adjustmentAmount, adjustmentKey, adjustmentLabel } from "@/utils/orderAdjustments";
-import { buildSeedLookup, readSeedLookupRows, type SeedLookup, type SeedLookupRows } from "@/utils/seedLookup";
 import type { EnrichedOrder } from "@/types/orderDetail";
 
 type LoadStatus = "idle" | "loading" | "loaded" | "error" | "notfound";
@@ -57,23 +56,23 @@ async function singleFlight(key: string, force: boolean, run: () => Promise<void
 const QUEUE_FACILITY_ID = "_NA_";
 
 /** Parking and queue facilities, where an item waits rather than being fulfilled. */
-export function isVirtualFacilityId(facilityId: string, seed: SeedLookup): boolean {
+export function isVirtualFacilityId(facilityId: string): boolean {
   if (!facilityId || facilityId === QUEUE_FACILITY_ID) return true;
-  const facilityTypeId = seed.facility(facilityId)?.facilityTypeId;
+  const facilityTypeId = seedData.facility(facilityId)?.facilityTypeId;
   return OrderActionValidator.isVirtualFacility({
     facilityId,
     facilityTypeId,
-    facilityParentTypeId: seed.facilityType(facilityTypeId)?.parentTypeId,
+    facilityParentTypeId: seedData.facilityType(facilityTypeId)?.parentTypeId,
   });
 }
 
 const newEntry = (): OrderEntry => ({ payload: null, status: "idle", loadedAt: "", error: "" });
 
-const adjustmentDisplayLabel = (adj: any, seed: SeedLookup) =>
-  adjustmentLabel(adj, seed.orderAdjustmentTypeDescription, "OTHER_ADJUSTMENT");
+const adjustmentDisplayLabel = (adj: any) =>
+  adjustmentLabel(adj, seedData.orderAdjustmentTypeDescription, "OTHER_ADJUSTMENT");
 
-const adjustmentUniqueKey = (adj: any, seed: SeedLookup, fallbackSeqId = "") =>
-  adjustmentKey(adj, adjustmentDisplayLabel(adj, seed), fallbackSeqId);
+const adjustmentUniqueKey = (adj: any, fallbackSeqId = "") =>
+  adjustmentKey(adj, adjustmentDisplayLabel(adj), fallbackSeqId);
 
 /**
  * Subtotal, adjustments grouped by label, and grand total. Sums the rows actually displayed
@@ -81,7 +80,7 @@ const adjustmentUniqueKey = (adj: any, seed: SeedLookup, fallbackSeqId = "") =>
  * which has been observed to exclude tax. Rounded to avoid floating-point drift
  * (e.g. 59 + 1.53 + 0.59 + 2.86 = 63.980000000000004).
  */
-function orderTotals(order: any, seed: SeedLookup) {
+function orderTotals(order: any) {
   if (!order) return { subtotal: 0, adjustments: {}, total: 0, includedAdjustments: {} };
 
   let subtotal = 0;
@@ -97,13 +96,13 @@ function orderTotals(order: any, seed: SeedLookup) {
   const seenAdjustments = new Set<string>();
 
   const recordAdjustment = (adj: any, fallbackSeqId = "") => {
-    const uniqueKey = adjustmentUniqueKey(adj, seed, fallbackSeqId);
+    const uniqueKey = adjustmentUniqueKey(adj, fallbackSeqId);
     if (seenAdjustments.has(uniqueKey)) return;
     seenAdjustments.add(uniqueKey);
 
     adjustmentsTotal += Number(adj.amount || 0);
     const { amount, isIncluded } = adjustmentAmount(adj);
-    const label = adjustmentDisplayLabel(adj, seed);
+    const label = adjustmentDisplayLabel(adj);
 
     // Included and excluded amounts stay in separate buckets: a label can carry both
     // (an included tax on one item, an ordinary one on another), and merging them would
@@ -242,12 +241,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     commEventsByOrderId: {} as Record<string, any[]>,
     shippingMethods: [] as any[],
     carrierParties: [] as any[],
-    /**
-     * Seed reference rows the order page's getters read synchronously, read from the local
-     * database on each order load. See utils/seedLookup.
-     */
-    seedRows: {} as SeedLookupRows,
-    seedRowsReady: false,
     fulfillmentTimelineByOrderId: {} as Record<string, any[]>,
     // Order event sources behind the timeline. OrderStatus rows arrive on the order document;
     // OrderFacilityChange rows are the only other place OMS records who moved what and why.
@@ -266,8 +259,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     inventoryTransfersByOrderId: {} as Record<string, any[]>,
   }),
   getters: {
-    /** Sync seed lookups over seedRows; rebuilt only when a new read lands. */
-    seedLookup: (state): SeedLookup => buildSeedLookup(state.seedRows, state.seedRowsReady),
     /**
      * The order page's view model: the raw order document joined with the loaded auxiliary
      * sources (order events, issuance, risk, returns, transfers) and the seed,
@@ -289,7 +280,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
           riskAssessments: this.riskAssessmentsForOrder(orderId),
           returnedQtyBySeqId: this.returnedQtyByItemSeqIdByOrderId(orderId),
           inventoryTransfers: this.inventoryTransfersByOrderId[orderId] || [],
-        }, { seed: this.seedLookup, productCache: useProductCacheStore() });
+        }, { seed: seedData, productCache: useProductCacheStore() });
       };
     },
 
@@ -344,7 +335,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
      * exchanges loaded beside it. See utils/orderEvents.
      */
     orderEventsByOrderId(): (orderId: string) => OrderEvent[] {
-      const seed = this.seedLookup;
       return (orderId: string): OrderEvent[] => buildOrderEvents({
         order: this.byOrderId[orderId]?.payload || null,
         facilityChanges: this.facilityChangesByOrderId[orderId] || [],
@@ -354,7 +344,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         fulfillment: this.fulfillmentTimelineByOrderId[orderId] || [],
         returnHeadersById: this.returnHeadersById,
         exchangeChildren: this.exchangeChildrenByOrderId[orderId] || [],
-        isVirtualFacility: (facilityId: string) => isVirtualFacilityId(facilityId, seed),
+        isVirtualFacility: (facilityId: string) => isVirtualFacilityId(facilityId),
       });
     },
 
@@ -387,7 +377,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     },
 
     orderTotalsByOrderId(): (orderId: string) => ReturnType<typeof orderTotals> {
-      return (orderId: string) => orderTotals(this.byOrderId[orderId]?.payload, this.seedLookup);
+      return (orderId: string) => orderTotals(this.byOrderId[orderId]?.payload);
     },
 
     allItemsByOrderId: (state) => (orderId: string) => {
@@ -433,12 +423,12 @@ export const useOrderDetailStore = defineStore("orderDetail", {
         const recordAdj = (seqId: string, adj: any) => {
           const extId = seqIdToExtId[seqId] || seqId;
           if (!extId) return;
-          const uniqueKey = `${extId}:${adjustmentUniqueKey(adj, this.seedLookup, seqId)}`;
+          const uniqueKey = `${extId}:${adjustmentUniqueKey(adj, seqId)}`;
           if (seenAdjustments.has(uniqueKey)) return;
           seenAdjustments.add(uniqueKey);
 
           const { amount, isIncluded } = adjustmentAmount(adj);
-          const label = adjustmentDisplayLabel(adj, this.seedLookup);
+          const label = adjustmentDisplayLabel(adj);
           const bucketKey = isIncluded ? `${label}\u0000included` : label;
           const buckets = index[extId] ||= {};
           const bucket = buckets[bucketKey] ||= { label, amount: 0, isIncluded };
@@ -469,7 +459,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     shippingMethodsByCarrier(): (carrierPartyId: string) => any[] {
       return (carrierPartyId: string) => {
         const fromDetail = this.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId);
-        return fromDetail.length ? fromDetail : this.seedLookup.shippingMethodsByCarrier(carrierPartyId);
+        return fromDetail.length ? fromDetail : seedData.shipmentMethodsByCarrier(carrierPartyId);
       };
     },
   },
@@ -665,17 +655,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       }
     },
 
-    /** Read the seed tables behind seedLookup from the local database. */
-    async loadSeedRows() {
-      try {
-        this.seedRows = await readSeedLookupRows((table) => omDb().all(table));
-      } catch (error: any) {
-        logger.warn("Failed to read order reference rows from the local database", error);
-      } finally {
-        this.seedRowsReady = true;
-      }
-    },
-
     async fetchShippingMethods() {
       try {
         const resp = await api({ url: 'oms/shippingGateways/carrierShipmentMethods', method: 'GET' });
@@ -836,8 +815,6 @@ export const useOrderDetailStore = defineStore("orderDetail", {
      */
     async loadOrderAggregate(orderId: string, force = false) {
       if (!orderId) return;
-      // Seed labels fill in as the read lands; the order fetch never waits on it.
-      this.loadSeedRows();
       await this.fetchOrder(orderId, force);
       const raw = this.orderById(orderId);
 
