@@ -29,9 +29,7 @@ import type { DbClient } from "@common/db/storage/dbClient";
  */
 export const orderManagerDb = defineAppDb({
   suffix: "OrderManagerDB",
-  // v2: statusFlowTransitions gained transitionName and conditionExpression. Rows cached without
-  //     them read every transition as user-driven, so they must not survive.
-  version: 2,
+  version: 1,
   schema: commonSchema,
 });
 
