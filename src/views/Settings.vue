@@ -208,8 +208,9 @@
           </ion-radio-group>
 
           <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-            <ion-fab-button :disabled="!timeZoneId" @click="saveUserTimeZone" :aria-label="translate('Save')">
-              <ion-icon :icon="saveOutline" />
+            <ion-fab-button :disabled="!timeZoneId || isSavingTimeZone" @click="saveUserTimeZone" :aria-label="translate('Save')">
+              <ion-spinner v-if="isSavingTimeZone" name="crescent" />
+              <ion-icon v-else :icon="saveOutline" />
             </ion-fab-button>
           </ion-fab>
         </ion-content>
@@ -265,6 +266,7 @@ const props = defineProps({
 });
 
 const isLoading = ref(true);
+const isSavingTimeZone = ref(false);
 const isOmsOffline = ref(false);
 const timeZoneModal = ref();
 const queryString = ref('');
@@ -317,8 +319,13 @@ function setCurrentProductStore(event: CustomEvent) {
 }
 
 async function saveUserTimeZone() {
-  await userStore.setUserTimeZone(timeZoneId.value);
-  closeModal();
+  isSavingTimeZone.value = true;
+  try {
+    await userStore.setUserTimeZone(timeZoneId.value);
+    closeModal();
+  } finally {
+    isSavingTimeZone.value = false;
+  }
 }
 
 function logout() {
