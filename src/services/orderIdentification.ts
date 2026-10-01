@@ -16,7 +16,7 @@ export async function createOrderIdentificationType(payload: { enumId: string; d
   });
 
   try {
-    await refreshAfterMutation("enum", { enumId: payload.enumId, enumTypeId: "ORDER_IDENTITY" });
+    await refreshAfterMutation("enum", { enumId: payload.enumId });
   } catch (error) {
     logger.warn("[orderIdentification] Failed to refresh the enum after create:", error);
   }
