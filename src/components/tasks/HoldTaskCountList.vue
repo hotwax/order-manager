@@ -1,15 +1,22 @@
 <template>
   <ion-list lines="none" class="hold-tasks-list">
-    <ion-item
-      v-for="holdTask in sortedHoldTaskCounts"
-      :key="holdTask.workEffortPurposeTypeId"
-      button
-      :detail="true"
-      :href="routeHref(holdTaskRoute(holdTask.workEffortPurposeTypeId))"
-      @click="navigateRoute($event, holdTaskRoute(holdTask.workEffortPurposeTypeId))"
-    >
-      <ion-label>{{ holdTaskLabel(holdTask) }}</ion-label>
-      <p slot="end">{{ translate("{count} tasks", { count: Number(holdTask.taskCount) }) }}</p>
+    <template v-if="sortedHoldTaskCounts.length > 0">
+      <ion-item
+        v-for="holdTask in sortedHoldTaskCounts"
+        :key="holdTask.workEffortPurposeTypeId"
+        button
+        :detail="true"
+        :href="routeHref(holdTaskRoute(holdTask.workEffortPurposeTypeId))"
+        @click="navigateRoute($event, holdTaskRoute(holdTask.workEffortPurposeTypeId))"
+      >
+        <ion-label>{{ holdTaskLabel(holdTask) }}</ion-label>
+        <p slot="end">{{ translate("{count} tasks", { count: Number(holdTask.taskCount) }) }}</p>
+      </ion-item>
+    </template>
+    <ion-item v-else lines="none">
+      <ion-label class="ion-text-center">
+        {{ translate('No items found') }}
+      </ion-label>
     </ion-item>
   </ion-list>
 </template>
