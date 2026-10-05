@@ -158,6 +158,7 @@
 import { computed, ref, watch } from 'vue';
 import { IonBackButton, IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonItem, IonLabel, IonList, IonMenuButton, IonPage, IonProgressBar, IonSegment, IonSegmentButton, IonTitle, IonToolbar, onIonViewWillEnter } from '@ionic/vue';
 import { translate } from '@common';
+import { useSeedData } from '@common/db';
 import router from '@/router';
 import Actions from '@/authorization/actions';
 import EmptyState from '@/components/common/EmptyState.vue';
@@ -185,6 +186,7 @@ const props = defineProps<{
 }>();
 
 const orderDetailStore = useOrderDetailStore();
+const seed = useSeedData();
 const orderTaskStore = useOrderTaskStore();
 const customerStore = useCustomerStore();
 const userStore = useUserStore();
@@ -334,12 +336,12 @@ const shopifyOrderId = computed(() =>
   (orderDetailStore.orderById(props.orderId)?.identifications || [])
     .find((identification: any) => identification.orderIdentificationTypeId === 'SHOPIFY_ORD_ID')?.idValue ?? '');
 
-// Reactive over the store's seed rows, so the link appears even when the shops are read from the
-// local database after the order renders.
+// Reactive over the seed table, so the link appears even when the shops are read from the local
+// database after the order renders.
 const shopifyAdminUrl = computed(() => {
   const productStoreId = orderDetailStore.orderById(props.orderId)?.productStoreId;
   if (!shopifyOrderId.value || !productStoreId) return '';
-  const shops = orderDetailStore.seedLookup.shopifyShops;
+  const shops = seed.shopifyShops();
   const shopId = singleShopIdForProductStore(shops, productStoreId);
   const shop: any = shopId ? shops.find((entry: any) => entry.shopId === shopId) : null;
   return shop ? shopifyAdminOrderUrl(shop.myshopifyDomain || shop.domain, shopifyOrderId.value) : '';

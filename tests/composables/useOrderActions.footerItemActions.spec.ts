@@ -13,6 +13,12 @@ vi.mock('@common', async (importOriginal) => ({
   ...(await importOriginal<any>()),
   translate: (key: string, params?: Record<string, unknown>) => key.replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? '')),
 }));
+// The status flow's transitions; empty unless a spec sets one.
+const allowedTransitions = vi.hoisted(() => vi.fn((_statusId: string): any[] => []));
+vi.mock('@common/db', async (importOriginal) => {
+  const original = await importOriginal<any>();
+  return { ...original, useSeedData: () => ({ ...original.useSeedData(), allowedTransitions }) };
+});
 vi.mock('@ionic/vue', async (importOriginal) => ({ ...(await importOriginal<any>()), modalController: { create: vi.fn() }, alertController: { create: vi.fn() } }));
 vi.mock('@/utils', async (importOriginal) => ({ ...(await importOriginal<any>()), showToast: vi.fn() }));
 
@@ -159,7 +165,8 @@ describe('footer bulk cancel', () => {
   beforeEach(() => {
     setActivePinia(createPinia());
     // In this status flow only an approved item can move to ITEM_CANCELLED.
-    useOrderDetailStore().seedRows = { statusFlowTransitions: [{ statusId: 'ITEM_APPROVED', toStatusId: 'ITEM_CANCELLED' }] };
+    allowedTransitions.mockImplementation((statusId: string) =>
+      statusId === 'ITEM_APPROVED' ? [{ statusId, toStatusId: 'ITEM_CANCELLED' }] : []);
     // Confirm every alert as soon as it is presented.
     vi.mocked(alertController.create).mockImplementation(async (options: any) => ({
       present: vi.fn(async () => options.buttons.find((button: any) => button.role === 'confirm').handler()),

@@ -1,6 +1,7 @@
 import { computed, ref, type Ref } from 'vue';
 import { alertController, modalController } from '@ionic/vue';
 import { api, translate } from '@common';
+import { useSeedData } from '@common/db';
 import { showToast } from '@/utils';
 import { OrderActionValidator, type FooterActionView, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import { isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
@@ -61,6 +62,7 @@ interface SelectionAction<Input> {
  */
 export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShipGroupItems, selectedSegment, canRequestInventoryTransfer }: UseOrderActionsOptions) {
   const orderDetailStore = useOrderDetailStore();
+  const seed = useSeedData();
   const orderTaskStore = useOrderTaskStore();
   const customerStore = useCustomerStore();
   const { getProduct, primaryIdentifier } = useProductIdentity();
@@ -90,7 +92,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
   function itemActionContext(item: EnrichedOrderItem) {
     return {
       isVirtual: isVirtualForItem(item),
-      itemAllowedToStatusIds: new Set<string>(orderDetailStore.seedLookup.allowedTransitions(item.statusId).map((transition: any) => transition.toStatusId))
+      itemAllowedToStatusIds: new Set<string>(seed.allowedTransitions(item.statusId).map((transition: any) => transition.toStatusId))
     };
   }
 
@@ -561,7 +563,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
    */
   const footerActions = computed(() => {
     if (!order.value) return [];
-    const allowedTransitions = orderDetailStore.seedLookup.allowedTransitions(order.value.statusId);
+    const allowedTransitions = seed.allowedTransitions(order.value.statusId);
     const orderAllowedToStatusIds = new Set<string>(allowedTransitions.map((transition: any) => transition.toStatusId));
     // The validator only offers "Cancel N items" for items it could cancel, so hand it those.
     const actions = OrderActionValidator.getOrderFooterActions(order.value, allowedTransitions, cancellableSelectedItems.value, { orderAllowedToStatusIds });

@@ -315,7 +315,7 @@
                     <ion-select :label="translate('Country')" label-placement="stacked" interface="popover"
                       :placeholder="translate('Select country')" v-model="shippingAddressForm.countryGeoId"
                       @ionChange="shippingAddressForm.stateProvinceGeoId = ''">
-                      <ion-select-option v-for="country in seed.countries" :key="country.geoId" :value="country.geoId">
+                      <ion-select-option v-for="country in seed.countries()" :key="country.geoId" :value="country.geoId">
                         {{ country.geoName }}
                       </ion-select-option>
                     </ion-select>
@@ -325,7 +325,7 @@
                       interface="popover" :placeholder="translate('Select State / Province')"
                       :disabled="!shippingAddressForm.countryGeoId"
                       v-model="shippingAddressForm.stateProvinceGeoId">
-                      <ion-select-option v-for="state in seed.states" :key="state.geoId" :value="state.geoId">
+                      <ion-select-option v-for="state in seed.states()" :key="state.geoId" :value="state.geoId">
                         {{ state.geoName }}
                       </ion-select-option>
                     </ion-select>
@@ -475,6 +475,7 @@ import {
   warningOutline,
 } from 'ionicons/icons';
 import { DxpShopifyImg, translate } from '@common';
+import { useSeedData } from '@common/db';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { confirmAction, isKit } from '@/utils';
@@ -522,7 +523,7 @@ const emit = defineEmits<{
 }>();
 
 const orderDetailStore = useOrderDetailStore();
-const seed = computed(() => orderDetailStore.seedLookup);
+const seed = useSeedData();
 const { getProduct, imagePreview, primaryIdentifier, secondaryIdentifier, featureLabel } = useProductIdentity();
 
 const ISSUANCE_LABELS: Record<ItemIssuance['kind'], string> = {
@@ -609,7 +610,7 @@ const carrierName = computed(() => {
   const carrier = props.carriers.find((party: any) => party.partyId === carrierId.value);
   return carrier ? partyName(carrier) : '';
 });
-const methodLabel = computed(() => methodId.value ? seed.value.shipmentMethodDescription(methodId.value) : '');
+const methodLabel = computed(() => methodId.value ? seed.shipmentMethodDescription(methodId.value) : '');
 const carrierMethods = computed(() => [...orderDetailStore.shippingMethodsByCarrier(carrierId.value)]
   .sort((a, b) => Number(a.sequenceNumber ?? Infinity) - Number(b.sequenceNumber ?? Infinity)));
 

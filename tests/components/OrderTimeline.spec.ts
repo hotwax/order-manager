@@ -1,11 +1,11 @@
-import { mount } from '@vue/test-utils';
+import { flushPromises, mount } from '@vue/test-utils';
 import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { Settings } from 'luxon';
 import OrderTimeline from '@/components/orders/OrderTimeline.vue';
 import type { OrderHistoryStatus } from '@/store/orderDetail';
 import { buildOrderEvents } from '@/utils/orderEvents';
 
-const seedRows = vi.hoisted(() => ({ ready: true }));
+const sync = vi.hoisted(() => ({ synced: true, running: true }));
 const FACILITIES: Record<string, string> = { WH: 'Main Warehouse', PARKING: 'Rejected Item Parking' };
 
 vi.mock('@common', () => ({
@@ -30,20 +30,26 @@ vi.mock('@ionic/vue', () => {
 
 vi.mock('@/composables/useOrderDetail', () => ({ FACILITY_CHANGE_PAGE_SIZE: 200 }));
 vi.mock('@/composables/useProductIdentity', () => ({ useProductIdentity: () => ({ primaryIdentifier: () => 'TEE-M' }) }));
+vi.mock('@common/db', () => {
+  // A list getter's `withSync` reads `sync.synced`; `serviceState.running` reads `sync.running`.
+  const table = () => Object.assign(() => [], { withSync: () => ({ data: [], synced: sync.synced }) });
+  return {
+    get serviceState() { return sync; },
+    useSeedData: () => ({
+      facilities: table(),
+      facilityTypes: table(),
+      getFacilities: async () => [],
+      getFacilityTypes: async () => [],
+      facilityName: (facilityId: string) => FACILITIES[facilityId] ?? facilityId,
+      statusDescription: (statusId: string) => statusId,
+      enumDescription: (enumId: string) => enumId,
+    }),
+  };
+});
+
 vi.mock('@/store/orderDetail', () => ({
   isVirtualFacilityId: (facilityId: string) => facilityId === 'PARKING',
-  useOrderDetailStore: () => ({
-    orderById: () => null,
-    get seedLookup() {
-      return {
-        ready: seedRows.ready,
-        facilityName: (facilityId: string) => FACILITIES[facilityId] ?? facilityId,
-        statusDescription: (statusId: string) => statusId,
-        describe: (value: string) => value,
-        enumDescription: (enumId: string) => enumId,
-      };
-    },
-  }),
+  useOrderDetailStore: () => ({ orderById: () => null }),
 }));
 
 // 2:00 PM on Tuesday, Sep 22, 2026 in Los Angeles.
@@ -96,13 +102,25 @@ describe('OrderTimeline', () => {
 
   it('shows loading until the facility list is known, and a retry when history failed', async () => {
     expect(mountTimeline({ ...idle, loading: true }).find('.skeleton').exists()).toBe(true);
-    seedRows.ready = false;
+    sync.synced = false;
     const waiting = mountTimeline();
-    seedRows.ready = true;
+    sync.synced = true;
     expect(waiting.findAll('.divider')).toHaveLength(0);
 
     const failed = mountTimeline({ ...idle, failed: true });
     await failed.find('button').trigger('click');
     expect(failed.emitted('retry')).toHaveLength(1);
+  });
+
+  it('shows the history once the facility read lands when sync stopped without filling the tables', async () => {
+    Object.assign(sync, { synced: false, running: false });
+    try {
+      const stopped = mountTimeline();
+      expect(stopped.findAll('.divider')).toHaveLength(0);
+      await flushPromises();
+      expect(stopped.findAll('.divider').length).toBeGreaterThan(0);
+    } finally {
+      Object.assign(sync, { synced: true, running: true });
+    }
   });
 });
