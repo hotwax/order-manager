@@ -161,6 +161,15 @@ export const useUserStore = defineStore("user", {
       this.pwaState.updateExists = payload.updateExists;
     },
     async postLogin() {
+      // Start every login from an empty local database. The logout wipe does not always run: a
+      // session that expires while nothing is requesting (a closed tab, a sleeping laptop) lands on
+      // /login without a 401 and so without `postLogout`, leaving the previous session's rows and its
+      // once-per-login sync markers behind. The next login — the same user or another one — would
+      // then skip the seed and read them. This hook runs once per real login (never on a reload),
+      // before anything below reads the database, and stops a sync the `isAuthenticated` watcher in
+      // App.vue may already have started against the old rows.
+      await stopAppDbSync().catch((error) => logger.error("Failed to clear the local database on login", error));
+
       try {
         await this.fetchUserProfile();
         this.oms = cookieHelper().get("oms") || "";

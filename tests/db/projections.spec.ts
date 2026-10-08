@@ -11,13 +11,10 @@ describe('seed projections', () => {
     );
   });
 
-  it('does not project geo polygon geometry', () => {
-    expect(Object.keys(geoFields)).not.toContain('wellKnownText');
-  });
-
   it('projects every geo field the seed getters read', () => {
     expect(Object.keys(geoFields)).toEqual(
-      expect.arrayContaining(['geoId', 'geoName', 'geoCode', 'geoCodeAlpha2', 'geoTypeEnumId']),
+      // wellKnownText: Company's state pickers label a state "Name (abbrev)" from it.
+      expect.arrayContaining(['geoId', 'geoName', 'geoCode', 'geoCodeAlpha2', 'geoTypeEnumId', 'wellKnownText']),
     );
   });
 });
