@@ -31,7 +31,10 @@ export const orderManagerDb = defineAppDb({
   suffix: "OrderManagerDB",
   // v2: statusFlowTransitions gained transitionName and conditionExpression. Rows cached without
   //     them read every transition as user-driven, so they must not survive.
-  version: 2,
+  // v3: the common seed tables gained fields (store time zones, enumName, facility fields, geo
+  //     wellKnownText). New fields leave the store strings unchanged, so only a version change makes
+  //     an existing database drop its old rows and re-sync them.
+  version: 3,
   schema: commonSchema,
 });
 
