@@ -21,6 +21,7 @@ export const useProductStore = defineStore('productStore', {
         barcodeIdentifierPref: "",
         barcodeIdentifierOptions: [] as any[],
       },
+      affectQOHOnRej: 'N'
     } as any,
     productStores: [] as any[],
     isProductStoreInitialized: false,
@@ -35,6 +36,7 @@ export const useProductStore = defineStore('productStore', {
     getProductIdentificationOptions: (state) => state.settings.productIdentifier.productIdentificationOptions,
     getBarcodeIdentifierOptions: (state) => state.settings.barcodeIdentifier.barcodeIdentifierOptions,
     getCurrentSampleProduct: (state) => state.settings.productIdentifier.currentSampleProduct,
+    getAffectQOHOnRej: (state) => state.settings.affectQOHOnRej,
   },
 
   actions: {
