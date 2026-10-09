@@ -1,4 +1,4 @@
-import { type RoutingEventKind, isStockLocation, routingEventKind, ruleLabel } from "@/utils/routingHistory";
+import { type RoutingEventKind, changeActor, isStockLocation, routingEventKind, ruleLabel } from "@/utils/routingHistory";
 
 /**
  * An order's routing as a left-to-right graph: each card is a ship group's contents at a moment,
@@ -35,9 +35,6 @@ export interface FlowEdge {
   to: string;
   kind: FlowEdgeKind;
   orderItemSeqIds: string[];
-  /** The facility change rows behind the move, one per item, for the inspector. */
-  changeIds: string[];
-  at: number;
   attempts: number;
   reasonEnumId: string;
   /** The user login when a person made the move; empty for routing and system moves. */
@@ -93,13 +90,6 @@ function foldMoves(rows: any[]): ItemMove[] {
   });
 
   return moves;
-}
-
-function actorOf(row: any): string {
-  if(row.changeUserLogin) {return String(row.changeUserLogin);}
-  const prefix = String(row.comments || "").split(":")[0]?.trim();
-
-  return prefix && prefix.length < 40 && prefix !== row.comments ? prefix : "";
 }
 
 /** Where an item started: the ship group at the location its first move left from, else where it is now. */
@@ -224,16 +214,13 @@ export function buildRoutingFlow(input: {
         to: to.nodeId,
         kind,
         orderItemSeqIds: [],
-        changeIds: [],
-        at: move?.at ?? step[0].at,
         attempts: move?.attempts ?? 1,
         reasonEnumId,
         user: move?.row.changeUserLogin ? String(move.row.changeUserLogin) : "",
-        actor: move ? actorOf(move.row) : "",
+        actor: move ? changeActor(move.row) : "",
         rule: move ? ruleLabel(move.row.routingRule) : "",
       };
       line.orderItemSeqIds.push(orderItemSeqId);
-      if(move?.row.orderFacilityChangeId) {line.changeIds.push(String(move.row.orderFacilityChangeId));}
       line.attempts = Math.max(line.attempts, move?.attempts ?? 1);
       lines.set(key, line);
     });

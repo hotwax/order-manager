@@ -1,6 +1,6 @@
 <template>
   <div ref="rootEl" class="ion-padding order-routing">
-    <ion-item v-if="status === 'error'" color="danger" lines="none" class="order-routing-message">
+    <ion-item v-if="status === 'error'" color="danger" lines="none">
       <ion-icon slot="start" :icon="warningOutline" />
       <ion-label>{{ translate('Routing history could not be loaded.') }}</ion-label>
       <ion-button slot="end" fill="outline" color="light" size="small" @click="emit('retry')">
@@ -149,7 +149,7 @@ import type { EnrichedOrder, EnrichedOrderItem } from "@/types/orderDetail";
 import { formatDateTime, formatNumber } from "@/utils/format";
 import { classifyMovement } from "@/utils/inventoryMovement";
 import type { RoutingFlow } from "@/utils/routingFlow";
-import { type ItemRoutingHistory, type RoutingEvent, type RoutingEventKind, isStockLocation } from "@/utils/routingHistory";
+import { type ItemRoutingHistory, type RoutingEvent, type RoutingEventKind, isStockLocation, ruleName } from "@/utils/routingHistory";
 
 const props = defineProps<{
   order: EnrichedOrder;
@@ -172,14 +172,16 @@ const shownByItem = reactive(new Map<string, number>());
 /** Items picked in the graph; their sections are outlined. */
 const highlighted = ref<string[]>([]);
 const rootEl = ref<HTMLElement | null>(null);
+const cardEls = new Map<string, HTMLElement>();
+
 /** The ion-content methods used to scroll it. */
 type ScrollableContent = HTMLElement & {
   getScrollElement(): Promise<HTMLElement>;
   scrollByPoint(x: number, y: number, duration: number): Promise<void>;
 };
+/** Space between the pinned graph and the card scrolled under it. */
 const CARD_GAP = 12;
 const SCROLL_MS = 300;
-const cardEls = new Map<string, HTMLElement>();
 
 function setCardRef(orderItemSeqId: string, el: Element | ComponentPublicInstance | null) {
   const element = el && "$el" in el ? el.$el as HTMLElement : el as HTMLElement | null;
@@ -246,7 +248,6 @@ const entries = computed(() => {
 type Entry = (typeof entries.value)[number];
 
 const facility = (facilityId: string) => seed.facilityName(facilityId) || facilityId;
-const signed = (value: number | null | undefined) => value === null || value === undefined ? "—" : formatNumber(value);
 
 function itemImage(item: EnrichedOrderItem) {
   return getProduct(item.productId)?.mainImageUrl || item.imageUrl;
@@ -264,17 +265,17 @@ function inventoryUrl(entry: Entry): string | undefined {
   return facilityId ? buildAppUrl("order-routing", `/inventory/${encodeURIComponent(entry.item.productId)}`, { facilityId }) ?? undefined : undefined;
 }
 
-/** Only an open item can be short: a completed or cancelled one has nothing left to ship from here. */
+/** Short at its location, as the page decided for the item and ship group tabs too. */
 function isShort(entry: Entry) {
-  const available = entry.history.since?.availableNow;
-
-  return isOpen(entry.item) && typeof available === "number" && available < 0;
+  return props.shortStock?.[entry.item.orderItemSeqId] !== undefined;
 }
 
 function locationLabel(entry: Entry) {
   const name = entry.item.facilityName || facility(entry.item.facilityId);
 
-  return isShort(entry) ? translate("{facility} ({available})", { facility: name, available: signed(entry.history.since!.availableNow) }) : name;
+  const available = props.shortStock?.[entry.item.orderItemSeqId];
+
+  return available === undefined ? name : translate("{facility} ({available})", { facility: name, available: formatNumber(available) });
 }
 
 function eventTitle(event: RoutingEvent) {
@@ -295,7 +296,7 @@ function eventTitle(event: RoutingEvent) {
 /** Labelled details: the routing rule, the reason for a rejection, and the user or system that moved it. */
 function eventDetail(event: RoutingEvent) {
   const parts: string[] = [];
-  if(event.rule) {parts.push(translate("Routing rule: {rule}", { rule: event.rule.split(" › ").pop() || event.rule }));}
+  if(event.rule) {parts.push(translate("Routing rule: {rule}", { rule: ruleName(event.rule) }));}
   if(["rejected", "cancelled", "moved"].includes(event.kind) && event.reasonEnumId) {
     parts.push(translate("Reason: {reason}", { reason: seed.enumDescription(event.reasonEnumId) || event.reasonEnumId }));
   }
@@ -367,11 +368,6 @@ function showMore(entry: Entry) {
 function showLess(entry: Entry) {
   shownByItem.delete(entry.item.orderItemSeqId);
 }
-
-/** Completed and cancelled items take no action. */
-function isOpen(item: EnrichedOrderItem) {
-  return !["ITEM_COMPLETED", "ITEM_CANCELLED", "ITEM_REJECTED"].includes(item.statusId);
-}
 </script>
 
 <style scoped>
@@ -393,5 +389,4 @@ function isOpen(item: EnrichedOrderItem) {
   --background: var(--ion-color-warning);
   --color: var(--ion-color-warning-contrast);
 }
-
 </style>

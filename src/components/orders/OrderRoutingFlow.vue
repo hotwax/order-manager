@@ -40,7 +40,7 @@
           :key="node.id"
           type="button"
           class="routing-flow-node"
-          :class="{ current: node.isCurrent, virtual: !isStockLocation(node.facilityId), short: isNodeShort(node), selected: isSelected('node', node.id) }"
+          :class="{ virtual: !isStockLocation(node.facilityId), short: isNodeShort(node), selected: isSelected('node', node.id) }"
           :style="nodeStyle(node)"
           @click="select('node', node.id)"
         >
@@ -74,7 +74,7 @@ import { useProductIdentity } from "@/composables/useProductIdentity";
 import type { EnrichedOrderItem } from "@/types/orderDetail";
 import { formatDateTime, formatNumber } from "@/utils/format";
 import { type FlowColumn, type FlowEdge, type FlowNode, type RoutingFlow, layoutRoutingFlow } from "@/utils/routingFlow";
-import { isStockLocation } from "@/utils/routingHistory";
+import { isStockLocation, ruleName } from "@/utils/routingHistory";
 
 const props = defineProps<{
   flow: RoutingFlow;
@@ -208,7 +208,7 @@ function edgeLabel(edge: FlowEdge) {
 function edgeActor(edge: FlowEdge) {
   if(edge.kind === "stayed") {return "";}
   if(edge.user) {return edge.user;}
-  if(edge.rule) {return edge.rule.split(" › ").pop() || edge.rule;}
+  if(edge.rule) {return ruleName(edge.rule);}
 
   return edge.actor;
 }
@@ -218,7 +218,6 @@ function edgeTitle(edge: FlowEdge) {
 
   return translate("{label}: {count} items", { label: edgeLabel(edge), count });
 }
-
 </script>
 
 <style scoped>

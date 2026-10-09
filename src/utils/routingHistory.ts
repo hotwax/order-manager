@@ -10,7 +10,6 @@ import { type LocationStock, type ProductFacilityPair, pairKey } from "@/service
  */
 
 export type RoutingEventKind = "brokered" | "released" | "allocated" | "moved" | "rejected" | "parked" | "unfillable" | "cancelled";
-export type MovementKind = "sync" | "reserved" | "released" | "shipped" | "transferred" | "received" | "adjusted" | "other";
 
 /** Stock at one location around a routing change. `exact` when the change's own movements were found. */
 export interface StockMoment {
@@ -24,8 +23,6 @@ export interface StockMoment {
 export interface RoutingEvent {
   id: string;
   at: number;
-  /** The last attempt of a run of unfillable attempts; the same as `at` otherwise. */
-  lastAt: number;
   attempts: number;
   kind: RoutingEventKind;
   fromFacilityId: string;
@@ -36,18 +33,12 @@ export interface RoutingEvent {
   /** The user login when a person made the change; empty for routing and system changes. */
   user: string;
   rule: string;
-  comments: string;
   stock: StockMoment | null;
 }
 
 export interface StockMovement {
   id: string;
   at: number;
-  kind: MovementKind;
-  orderId: string;
-  orderName: string;
-  /** The movement belongs to the order being viewed. */
-  isThisOrder: boolean;
   atpDiff: number;
   qohDiff: number;
   atpAfter: number | null;
@@ -91,7 +82,7 @@ const num = (value: unknown): number | null => {
 };
 
 /** A movement's recorded time. External resets carry no effective date, only their creation time. */
-export const movementAt = (row: any): number => num(row.createdStamp) ?? num(row.effectiveDate) ?? 0;
+const movementAt = (row: any): number => num(row.createdStamp) ?? num(row.effectiveDate) ?? 0;
 
 const bySequence = (a: any, b: any) => movementAt(a) - movementAt(b) ||
   (num(a.inventoryItemDetailSeqId) ?? 0) - (num(b.inventoryItemDetailSeqId) ?? 0);
@@ -119,7 +110,13 @@ export function ruleLabel(routingRule?: string): string {
   return (routingRule || "").replace(/\]\s*$/, "").split(":").map((part) => part.trim()).filter(Boolean).join(" › ");
 }
 
-function actorOf(row: any): string {
+/** The rule itself, without its routing group and routing: "Primary › Standard Shipping › Warehouse" → "Warehouse". */
+export function ruleName(rule: string): string {
+  return rule.split(" › ").pop() || rule;
+}
+
+/** Who made a facility change: the user, or the system its comment names ("Primary : Inventory found…"). */
+export function changeActor(row: any): string {
   if(row.changeUserLogin) {return String(row.changeUserLogin);}
   const prefix = String(row.comments || "").split(":")[0]?.trim();
 
@@ -127,24 +124,11 @@ function actorOf(row: any): string {
 }
 
 /** Where a change's stock is read: the location an item arrived at, or the one it left. */
-export function stockLocationOf(event: Pick<RoutingEvent, "kind" | "fromFacilityId" | "toFacilityId">): string {
+function stockLocationOf(event: Pick<RoutingEvent, "kind" | "fromFacilityId" | "toFacilityId">): string {
   if(ARRIVALS.includes(event.kind)) {return isStockLocation(event.toFacilityId) ? event.toFacilityId : "";}
   if(DEPARTURES.includes(event.kind)) {return isStockLocation(event.fromFacilityId) ? event.fromFacilityId : "";}
 
   return "";
-}
-
-export function classifyMovement(row: any): MovementKind {
-  const reason = row.reasonEnumId;
-  const qohDiff = num(row.quantityOnHandDiff) ?? 0;
-  if(reason === "VAR_EXT_RESET") {return "sync";}
-  if(reason === "INV_RES_CREATE") {return "reserved";}
-  if(reason === "INV_RES_RELEASE") {return "released";}
-  if(row.physicalInventoryId || reason) {return "adjusted";}
-  if(row.orderId && qohDiff < 0) {return row.orderTypeId === "TRANSFER_ORDER" ? "transferred" : "shipped";}
-  if(row.orderId && qohDiff > 0) {return "received";}
-
-  return "other";
 }
 
 function balanceAfter(row: any) {
@@ -157,16 +141,12 @@ function balanceAfter(row: any) {
   };
 }
 
-function toMovement(row: any, orderId: string): StockMovement {
+function toMovement(row: any): StockMovement {
   const after = balanceAfter(row);
 
   return {
     id: String(row.inventoryItemDetailSeqId ?? `${row.inventoryItemId}-${movementAt(row)}`),
     at: movementAt(row),
-    kind: classifyMovement(row),
-    orderId: row.orderId || "",
-    orderName: row.orderName || row.orderId || "",
-    isThisOrder: Boolean(row.orderId) && row.orderId === orderId,
     atpDiff: num(row.availableToPromiseDiff) ?? 0,
     qohDiff: num(row.quantityOnHandDiff) ?? 0,
     atpAfter: after.atp,
@@ -203,23 +183,20 @@ function eventsForItem(changes: any[], item: RoutingItem): RoutingEvent[] {
       // Routing retries an unfillable item every run; one line per run would bury everything else.
       if(kind === "unfillable" && previous?.kind === "unfillable") {
         previous.attempts += 1;
-        previous.lastAt = at;
 
         return;
       }
       events.push({
         id: String(row.orderFacilityChangeId ?? `${item.orderItemSeqId}-${at}`),
         at,
-        lastAt: at,
         attempts: 1,
         kind,
         fromFacilityId: row.fromFacilityId || "",
         toFacilityId: row.facilityId || "",
         reasonEnumId: row.changeReasonEnumId || "",
-        actor: actorOf(row),
+        actor: changeActor(row),
         user: row.changeUserLogin ? String(row.changeUserLogin) : "",
         rule: ruleLabel(row.routingRule),
-        comments: row.comments || "",
         stock: null,
       });
     });
@@ -277,7 +254,7 @@ export function buildRoutingHistory(input: {
           .filter((row) => movementAt(row) > fromAt)
           .filter((row) => !(row.orderId === orderId && Math.abs(movementAt(row) - arrival.at) <= SAME_CHANGE_WINDOW_MS))
           .sort(bySequence)
-          .map((row) => toMovement(row, orderId)) : [];
+          .map((row) => toMovement(row)) : [];
         const lastMovement = later[later.length - 1];
         since = {
           facilityId: item.facilityId,

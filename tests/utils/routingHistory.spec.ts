@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildRoutingHistory, classifyMovement, isShortAtLocation, isStockLocation, movementRequests, ruleLabel, stockAt,
+  buildRoutingHistory, isShortAtLocation, isStockLocation, movementRequests, ruleLabel, stockAt,
 } from "@/utils/routingHistory";
 
 // Shaped on a real order: brokered to the warehouse on the one unit an inventory reset had added,
@@ -51,12 +51,11 @@ describe("routing history", () => {
     });
 
     // The item's own reservation is the brokering itself, so "since" starts after it.
-    expect(history.since?.movements.map((m) => [m.kind, m.atpAfter])).toEqual([["sync", -1], ["shipped", -1]]);
+    expect(history.since?.movements.map((m) => [m.raw.inventoryItemDetailSeqId, m.atpAfter])).toEqual([["500440", -1], ["510897", -1]]);
     expect(history.since).toMatchObject({ facilityId: WAREHOUSE, availableNow: -1, onHandNow: 1, truncated: false });
   });
 
   it("places inventory resets by when they were recorded, since they carry no effective date", () => {
-    expect(classifyMovement(rows[3])).toBe("sync");
     const moment = stockAt(rows, WAREHOUSE, t("2026-10-04T00:00:00Z"), "another-order");
     expect(moment).toEqual({ facilityId: WAREHOUSE, before: -1, after: -1, onHand: 3, exact: false });
   });
@@ -74,7 +73,7 @@ describe("routing history", () => {
       stock: {},
     });
     expect(history.events).toHaveLength(1);
-    expect(history.events[0]).toMatchObject({ kind: "unfillable", attempts: 2, lastAt: t("2026-10-09T21:50:47Z"), stock: null });
+    expect(history.events[0]).toMatchObject({ kind: "unfillable", attempts: 2, stock: null });
     expect(history.since).toBeNull();
   });
 

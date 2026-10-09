@@ -252,6 +252,41 @@ watch(selectedSegment, (segment) => {
   if (segment === 'routing') loadRoutingHistory();
 });
 
+const {
+  isShipGroupActionDisabled, isItemFacilityActionDisabled,
+  inventoryTransferItemsForShipGroup, brokerShipGroup, parkSelectedItems, rejectSelectedItems, releaseSelectedItems,
+  requestInventoryTransfersForShipGroup, openAddTaskModal, openAddItemModal, viewInventory, saveCarrierAndMethod,
+  shipGroupEditor, setShipGroupEditor, savingShipGroupId, saveShipGroupFields, saveShippingAddress,
+  rejectAndReleaseItem, openItemAttributesModal, openItemTransfersModal,
+  footerActions, runFooterAction, footerActionLabel, openCustomerContactModal, openLocalePrompt, openManageIdentificationsModal,
+  openManageAttributesModal, openRiskDetails, openCreateHoldTaskModal, reloadHoldTasks,
+} = useOrderActions({ order, loadOrder, selectedItemIds, selectedShipGroupItems, selectedSegment, canRequestInventoryTransfer });
+
+/* ── Items tab ────────────────────────────────────────────────────────── */
+
+const itemActions = computed(() => Object.fromEntries((order.value?.groupedItems || [])
+  .flatMap((group) => group.items)
+  .map((item) => [item.orderItemSeqId, { facilityDisabled: isItemFacilityActionDisabled(item) }])));
+
+/* ── Ship groups tab ──────────────────────────────────────────────────── */
+
+const SHIP_GROUP_ACTIONS: ShipGroupActionId[] = ['BROKER', 'RELEASE', 'PARK_ITEMS', 'PULL_BACK', 'ADD_TASK', 'ADD_ITEMS', 'EDIT_CARRIER_METHOD', 'EDIT_ADDRESS'];
+
+const shipGroupDisabledActions = computed(() => Object.fromEntries((order.value?.shipGroups || []).map((shipGroup) => [
+  shipGroup.id,
+  Object.fromEntries(SHIP_GROUP_ACTIONS.map((actionId) => [actionId, isShipGroupActionDisabled(shipGroup, actionId)])),
+])));
+
+const shipGroupDistances = useOrderDistances(() => order.value?.shipGroups || []);
+
+const availableCarriers = computed(() =>
+  [...orderDetailStore.carrierParties].sort((a, b) => {
+    const nameA = ([a.firstName, a.lastName].filter(Boolean).join(' ') || a.groupName || a.partyId).toLowerCase();
+    const nameB = ([b.firstName, b.lastName].filter(Boolean).join(' ') || b.groupName || b.partyId).toLowerCase();
+    return nameA.localeCompare(nameB);
+  })
+);
+
 /* ── Routing tab and short-stock warnings ─────────────────────────────── */
 
 const routingItems = computed<RoutingItem[]>(() => (order.value?.shipGroups || [])
@@ -299,41 +334,6 @@ const routingFlow = computed(() => order.value ? buildRoutingFlow({
   changes: routingHistoryStore.changesByOrderId[props.orderId] || [],
   importedAt: toMillis(orderDetailStore.orderById(props.orderId)?.entryDate || orderDetailStore.orderById(props.orderId)?.orderDate) || 0,
 }) : undefined);
-
-const {
-  isShipGroupActionDisabled, isItemFacilityActionDisabled,
-  inventoryTransferItemsForShipGroup, brokerShipGroup, parkSelectedItems, rejectSelectedItems, releaseSelectedItems,
-  requestInventoryTransfersForShipGroup, openAddTaskModal, openAddItemModal, viewInventory, saveCarrierAndMethod,
-  shipGroupEditor, setShipGroupEditor, savingShipGroupId, saveShipGroupFields, saveShippingAddress,
-  rejectAndReleaseItem, openItemAttributesModal, openItemTransfersModal,
-  footerActions, runFooterAction, footerActionLabel, openCustomerContactModal, openLocalePrompt, openManageIdentificationsModal,
-  openManageAttributesModal, openRiskDetails, openCreateHoldTaskModal, reloadHoldTasks,
-} = useOrderActions({ order, loadOrder, selectedItemIds, selectedShipGroupItems, selectedSegment, canRequestInventoryTransfer });
-
-/* ── Items tab ────────────────────────────────────────────────────────── */
-
-const itemActions = computed(() => Object.fromEntries((order.value?.groupedItems || [])
-  .flatMap((group) => group.items)
-  .map((item) => [item.orderItemSeqId, { facilityDisabled: isItemFacilityActionDisabled(item) }])));
-
-/* ── Ship groups tab ──────────────────────────────────────────────────── */
-
-const SHIP_GROUP_ACTIONS: ShipGroupActionId[] = ['BROKER', 'RELEASE', 'PARK_ITEMS', 'PULL_BACK', 'ADD_TASK', 'ADD_ITEMS', 'EDIT_CARRIER_METHOD', 'EDIT_ADDRESS'];
-
-const shipGroupDisabledActions = computed(() => Object.fromEntries((order.value?.shipGroups || []).map((shipGroup) => [
-  shipGroup.id,
-  Object.fromEntries(SHIP_GROUP_ACTIONS.map((actionId) => [actionId, isShipGroupActionDisabled(shipGroup, actionId)])),
-])));
-
-const shipGroupDistances = useOrderDistances(() => order.value?.shipGroups || []);
-
-const availableCarriers = computed(() =>
-  [...orderDetailStore.carrierParties].sort((a, b) => {
-    const nameA = ([a.firstName, a.lastName].filter(Boolean).join(' ') || a.groupName || a.partyId).toLowerCase();
-    const nameB = ([b.firstName, b.lastName].filter(Boolean).join(' ') || b.groupName || b.partyId).toLowerCase();
-    return nameA.localeCompare(nameB);
-  })
-);
 
 /* ── Holds tab ────────────────────────────────────────────────────────── */
 

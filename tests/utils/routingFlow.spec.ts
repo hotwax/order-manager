@@ -56,7 +56,7 @@ describe("routing flow", () => {
     ]);
     expect(flow.nodes.map((node) => node.id)).toEqual(["0-00001", "1-00002", "2-00003", "3-00004"]);
     expect(flow.nodes[3].isCurrent).toBe(true);
-    expect(flow.edges[1]).toMatchObject({ kind: "rejected", actor: "monica.thorbourne", reasonEnumId: "NOT_IN_STOCK", changeIds: ["c2"] });
+    expect(flow.edges[1]).toMatchObject({ kind: "rejected", actor: "monica.thorbourne", reasonEnumId: "NOT_IN_STOCK" });
   });
 
   it("keeps a rejection that routing followed within seconds, and folds a Shopify detour between retries", () => {
