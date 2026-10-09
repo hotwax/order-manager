@@ -19,106 +19,94 @@
     <ion-card
       v-for="entry in entries"
       :key="entry.item.orderItemSeqId"
-      class="order-routing-card"
+      class="routing-item"
       :class="{ highlighted: highlighted.includes(entry.item.orderItemSeqId) }"
     >
-      <ion-card-header class="order-routing-header">
-        <div>
-          <ion-card-title>{{ primaryIdentifier(entry.item.productId) || entry.item.name }}</ion-card-title>
-          <ion-card-subtitle>{{ translate('Item {id}', { id: entry.item.orderItemSeqId }) }} · {{ secondaryIdentifier(entry.item.productId) || entry.item.sku }}</ion-card-subtitle>
-        </div>
-        <ion-chip v-if="entry.item.facilityId" :outline="!isShort(entry)" :class="{ 'facility-warning': isShort(entry) }">
-          <ion-icon :icon="businessOutline" />
+      <ion-item lines="full">
+        <ion-thumbnail slot="start">
+          <DxpShopifyImg :key="itemImage(entry.item)" :src="itemImage(entry.item)" size="small" />
+        </ion-thumbnail>
+        <ion-label>
+          {{ primaryIdentifier(entry.item.productId) || entry.item.name }}
+          <p>{{ translate('Item {id}', { id: entry.item.orderItemSeqId }) }} · {{ secondaryIdentifier(entry.item.productId) || entry.item.sku }}</p>
+        </ion-label>
+        <ion-chip v-if="entry.item.facilityId" slot="end" :outline="!isShort(entry)" :class="{ 'facility-warning': isShort(entry) }">
+          <ion-icon :icon="isShort(entry) ? warningOutline : businessOutline" />
           <ion-label>{{ locationLabel(entry) }}</ion-label>
         </ion-chip>
-      </ion-card-header>
+      </ion-item>
 
-      <ion-list lines="full">
-        <ion-item v-if="hiddenCount(entry)" button :detail="false" @click="expanded.add(entry.item.orderItemSeqId)">
-          <ion-label color="medium">
-            {{ translate('Show {count} earlier changes', { count: hiddenCount(entry) }) }}
-          </ion-label>
-        </ion-item>
+      <!-- The timeline opens on demand. Collapsed, the header still answers "can it ship from here?" with the
+           stock now; open, it lists changes newest first, ten at a time. -->
+      <ion-accordion-group v-if="entry.rows.length || entry.history.since">
+        <ion-accordion :value="entry.item.orderItemSeqId">
+          <ion-item slot="header" :color="isShort(entry) ? 'warning' : undefined">
+            <ion-icon slot="start" :icon="isShort(entry) ? warningOutline : timeOutline" />
+            <ion-label class="ion-text-wrap">
+              {{ translate('Inventory timeline') }}
+              <p>
+                {{ isShort(entry) ? translate('Short here. Reject the item to send it back to routing.') : translate('{count} changes', { count: entry.rows.length }) }}
+              </p>
+            </ion-label>
+            <ion-label v-if="entry.history.since" slot="end" class="ion-text-end routing-stock">
+              {{ translate('{available} available', { available: signed(entry.history.since.availableNow) }) }}
+              <p>{{ translate('{onHand} on hand', { onHand: signed(entry.history.since.onHandNow) }) }}</p>
+            </ion-label>
+          </ion-item>
+          <ion-list slot="content" lines="full">
+            <ion-item v-for="row in visibleRows(entry)" :key="row.id">
+              <ion-icon slot="start" :icon="row.icon" :color="row.color" />
+              <ion-label>
+                <h3 v-if="row.type === 'routing'">
+                  {{ row.title }}
+                </h3>
+                <template v-else>
+                  {{ row.title }}
+                </template>
+                <p>{{ row.detail ? `${formatDateTime(row.at, { year: false })} · ${row.detail}` : formatDateTime(row.at, { year: false }) }}</p>
+              </ion-label>
+              <ion-label v-if="row.available" slot="end" class="ion-text-end routing-stock">
+                {{ row.available }}
+                <p v-if="row.onHand">
+                  {{ row.onHand }}
+                </p>
+              </ion-label>
+            </ion-item>
+            <ion-item v-if="remainingCount(entry)" button :detail="false" lines="none" @click="showMore(entry)">
+              <ion-label color="primary">
+                {{ translate('View more ({count})', { count: remainingCount(entry) }) }}
+              </ion-label>
+            </ion-item>
+            <ion-item v-else-if="entry.history.since?.truncated" lines="none">
+              <ion-label color="medium">
+                {{ translate('Older stock changes are not shown.') }}
+              </ion-label>
+            </ion-item>
+          </ion-list>
+        </ion-accordion>
+      </ion-accordion-group>
 
-        <ion-item v-for="event in visibleEvents(entry)" :key="event.id">
-          <ion-icon slot="start" :icon="EVENT_ICONS[event.kind]" :color="event.kind === 'rejected' || event.kind === 'unfillable' ? 'warning' : 'medium'" />
-          <ion-label class="ion-text-wrap">
-            <h3>{{ eventTitle(event) }}</h3>
-            <p v-if="eventDetail(event)">
-              {{ eventDetail(event) }}
-            </p>
-            <p v-if="event.stock" class="order-routing-stock">
-              {{ stockLine(event) }}
-            </p>
-          </ion-label>
-          <ion-note slot="end" class="order-routing-time">
-            {{ formatDateTime(event.at, { year: false }) }}
-          </ion-note>
-        </ion-item>
-
-        <ion-item v-if="!entry.history.events.length && status === 'loaded'" lines="none">
-          <ion-label color="medium">
-            {{ translate('No routing changes recorded for this item.') }}
-          </ion-label>
-        </ion-item>
-        <ion-item v-if="status === 'loading' && !entry.history.events.length" lines="none">
-          <ion-label color="medium">
-            {{ translate('Loading routing history...') }}
-          </ion-label>
-        </ion-item>
-      </ion-list>
-
-      <ion-list v-if="entry.history.since" lines="full" class="order-routing-since">
-        <ion-list-header>
-          <ion-label>{{ sinceTitle(entry.history.since) }}</ion-label>
-        </ion-list-header>
-        <ion-item v-for="movement in entry.history.since.movements" :key="movement.id">
-          <ion-label class="ion-text-wrap">
-            <h3>
-              {{ movementTitle(movement) }}
-              <ion-badge v-if="movement.kind === 'sync'" color="warning">
-                {{ translate('Inventory sync') }}
-              </ion-badge>
-            </h3>
-            <p>{{ movementLine(movement) }}</p>
-          </ion-label>
-          <ion-note slot="end" class="order-routing-time">
-            {{ formatDateTime(movement.at, { year: false }) }}
-          </ion-note>
-        </ion-item>
-        <ion-item v-if="entry.history.since.fromAt && !entry.history.since.movements.length">
-          <ion-label color="medium">
-            {{ translate('No stock changes since then.') }}
-          </ion-label>
-        </ion-item>
-        <ion-item v-if="entry.history.since.truncated">
-          <ion-label color="medium">
-            {{ translate('Older stock changes are not shown.') }}
-          </ion-label>
-        </ion-item>
-        <ion-item lines="none" :color="isShort(entry) ? 'warning' : undefined">
-          <ion-label class="ion-text-wrap">
-            <h3>{{ nowLine(entry.history.since) }}</h3>
-            <p v-if="isShort(entry)">
-              {{ translate('This location has promised more than it has. HotWax does not re-route an allocated item on its own; reject the item to send it back to routing.') }}
-            </p>
-          </ion-label>
-        </ion-item>
-      </ion-list>
+      <ion-item v-else-if="status === 'loaded'" lines="none">
+        <ion-label color="medium">
+          {{ translate('No routing changes recorded for this item.') }}
+        </ion-label>
+      </ion-item>
+      <ion-item v-else-if="status === 'loading'" lines="none">
+        <ion-label color="medium">
+          {{ translate('Loading routing history...') }}
+        </ion-label>
+      </ion-item>
     </ion-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { translate } from "@common";
+import { DxpShopifyImg, translate } from "@common";
 import { useSeedData } from "@common/db";
+import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonChip, IonIcon, IonItem, IonLabel, IonList, IonThumbnail } from "@ionic/vue";
 import {
-  IonBadge, IonButton, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonChip, IonIcon, IonItem, IonLabel,
-  IonList, IonListHeader, IonNote,
-} from "@ionic/vue";
-import {
-  arrowRedoOutline, banOutline, businessOutline, closeCircleOutline, compassOutline, pauseCircleOutline, returnDownBackOutline,
-  swapHorizontalOutline, warningOutline,
+  arrowRedoOutline, banOutline, businessOutline, closeCircleOutline, compassOutline, cubeOutline, pauseCircleOutline,
+  refreshOutline, returnDownBackOutline, swapHorizontalOutline, timeOutline, warningOutline,
 } from "ionicons/icons";
 import { computed, reactive, ref } from "vue";
 import OrderRoutingFlow from "@/components/orders/OrderRoutingFlow.vue";
@@ -126,7 +114,7 @@ import { useProductIdentity } from "@/composables/useProductIdentity";
 import type { EnrichedOrder, EnrichedOrderItem } from "@/types/orderDetail";
 import { formatDateTime, formatNumber } from "@/utils/format";
 import type { RoutingFlow } from "@/utils/routingFlow";
-import type { ItemRoutingHistory, MovementKind, RoutingEvent, RoutingEventKind, SinceBlock, StockMovement } from "@/utils/routingHistory";
+import type { ItemRoutingHistory, MovementKind, RoutingEvent, RoutingEventKind, StockMovement } from "@/utils/routingHistory";
 
 const props = defineProps<{
   order: EnrichedOrder;
@@ -141,14 +129,13 @@ const props = defineProps<{
 const emit = defineEmits<{ retry: [] }>();
 
 const seed = useSeedData();
-const { primaryIdentifier, secondaryIdentifier } = useProductIdentity();
+const { getProduct, primaryIdentifier, secondaryIdentifier } = useProductIdentity();
 
-/** Items whose older changes the user asked to see. */
-const expanded = reactive(new Set<string>());
-/** Items picked in the graph; their cards below are outlined. */
+/** How many rows each item's timeline shows; "View more" adds a page. */
+const PAGE_SIZE = 10;
+const shownByItem = reactive(new Map<string, number>());
+/** Items picked in the graph; their sections are outlined. */
 const highlighted = ref<string[]>([]);
-/** The latest changes tell the current story; older ones are a tap away. */
-const VISIBLE_EVENTS = 3;
 
 const EVENT_ICONS: Record<RoutingEventKind, string> = {
   brokered: compassOutline,
@@ -162,7 +149,7 @@ const EVENT_ICONS: Record<RoutingEventKind, string> = {
 };
 
 const MOVEMENT_TITLES: Record<MovementKind, string> = {
-  sync: "Stock reset from the inventory system",
+  sync: "Inventory sync",
   reserved: "Reserved for {order}",
   released: "Reservation released for {order}",
   shipped: "Shipped {order}",
@@ -172,20 +159,43 @@ const MOVEMENT_TITLES: Record<MovementKind, string> = {
   other: "Stock changed",
 };
 
+type Row = {
+  id: string;
+  at: number;
+  type: "routing" | "stock";
+  /** Ionic color for the row's icon. */
+  color: string;
+  icon: string;
+  title: string;
+  detail: string;
+  /** Available to promise at the location: "1 → 0" across the change, or the level when it did not move. */
+  available: string;
+  onHand: string;
+};
+
 const entries = computed(() => {
   const items = props.order.shipGroups.flatMap((group) => group.items);
   const byItem = new Map(props.history.map((history) => [history.orderItemSeqId, history]));
 
-  return items.map((item: EnrichedOrderItem) => ({
-    item,
-    history: byItem.get(item.orderItemSeqId) || { orderItemSeqId: item.orderItemSeqId, productId: item.productId, facilityId: item.facilityId, events: [], since: null },
-  }));
+  return items.map((item: EnrichedOrderItem) => {
+    const history = byItem.get(item.orderItemSeqId) || { orderItemSeqId: item.orderItemSeqId, productId: item.productId, facilityId: item.facilityId, events: [], since: null };
+
+    return { item, history, rows: rowsFor(history) };
+  });
 });
 
 type Entry = (typeof entries.value)[number];
 
 const facility = (facilityId: string) => seed.facilityName(facilityId) || facilityId;
-const signed = (value: number | null) => value === null ? "—" : formatNumber(value);
+const signed = (value: number | null | undefined) => value === null || value === undefined ? "—" : formatNumber(value);
+const change = (before: number | null, after: number | null) => before !== null && after !== null && before !== after
+  ? translate("{before} → {after}", { before: signed(before), after: signed(after) })
+  : signed(after);
+const onHand = (value: number | null | undefined) => value === null || value === undefined ? "" : translate("{onHand} on hand", { onHand: signed(value) });
+
+function itemImage(item: EnrichedOrderItem) {
+  return getProduct(item.productId)?.mainImageUrl || item.imageUrl;
+}
 
 function isShort(entry: Entry) {
   const available = entry.history.since?.availableNow;
@@ -197,14 +207,6 @@ function locationLabel(entry: Entry) {
   const name = entry.item.facilityName || facility(entry.item.facilityId);
 
   return isShort(entry) ? translate("{facility} ({available})", { facility: name, available: signed(entry.history.since!.availableNow) }) : name;
-}
-
-function hiddenCount(entry: Entry) {
-  return expanded.has(entry.item.orderItemSeqId) ? 0 : Math.max(entry.history.events.length - VISIBLE_EVENTS, 0);
-}
-
-function visibleEvents(entry: Entry) {
-  return entry.history.events.slice(hiddenCount(entry));
 }
 
 function eventTitle(event: RoutingEvent) {
@@ -222,30 +224,13 @@ function eventTitle(event: RoutingEvent) {
   }
 }
 
+/** Why and by whom, as in the graph: the reason for a rejection, then the user or the rule. */
 function eventDetail(event: RoutingEvent) {
   const parts: string[] = [];
-  if(event.rule) {parts.push(translate("Rule: {rule}", { rule: event.rule }));}
   if(["rejected", "cancelled", "moved"].includes(event.kind) && event.reasonEnumId) {parts.push(seed.enumDescription(event.reasonEnumId) || event.reasonEnumId);}
-  if(event.actor && !event.rule) {parts.push(translate("By {actor}", { actor: event.actor }));}
-  if(event.kind === "unfillable" && event.attempts > 1) {parts.push(translate("Last tried {time}", { time: formatDateTime(event.lastAt, { year: false }) }));}
+  if(event.rule) {parts.push(event.rule.split(" › ").pop() || event.rule);} else if(event.actor) {parts.push(event.actor);}
 
   return parts.join(" · ");
-}
-
-function stockLine(event: RoutingEvent) {
-  const stock = event.stock!;
-  const place = facility(stock.facilityId);
-  if(stock.exact && stock.before !== stock.after) {
-    return translate("Available at {facility}: {before} → {after}, on hand {onHand}", { facility: place, before: signed(stock.before), after: signed(stock.after), onHand: signed(stock.onHand) });
-  }
-
-  return translate("Available at {facility}: {available}, on hand {onHand}", { facility: place, available: signed(stock.after), onHand: signed(stock.onHand) });
-}
-
-function sinceTitle(since: SinceBlock) {
-  return since.fromAt
-    ? translate("Stock at {facility} since {time}", { facility: facility(since.facilityId), time: formatDateTime(since.fromAt, { year: false }) })
-    : translate("Stock at {facility}", { facility: facility(since.facilityId) });
 }
 
 function movementTitle(movement: StockMovement) {
@@ -254,16 +239,44 @@ function movementTitle(movement: StockMovement) {
   return translate(MOVEMENT_TITLES[movement.kind], { order });
 }
 
-function movementLine(movement: StockMovement) {
-  const before = movement.atpAfter === null ? null : movement.atpAfter - movement.atpDiff;
+function rowsFor(history: ItemRoutingHistory): Row[] {
+  const routing: Row[] = history.events.map((event) => ({
+    id: `e-${event.id}`,
+    at: event.at,
+    type: "routing",
+    color: event.kind === "rejected" || event.kind === "unfillable" ? "warning" : "primary",
+    icon: EVENT_ICONS[event.kind],
+    title: eventTitle(event),
+    detail: eventDetail(event),
+    available: event.stock ? change(event.stock.before, event.stock.after) : "",
+    onHand: onHand(event.stock?.onHand),
+  }));
+  const stock: Row[] = (history.since?.movements || []).map((movement) => ({
+    id: `m-${movement.id}`,
+    at: movement.at,
+    type: "stock",
+    color: movement.kind === "sync" ? "warning" : "medium",
+    icon: movement.kind === "sync" ? refreshOutline : cubeOutline,
+    title: movementTitle(movement),
+    detail: "",
+    available: change(movement.atpAfter === null ? null : movement.atpAfter - movement.atpDiff, movement.atpAfter),
+    onHand: onHand(movement.qohAfter),
+  }));
 
-  return movement.atpDiff
-    ? translate("Available {before} → {after}, on hand {onHand}", { before: signed(before), after: signed(movement.atpAfter), onHand: signed(movement.qohAfter) })
-    : translate("Available {available}, on hand {onHand}", { available: signed(movement.atpAfter), onHand: signed(movement.qohAfter) });
+  return [...routing, ...stock].sort((a, b) => a.at - b.at);
 }
 
-function nowLine(since: SinceBlock) {
-  return translate("Available now: {available}, on hand {onHand}", { available: signed(since.availableNow), onHand: signed(since.onHandNow) });
+/** Newest first, a page at a time. */
+function visibleRows(entry: Entry) {
+  return [...entry.rows].reverse().slice(0, shownByItem.get(entry.item.orderItemSeqId) ?? PAGE_SIZE);
+}
+
+function remainingCount(entry: Entry) {
+  return Math.max(entry.rows.length - (shownByItem.get(entry.item.orderItemSeqId) ?? PAGE_SIZE), 0);
+}
+
+function showMore(entry: Entry) {
+  shownByItem.set(entry.item.orderItemSeqId, (shownByItem.get(entry.item.orderItemSeqId) ?? PAGE_SIZE) + PAGE_SIZE);
 }
 </script>
 
@@ -274,11 +287,11 @@ function nowLine(since: SinceBlock) {
   gap: var(--spacer-sm, 12px);
 }
 
-.order-routing-card {
+.routing-item {
   margin: 0;
 }
 
-.order-routing-card.highlighted {
+.routing-item.highlighted {
   outline: 2px solid var(--ion-color-primary);
 }
 
@@ -287,26 +300,7 @@ function nowLine(since: SinceBlock) {
   --color: var(--ion-color-warning-contrast);
 }
 
-.order-routing-header {
-  text-align: start;
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.order-routing-since ion-list-header {
-  border-top: 1px solid var(--ion-color-light-shade);
-}
-
-.order-routing-time {
-  white-space: nowrap;
-  font-size: 0.85em;
-}
-
-.order-routing-stock {
+.routing-stock {
   font-variant-numeric: tabular-nums;
 }
 </style>
