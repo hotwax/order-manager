@@ -61,6 +61,7 @@ export const useProductStore = defineStore('productStore', {
     },
     async setCurrentProductStore(store: any) {
       this.currentProductStore = store
+      this.fetchProductStoreSettings(store.productStoreId);
     },
 
     async fetchProductStores() {
@@ -138,6 +139,7 @@ export const useProductStore = defineStore('productStore', {
       } catch (error) {
         console.error('error', error)
       }
+      this.fetchProductStoreSettings(payload.productStoreId);
       this.currentProductStore = payload;
     },
     async fetchProductStoreSettings(productStoreId: string) {
