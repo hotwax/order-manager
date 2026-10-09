@@ -12,7 +12,6 @@
       v-if="flow && status === 'loaded'"
       :flow="flow"
       :items="entries.map((entry) => entry.item)"
-      :history="history"
       :short-stock="shortStock || {}"
       @select-items="highlighted = $event"
     />

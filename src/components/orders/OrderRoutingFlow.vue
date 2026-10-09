@@ -62,70 +62,23 @@
         </button>
       </div>
     </div>
-
-    <ion-card v-if="selectedEdge || selectedNode" class="routing-flow-inspector">
-      <ion-button class="routing-flow-inspector-close" fill="clear" color="medium" size="small" :aria-label="translate('Close')" @click="clearSelection">
-        <ion-icon slot="icon-only" :icon="closeOutline" />
-      </ion-button>
-      <ion-list v-if="selectedEdge" lines="none">
-        <ion-item>
-          <ion-label class="ion-text-wrap">
-            <h2>{{ edgeTitle(selectedEdge) }}</h2>
-            <p>{{ nodePlace(selectedEdge.from) }} → {{ nodePlace(selectedEdge.to) }}</p>
-            <p>{{ edgeMeta(selectedEdge) }}</p>
-          </ion-label>
-          <ion-note slot="end">
-            {{ formatDateTime(selectedEdge.at, { year: false }) }}
-          </ion-note>
-        </ion-item>
-        <ion-item v-for="id in selectedEdge.orderItemSeqIds" :key="id">
-          <ion-label class="ion-text-wrap">
-            {{ itemPrimary(id) }}
-            <p v-if="stockForMove(selectedEdge, id)">
-              {{ stockForMove(selectedEdge, id) }}
-            </p>
-          </ion-label>
-        </ion-item>
-      </ion-list>
-      <ion-list v-else-if="selectedNode" lines="none">
-        <ion-item>
-          <ion-label class="ion-text-wrap">
-            <h2>{{ nodePlace(selectedNode.id) }}</h2>
-            <p>{{ nodeWhen(selectedNode) }}</p>
-          </ion-label>
-        </ion-item>
-        <ion-item v-for="id in selectedNode.orderItemSeqIds" :key="id">
-          <ion-label class="ion-text-wrap">
-            {{ itemPrimary(id) }}
-            <p v-if="selectedNode.isCurrent && stockNow(id)">
-              {{ stockNow(id) }}
-            </p>
-          </ion-label>
-        </ion-item>
-      </ion-list>
-    </ion-card>
-    <p v-else class="routing-flow-hint">
-      {{ translate('Select a ship group or a move to see its details.') }}
-    </p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { DxpShopifyImg, translate } from "@common";
 import { useSeedData } from "@common/db";
-import { IonBadge, IonButton, IonCard, IonIcon, IonItem, IonLabel, IonList, IonNote } from "@ionic/vue";
-import { closeOutline } from "ionicons/icons";
+import { IonBadge } from "@ionic/vue";
 import { computed, ref } from "vue";
 import { useProductIdentity } from "@/composables/useProductIdentity";
 import type { EnrichedOrderItem } from "@/types/orderDetail";
 import { formatDateTime, formatNumber } from "@/utils/format";
 import { type FlowColumn, type FlowEdge, type FlowNode, type RoutingFlow, layoutRoutingFlow } from "@/utils/routingFlow";
-import { type ItemRoutingHistory, isStockLocation } from "@/utils/routingHistory";
+import { isStockLocation } from "@/utils/routingHistory";
 
 const props = defineProps<{
   flow: RoutingFlow;
   items: EnrichedOrderItem[];
-  history: ItemRoutingHistory[];
   /** Available to promise at the item's location, for items whose location is short. */
   shortStock: Record<string, number>;
 }>();
@@ -153,17 +106,12 @@ const KIND_LABELS: Record<string, string> = {
 };
 
 const selected = ref<{ kind: "node" | "edge"; id: string } | null>(null);
-const selectedEdge = computed(() => selected.value?.kind === "edge" ? props.flow.edges.find((edge) => edge.id === selected.value?.id) : undefined);
-const selectedNode = computed(() => selected.value?.kind === "node" ? props.flow.nodes.find((node) => node.id === selected.value?.id) : undefined);
 
 function select(kind: "node" | "edge", id: string) {
   selected.value = isSelected(kind, id) ? null : { kind, id };
-  emit("select-items", selectedEdge.value?.orderItemSeqIds || selectedNode.value?.orderItemSeqIds || []);
-}
-
-function clearSelection() {
-  selected.value = null;
-  emit("select-items", []);
+  const edge = selected.value?.kind === "edge" ? props.flow.edges.find((entry) => entry.id === id) : undefined;
+  const node = selected.value?.kind === "node" ? props.flow.nodes.find((entry) => entry.id === id) : undefined;
+  emit("select-items", edge?.orderItemSeqIds || node?.orderItemSeqIds || []);
 }
 
 function isSelected(kind: "node" | "edge", id: string) {
@@ -171,9 +119,7 @@ function isSelected(kind: "node" | "edge", id: string) {
 }
 
 const itemsById = computed(() => new Map(props.items.map((item) => [item.orderItemSeqId, item])));
-const historyById = computed(() => new Map(props.history.map((entry) => [entry.orderItemSeqId, entry])));
 const facility = (facilityId: string) => seed.facilityName(facilityId) || facilityId;
-const signed = (value: number | null | undefined) => value === null || value === undefined ? "—" : formatNumber(value);
 
 function itemPrimary(id: string) {
   const item = itemsById.value.get(id);
@@ -273,45 +219,6 @@ function edgeTitle(edge: FlowEdge) {
   return translate("{label}: {count} items", { label: edgeLabel(edge), count });
 }
 
-function edgeMeta(edge: FlowEdge) {
-  const parts: string[] = [];
-  if(edge.rule) {parts.push(translate("Rule: {rule}", { rule: edge.rule }));}
-  if(edge.actor && !edge.rule) {parts.push(translate("By {actor}", { actor: edge.actor }));}
-  if(edge.reasonEnumId && edge.kind !== "brokered") {parts.push(seed.enumDescription(edge.reasonEnumId) || edge.reasonEnumId);}
-
-  return parts.join(" · ");
-}
-
-function nodePlace(nodeId: string) {
-  const node = props.flow.nodes.find((entry) => entry.id === nodeId);
-
-  return node ? translate("{facility}, ship group {id}", { facility: facility(node.facilityId), id: node.shipGroupSeqId }) : "";
-}
-
-function nodeWhen(node: FlowNode) {
-  const column = props.flow.columns[node.column];
-  const label = translate("{label} {time}", { label: columnLabel(column), time: formatDateTime(column.at, { year: false }) });
-
-  return node.isCurrent ? translate("{label}; still there now", { label }) : label;
-}
-
-/** The stock the item's own routing change saw, from the routing history. */
-function stockForMove(edge: FlowEdge, id: string) {
-  const event = historyById.value.get(id)?.events.find((entry) => edge.changeIds.includes(entry.id));
-  const stock = event?.stock;
-  if(!stock) {return "";}
-  const place = facility(stock.facilityId);
-
-  return stock.exact && stock.before !== stock.after
-    ? translate("Available at {facility}: {before} → {after}, on hand {onHand}", { facility: place, before: signed(stock.before), after: signed(stock.after), onHand: signed(stock.onHand) })
-    : translate("Available at {facility}: {available}, on hand {onHand}", { facility: place, available: signed(stock.after), onHand: signed(stock.onHand) });
-}
-
-function stockNow(id: string) {
-  const since = historyById.value.get(id)?.since;
-
-  return since ? translate("Available now: {available}, on hand {onHand}", { available: signed(since.availableNow), onHand: signed(since.onHandNow) }) : "";
-}
 </script>
 
 <style scoped>
@@ -428,12 +335,9 @@ function stockNow(id: string) {
 }
 
 .routing-flow-node.virtual {
-  opacity: 0.6;
+  /* Only the card's background fades, so the grid shows through; its text and images stay as they are. */
+  background: rgba(var(--ion-background-color-rgb, 255, 255, 255), 0.6);
   box-shadow: none;
-}
-
-.routing-flow-node.virtual.selected, .routing-flow-node.virtual:focus-visible {
-  opacity: 1;
 }
 
 .routing-flow-node.short {
@@ -503,38 +407,4 @@ function stockNow(id: string) {
   font-weight: 600;
 }
 
-.routing-flow-inspector {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: min(340px, calc(100% - 16px));
-  max-height: calc(40vh - 16px);
-  margin: 0;
-  overflow-y: auto;
-  box-shadow: 0 8px 24px rgba(var(--ion-color-dark-rgb, 15, 23, 42), 0.18);
-}
-
-.routing-flow-inspector ion-item:first-of-type {
-  --inner-padding-end: 36px;
-}
-
-.routing-flow-inspector-close {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  z-index: 1;
-}
-
-.routing-flow-hint {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-  margin: 0;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--ion-color-light);
-  font-size: 0.75rem;
-  color: var(--ion-color-medium-shade);
-  pointer-events: none;
-}
 </style>
