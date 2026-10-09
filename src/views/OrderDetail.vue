@@ -35,6 +35,9 @@
         <ion-segment-button value="ship-groups">
           <ion-label>{{ translate('Ship groups') }}</ion-label>
         </ion-segment-button>
+        <ion-segment-button value="routing">
+          <ion-label>{{ translate('Routing') }}</ion-label>
+        </ion-segment-button>
         <ion-segment-button value="holds">
           <ion-label>{{ translate('Holds') }}</ion-label>
         </ion-segment-button>
@@ -49,6 +52,7 @@
         :order="order"
         :item-actions="itemActions"
         :payment-return-ids="paymentReturnIds"
+        :short-stock="shortStock"
         @reject-and-release="rejectAndReleaseItem"
         @open-item-attributes="openItemAttributesModal"
         @open-item-transfers="openItemTransfersModal"
@@ -72,9 +76,11 @@
             :has-transferable-items="inventoryTransferItemsForShipGroup(shipGroup).length > 0"
             :editor="shipGroupEditor(shipGroup)"
             :saving="savingShipGroupId === shipGroup.id"
+            :short-stock="shortStock"
             @update:expanded="$event ? expandedShipGroupIds.add(shipGroup.id) : expandedShipGroupIds.delete(shipGroup.id)"
             @update:selected-item-ids="selectedShipGroupItems[shipGroup.id] = $event"
             @show-holds="selectedSegment = 'holds'"
+            @show-routing="selectedSegment = 'routing'"
             @broker="brokerShipGroup(shipGroup)"
             @release="releaseSelectedItems(shipGroup)"
             @park="parkSelectedItems(shipGroup)"
@@ -92,6 +98,14 @@
         <EmptyState v-else :title="translate('No ship groups')"
           :message="translate('There are no ship groups defined for this order.')" />
       </div>
+
+      <OrderRoutingSegment
+        v-if="selectedSegment === 'routing'"
+        :order="order"
+        :history="routingHistory"
+        :status="routingHistoryStore.statusFor(orderId)"
+        @retry="loadRoutingHistory(true)"
+      />
 
       <OrderHoldsSegment
         v-if="selectedSegment === 'holds'"
@@ -166,17 +180,21 @@ import ErrorState from '@/components/common/ErrorState.vue';
 import OrderCommsSegment from '@/components/orders/OrderCommsSegment.vue';
 import OrderHoldsSegment from '@/components/orders/OrderHoldsSegment.vue';
 import OrderItemsSegment from '@/components/orders/OrderItemsSegment.vue';
+import OrderRoutingSegment from '@/components/orders/OrderRoutingSegment.vue';
 import OrderShipGroupCard from '@/components/orders/OrderShipGroupCard.vue';
 import OrderSummaryHeader from '@/components/orders/OrderSummaryHeader.vue';
 import { useOrderActions } from '@/composables/useOrderActions';
 import { useOrderDistances } from '@/composables/useOrderDistances';
 import { useProductMaster } from '@/composables/useProductMaster';
+import { pairKey } from '@/services/routingHistory';
 import { useCustomerStore } from '@/store/customer';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderTaskStore } from '@/store/orderTask';
+import { useRoutingHistoryStore } from '@/store/routingHistory';
 import { useUserStore } from '@/store/user';
 import type { ShipGroupActionId } from '@/utils/OrderActionValidator';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
+import { type RoutingItem, isShortAtLocation } from '@/utils/routingHistory';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
 import type { EnrichedPayment } from '@/types/orderDetail';
 import type { OrderEventLink } from '@/utils/orderEvents';
@@ -188,6 +206,7 @@ const props = defineProps<{
 const orderDetailStore = useOrderDetailStore();
 const seed = useSeedData();
 const orderTaskStore = useOrderTaskStore();
+const routingHistoryStore = useRoutingHistoryStore();
 const customerStore = useCustomerStore();
 const userStore = useUserStore();
 const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW));
@@ -224,7 +243,32 @@ watch(selectedSegment, (segment) => {
     orderDetailStore.fetchRiskAssessments(props.orderId);
   }
   if (segment === 'comms') orderDetailStore.fetchCommEvents(props.orderId);
+  if (segment === 'routing') loadRoutingHistory();
 });
+
+/* ── Routing tab and short-stock warnings ─────────────────────────────── */
+
+const routingItems = computed<RoutingItem[]>(() => (order.value?.shipGroups || [])
+  .flatMap((group) => group.items)
+  .map((item) => ({ orderItemSeqId: item.orderItemSeqId, productId: item.productId, facilityId: item.facilityId, statusId: item.statusId })));
+
+function loadRoutingHistory(force = false) {
+  if (routingItems.value.length) routingHistoryStore.loadRoutingHistory(props.orderId, routingItems.value, force);
+}
+
+// Current stock at each item's location, so a location that is short shows it on the item and its ship group.
+watch(() => routingItems.value.map((item) => `${item.orderItemSeqId}:${pairKey(item.productId, item.facilityId)}:${item.statusId}`).join(','),
+  () => {
+    routingHistoryStore.fetchItemLocationStock(routingItems.value);
+    if (selectedSegment.value === 'routing') loadRoutingHistory();
+  }, { immediate: true });
+
+/** Available to promise at the item's location, only for items whose location is short. */
+const shortStock = computed(() => Object.fromEntries(routingItems.value
+  .filter((item) => isShortAtLocation(item, routingHistoryStore.stockByPair))
+  .map((item) => [item.orderItemSeqId, routingHistoryStore.stockByPair[pairKey(item.productId, item.facilityId)].atp])));
+
+const routingHistory = computed(() => routingHistoryStore.historyFor(props.orderId, routingItems.value));
 
 const {
   isShipGroupActionDisabled, isItemFacilityActionDisabled,
