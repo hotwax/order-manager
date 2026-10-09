@@ -40,6 +40,9 @@ export interface FlowEdge {
   at: number;
   attempts: number;
   reasonEnumId: string;
+  /** The user login when a person made the move; empty for routing and system moves. */
+  user: string;
+  /** The user, or the system named in the change's comment, e.g. "Primary". */
   actor: string;
   rule: string;
 }
@@ -225,6 +228,7 @@ export function buildRoutingFlow(input: {
         at: move?.at ?? step[0].at,
         attempts: move?.attempts ?? 1,
         reasonEnumId,
+        user: move?.row.changeUserLogin ? String(move.row.changeUserLogin) : "",
         actor: move ? actorOf(move.row) : "",
         rule: move ? ruleLabel(move.row.routingRule) : "",
       };

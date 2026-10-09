@@ -1,6 +1,7 @@
 <template>
+  <!-- The graph stays pinned at the top of the segment while the item history below scrolls under it.
+       It scrolls inside its own frame so a long routing history never widens the page. -->
   <div class="routing-flow">
-    <!-- The graph scrolls sideways inside its own frame so a long routing history never widens the page. -->
     <div class="routing-flow-scroll">
       <div class="routing-flow-canvas" :style="{ width: `${layout.width}px`, height: `${layout.height}px` }">
         <div
@@ -28,6 +29,9 @@
             <line class="edge-hit" v-bind="edgeEnds(edge)" />
             <line class="edge-line" v-bind="edgeEnds(edge)" />
             <text :x="edgeLabelPoint(edge).x" :y="edgeLabelPoint(edge).y" text-anchor="middle">{{ edgeLabel(edge) }}</text>
+            <text v-if="edgeActor(edge)" class="edge-actor" :x="edgeLabelPoint(edge).x" :y="edgeLabelPoint(edge).y + 20" text-anchor="middle">
+              {{ edgeActor(edge) }}
+            </text>
           </g>
         </svg>
 
@@ -43,7 +47,7 @@
           <span class="routing-flow-node-title">{{ facility(node.facilityId) }}</span>
           <small class="routing-flow-node-subtitle">
             {{ translate('Ship group {id}', { id: node.shipGroupSeqId }) }}
-            <ion-badge v-if="node.isCurrent" color="medium">{{ translate('Current') }}</ion-badge>
+            <ion-badge v-if="nodeBadge(node)" :color="nodeBadge(node)!.color">{{ nodeBadge(node)!.label }}</ion-badge>
           </small>
           <span v-for="id in node.orderItemSeqIds" :key="id" class="routing-flow-item">
             <span class="routing-flow-thumb"><DxpShopifyImg :key="itemImage(id)" :src="itemImage(id)" size="small" /></span>
@@ -59,7 +63,10 @@
       </div>
     </div>
 
-    <ion-card class="routing-flow-inspector">
+    <ion-card v-if="selectedEdge || selectedNode" class="routing-flow-inspector">
+      <ion-button class="routing-flow-inspector-close" fill="clear" color="medium" size="small" :aria-label="translate('Close')" @click="clearSelection">
+        <ion-icon slot="icon-only" :icon="closeOutline" />
+      </ion-button>
       <ion-list v-if="selectedEdge" lines="none">
         <ion-item>
           <ion-label class="ion-text-wrap">
@@ -96,19 +103,18 @@
           </ion-label>
         </ion-item>
       </ion-list>
-      <ion-item v-else lines="none">
-        <ion-label color="medium" class="ion-text-wrap">
-          {{ translate('Select a ship group or a move to see its details.') }}
-        </ion-label>
-      </ion-item>
     </ion-card>
+    <p v-else class="routing-flow-hint">
+      {{ translate('Select a ship group or a move to see its details.') }}
+    </p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { DxpShopifyImg, translate } from "@common";
 import { useSeedData } from "@common/db";
-import { IonBadge, IonCard, IonItem, IonLabel, IonList, IonNote } from "@ionic/vue";
+import { IonBadge, IonButton, IonCard, IonIcon, IonItem, IonLabel, IonList, IonNote } from "@ionic/vue";
+import { closeOutline } from "ionicons/icons";
 import { computed, ref } from "vue";
 import { useProductIdentity } from "@/composables/useProductIdentity";
 import type { EnrichedOrderItem } from "@/types/orderDetail";
@@ -129,7 +135,7 @@ const emit = defineEmits<{ "select-items": [orderItemSeqIds: string[]] }>();
 const seed = useSeedData();
 const { getProduct, primaryIdentifier, secondaryIdentifier } = useProductIdentity();
 
-const SIZE = { cardWidth: 260, columnGap: 150, headerHeight: 58, rowHeight: 52, cardGap: 28, top: 52, left: 16 };
+const SIZE = { cardWidth: 260, columnGap: 210, headerHeight: 58, rowHeight: 52, cardGap: 28, top: 52, left: 16 };
 const layout = computed(() => layoutRoutingFlow(props.flow, SIZE));
 
 const KIND_LABELS: Record<string, string> = {
@@ -153,6 +159,11 @@ const selectedNode = computed(() => selected.value?.kind === "node" ? props.flow
 function select(kind: "node" | "edge", id: string) {
   selected.value = isSelected(kind, id) ? null : { kind, id };
   emit("select-items", selectedEdge.value?.orderItemSeqIds || selectedNode.value?.orderItemSeqIds || []);
+}
+
+function clearSelection() {
+  selected.value = null;
+  emit("select-items", []);
 }
 
 function isSelected(kind: "node" | "edge", id: string) {
@@ -188,6 +199,19 @@ function nodeStyle(node: FlowNode) {
   const position = layout.value.positions[node.id];
 
   return { left: `${position.x}px`, top: `${position.y}px`, width: `${SIZE.cardWidth}px`, height: `${position.height}px` };
+}
+
+/** Done when every item in it is: Completed (items sold in store end here) or Cancelled; else Current while it still holds them. */
+function nodeBadge(node: FlowNode): { label: string; color: string } | undefined {
+  if(!node.isCurrent) {return undefined;}
+  const statuses = node.orderItemSeqIds.map((id) => itemsById.value.get(id)?.statusId);
+  if(statuses.every((status) => status === "ITEM_COMPLETED" || status === "ITEM_CANCELLED")) {
+    return statuses.includes("ITEM_COMPLETED")
+      ? { label: translate("Completed"), color: "success" }
+      : { label: translate("Cancelled"), color: "medium" };
+  }
+
+  return { label: translate("Current"), color: "primary" };
 }
 
 function isNodeShort(node: FlowNode) {
@@ -232,6 +256,15 @@ function edgeLabel(edge: FlowEdge) {
   if(edge.attempts > 1) {label = translate("{label} ×{count}", { label, count: edge.attempts });}
 
   return edge.orderItemSeqIds.length > 1 ? translate("{label} ({count})", { label, count: edge.orderItemSeqIds.length }) : label;
+}
+
+/** Who moved the items: the user's login, the routing rule for a brokering, or the system that did it. */
+function edgeActor(edge: FlowEdge) {
+  if(edge.kind === "stayed") {return "";}
+  if(edge.user) {return edge.user;}
+  if(edge.rule) {return edge.rule.split(" › ").pop() || edge.rule;}
+
+  return edge.actor;
 }
 
 function edgeTitle(edge: FlowEdge) {
@@ -283,13 +316,14 @@ function stockNow(id: string) {
 
 <style scoped>
 .routing-flow {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacer-sm, 12px);
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .routing-flow-scroll {
-  overflow-x: auto;
+  max-height: 40vh;
+  overflow: auto;
   border: 1px solid var(--ion-color-light-shade);
   border-radius: 10px;
   /* The same grid the Data Document graph builder draws behind its cards. */
@@ -337,6 +371,11 @@ function stockNow(id: string) {
 .routing-flow-edge .edge-line {
   stroke: var(--ion-color-medium);
   stroke-width: 2;
+}
+
+.routing-flow-edge text.edge-actor {
+  font-size: 11px;
+  fill: var(--ion-color-medium-shade);
 }
 
 .routing-flow-edge text {
@@ -389,8 +428,12 @@ function stockNow(id: string) {
 }
 
 .routing-flow-node.virtual {
-  background: var(--ion-color-light);
+  opacity: 0.6;
   box-shadow: none;
+}
+
+.routing-flow-node.virtual.selected, .routing-flow-node.virtual:focus-visible {
+  opacity: 1;
 }
 
 .routing-flow-node.short {
@@ -461,6 +504,37 @@ function stockNow(id: string) {
 }
 
 .routing-flow-inspector {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: min(340px, calc(100% - 16px));
+  max-height: calc(40vh - 16px);
   margin: 0;
+  overflow-y: auto;
+  box-shadow: 0 8px 24px rgba(var(--ion-color-dark-rgb, 15, 23, 42), 0.18);
+}
+
+.routing-flow-inspector ion-item:first-of-type {
+  --inner-padding-end: 36px;
+}
+
+.routing-flow-inspector-close {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 1;
+}
+
+.routing-flow-hint {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  margin: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--ion-color-light);
+  font-size: 0.75rem;
+  color: var(--ion-color-medium-shade);
+  pointer-events: none;
 }
 </style>
