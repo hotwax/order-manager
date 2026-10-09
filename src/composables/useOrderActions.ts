@@ -65,6 +65,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
   const seed = useSeedData();
   const orderTaskStore = useOrderTaskStore();
   const customerStore = useCustomerStore();
+  const productStore = useProductStore();
   const { getProduct, primaryIdentifier } = useProductIdentity();
 
   const allItems = computed(() => (order.value?.groupedItems || []).flatMap((group) => group.items));
@@ -262,7 +263,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     apply: (orderId, items, { rejectionReasonId }) => api({
       url: `oms/orders/${orderId}/reject`,
       method: 'POST',
-      data: { orderId, items: items.map(({ orderItemSeqId }) => ({ orderItemSeqId, quantity: '1', rejectionReasonId, maySplit: 'Y' })) },
+      data: { orderId, items: items.map(({ orderItemSeqId }) => ({ orderItemSeqId, quantity: '1', rejectionReasonId, maySplit: 'Y', updateQOH: productStore.getAffectQOHOnRej === "Y" })) },
     }),
     success: 'Items rejected successfully.',
     failure: 'Failed to reject items. Please try again.',
@@ -397,7 +398,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
 
     if (!isVirtualForItem(item)) {
       try {
-        await api({ url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/reject`, method: 'POST', data: { rejectionReasonId: 'NO_VARIANCE_LOG' } });
+        await api({ url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/reject`, method: 'POST', data: { rejectionReasonId: 'NO_VARIANCE_LOG', updateQOH: productStore.getAffectQOHOnRej === "Y" } });
       } catch {
         await showToast(translate('Failed to reject the item. Please try again.'));
         return;
