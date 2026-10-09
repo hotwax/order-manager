@@ -149,7 +149,8 @@
 
     <ion-fab v-if="source" slot="fixed" vertical="bottom" horizontal="end">
       <ion-fab-button :disabled="submitting" :aria-label="translate('Save transfer request')" @click="submit">
-        <ion-icon :icon="saveOutline" />
+        <ion-spinner v-if="submitting" name="crescent" slot="icon-only" />
+        <ion-icon v-else :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>
   </ion-content>
