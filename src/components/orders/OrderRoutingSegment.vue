@@ -1,5 +1,5 @@
 <template>
-  <div class="ion-padding order-routing">
+  <div ref="rootEl" class="ion-padding order-routing">
     <ion-item v-if="status === 'error'" color="danger" lines="none" class="order-routing-message">
       <ion-icon slot="start" :icon="warningOutline" />
       <ion-label>{{ translate('Routing history could not be loaded.') }}</ion-label>
@@ -13,12 +13,13 @@
       :flow="flow"
       :items="entries.map((entry) => entry.item)"
       :short-stock="shortStock || {}"
-      @select-items="highlighted = $event"
+      @select-items="focusItems"
     />
 
     <ion-card
       v-for="entry in entries"
       :key="entry.item.orderItemSeqId"
+      :ref="(el) => setCardRef(entry.item.orderItemSeqId, el)"
       class="routing-item"
       :class="{ highlighted: highlighted.includes(entry.item.orderItemSeqId) }"
     >
@@ -34,50 +35,82 @@
           <ion-icon :icon="isShort(entry) ? warningOutline : businessOutline" />
           <ion-label>{{ locationLabel(entry) }}</ion-label>
         </ion-chip>
+        <!-- The full stock picture for this product at this location lives in Order Routing. -->
+        <ion-button
+          v-if="inventoryUrl(entry)"
+          slot="end"
+          fill="clear"
+          size="small"
+          :href="inventoryUrl(entry)"
+          target="_blank"
+          rel="noopener"
+        >
+          {{ translate('Inventory details') }}
+          <ion-icon slot="end" :icon="openOutline" />
+        </ion-button>
+      </ion-item>
+
+      <!-- When the item cannot ship from where it is, the fix sits on its card: reject it back to routing,
+           or move it to a location that has stock. Both open the same dialogs as elsewhere on the order. -->
+      <ion-item v-if="isShort(entry)" color="warning" lines="none">
+        <ion-icon slot="start" :icon="warningOutline" />
+        <ion-label class="ion-text-wrap">
+          {{ translate('Short here. Reject the item to send it back to routing, or move it to a location with stock.') }}
+        </ion-label>
+        <ion-button slot="end" fill="solid" color="dark" size="small" @click="emit('reject-item', entry.item)">
+          {{ translate('Reject item') }}
+        </ion-button>
+        <ion-button slot="end" fill="outline" color="dark" size="small" @click="emit('move-item', entry.item)">
+          {{ translate('Move item') }}
+        </ion-button>
       </ion-item>
 
       <!-- The timeline opens on demand. Collapsed, the header still answers "can it ship from here?" with the
-           stock now; open, it lists changes newest first, ten at a time. -->
+           stock now; open, it lists changes oldest first, ten at a time. -->
       <ion-accordion-group v-if="entry.rows.length || entry.history.since">
         <ion-accordion :value="entry.item.orderItemSeqId">
-          <ion-item slot="header" :color="isShort(entry) ? 'warning' : undefined">
-            <ion-icon slot="start" :icon="isShort(entry) ? warningOutline : timeOutline" />
+          <ion-item slot="header">
+            <ion-icon slot="start" :icon="timeOutline" />
             <ion-label class="ion-text-wrap">
               {{ translate('Inventory timeline') }}
-              <p>
-                {{ isShort(entry) ? translate('Short here. Reject the item to send it back to routing.') : translate('{count} changes', { count: entry.rows.length }) }}
-              </p>
+              <p>{{ translate('{count} changes', { count: entry.rows.length }) }}</p>
             </ion-label>
-            <ion-label v-if="entry.history.since" slot="end" class="ion-text-end routing-stock">
-              {{ translate('{available} available', { available: signed(entry.history.since.availableNow) }) }}
-              <p>{{ translate('{onHand} on hand', { onHand: signed(entry.history.since.onHandNow) }) }}</p>
-            </ion-label>
+            <InventoryDeltaPills
+              v-if="entry.history.since"
+              slot="end"
+              :atp="{ balance: entry.history.since.availableNow }"
+              :qoh="{ balance: entry.history.since.onHandNow }"
+            />
           </ion-item>
           <ion-list slot="content" lines="full">
-            <ion-item v-for="row in visibleRows(entry)" :key="row.id">
+            <ion-item v-for="(row, index) in visibleRows(entry)" :key="row.id" :lines="isLastRow(entry, index) ? 'none' : undefined">
               <ion-icon slot="start" :icon="row.icon" :color="row.color" />
               <ion-label>
+                <p v-if="row.overline" class="overline">
+                  {{ row.overline }}
+                </p>
                 <h3 v-if="row.type === 'routing'">
                   {{ row.title }}
                 </h3>
                 <template v-else>
                   {{ row.title }}
                 </template>
-                <p>{{ row.detail ? `${formatDateTime(row.at, { year: false })} · ${row.detail}` : formatDateTime(row.at, { year: false }) }}</p>
-              </ion-label>
-              <ion-label v-if="row.available" slot="end" class="ion-text-end routing-stock">
-                {{ row.available }}
-                <p v-if="row.onHand">
-                  {{ row.onHand }}
+                <p>{{ formatDateTime(row.at, { year: false }) }}</p>
+                <p v-if="row.detail">
+                  {{ row.detail }}
                 </p>
               </ion-label>
+              <InventoryDeltaPills v-if="row.atp || row.qoh" slot="end" :atp="row.atp || {}" :qoh="row.qoh || {}" />
             </ion-item>
-            <ion-item v-if="remainingCount(entry)" button :detail="false" lines="none" @click="showMore(entry)">
-              <ion-label color="primary">
+            <ion-item v-if="remainingCount(entry) || canShowLess(entry)" lines="none">
+              <ion-button v-if="remainingCount(entry)" fill="clear" size="small" @click="showMore(entry)">
                 {{ translate('View more ({count})', { count: remainingCount(entry) }) }}
-              </ion-label>
+              </ion-button>
+              <ion-button v-if="canShowLess(entry)" fill="clear" size="small" color="medium" @click="showLess(entry)">
+                {{ translate('View less') }}
+              </ion-button>
             </ion-item>
-            <ion-item v-else-if="entry.history.since?.truncated" lines="none">
+            <ion-item v-if="!remainingCount(entry) && entry.history.since?.truncated" lines="none">
               <ion-label color="medium">
                 {{ translate('Older stock changes are not shown.') }}
               </ion-label>
@@ -101,20 +134,22 @@
 </template>
 
 <script setup lang="ts">
-import { DxpShopifyImg, translate } from "@common";
+import { DxpShopifyImg, buildAppUrl, translate } from "@common";
 import { useSeedData } from "@common/db";
 import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonChip, IonIcon, IonItem, IonLabel, IonList, IonThumbnail } from "@ionic/vue";
 import {
-  arrowRedoOutline, banOutline, businessOutline, closeCircleOutline, compassOutline, cubeOutline, pauseCircleOutline,
-  refreshOutline, returnDownBackOutline, swapHorizontalOutline, timeOutline, warningOutline,
+  arrowRedoOutline, banOutline, businessOutline, closeCircleOutline, compassOutline, openOutline,
+  pauseCircleOutline, returnDownBackOutline, swapHorizontalOutline, timeOutline, warningOutline,
 } from "ionicons/icons";
-import { computed, reactive, ref } from "vue";
+import { type ComponentPublicInstance, computed, nextTick, reactive, ref } from "vue";
+import InventoryDeltaPills from "@/components/orders/InventoryDeltaPills.vue";
 import OrderRoutingFlow from "@/components/orders/OrderRoutingFlow.vue";
 import { useProductIdentity } from "@/composables/useProductIdentity";
 import type { EnrichedOrder, EnrichedOrderItem } from "@/types/orderDetail";
 import { formatDateTime, formatNumber } from "@/utils/format";
+import { classifyMovement } from "@/utils/inventoryMovement";
 import type { RoutingFlow } from "@/utils/routingFlow";
-import type { ItemRoutingHistory, MovementKind, RoutingEvent, RoutingEventKind, StockMovement } from "@/utils/routingHistory";
+import { type ItemRoutingHistory, type RoutingEvent, type RoutingEventKind, isStockLocation } from "@/utils/routingHistory";
 
 const props = defineProps<{
   order: EnrichedOrder;
@@ -126,7 +161,7 @@ const props = defineProps<{
   shortStock?: Record<string, number>;
 }>();
 
-const emit = defineEmits<{ retry: [] }>();
+const emit = defineEmits<{ retry: []; "reject-item": [item: EnrichedOrderItem]; "move-item": [item: EnrichedOrderItem] }>();
 
 const seed = useSeedData();
 const { getProduct, primaryIdentifier, secondaryIdentifier } = useProductIdentity();
@@ -136,6 +171,39 @@ const PAGE_SIZE = 10;
 const shownByItem = reactive(new Map<string, number>());
 /** Items picked in the graph; their sections are outlined. */
 const highlighted = ref<string[]>([]);
+const rootEl = ref<HTMLElement | null>(null);
+/** The ion-content methods used to scroll it. */
+type ScrollableContent = HTMLElement & {
+  getScrollElement(): Promise<HTMLElement>;
+  scrollByPoint(x: number, y: number, duration: number): Promise<void>;
+};
+const CARD_GAP = 12;
+const SCROLL_MS = 300;
+const cardEls = new Map<string, HTMLElement>();
+
+function setCardRef(orderItemSeqId: string, el: Element | ComponentPublicInstance | null) {
+  const element = el && "$el" in el ? el.$el as HTMLElement : el as HTMLElement | null;
+  if(element) {cardEls.set(orderItemSeqId, element);} else {cardEls.delete(orderItemSeqId);}
+}
+
+/**
+ * A card or move picked in the graph: outline its items and scroll the first one up to sit just under
+ * the pinned graph, so both stay in view. Their timelines stay as the user left them.
+ */
+async function focusItems(orderItemSeqIds: string[]) {
+  highlighted.value = orderItemSeqIds;
+  if(!orderItemSeqIds.length) {return;}
+  await nextTick();
+  const card = cardEls.get(orderItemSeqIds[0]);
+  if(!card) {return;}
+  const graphHeight = rootEl.value?.querySelector<HTMLElement>(".routing-flow")?.offsetHeight ?? 0;
+  const content = card.closest("ion-content") as ScrollableContent | null;
+  if(!content) {return;}
+  // Once scrolled, the graph is pinned at the top of the content area, so the card goes just below it.
+  const contentTop = (await content.getScrollElement()).getBoundingClientRect().top;
+  const target = contentTop + graphHeight + CARD_GAP;
+  await content.scrollByPoint(0, card.getBoundingClientRect().top - target, SCROLL_MS);
+}
 
 const EVENT_ICONS: Record<RoutingEventKind, string> = {
   brokered: compassOutline,
@@ -148,17 +216,6 @@ const EVENT_ICONS: Record<RoutingEventKind, string> = {
   cancelled: closeCircleOutline,
 };
 
-const MOVEMENT_TITLES: Record<MovementKind, string> = {
-  sync: "Inventory sync",
-  reserved: "Reserved for {order}",
-  released: "Reservation released for {order}",
-  shipped: "Shipped {order}",
-  transferred: "Transferred out on {order}",
-  received: "Received on {order}",
-  adjusted: "Stock adjusted",
-  other: "Stock changed",
-};
-
 type Row = {
   id: string;
   at: number;
@@ -166,11 +223,13 @@ type Row = {
   /** Ionic color for the row's icon. */
   color: string;
   icon: string;
+  /** The movement type above the title, e.g. "Sales order", as in Order Routing's inventory history. */
+  overline?: string;
   title: string;
   detail: string;
-  /** Available to promise at the location: "1 → 0" across the change, or the level when it did not move. */
-  available: string;
-  onHand: string;
+  /** Available to promise and on hand after the change, with the change itself where it is known. */
+  atp?: { balance: number | null; change?: number | null };
+  qoh?: { balance: number | null; change?: number | null };
 };
 
 const entries = computed(() => {
@@ -188,19 +247,28 @@ type Entry = (typeof entries.value)[number];
 
 const facility = (facilityId: string) => seed.facilityName(facilityId) || facilityId;
 const signed = (value: number | null | undefined) => value === null || value === undefined ? "—" : formatNumber(value);
-const change = (before: number | null, after: number | null) => before !== null && after !== null && before !== after
-  ? translate("{before} → {after}", { before: signed(before), after: signed(after) })
-  : signed(after);
-const onHand = (value: number | null | undefined) => value === null || value === undefined ? "" : translate("{onHand} on hand", { onHand: signed(value) });
 
 function itemImage(item: EnrichedOrderItem) {
   return getProduct(item.productId)?.mainImageUrl || item.imageUrl;
 }
 
+/**
+ * This product's inventory page in Order Routing, scoped to the item's location, or to the last real
+ * location it was at when it now sits in a queue or parking.
+ */
+function inventoryUrl(entry: Entry): string | undefined {
+  const facilityId = isStockLocation(entry.item.facilityId)
+    ? entry.item.facilityId
+    : [...entry.history.events].reverse().find((event) => event.stock)?.stock?.facilityId;
+
+  return facilityId ? buildAppUrl("order-routing", `/inventory/${encodeURIComponent(entry.item.productId)}`, { facilityId }) ?? undefined : undefined;
+}
+
+/** Only an open item can be short: a completed or cancelled one has nothing left to ship from here. */
 function isShort(entry: Entry) {
   const available = entry.history.since?.availableNow;
 
-  return typeof available === "number" && available < 0;
+  return isOpen(entry.item) && typeof available === "number" && available < 0;
 }
 
 function locationLabel(entry: Entry) {
@@ -224,19 +292,16 @@ function eventTitle(event: RoutingEvent) {
   }
 }
 
-/** Why and by whom, as in the graph: the reason for a rejection, then the user or the rule. */
+/** Labelled details: the routing rule, the reason for a rejection, and the user or system that moved it. */
 function eventDetail(event: RoutingEvent) {
   const parts: string[] = [];
-  if(["rejected", "cancelled", "moved"].includes(event.kind) && event.reasonEnumId) {parts.push(seed.enumDescription(event.reasonEnumId) || event.reasonEnumId);}
-  if(event.rule) {parts.push(event.rule.split(" › ").pop() || event.rule);} else if(event.actor) {parts.push(event.actor);}
+  if(event.rule) {parts.push(translate("Routing rule: {rule}", { rule: event.rule.split(" › ").pop() || event.rule }));}
+  if(["rejected", "cancelled", "moved"].includes(event.kind) && event.reasonEnumId) {
+    parts.push(translate("Reason: {reason}", { reason: seed.enumDescription(event.reasonEnumId) || event.reasonEnumId }));
+  }
+  if(event.user) {parts.push(translate("User: {user}", { user: event.user }));} else if(!event.rule && event.actor) {parts.push(translate("Source: {source}", { source: event.actor }));}
 
   return parts.join(" · ");
-}
-
-function movementTitle(movement: StockMovement) {
-  const order = movement.isThisOrder ? translate("this order") : movement.orderName;
-
-  return translate(MOVEMENT_TITLES[movement.kind], { order });
 }
 
 function rowsFor(history: ItemRoutingHistory): Row[] {
@@ -248,35 +313,64 @@ function rowsFor(history: ItemRoutingHistory): Row[] {
     icon: EVENT_ICONS[event.kind],
     title: eventTitle(event),
     detail: eventDetail(event),
-    available: event.stock ? change(event.stock.before, event.stock.after) : "",
-    onHand: onHand(event.stock?.onHand),
+    atp: event.stock ? {
+      balance: event.stock.after,
+      change: event.stock.exact && event.stock.before !== null && event.stock.after !== null ? event.stock.after - event.stock.before : null,
+    } : undefined,
+    qoh: event.stock ? { balance: event.stock.onHand } : undefined,
   }));
-  const stock: Row[] = (history.since?.movements || []).map((movement) => ({
-    id: `m-${movement.id}`,
-    at: movement.at,
-    type: "stock",
-    color: movement.kind === "sync" ? "warning" : "medium",
-    icon: movement.kind === "sync" ? refreshOutline : cubeOutline,
-    title: movementTitle(movement),
-    detail: "",
-    available: change(movement.atpAfter === null ? null : movement.atpAfter - movement.atpDiff, movement.atpAfter),
-    onHand: onHand(movement.qohAfter),
-  }));
+  // Stock movements read exactly as in Order Routing's inventory history: type, reference, balance and change.
+  const stock: Row[] = (history.since?.movements || []).map((movement) => {
+    const movementType = classifyMovement(movement.raw, (enumId) => seed.enumDescription(enumId));
+
+    return {
+      id: `m-${movement.id}`,
+      at: movement.at,
+      type: "stock",
+      color: movementType.color,
+      icon: movementType.icon,
+      overline: translate(movementType.label),
+      title: movementType.referenceLabel,
+      detail: "",
+      atp: { balance: movement.atpAfter, change: movement.atpDiff },
+      qoh: { balance: movement.qohAfter, change: movement.qohDiff },
+    };
+  });
 
   return [...routing, ...stock].sort((a, b) => a.at - b.at);
 }
 
-/** Newest first, a page at a time. */
+/** Oldest first, a page at a time. */
 function visibleRows(entry: Entry) {
-  return [...entry.rows].reverse().slice(0, shownByItem.get(entry.item.orderItemSeqId) ?? PAGE_SIZE);
+  return entry.rows.slice(0, shownByItem.get(entry.item.orderItemSeqId) ?? PAGE_SIZE);
+}
+
+/** The final row, with no "View more" or note after it, needs no divider below. */
+function isLastRow(entry: Entry, index: number) {
+  const hasFooter = remainingCount(entry) > 0 || canShowLess(entry) || Boolean(entry.history.since?.truncated);
+
+  return !hasFooter && index === visibleRows(entry).length - 1;
 }
 
 function remainingCount(entry: Entry) {
   return Math.max(entry.rows.length - (shownByItem.get(entry.item.orderItemSeqId) ?? PAGE_SIZE), 0);
 }
 
+function canShowLess(entry: Entry) {
+  return (shownByItem.get(entry.item.orderItemSeqId) ?? PAGE_SIZE) > PAGE_SIZE;
+}
+
 function showMore(entry: Entry) {
   shownByItem.set(entry.item.orderItemSeqId, (shownByItem.get(entry.item.orderItemSeqId) ?? PAGE_SIZE) + PAGE_SIZE);
+}
+
+function showLess(entry: Entry) {
+  shownByItem.delete(entry.item.orderItemSeqId);
+}
+
+/** Completed and cancelled items take no action. */
+function isOpen(item: EnrichedOrderItem) {
+  return !["ITEM_COMPLETED", "ITEM_CANCELLED", "ITEM_REJECTED"].includes(item.statusId);
 }
 </script>
 
@@ -300,7 +394,4 @@ function showMore(entry: Entry) {
   --color: var(--ion-color-warning-contrast);
 }
 
-.routing-stock {
-  font-variant-numeric: tabular-nums;
-}
 </style>

@@ -33,6 +33,8 @@ export interface RoutingEvent {
   reasonEnumId: string;
   /** The user who made the change, or the routing that did. */
   actor: string;
+  /** The user login when a person made the change; empty for routing and system changes. */
+  user: string;
   rule: string;
   comments: string;
   stock: StockMoment | null;
@@ -50,6 +52,8 @@ export interface StockMovement {
   qohDiff: number;
   atpAfter: number | null;
   qohAfter: number | null;
+  /** The InventoryItemDetail row, for presenting it the way Order Routing's inventory history does. */
+  raw: any;
 }
 
 /** What happened to stock at the item's current location since it was routed there. */
@@ -167,6 +171,7 @@ function toMovement(row: any, orderId: string): StockMovement {
     qohDiff: num(row.quantityOnHandDiff) ?? 0,
     atpAfter: after.atp,
     qohAfter: after.qoh,
+    raw: row,
   };
 }
 
@@ -212,6 +217,7 @@ function eventsForItem(changes: any[], item: RoutingItem): RoutingEvent[] {
         toFacilityId: row.facilityId || "",
         reasonEnumId: row.changeReasonEnumId || "",
         actor: actorOf(row),
+        user: row.changeUserLogin ? String(row.changeUserLogin) : "",
         rule: ruleLabel(row.routingRule),
         comments: row.comments || "",
         stock: null,

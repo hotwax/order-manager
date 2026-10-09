@@ -107,6 +107,8 @@
         :short-stock="shortStock"
         :status="routingHistoryStore.statusFor(orderId)"
         @retry="loadRoutingHistory(true)"
+        @reject-item="rejectItemFromRouting"
+        @move-item="moveItemFromRouting"
       />
 
       <OrderHoldsSegment
@@ -200,7 +202,7 @@ import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
 import { buildRoutingFlow } from '@/utils/routingFlow';
 import { type RoutingItem, isShortAtLocation } from '@/utils/routingHistory';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
-import type { EnrichedPayment } from '@/types/orderDetail';
+import type { EnrichedOrderItem, EnrichedPayment } from '@/types/orderDetail';
 import type { OrderEventLink } from '@/utils/orderEvents';
 
 const props = defineProps<{
@@ -273,6 +275,23 @@ const shortStock = computed(() => Object.fromEntries(routingItems.value
   .map((item) => [item.orderItemSeqId, routingHistoryStore.stockByPair[pairKey(item.productId, item.facilityId)].atp])));
 
 const routingHistory = computed(() => routingHistoryStore.historyFor(props.orderId, routingItems.value));
+
+/** Reject one item from its ship group with a reason, the same dialog as Pull back, then refresh the routing. */
+async function rejectItemFromRouting(item: EnrichedOrderItem) {
+  const shipGroup = order.value?.shipGroups.find((group) => group.id === item.shipGroupSeqId);
+  if (!shipGroup) return;
+  selectedShipGroupItems.value[shipGroup.id] = [item.orderItemSeqId];
+  await rejectSelectedItems(shipGroup);
+  // A cancelled dialog leaves the selection behind; a completed reject clears it already.
+  selectedShipGroupItems.value[shipGroup.id] = [];
+  loadRoutingHistory(true);
+}
+
+/** Move one item to a location the user picks, the same flow as the location chip on the Items tab. */
+async function moveItemFromRouting(item: EnrichedOrderItem) {
+  await rejectAndReleaseItem(item);
+  loadRoutingHistory(true);
+}
 
 const routingFlow = computed(() => order.value ? buildRoutingFlow({
   items: (order.value.shipGroups || []).flatMap((group) => group.items.map((item) => ({ orderItemSeqId: item.orderItemSeqId, shipGroupSeqId: group.id }))),
