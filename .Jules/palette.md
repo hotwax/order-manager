@@ -39,3 +39,8 @@
 ## 2026-09-23 - Ionic ion-button vs raw a tags
 **Learning:** The application uses raw a tags in some places with openOutline icons. This breaks visual consistency and can cause focus state and accessibility issues. Ionic's ion-button natively supports href, target, and rel attributes and renders a compliant anchor tag internally.
 **Action:** When adding external links or reviewing them, upgrade a tags to ion-button fill='clear' to maintain keyboard accessibility, correct focus styling, and general UI cohesion within the app.
+## 2024-09-28 - Missing empty states for data lists
+
+**Learning:** When displaying dynamic data lists (e.g. `<ion-list>` rendered conditionally via `v-for`), if the dataset is empty, the UI can feel broken or collapsed. Adding a fallback empty state using an `<ion-item v-else lines="none">` with a `translate()` wrapped `ion-label` makes the UI much more communicative and polished.
+
+**Action:** Before rendering lists, always verify if there is a possibility that the underlying data might be empty. If so, apply an empty state layout, such as a fallback item explaining "No items found".
