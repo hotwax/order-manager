@@ -103,6 +103,8 @@
         v-if="selectedSegment === 'routing'"
         :order="order"
         :history="routingHistory"
+        :flow="routingFlow"
+        :short-stock="shortStock"
         :status="routingHistoryStore.statusFor(orderId)"
         @retry="loadRoutingHistory(true)"
       />
@@ -193,7 +195,9 @@ import { useOrderTaskStore } from '@/store/orderTask';
 import { useRoutingHistoryStore } from '@/store/routingHistory';
 import { useUserStore } from '@/store/user';
 import type { ShipGroupActionId } from '@/utils/OrderActionValidator';
+import { toMillis } from '@/utils/format';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
+import { buildRoutingFlow } from '@/utils/routingFlow';
 import { type RoutingItem, isShortAtLocation } from '@/utils/routingHistory';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
 import type { EnrichedPayment } from '@/types/orderDetail';
@@ -269,6 +273,13 @@ const shortStock = computed(() => Object.fromEntries(routingItems.value
   .map((item) => [item.orderItemSeqId, routingHistoryStore.stockByPair[pairKey(item.productId, item.facilityId)].atp])));
 
 const routingHistory = computed(() => routingHistoryStore.historyFor(props.orderId, routingItems.value));
+
+const routingFlow = computed(() => order.value ? buildRoutingFlow({
+  items: (order.value.shipGroups || []).flatMap((group) => group.items.map((item) => ({ orderItemSeqId: item.orderItemSeqId, shipGroupSeqId: group.id }))),
+  shipGroups: (order.value.shipGroups || []).map((group) => ({ id: group.id, facilityId: group.facilityId })),
+  changes: routingHistoryStore.changesByOrderId[props.orderId] || [],
+  importedAt: toMillis(orderDetailStore.orderById(props.orderId)?.entryDate || orderDetailStore.orderById(props.orderId)?.orderDate) || 0,
+}) : undefined);
 
 const {
   isShipGroupActionDisabled, isItemFacilityActionDisabled,

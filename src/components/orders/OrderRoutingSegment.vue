@@ -8,7 +8,21 @@
       </ion-button>
     </ion-item>
 
-    <ion-card v-for="entry in entries" :key="entry.item.orderItemSeqId" class="order-routing-card">
+    <OrderRoutingFlow
+      v-if="flow && status === 'loaded'"
+      :flow="flow"
+      :items="entries.map((entry) => entry.item)"
+      :history="history"
+      :short-stock="shortStock || {}"
+      @select-items="highlighted = $event"
+    />
+
+    <ion-card
+      v-for="entry in entries"
+      :key="entry.item.orderItemSeqId"
+      class="order-routing-card"
+      :class="{ highlighted: highlighted.includes(entry.item.orderItemSeqId) }"
+    >
       <ion-card-header class="order-routing-header">
         <div>
           <ion-card-title>{{ primaryIdentifier(entry.item.productId) || entry.item.name }}</ion-card-title>
@@ -107,16 +121,22 @@ import {
   arrowRedoOutline, banOutline, businessOutline, closeCircleOutline, compassOutline, pauseCircleOutline, returnDownBackOutline,
   swapHorizontalOutline, warningOutline,
 } from "ionicons/icons";
-import { computed, reactive } from "vue";
+import { computed, reactive, ref } from "vue";
+import OrderRoutingFlow from "@/components/orders/OrderRoutingFlow.vue";
 import { useProductIdentity } from "@/composables/useProductIdentity";
 import type { EnrichedOrder, EnrichedOrderItem } from "@/types/orderDetail";
 import { formatDateTime, formatNumber } from "@/utils/format";
+import type { RoutingFlow } from "@/utils/routingFlow";
 import type { ItemRoutingHistory, MovementKind, RoutingEvent, RoutingEventKind, SinceBlock, StockMovement } from "@/utils/routingHistory";
 
 const props = defineProps<{
   order: EnrichedOrder;
   history: ItemRoutingHistory[];
   status?: "loading" | "loaded" | "error";
+  /** The order's routing as a graph of ship group states, shown above the per-item history. */
+  flow?: RoutingFlow;
+  /** Available to promise at the item's location, for items whose location is short. */
+  shortStock?: Record<string, number>;
 }>();
 
 const emit = defineEmits<{ retry: [] }>();
@@ -126,6 +146,8 @@ const { primaryIdentifier, secondaryIdentifier } = useProductIdentity();
 
 /** Items whose older changes the user asked to see. */
 const expanded = reactive(new Set<string>());
+/** Items picked in the graph; their cards below are outlined. */
+const highlighted = ref<string[]>([]);
 /** The latest changes tell the current story; older ones are a tap away. */
 const VISIBLE_EVENTS = 3;
 
@@ -255,6 +277,10 @@ function nowLine(since: SinceBlock) {
 
 .order-routing-card {
   margin: 0;
+}
+
+.order-routing-card.highlighted {
+  outline: 2px solid var(--ion-color-primary);
 }
 
 .facility-warning {
