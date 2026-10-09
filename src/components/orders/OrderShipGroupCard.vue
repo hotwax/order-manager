@@ -140,8 +140,10 @@
               <p v-if="featureLabel(item.productId)" class="ship-group-item-features" :title="featureLabel(item.productId)">{{ featureLabel(item.productId) }}</p>
             </ion-label>
             <ion-label slot="end" class="ion-text-center">
-              {{ item.quantity }}
-              <p>{{ translate('qty') }}</p>
+              {{ item.quantity }} {{ translate('qty') }}
+              <p v-if="item.promisedDatetime">
+                <ion-badge>{{ formatDate(item.promisedDatetime) }}</ion-badge>
+              </p>
             </ion-label>
           </ion-item>
           <ion-item v-if="hiddenItemCount" button :detail="false" @click="emit('update:expanded', true)">
@@ -479,7 +481,7 @@ import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { confirmAction, isKit } from '@/utils';
 import type { ShipGroupMilestones } from '@/utils/orderEvents';
-import { formatDateTime, formatElapsed, formatNumber, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
+import { formatDate, formatDateTime, formatElapsed, formatNumber, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
 import { OrderActionValidator, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import type { EnrichedShipGroup, ItemIssuance, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 

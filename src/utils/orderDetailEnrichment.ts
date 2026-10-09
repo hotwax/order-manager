@@ -274,6 +274,7 @@ function enrichShipGroup(
       adjustments: itemAdjustmentSummaries(raw, item, seed),
       issuance: isPosCompleted && aux.issuanceByItem ? itemIssuance(item, aux.issuanceByItem) : undefined,
       transfers: itemTransfers(item.orderItemSeqId, aux.inventoryTransfers, seed),
+      promisedDatetime: item.promisedDatetime || ""
     };
   });
 
