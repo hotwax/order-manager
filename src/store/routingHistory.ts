@@ -21,6 +21,8 @@ interface RoutingHistoryState {
 }
 
 const inFlight = new Map<string, Promise<void>>();
+/** Orders whose items moved since their routing was read; the next load reads it again. */
+const stale = new Set<string>();
 
 export const useRoutingHistoryStore = defineStore("routingHistory", {
   state: (): RoutingHistoryState => ({
@@ -54,14 +56,23 @@ export const useRoutingHistoryStore = defineStore("routingHistory", {
       }
     },
 
+    /** The order's items moved (an action here, or routing on the server): read its routing again next time. */
+    markStale(orderId: string) {
+      stale.add(orderId);
+    },
+
     /** Routing changes, the stock movements behind them, and current stock, for the Routing segment. */
     loadRoutingHistory(orderId: string, items: RoutingItem[], force = false): Promise<void> {
-      if(!force && this.statusByOrderId[orderId] === "loaded") {return Promise.resolve();}
+      if(!force && !stale.has(orderId) && this.statusByOrderId[orderId] === "loaded") {return Promise.resolve();}
       const running = inFlight.get(orderId);
-      if(running) {return running;}
+      // A forced load wants changes newer than the running load has read, so it runs again after it.
+      if(running) {return force ? running.then(() => this.loadRoutingHistory(orderId, items, true)) : running;}
 
+      // A reload keeps the routing already shown on screen until the new one is in.
+      const reloading = this.statusByOrderId[orderId] === "loaded";
+      stale.delete(orderId);
       const load = (async () => {
-        this.statusByOrderId[orderId] = "loading";
+        if(!reloading) {this.statusByOrderId[orderId] = "loading";}
         try {
           const changes = await fetchRoutingChanges(orderId);
           this.changesByOrderId[orderId] = changes;
@@ -81,7 +92,12 @@ export const useRoutingHistoryStore = defineStore("routingHistory", {
           this.statusByOrderId[orderId] = "loaded";
         } catch (err) {
           logger.error("Failed to load routing history", err);
-          this.statusByOrderId[orderId] = "error";
+          if(reloading) {
+            // Keep what is on screen, and read it again on the next visit.
+            stale.add(orderId);
+          } else {
+            this.statusByOrderId[orderId] = "error";
+          }
         } finally {
           inFlight.delete(orderId);
         }

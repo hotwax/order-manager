@@ -107,23 +107,42 @@ describe("routing flow", () => {
 
   it("orders and groups SQL timestamps the same as epoch millis", () => {
     const sql = (iso: string) => DateTime.fromISO(iso).toFormat("yyyy-MM-dd HH:mm:ss.SSS");
-    const items = [{ orderItemSeqId: "01", shipGroupSeqId: "00002" }, { orderItemSeqId: "02", shipGroupSeqId: "00002" }];
-    const moves: Array<[string, string, string, string, string, string]> = [
-      ["b1", "01", "_NA_", "100000", "BROKERED", "2026-10-08T17:02:00Z"],
-      ["b2", "02", "_NA_", "100000", "BROKERED", "2026-10-08T17:02:01Z"],
-      ["r1", "01", "100000", "REJECTED_ITM_PARKING", "NOT_IN_STOCK", "2026-10-08T19:00:00Z"],
+    const items = [{ orderItemSeqId: "01", shipGroupSeqId: "00003" }, { orderItemSeqId: "02", shipGroupSeqId: "00002" }];
+    const moves: Array<[string, string, string, string, string, string, string]> = [
+      ["b1", "01", "00002", "_NA_", "100000", "BROKERED", "2026-10-08T17:02:00Z"],
+      ["b2", "02", "00002", "_NA_", "100000", "BROKERED", "2026-10-08T17:02:01Z"],
+      ["r1", "01", "00003", "100000", "REJECTED_ITM_PARKING", "NOT_IN_STOCK", "2026-10-08T19:00:00Z"],
     ];
     const build = (at: (iso: string) => any) => buildRoutingFlow({
       items,
-      shipGroups: [{ id: "00001", facilityId: "_NA_" }, { id: "00002", facilityId: "100000" }],
+      shipGroups: [{ id: "00001", facilityId: "_NA_" }, { id: "00002", facilityId: "100000" }, { id: "00003", facilityId: "REJECTED_ITM_PARKING" }],
       // Newest first, as the endpoint returns them, so the order has to come from the timestamps.
-      changes: [...moves].reverse().map(([id, item, from, to, reason, iso]) => ({ ...change(id, item, "00002", from, to, reason, iso), changeDatetime: at(iso) })),
+      changes: [...moves].reverse().map(([id, item, shipGroup, from, to, reason, iso]) => ({ ...change(id, item, shipGroup, from, to, reason, iso), changeDatetime: at(iso) })),
       importedAt: t("2026-10-08T16:59:45Z"),
     });
 
     const flow = build(sql);
     expect(flow.columns.map((column) => column.kind)).toEqual(["imported", "brokered", "rejected"]);
     expect(flow).toEqual(build(t));
+  });
+
+  it("ignores moves that leave an item in the ship group it is already in", () => {
+    // Only the latest unfillable attempts are read, so older "back to the queue" loops lose the
+    // attempts between them and arrive as repeated moves into the queue's ship group.
+    const flow = buildRoutingFlow({
+      items: [{ orderItemSeqId: "01", shipGroupSeqId: "00001" }],
+      shipGroups: [{ id: "00001", facilityId: "_NA_" }, { id: "00004", facilityId: "UNFILLABLE_PARKING" }],
+      changes: [
+        change("u", "01", "00004", "_NA_", "UNFILLABLE_PARKING", "UNFILLABLE", "2026-10-01T10:00:00Z"),
+        change("q1", "01", "00001", "UNFILLABLE_PARKING", "_NA_", "ALLOCATED", "2026-10-02T10:00:00Z"),
+        change("q2", "01", "00001", "_NA_", "_NA_", "ALLOCATED", "2026-10-03T10:00:00Z"),
+        change("q3", "01", "00001", "_NA_", "_NA_", "ALLOCATED", "2026-10-04T10:00:00Z"),
+      ],
+      importedAt: t("2026-10-01T09:59:00Z"),
+    });
+
+    expect(flow.nodes.map((node) => node.id)).toEqual(["0-00001", "1-00004", "2-00001"]);
+    expect(flow.edges.map((edge) => [edge.kind, edge.attempts])).toEqual([["unfillable", 1], ["requeued", 3]]);
   });
 
   it("shows an order that never moved as its imported ship group", () => {

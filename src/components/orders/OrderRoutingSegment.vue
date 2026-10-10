@@ -138,7 +138,7 @@ import { DxpShopifyImg, buildAppUrl, translate } from "@common";
 import { useSeedData } from "@common/db";
 import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonChip, IonIcon, IonItem, IonLabel, IonList, IonThumbnail } from "@ionic/vue";
 import {
-  arrowRedoOutline, banOutline, businessOutline, closeCircleOutline, compassOutline, openOutline,
+  arrowRedoOutline, arrowUndoOutline, banOutline, businessOutline, closeCircleOutline, compassOutline, openOutline,
   pauseCircleOutline, returnDownBackOutline, swapHorizontalOutline, timeOutline, warningOutline,
 } from "ionicons/icons";
 import { type ComponentPublicInstance, computed, nextTick, reactive, ref } from "vue";
@@ -214,6 +214,7 @@ const EVENT_ICONS: Record<RoutingEventKind, string> = {
   moved: swapHorizontalOutline,
   rejected: returnDownBackOutline,
   parked: pauseCircleOutline,
+  requeued: arrowUndoOutline,
   unfillable: banOutline,
   cancelled: closeCircleOutline,
 };
@@ -286,6 +287,7 @@ function eventTitle(event: RoutingEvent) {
     case "moved": return translate("{from} to {to}", { from: facility(event.fromFacilityId), to: facility(event.toFacilityId) });
     case "rejected": return translate("Rejected from {facility}", { facility: facility(event.fromFacilityId) });
     case "parked": return translate("Parked in {facility}", { facility: facility(event.toFacilityId) });
+    case "requeued": return translate("Back to queue");
     case "cancelled": return translate("Cancelled at {facility}", { facility: facility(event.fromFacilityId) });
     default: return event.attempts > 1
       ? translate("No location had stock ({count} attempts)", { count: event.attempts })

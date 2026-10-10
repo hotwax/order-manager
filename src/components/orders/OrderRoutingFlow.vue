@@ -99,6 +99,7 @@ const KIND_LABELS: Record<string, string> = {
   moved: "Moved",
   rejected: "Rejected",
   parked: "Parked",
+  requeued: "Back to queue",
   unfillable: "No stock",
   cancelled: "Cancelled",
   stayed: "Stayed",

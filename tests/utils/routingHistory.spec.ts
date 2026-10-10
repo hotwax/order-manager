@@ -65,7 +65,7 @@ describe("routing history", () => {
   });
 
   it("places inventory resets by when they were recorded, since they carry no effective date", () => {
-    const moment = stockAt(rows, WAREHOUSE, t("2026-10-04T00:00:00Z"), "another-order");
+    const moment = stockAt(rows, WAREHOUSE, t("2026-10-04T00:00:00Z"), "another-order", "01");
     expect(moment).toEqual({ facilityId: WAREHOUSE, before: -1, after: -1, onHand: 3, exact: false });
   });
 
@@ -113,6 +113,26 @@ describe("routing history", () => {
     expect(routingEventKind({ ...shopifySync, facilityId: "REJECTED_ITM_PARKING" })).toBe("parked");
     expect(routingEventKind({ ...shopifySync, facilityId: "PARKING" })).toBe("parked");
     expect(routingEventKind({ ...shopifySync, facilityId: WAREHOUSE })).toBe("allocated");
+    // Back to the brokering queue is not parking.
+    expect(routingEventKind({ ...shopifySync, facilityId: "_NA_" })).toBe("requeued");
+  });
+
+  it("gives each unit of a split line its own stock change, not its siblings'", () => {
+    // Three units of one line, brokered to the warehouse together: each reserved one.
+    const units = ["01", "02", "03"];
+    const unitRows = units.map((seq, index) => movement(`60${index}`, `2026-10-02T22:51:50.4${ index }Z`, {
+      orderId: ORDER_ID, orderItemSeqId: seq, reasonEnumId: "INV_RES_CREATE",
+      lastAvailableToPromise: 5 - index, availableToPromiseDiff: -1, lastQuantityOnHand: 5, quantityOnHandDiff: 0,
+    }));
+    const history = buildRoutingHistory({
+      orderId: ORDER_ID,
+      items: units.map((seq) => ({ ...item, orderItemSeqId: seq })),
+      changes: units.map((seq) => ({ ...brokered, orderFacilityChangeId: `fc-${seq}`, orderItemSeqId: seq })),
+      movements: { [`${PRODUCT}|${WAREHOUSE}`]: { rows: unitRows, truncated: false } },
+      stock: { [`${PRODUCT}|${WAREHOUSE}`]: { atp: 2, qoh: 5 } },
+    });
+
+    expect(history.map((unit) => [unit.events[0].stock?.before, unit.events[0].stock?.after])).toEqual([[5, 4], [4, 3], [3, 2]]);
   });
 
   it("reads SQL timestamps the same as epoch millis", () => {

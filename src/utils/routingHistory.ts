@@ -11,7 +11,7 @@ import { toMillis } from "@/utils/format";
  * item here, and can it ship from here?" without anyone reading logs.
  */
 
-export type RoutingEventKind = "brokered" | "released" | "allocated" | "moved" | "rejected" | "parked" | "unfillable" | "cancelled";
+export type RoutingEventKind = "brokered" | "released" | "allocated" | "moved" | "rejected" | "parked" | "requeued" | "unfillable" | "cancelled";
 
 /** Stock at one location around a routing change. `exact` when the change's own movements were found. */
 export interface StockMoment {
@@ -74,7 +74,7 @@ export type MovementPage = { rows: any[]; truncated: boolean };
 /** A change and its own inventory movements are written in one transaction, a moment apart. */
 const SAME_CHANGE_WINDOW_MS = 2 * 60 * 1000;
 const ARRIVALS: RoutingEventKind[] = ["brokered", "released", "allocated", "moved"];
-const DEPARTURES: RoutingEventKind[] = ["rejected", "cancelled", "parked", "unfillable"];
+const DEPARTURES: RoutingEventKind[] = ["rejected", "cancelled", "parked", "requeued", "unfillable"];
 
 const num = (value: unknown): number | null => {
   if(value === null || value === undefined || value === "") {return null;}
@@ -113,8 +113,12 @@ export function routingEventKind(row: any): RoutingEventKind {
   switch (row.changeReasonEnumId) {
     case "BROKERED": return "brokered";
     case "RELEASED": return "released";
-    // A Shopify sync records its moves as allocations, even when it puts the item in a parking lot.
-    case "ALLOCATED": return isStockLocation(row.facilityId) ? "allocated" : "parked";
+    // A Shopify sync records its moves as allocations, even when it sends the item back to the
+    // brokering queue or puts it in a parking lot.
+    case "ALLOCATED":
+      if(row.facilityId === "_NA_") {return "requeued";}
+
+      return isStockLocation(row.facilityId) ? "allocated" : "parked";
     case "PARKED": return "parked";
     case "UNFILLABLE": return "unfillable";
     case "SHOPIFY_CANCELLATION": return "cancelled";
@@ -173,10 +177,19 @@ function toMovement(row: any): StockMovement {
   };
 }
 
+/**
+ * A movement the item's own change wrote: same order, same item when the row names one (a line
+ * split into one item per unit moves each unit's stock separately), a moment from the change.
+ */
+const isOwnMovement = (row: any, orderId: string, orderItemSeqId: string, at: number) =>
+  row.orderId === orderId &&
+  (!row.orderItemSeqId || row.orderItemSeqId === orderItemSeqId) &&
+  Math.abs(movementAt(row) - at) <= SAME_CHANGE_WINDOW_MS;
+
 /** Stock at a location around a change: from the change's own movements when they exist, else the last balance before it. */
-export function stockAt(rows: any[], facilityId: string, at: number, orderId: string): StockMoment | null {
+export function stockAt(rows: any[], facilityId: string, at: number, orderId: string, orderItemSeqId: string): StockMoment | null {
   const sorted = [...rows].sort(bySequence);
-  const own = sorted.filter((row) => row.orderId === orderId && Math.abs(movementAt(row) - at) <= SAME_CHANGE_WINDOW_MS);
+  const own = sorted.filter((row) => isOwnMovement(row, orderId, orderItemSeqId, at));
   if(own.length) {
     const first = own[0];
     const last = own[own.length - 1];
@@ -257,7 +270,7 @@ export function buildRoutingHistory(input: {
     events.forEach((event) => {
       const facilityId = stockLocationOf(event);
       const page = facilityId ? movements[pairKey(item.productId, facilityId)] : undefined;
-      event.stock = page ? stockAt(page.rows, facilityId, event.at, orderId) : null;
+      event.stock = page ? stockAt(page.rows, facilityId, event.at, orderId, item.orderItemSeqId) : null;
     });
 
     let since: SinceBlock | null = null;
@@ -270,7 +283,7 @@ export function buildRoutingHistory(input: {
         // Without the arrival there is no "since" to measure from, so only the current stock shows.
         const later = arrival ? (page?.rows || [])
           .filter((row) => movementAt(row) > fromAt)
-          .filter((row) => !(row.orderId === orderId && Math.abs(movementAt(row) - arrival.at) <= SAME_CHANGE_WINDOW_MS))
+          .filter((row) => !isOwnMovement(row, orderId, item.orderItemSeqId, arrival.at))
           .sort(bySequence)
           .map((row) => toMovement(row)) : [];
         const lastMovement = later[later.length - 1];

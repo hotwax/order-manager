@@ -59,15 +59,16 @@ type ItemMove = { row: any; at: number; attempts: number };
 
 /**
  * One item's moves, with routing's retries folded in: repeated unfillable attempts, and the
- * "sent back to the queue, still unfillable" loop, become one move with an attempt count.
+ * "sent back to the queue, still unfillable" loop, become one move with an attempt count. A move
+ * that leaves the item in the ship group it is already in changes nothing on the graph.
  */
 function foldMoves(rows: any[]): ItemMove[] {
   const moves: ItemMove[] = [];
   rows.forEach((row, index) => {
     const previous = moves[moves.length - 1];
     const kind = routingEventKind(row);
-    if(kind === "unfillable" && previous && routingEventKind(previous.row) === "unfillable" && previous.row.shipGroupSeqId === row.shipGroupSeqId) {
-      previous.attempts += 1;
+    if(previous && previous.row.shipGroupSeqId === row.shipGroupSeqId) {
+      if(kind === routingEventKind(previous.row)) {previous.attempts += 1;}
 
       return;
     }

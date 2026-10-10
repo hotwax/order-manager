@@ -108,7 +108,7 @@
         :status="routingHistoryStore.statusFor(orderId)"
         @retry="loadRoutingHistory(true)"
         @reject-item="rejectItemFromRouting"
-        @move-item="moveItemFromRouting"
+        @move-item="rejectAndReleaseItem"
       />
 
       <OrderHoldsSegment
@@ -298,10 +298,13 @@ function loadRoutingHistory(force = false) {
 }
 
 // Current stock at each item's location, so a location that is short shows it on the item and its ship group.
+// When items move (an action on this page, or routing on the server), the routing read before is out of date.
 watch(() => routingItems.value.map((item) => `${item.orderItemSeqId}:${pairKey(item.productId, item.facilityId)}:${item.statusId}`).join(','),
-  () => {
+  (_items, previousItems) => {
     routingHistoryStore.fetchItemLocationStock(routingItems.value);
-    if (selectedSegment.value === 'routing') loadRoutingHistory();
+    const moved = previousItems !== undefined;
+    if (selectedSegment.value === 'routing') loadRoutingHistory(moved);
+    else if (moved) routingHistoryStore.markStale(props.orderId);
   }, { immediate: true });
 
 /** Available to promise at the item's location, only for items whose location is short. */
@@ -311,22 +314,24 @@ const shortStock = computed(() => Object.fromEntries(routingItems.value
 
 const routingHistory = computed(() => routingHistoryStore.historyFor(props.orderId, routingItems.value));
 
-/** Reject one item from its ship group with a reason, the same dialog as Pull back, then refresh the routing. */
+// Reject and Move (rejectAndReleaseItem, bound as is) reload the order when they go through; the items watcher above then refreshes the routing.
+
+/** Reject one item from its ship group with a reason, the same dialog as Pull back. */
 async function rejectItemFromRouting(item: EnrichedOrderItem) {
   const shipGroup = order.value?.shipGroups.find((group) => group.id === item.shipGroupSeqId);
   if (!shipGroup) return;
+  // Pull back acts on the ship group's checked items, so check only this one, then give back what was checked.
+  const checked = selectedShipGroupItems.value[shipGroup.id] || [];
   selectedShipGroupItems.value[shipGroup.id] = [item.orderItemSeqId];
-  await rejectSelectedItems(shipGroup);
-  // A cancelled dialog leaves the selection behind; a completed reject clears it already.
-  selectedShipGroupItems.value[shipGroup.id] = [];
-  loadRoutingHistory(true);
+  try {
+    await rejectSelectedItems(shipGroup);
+  } finally {
+    // A rejected item has left the ship group by now (the order reloads first); a cancelled one has not.
+    const stillHere = new Set(order.value?.shipGroups.find((group) => group.id === shipGroup.id)?.items.map((groupItem) => groupItem.orderItemSeqId));
+    selectedShipGroupItems.value[shipGroup.id] = checked.filter((id) => stillHere.has(id));
+  }
 }
 
-/** Move one item to a location the user picks, the same flow as the location chip on the Items tab. */
-async function moveItemFromRouting(item: EnrichedOrderItem) {
-  await rejectAndReleaseItem(item);
-  loadRoutingHistory(true);
-}
 
 const routingFlow = computed(() => order.value ? buildRoutingFlow({
   items: (order.value.shipGroups || []).flatMap((group) => group.items.map((item) => ({ orderItemSeqId: item.orderItemSeqId, shipGroupSeqId: group.id }))),
