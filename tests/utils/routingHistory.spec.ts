@@ -1,7 +1,16 @@
-import { describe, expect, it } from "vitest";
+import { DateTime } from "luxon";
+import { describe, expect, it, vi } from "vitest";
 import {
   buildRoutingHistory, isShortAtLocation, isStockLocation, movementRequests, ruleLabel, stockAt,
 } from "@/utils/routingHistory";
+
+// One seeded facility: a parking lot whose id does not follow the *_PARKING convention.
+vi.mock("@common/db", () => ({
+  useSeedData: () => ({
+    facility: (facilityId: string) => facilityId === "PARKING" ? { facilityId, facilityTypeId: "PARKING_LOT" } : undefined,
+    facilityType: (facilityTypeId: string) => facilityTypeId === "PARKING_LOT" ? { facilityTypeId, parentTypeId: "VIRTUAL_FACILITY" } : undefined,
+  }),
+}));
 
 // Shaped on a real order: brokered to the warehouse on the one unit an inventory reset had added,
 // then a later reset took the warehouse to -1 while the item was still reserved there.
@@ -91,6 +100,32 @@ describe("routing history", () => {
     expect(isShortAtLocation({ ...item, facilityId: "UNFILLABLE_PARKING" }, stock)).toBe(false);
     expect(isShortAtLocation(item, { [`${PRODUCT}|${WAREHOUSE}`]: { atp: 0, qoh: 1 } })).toBe(false);
     expect(isStockLocation("_NA_")).toBe(false);
+  });
+
+  it("knows a virtual location by its facility type, whatever its id", () => {
+    expect(isStockLocation("PARKING")).toBe(false);
+    expect(isStockLocation("REJECTED_ITM_PARKING")).toBe(false);
+    expect(isStockLocation(WAREHOUSE)).toBe(true);
+  });
+
+  it("reads SQL timestamps the same as epoch millis", () => {
+    const sql = (millis: number) => DateTime.fromMillis(millis).toFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    const input = {
+      orderId: ORDER_ID,
+      items: [item],
+      changes: [brokered],
+      movements: { [`${PRODUCT}|${WAREHOUSE}`]: { rows, truncated: false } },
+      stock: { [`${PRODUCT}|${WAREHOUSE}`]: { atp: -1, qoh: 1 } },
+    };
+    const asSql = {
+      ...input,
+      changes: [{ ...brokered, changeDatetime: sql(brokered.changeDatetime) }],
+      movements: { [`${PRODUCT}|${WAREHOUSE}`]: { rows: rows.map((row) => ({ ...row, createdStamp: sql(row.createdStamp) })), truncated: false } },
+    };
+    const strip = (history: any) => ({ ...history, since: { ...history.since, movements: history.since.movements.map((movement: any) => ({ ...movement, raw: undefined })) } });
+
+    expect(strip(buildRoutingHistory(asSql)[0])).toEqual(strip(buildRoutingHistory(input)[0]));
+    expect(buildRoutingHistory(asSql)[0].events[0].at).toBe(brokered.changeDatetime);
   });
 
   it("cleans the stored rule name", () => {

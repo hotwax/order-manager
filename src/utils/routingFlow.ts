@@ -1,4 +1,4 @@
-import { type RoutingEventKind, changeActor, isStockLocation, routingEventKind, ruleLabel } from "@/utils/routingHistory";
+import { type RoutingEventKind, changeActor, changeAt, isStockLocation, routingEventKind, ruleLabel } from "@/utils/routingHistory";
 
 /**
  * An order's routing as a left-to-right graph: each card is a ship group's contents at a moment,
@@ -55,12 +55,6 @@ export type FlowShipGroup = { id: string; facilityId: string };
 
 const STEP_WINDOW_MS = 60 * 1000;
 
-const num = (value: unknown) => {
-  const parsed = Number(value);
-
-  return Number.isFinite(parsed) ? parsed : 0;
-};
-
 type ItemMove = { row: any; at: number; attempts: number };
 
 /**
@@ -86,7 +80,7 @@ function foldMoves(rows: any[]): ItemMove[] {
       // Skip the detour; the next attempt then folds into the previous one as a retry.
       return;
     }
-    moves.push({ row, at: num(row.changeDatetime), attempts: 1 });
+    moves.push({ row, at: changeAt(row), attempts: 1 });
   });
 
   return moves;
@@ -116,7 +110,7 @@ export function buildRoutingFlow(input: {
   items.forEach((item) => {
     const rows = changes
       .filter((row) => row.orderItemSeqId === item.orderItemSeqId)
-      .sort((a, b) => num(a.changeDatetime) - num(b.changeDatetime));
+      .sort((a, b) => changeAt(a) - changeAt(b));
     movesByItem.set(item.orderItemSeqId, foldMoves(rows));
   });
 

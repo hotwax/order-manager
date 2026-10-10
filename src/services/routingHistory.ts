@@ -1,4 +1,5 @@
 import { api } from "@common";
+import { toMillis } from "@/utils/format";
 
 /** Routing changes are read newest first; an order with more than a page loses its oldest moves. */
 const ROUTING_CHANGE_PAGE_SIZE = 200;
@@ -6,6 +7,9 @@ const ROUTING_CHANGE_PAGE_SIZE = 200;
 const UNFILLABLE_SAMPLE_SIZE = 50;
 const MOVEMENT_PAGE_SIZE = 100;
 const MOVEMENT_PAGE_LIMIT = 5;
+const STOCK_PAGE_SIZE = 500;
+/** A guard against an endpoint that ignores pageIndex; 20 pages is far beyond one order. */
+const STOCK_PAGE_LIMIT = 20;
 
 export type ProductFacilityPair = { productId: string; facilityId: string };
 export type LocationStock = { atp: number; qoh: number };
@@ -47,7 +51,7 @@ export async function fetchRoutingChanges(orderId: string): Promise<any[]> {
   ]);
 
   return [...rowsOf(moves), ...rowsOf(unfillable)]
-    .sort((a, b) => numericValue(a.changeDatetime) - numericValue(b.changeDatetime));
+    .sort((a, b) => (toMillis(a.changeDatetime) ?? 0) - (toMillis(b.changeDatetime) ?? 0));
 }
 
 /** Available to promise and on hand for each product at each facility, summed over its inventory items. */
@@ -56,20 +60,28 @@ export async function fetchLocationStock(pairs: ProductFacilityPair[]): Promise<
   const wanted = new Set(pairs.map((pair) => pairKey(pair.productId, pair.facilityId)));
   const productIds = [...new Set(pairs.map((pair) => pair.productId))];
   const facilityIds = [...new Set(pairs.map((pair) => pair.facilityId))];
-  const response: any = await api({
-    url: "oms/inventoryLogs",
-    method: "GET",
-    params: {
-      productId: productIds.join(","),
-      productId_op: "in",
-      facilityId: facilityIds.join(","),
-      facilityId_op: "in",
-      pageSize: 500
-    }
-  });
+  // A product can sit in many inventory items at one facility, so read every page before summing.
+  const rows: any[] = [];
+  for(let pageIndex = 0; pageIndex < STOCK_PAGE_LIMIT; pageIndex++) {
+    const response: any = await api({
+      url: "oms/inventoryLogs",
+      method: "GET",
+      params: {
+        productId: productIds.join(","),
+        productId_op: "in",
+        facilityId: facilityIds.join(","),
+        facilityId_op: "in",
+        pageIndex,
+        pageSize: STOCK_PAGE_SIZE
+      }
+    });
+    const page = rowsOf(response);
+    rows.push(...page);
+    if(page.length < STOCK_PAGE_SIZE) {break;}
+  }
 
   const stock: Record<string, LocationStock> = {};
-  rowsOf(response).forEach((row: any) => {
+  rows.forEach((row: any) => {
     const key = pairKey(row.productId, row.facilityId);
     if(!wanted.has(key)) {return;}
     const entry = stock[key] || (stock[key] = { atp: 0, qoh: 0 });
@@ -95,7 +107,8 @@ export async function fetchStockMovements(productId: string, facilityId: string,
     });
     const page = rowsOf(response);
     rows.push(...page);
-    const oldest = page.length ? numericValue(page[page.length - 1].createdStamp || page[page.length - 1].effectiveDate) : 0;
+    const last = page[page.length - 1];
+    const oldest = last ? toMillis(last.createdStamp) ?? toMillis(last.effectiveDate) ?? 0 : 0;
     if(page.length < MOVEMENT_PAGE_SIZE || (oldest && oldest < sinceMillis)) {return { rows, truncated: false };}
   }
 

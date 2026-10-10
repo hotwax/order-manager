@@ -1,4 +1,6 @@
+import { useSeedData } from "@common/db";
 import { type LocationStock, type ProductFacilityPair, pairKey } from "@/services/routingHistory";
+import { toMillis } from "@/utils/format";
 
 /**
  * The routing history of an order's items, with the stock each change saw.
@@ -81,15 +83,30 @@ const num = (value: unknown): number | null => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+/** When a routing change happened. OMS returns epoch millis or SQL timestamps. */
+export const changeAt = (row: any): number => toMillis(row.changeDatetime) ?? 0;
+
 /** A movement's recorded time. External resets carry no effective date, only their creation time. */
-const movementAt = (row: any): number => num(row.createdStamp) ?? num(row.effectiveDate) ?? 0;
+export const movementAt = (row: any): number => toMillis(row.createdStamp) ?? toMillis(row.effectiveDate) ?? 0;
 
 const bySequence = (a: any, b: any) => movementAt(a) - movementAt(b) ||
   (num(a.inventoryItemDetailSeqId) ?? 0) - (num(b.inventoryItemDetailSeqId) ?? 0);
 
-/** Virtual locations (no facility yet, the parking lots) hold no stock to show. */
+const VIRTUAL_FACILITY = "VIRTUAL_FACILITY";
+
+/**
+ * Virtual locations (no facility yet, the parking lots) hold no stock to show. The facility's type
+ * decides; the id convention is only the fallback for a facility the seed has not loaded.
+ */
 export function isStockLocation(facilityId?: string): boolean {
-  return Boolean(facilityId) && facilityId !== "_NA_" && !String(facilityId).endsWith("_PARKING");
+  if(!facilityId || facilityId === "_NA_") {return false;}
+  const seed = useSeedData();
+  const facility = seed.facility(facilityId);
+  if(facility) {
+    return facility.facilityTypeId !== VIRTUAL_FACILITY && seed.facilityType(facility.facilityTypeId)?.parentTypeId !== VIRTUAL_FACILITY;
+  }
+
+  return !facilityId.endsWith("_PARKING");
 }
 
 export function routingEventKind(row: any): RoutingEventKind {
@@ -177,7 +194,7 @@ function eventsForItem(changes: any[], item: RoutingItem): RoutingEvent[] {
   changes
     .filter((row) => row.orderItemSeqId === item.orderItemSeqId)
     .forEach((row) => {
-      const at = num(row.changeDatetime) ?? 0;
+      const at = changeAt(row);
       const kind = routingEventKind(row);
       const previous = events[events.length - 1];
       // Routing retries an unfillable item every run; one line per run would bury everything else.

@@ -1,3 +1,4 @@
+import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
 import { buildRoutingFlow, layoutRoutingFlow } from "@/utils/routingFlow";
 
@@ -102,6 +103,27 @@ describe("routing flow", () => {
       ["1-00002", "2-00002", "stayed"],
       ["1-00002", "2-00003", "rejected"],
     ]);
+  });
+
+  it("orders and groups SQL timestamps the same as epoch millis", () => {
+    const sql = (iso: string) => DateTime.fromISO(iso).toFormat("yyyy-MM-dd HH:mm:ss.SSS");
+    const items = [{ orderItemSeqId: "01", shipGroupSeqId: "00002" }, { orderItemSeqId: "02", shipGroupSeqId: "00002" }];
+    const moves: Array<[string, string, string, string, string, string]> = [
+      ["b1", "01", "_NA_", "100000", "BROKERED", "2026-10-08T17:02:00Z"],
+      ["b2", "02", "_NA_", "100000", "BROKERED", "2026-10-08T17:02:01Z"],
+      ["r1", "01", "100000", "REJECTED_ITM_PARKING", "NOT_IN_STOCK", "2026-10-08T19:00:00Z"],
+    ];
+    const build = (at: (iso: string) => any) => buildRoutingFlow({
+      items,
+      shipGroups: [{ id: "00001", facilityId: "_NA_" }, { id: "00002", facilityId: "100000" }],
+      // Newest first, as the endpoint returns them, so the order has to come from the timestamps.
+      changes: [...moves].reverse().map(([id, item, from, to, reason, iso]) => ({ ...change(id, item, "00002", from, to, reason, iso), changeDatetime: at(iso) })),
+      importedAt: t("2026-10-08T16:59:45Z"),
+    });
+
+    const flow = build(sql);
+    expect(flow.columns.map((column) => column.kind)).toEqual(["imported", "brokered", "rejected"]);
+    expect(flow).toEqual(build(t));
   });
 
   it("shows an order that never moved as its imported ship group", () => {
