@@ -242,8 +242,12 @@ export interface FlowLayout {
 }
 
 /** Cards sit in columns; each card lines up with the cards its items came from, without overlapping. */
-/** The graph's card sizes, shared by the graph and by the placeholder that holds its place while it loads. */
-export const ROUTING_FLOW_SIZE = { cardWidth: 260, columnGap: 210, headerHeight: 58, rowHeight: 52, cardGap: 28, top: 52, left: 16 };
+/**
+ * The graph's card sizes, shared by the graph and by the placeholder that holds its place while it
+ * loads. Card heights are first guesses (a header and item rows of two lines each); the graph lays
+ * cards out from their measured heights once they render.
+ */
+export const ROUTING_FLOW_SIZE = { cardWidth: 260, columnGap: 210, headerHeight: 62, rowHeight: 62, cardGap: 28, top: 52, left: 16 };
 export type FlowSize = typeof ROUTING_FLOW_SIZE;
 
 /**
@@ -260,9 +264,10 @@ export function estimateFlowHeight(itemsPerShipGroup: number[], size: FlowSize =
   return size.top + Math.max(imported, current) + size.cardGap;
 }
 
-export function layoutRoutingFlow(flow: RoutingFlow, size: FlowSize = ROUTING_FLOW_SIZE): FlowLayout {
+/** `heights` are the cards' measured heights by node id; a card not measured yet uses the size's guess. */
+export function layoutRoutingFlow(flow: RoutingFlow, size: FlowSize = ROUTING_FLOW_SIZE, heights: Record<string, number> = {}): FlowLayout {
   const positions: FlowLayout["positions"] = {};
-  const cardHeight = (node: FlowNode) => size.headerHeight + node.orderItemSeqIds.length * size.rowHeight;
+  const cardHeight = (node: FlowNode) => heights[node.id] ?? size.headerHeight + node.orderItemSeqIds.length * size.rowHeight;
   let bottom = 0;
   flow.columns.forEach((column) => {
     const inColumn = flow.nodes.filter((node) => node.column === column.index);

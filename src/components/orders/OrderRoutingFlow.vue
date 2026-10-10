@@ -50,7 +50,9 @@
             type="button"
             class="routing-flow-node"
             :class="{ virtual: !isStockLocation(node.facilityId), short: isNodeShort(node), selected: isSelected('node', node.id) }"
+            :ref="observeNode"
             :style="nodeStyle(node)"
+            :data-node-id="node.id"
             @click="select('node', node.id)"
           >
             <span class="routing-flow-node-title">{{ facility(node.facilityId) }}</span>
@@ -79,7 +81,7 @@
 import { DxpShopifyImg, translate } from "@common";
 import { useSeedData } from "@common/db";
 import { IonBadge, IonLabel, IonSpinner } from "@ionic/vue";
-import { computed, nextTick, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useProductIdentity } from "@/composables/useProductIdentity";
 import type { EnrichedOrderItem } from "@/types/orderDetail";
 import { formatDateTime, formatNumber } from "@/utils/format";
@@ -104,7 +106,30 @@ const { getProduct, primaryIdentifier, secondaryIdentifier } = useProductIdentit
 const SIZE = ROUTING_FLOW_SIZE;
 const EMPTY_FLOW: RoutingFlow = { columns: [], nodes: [], edges: [] };
 const graph = computed(() => props.flow ?? EMPTY_FLOW);
-const layout = computed(() => layoutRoutingFlow(graph.value, SIZE));
+// Cards size to their content (wrapped names, badges), and the graph lays them out from what they
+// measure, so a change to the card's contents never crops it.
+const measuredHeights = ref<Record<string, number>>({});
+const layout = computed(() => layoutRoutingFlow(graph.value, SIZE, measuredHeights.value));
+const nodeObserver = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver((entries) => {
+  const next = { ...measuredHeights.value };
+  let changed = false;
+  entries.forEach((entry) => {
+    const element = entry.target as HTMLElement;
+    const nodeId = element.dataset.nodeId;
+    const height = element.offsetHeight;
+    if(nodeId && height && next[nodeId] !== height) {
+      next[nodeId] = height;
+      changed = true;
+    }
+  });
+  if(changed) {measuredHeights.value = next;}
+});
+
+function observeNode(element: unknown) {
+  if(element instanceof HTMLElement) {nodeObserver?.observe(element);}
+}
+
+onBeforeUnmount(() => nodeObserver?.disconnect());
 
 /** The graph's likely height before it loads: today's ship groups stacked, or every item on one imported card. */
 const estimatedHeight = computed(() => {
@@ -180,7 +205,7 @@ const columnX = (index: number) => SIZE.left + index * (SIZE.cardWidth + SIZE.co
 function nodeStyle(node: FlowNode) {
   const position = layout.value.positions[node.id];
 
-  return { left: `${position.x}px`, top: `${position.y}px`, width: `${SIZE.cardWidth}px`, height: `${position.height}px` };
+  return { left: `${position.x}px`, top: `${position.y}px`, width: `${SIZE.cardWidth}px` };
 }
 
 /** Done when every item in it is: Completed (items sold in store end here) or Cancelled; else Current while it still holds them. */
