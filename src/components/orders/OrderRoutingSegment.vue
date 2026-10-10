@@ -36,15 +36,7 @@
           <ion-label>{{ locationLabel(entry) }}</ion-label>
         </ion-chip>
         <!-- The full stock picture for this product at this location lives in Order Routing. -->
-        <ion-button
-          v-if="inventoryUrl(entry)"
-          slot="end"
-          fill="clear"
-          size="small"
-          :href="inventoryUrl(entry)"
-          target="_blank"
-          rel="noopener"
-        >
+        <ion-button v-if="inventoryFacilityId(entry)" slot="end" fill="clear" size="small" @click="openInventoryDetails(entry)">
           {{ translate('Inventory details') }}
           <ion-icon slot="end" :icon="openOutline" />
         </ion-button>
@@ -134,7 +126,7 @@
 </template>
 
 <script setup lang="ts">
-import { DxpShopifyImg, buildAppUrl, translate } from "@common";
+import { DxpShopifyImg, translate, useFastTravel } from "@common";
 import { useSeedData } from "@common/db";
 import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonChip, IonIcon, IonItem, IonLabel, IonList, IonThumbnail } from "@ionic/vue";
 import {
@@ -164,6 +156,7 @@ const props = defineProps<{
 const emit = defineEmits<{ retry: []; "reject-item": [item: EnrichedOrderItem]; "move-item": [item: EnrichedOrderItem] }>();
 
 const seed = useSeedData();
+const { openApp } = useFastTravel();
 const { getProduct, primaryIdentifier, secondaryIdentifier } = useProductIdentity();
 
 /** How many rows each item's timeline shows; "View more" adds a page. */
@@ -254,16 +247,17 @@ function itemImage(item: EnrichedOrderItem) {
   return getProduct(item.productId)?.mainImageUrl || item.imageUrl;
 }
 
-/**
- * This product's inventory page in Order Routing, scoped to the item's location, or to the last real
- * location it was at when it now sits in a queue or parking.
- */
-function inventoryUrl(entry: Entry): string | undefined {
-  const facilityId = isStockLocation(entry.item.facilityId)
+/** The location whose stock explains the item: where it is, or the last real location it was at when it now sits in a queue or parking. */
+function inventoryFacilityId(entry: Entry): string | undefined {
+  return isStockLocation(entry.item.facilityId)
     ? entry.item.facilityId
     : [...entry.history.events].reverse().find((event) => event.stock)?.stock?.facilityId;
+}
 
-  return facilityId ? buildAppUrl("order-routing", `/inventory/${encodeURIComponent(entry.item.productId)}`, { facilityId }) ?? undefined : undefined;
+/** This product's inventory at that location in Order Routing, in a new tab, through Fast Travel's deep links. */
+function openInventoryDetails(entry: Entry) {
+  const facilityId = inventoryFacilityId(entry);
+  if(facilityId) {openApp("order-routing", { path: `/inventory/${encodeURIComponent(entry.item.productId)}`, query: { facilityId }, newTab: true });}
 }
 
 /** Short at its location, as the page decided for the item and ship group tabs too. */
