@@ -43,67 +43,70 @@
         </ion-segment-button>
       </ion-segment>
 
-      <OrderItemsSegment
-        v-if="selectedSegment === 'items'"
-        v-model:selected-item-ids="selectedItemIds"
-        :order="order"
-        :item-actions="itemActions"
-        :payment-return-ids="paymentReturnIds"
-        @reject-and-release="rejectAndReleaseItem"
-        @open-item-attributes="openItemAttributesModal"
-        @open-item-transfers="openItemTransfersModal"
-      />
+      <!-- Switching segments never shortens the page under a user scrolled down to them. -->
+      <div :key="orderId" v-segment-height="selectedSegment">
+        <OrderItemsSegment
+          v-if="selectedSegment === 'items'"
+          v-model:selected-item-ids="selectedItemIds"
+          :order="order"
+          :item-actions="itemActions"
+          :payment-return-ids="paymentReturnIds"
+          @reject-and-release="rejectAndReleaseItem"
+          @open-item-attributes="openItemAttributesModal"
+          @open-item-transfers="openItemTransfersModal"
+        />
 
-      <div v-if="selectedSegment === 'ship-groups'" class="ion-padding">
-        <template v-if="order.shipGroups.length">
-          <OrderShipGroupCard
-            v-for="shipGroup in order.shipGroups.filter((sg) => sg.items.length)"
-            :key="shipGroup.id"
-            :ship-group="shipGroup"
-            :order-id="order.id"
-            :order-status-id="order.statusId"
-            :expanded="expandedShipGroupIds.has(shipGroup.id)"
-            :selected-item-ids="selectedShipGroupItems[shipGroup.id] || []"
-            :hold-task-count="countShipGroupHoldTasks(allHoldTasks, shipGroup.id)"
-            :distance="shipGroupDistances[shipGroup.id]"
-            :carriers="availableCarriers"
-            :disabled-actions="shipGroupDisabledActions[shipGroup.id]"
-            :can-request-inventory-transfer="canRequestInventoryTransfer"
-            :has-transferable-items="inventoryTransferItemsForShipGroup(shipGroup).length > 0"
-            :editor="shipGroupEditor(shipGroup)"
-            :saving="savingShipGroupId === shipGroup.id"
-            @update:expanded="$event ? expandedShipGroupIds.add(shipGroup.id) : expandedShipGroupIds.delete(shipGroup.id)"
-            @update:selected-item-ids="selectedShipGroupItems[shipGroup.id] = $event"
-            @show-holds="selectedSegment = 'holds'"
-            @broker="brokerShipGroup(shipGroup)"
-            @release="releaseSelectedItems(shipGroup)"
-            @park="parkSelectedItems(shipGroup)"
-            @pull-back="rejectSelectedItems(shipGroup)"
-            @request-transfer="requestInventoryTransfersForShipGroup(shipGroup)"
-            @add-task="openAddTaskModal(shipGroup)"
-            @add-items="openAddItemModal(shipGroup)"
-            @view-inventory="viewInventory"
-            @change-carrier-method="(carrierPartyId, shipmentMethodTypeId) => saveCarrierAndMethod(shipGroup, carrierPartyId, shipmentMethodTypeId)"
-            @update:editor="setShipGroupEditor(shipGroup, $event)"
-            @save-fields="saveShipGroupFields(shipGroup, $event)"
-            @save-address="saveShippingAddress(shipGroup, $event)"
-          />
-        </template>
-        <EmptyState v-else :title="translate('No ship groups')"
-          :message="translate('There are no ship groups defined for this order.')" />
+        <div v-if="selectedSegment === 'ship-groups'" class="ion-padding">
+          <template v-if="order.shipGroups.length">
+            <OrderShipGroupCard
+              v-for="shipGroup in order.shipGroups.filter((sg) => sg.items.length)"
+              :key="shipGroup.id"
+              :ship-group="shipGroup"
+              :order-id="order.id"
+              :order-status-id="order.statusId"
+              :expanded="expandedShipGroupIds.has(shipGroup.id)"
+              :selected-item-ids="selectedShipGroupItems[shipGroup.id] || []"
+              :hold-task-count="countShipGroupHoldTasks(allHoldTasks, shipGroup.id)"
+              :distance="shipGroupDistances[shipGroup.id]"
+              :carriers="availableCarriers"
+              :disabled-actions="shipGroupDisabledActions[shipGroup.id]"
+              :can-request-inventory-transfer="canRequestInventoryTransfer"
+              :has-transferable-items="inventoryTransferItemsForShipGroup(shipGroup).length > 0"
+              :editor="shipGroupEditor(shipGroup)"
+              :saving="savingShipGroupId === shipGroup.id"
+              @update:expanded="$event ? expandedShipGroupIds.add(shipGroup.id) : expandedShipGroupIds.delete(shipGroup.id)"
+              @update:selected-item-ids="selectedShipGroupItems[shipGroup.id] = $event"
+              @show-holds="selectedSegment = 'holds'"
+              @broker="brokerShipGroup(shipGroup)"
+              @release="releaseSelectedItems(shipGroup)"
+              @park="parkSelectedItems(shipGroup)"
+              @pull-back="rejectSelectedItems(shipGroup)"
+              @request-transfer="requestInventoryTransfersForShipGroup(shipGroup)"
+              @add-task="openAddTaskModal(shipGroup)"
+              @add-items="openAddItemModal(shipGroup)"
+              @view-inventory="viewInventory"
+              @change-carrier-method="(carrierPartyId, shipmentMethodTypeId) => saveCarrierAndMethod(shipGroup, carrierPartyId, shipmentMethodTypeId)"
+              @update:editor="setShipGroupEditor(shipGroup, $event)"
+              @save-fields="saveShipGroupFields(shipGroup, $event)"
+              @save-address="saveShippingAddress(shipGroup, $event)"
+            />
+          </template>
+          <EmptyState v-else :title="translate('No ship groups')"
+            :message="translate('There are no ship groups defined for this order.')" />
+        </div>
+
+        <OrderHoldsSegment
+          v-if="selectedSegment === 'holds'"
+          :address-validation-tasks="addressValidationTasks"
+          :swap-tasks="swapTasks"
+          :fraud-tasks="fraudTasks"
+          :hold-tasks="holdTasks"
+          @completed="reloadHoldTasks"
+          @create-hold-task="openCreateHoldTaskModal"
+        />
+
+        <OrderCommsSegment v-if="selectedSegment === 'comms'" :comm-events="orderDetailStore.commEventsForOrder(orderId)" />
       </div>
-
-      <OrderHoldsSegment
-        v-if="selectedSegment === 'holds'"
-        :address-validation-tasks="addressValidationTasks"
-        :swap-tasks="swapTasks"
-        :fraud-tasks="fraudTasks"
-        :hold-tasks="holdTasks"
-        @completed="reloadHoldTasks"
-        @create-hold-task="openCreateHoldTaskModal"
-      />
-
-      <OrderCommsSegment v-if="selectedSegment === 'comms'" :comm-events="orderDetailStore.commEventsForOrder(orderId)" />
     </ion-content>
 
     <ion-content v-else-if="loading">
