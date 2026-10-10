@@ -1,7 +1,7 @@
 import { logger } from "@common";
 import { defineStore } from "pinia";
 import {
-  type LocationStock, fetchLocationStock, fetchRoutingChanges, fetchStockMovements,
+  type LocationStock, fetchInventoryCutoff, fetchLocationStock, fetchRoutingChanges, fetchStockMovements,
   pairKey
 } from "@/services/routingHistory";
 import {
@@ -18,6 +18,17 @@ interface RoutingHistoryState {
   movementsByPair: Record<string, MovementPage>;
   /** Current available to promise and on hand per product and facility, keyed by pairKey. */
   stockByPair: Record<string, LocationStock>;
+  /** When each product store went live on HotWax inventory (see fetchInventoryCutoff); null when unknown. */
+  cutoffByProductStore: Record<string, number | null>;
+}
+
+export interface LoadRoutingOptions {
+  /** Read again even when already loaded. */
+  force?: boolean;
+  /** When the order came in, where an item that was never routed is read from. */
+  importedAt?: number;
+  /** The order's product store, whose go-live explains items with no inventory impact. */
+  productStoreId?: string;
 }
 
 const inFlight = new Map<string, Promise<void>>();
@@ -30,6 +41,7 @@ export const useRoutingHistoryStore = defineStore("routingHistory", {
     statusByOrderId: {},
     movementsByPair: {},
     stockByPair: {},
+    cutoffByProductStore: {},
   }),
   getters: {
     historyFor: (state) => (orderId: string, items: RoutingItem[]): ItemRoutingHistory[] => buildRoutingHistory({
@@ -40,6 +52,7 @@ export const useRoutingHistoryStore = defineStore("routingHistory", {
       stock: state.stockByPair,
     }),
     statusFor: (state) => (orderId: string): LoadStatus | undefined => state.statusByOrderId[orderId],
+    cutoffFor: (state) => (productStoreId?: string): number | null => (productStoreId && state.cutoffByProductStore[productStoreId]) || null,
   },
   actions: {
     /** Current stock at each item's location, for the warnings on the item and ship group views. */
@@ -61,15 +74,13 @@ export const useRoutingHistoryStore = defineStore("routingHistory", {
       stale.add(orderId);
     },
 
-    /**
-     * Routing changes, the stock movements behind them, and current stock, for the Routing segment.
-     * `importedAt` is when the order came in, where an item that was never routed is read from.
-     */
-    loadRoutingHistory(orderId: string, items: RoutingItem[], force = false, importedAt?: number): Promise<void> {
+    /** Routing changes, the stock movements behind them, and current stock, for the Routing segment. */
+    loadRoutingHistory(orderId: string, items: RoutingItem[], options: LoadRoutingOptions = {}): Promise<void> {
+      const { force = false, importedAt, productStoreId } = options;
       if(!force && !stale.has(orderId) && this.statusByOrderId[orderId] === "loaded") {return Promise.resolve();}
       const running = inFlight.get(orderId);
       // A forced load wants changes newer than the running load has read, so it runs again after it.
-      if(running) {return force ? running.then(() => this.loadRoutingHistory(orderId, items, true, importedAt)) : running;}
+      if(running) {return force ? running.then(() => this.loadRoutingHistory(orderId, items, options)) : running;}
 
       // A reload keeps the routing already shown on screen until the new one is in.
       const reloading = this.statusByOrderId[orderId] === "loaded";
@@ -80,6 +91,14 @@ export const useRoutingHistoryStore = defineStore("routingHistory", {
           const changes = await fetchRoutingChanges(orderId);
           this.changesByOrderId[orderId] = changes;
           const requests = movementRequests(items, changes, importedAt);
+          if(productStoreId && !(productStoreId in this.cutoffByProductStore)) {
+            // Only explains empty timelines, so a failure leaves them unexplained rather than failing the load.
+            this.cutoffByProductStore[productStoreId] = await fetchInventoryCutoff(productStoreId).catch((err) => {
+              logger.error("Failed to read the store's inventory go-live", err);
+
+              return null;
+            });
+          }
           const pages = await Promise.allSettled(requests.map((request) =>
             fetchStockMovements(request.productId, request.facilityId, request.sinceMillis)));
           pages.forEach((page, index) => {

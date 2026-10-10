@@ -105,6 +105,7 @@
         :history="routingHistory"
         :flow="routingFlow"
         :short-stock="shortStock"
+        :no-impact="routingNoImpact"
         :status="routingHistoryStore.statusFor(orderId)"
         @retry="loadRoutingHistory(true)"
         @reject-item="rejectItemFromRouting"
@@ -200,7 +201,7 @@ import type { ShipGroupActionId } from '@/utils/OrderActionValidator';
 import { toMillis } from '@/utils/format';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
 import { buildRoutingFlow } from '@/utils/routingFlow';
-import { type RoutingItem, isShortAtLocation } from '@/utils/routingHistory';
+import { type RoutingItem, isShortAtLocation, noInventoryImpact } from '@/utils/routingHistory';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
 import type { EnrichedOrderItem, EnrichedPayment } from '@/types/orderDetail';
 import type { OrderEventLink } from '@/utils/orderEvents';
@@ -289,15 +290,36 @@ const availableCarriers = computed(() =>
 
 /* ── Routing tab and short-stock warnings ─────────────────────────────── */
 
+/** When each item was completed, from the order's status history: an item completed before go-live never moved stock. */
+const itemCompletedAt = computed(() => {
+  const completed: Record<string, number> = {};
+  (orderDetailStore.orderById(props.orderId)?.statuses || []).forEach((row: any) => {
+    const at = row.statusId === 'ITEM_COMPLETED' && row.orderItemSeqId ? toMillis(row.statusDatetime) : undefined;
+    if (at && at > (completed[row.orderItemSeqId] || 0)) completed[row.orderItemSeqId] = at;
+  });
+  return completed;
+});
+
 const routingItems = computed<RoutingItem[]>(() => (order.value?.shipGroups || [])
   .flatMap((group) => group.items)
-  .map((item) => ({ orderItemSeqId: item.orderItemSeqId, productId: item.productId, facilityId: item.facilityId, statusId: item.statusId })));
+  .map((item) => ({
+    orderItemSeqId: item.orderItemSeqId,
+    productId: item.productId,
+    facilityId: item.facilityId,
+    statusId: item.statusId,
+    completedAt: itemCompletedAt.value[item.orderItemSeqId],
+  })));
 
 /** When the order came in: the routing graph's first column, and where items that were never routed are read from. */
 const orderImportedAt = computed(() => toMillis(orderDetailStore.orderById(props.orderId)?.entryDate || orderDetailStore.orderById(props.orderId)?.orderDate) || 0);
 
 function loadRoutingHistory(force = false) {
-  if (routingItems.value.length) routingHistoryStore.loadRoutingHistory(props.orderId, routingItems.value, force, orderImportedAt.value || undefined);
+  if (!routingItems.value.length) return;
+  routingHistoryStore.loadRoutingHistory(props.orderId, routingItems.value, {
+    force,
+    importedAt: orderImportedAt.value || undefined,
+    productStoreId: orderDetailStore.orderById(props.orderId)?.productStoreId,
+  });
 }
 
 // Current stock at each item's location, so a location that is short shows it on the item and its ship group.
@@ -316,6 +338,17 @@ const shortStock = computed(() => Object.fromEntries(routingItems.value
   .map((item) => [item.orderItemSeqId, routingHistoryStore.stockByPair[pairKey(item.productId, item.facilityId)].atp])));
 
 const routingHistory = computed(() => routingHistoryStore.historyFor(props.orderId, routingItems.value));
+
+/** Why an item's inventory timeline is empty: completed before the store went live, or nothing moved yet. */
+const routingNoImpact = computed(() => {
+  const cutoff = routingHistoryStore.cutoffFor(orderDetailStore.orderById(props.orderId)?.productStoreId);
+  const byItem = new Map(routingHistory.value.map((history) => [history.orderItemSeqId, history]));
+  return Object.fromEntries(routingItems.value.flatMap((item) => {
+    const history = byItem.get(item.orderItemSeqId);
+    const note = history && noInventoryImpact(item, history, cutoff);
+    return note ? [[item.orderItemSeqId, note]] : [];
+  }));
+});
 
 // Reject and Move (rejectAndReleaseItem, bound as is) reload the order when they go through; the items watcher above then refreshes the routing.
 

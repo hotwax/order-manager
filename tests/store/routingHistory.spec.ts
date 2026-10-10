@@ -45,7 +45,7 @@ describe("routing history store", () => {
       .mockResolvedValueOnce([change("a"), change("b")]);
 
     const first = store.loadRoutingHistory(ORDER_ID, items);
-    const forced = store.loadRoutingHistory(ORDER_ID, items, true);
+    const forced = store.loadRoutingHistory(ORDER_ID, items, { force: true });
     finishFirst([change("a")]);
     await Promise.all([first, forced]);
 
@@ -62,7 +62,7 @@ describe("routing history store", () => {
       .mockResolvedValueOnce([change("a"), change("b")]);
 
     await store.loadRoutingHistory(ORDER_ID, items);
-    const reload = store.loadRoutingHistory(ORDER_ID, items, true);
+    const reload = store.loadRoutingHistory(ORDER_ID, items, { force: true });
     expect(store.statusFor(ORDER_ID)).toBe("loaded");
     failReload(new Error("offline"));
     await reload;

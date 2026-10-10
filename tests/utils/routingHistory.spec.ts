@@ -2,7 +2,7 @@ import { DateTime } from "luxon";
 import { describe, expect, it, vi } from "vitest";
 import { summariseIssuance } from "@/utils/inventoryIssuance";
 import {
-  buildRoutingHistory, isShortAtLocation, isStockLocation, movementRequests, routingEventKind, ruleLabel, stockAt,
+  buildRoutingHistory, isShortAtLocation, isStockLocation, movementRequests, noInventoryImpact, routingEventKind, ruleLabel, stockAt,
 } from "@/utils/routingHistory";
 
 // One seeded facility: a parking lot whose id does not follow the *_PARKING convention.
@@ -180,6 +180,34 @@ describe("routing history", () => {
     });
     expect(history.events).toEqual([]);
     expect(history.since).toMatchObject({ movements: [], availableNow: -1, onHandNow: 1 });
+  });
+
+  it("explains an empty timeline: completed before go-live, or nothing moved yet", () => {
+    // Shaped on a 2023 web order imported at launch: one unit arrived fulfilled, so nothing issued for it.
+    const launchAt = t("2026-08-17T03:59:55Z");
+    const completedEarly = { ...item, statusId: "ITEM_COMPLETED", completedAt: t("2023-03-06T03:45:09Z") };
+    const empty = { orderItemSeqId: "01", productId: PRODUCT, facilityId: WAREHOUSE, events: [], since: null };
+
+    expect(noInventoryImpact(completedEarly, empty, launchAt)).toEqual({ reason: "preLaunch", launchAt });
+    expect(noInventoryImpact({ ...completedEarly, completedAt: t("2026-09-01T00:00:00Z") }, empty, launchAt)).toEqual({ reason: "none" });
+    expect(noInventoryImpact(completedEarly, empty, null)).toEqual({ reason: "none" });
+    expect(noInventoryImpact(item, empty, launchAt)).toEqual({ reason: "none" });
+    expect(noInventoryImpact(item, { ...empty, events: [{} as any] }, launchAt)).toBeNull();
+  });
+
+  it("shows a reservation's change when its rows record no balance", () => {
+    // The other unit of that line, allocated by a Shopify sync: its reservation row carries the diff only.
+    const allocated = { ...brokered, orderFacilityChangeId: "fc9", changeReasonEnumId: "ALLOCATED", changeDatetime: t("2026-08-17T13:11:36.201Z") };
+    const reservation = movement("141001", "2026-08-17T13:11:36.117Z", { orderId: ORDER_ID, orderItemSeqId: "01", reasonEnumId: "INV_RES_CREATE", availableToPromiseDiff: -1, quantityOnHandDiff: 0 });
+    const [history] = buildRoutingHistory({
+      orderId: ORDER_ID,
+      items: [item],
+      changes: [allocated],
+      movements: { [`${PRODUCT}|${WAREHOUSE}`]: { rows: [reservation], truncated: false } },
+      stock: {},
+    });
+
+    expect(history.events[0].stock).toMatchObject({ before: null, after: null, change: -1, exact: true });
   });
 
   it("reads SQL timestamps the same as epoch millis", () => {

@@ -23,6 +23,8 @@ export interface StockMoment {
   onHand: number | null;
   /** On hand before, when the change's rows record it (an issuance does; a routing change reads ATP). */
   onHandBefore?: number | null;
+  /** The change's own effect on ATP, from its rows: known even when they record no balance. */
+  change?: number | null;
   exact: boolean;
 }
 
@@ -72,7 +74,7 @@ export interface ItemRoutingHistory {
   since: SinceBlock | null;
 }
 
-export type RoutingItem = { orderItemSeqId: string; productId: string; facilityId: string; statusId?: string };
+export type RoutingItem = { orderItemSeqId: string; productId: string; facilityId: string; statusId?: string; completedAt?: number };
 export type MovementPage = { rows: any[]; truncated: boolean };
 
 /** A change and its own inventory movements are written in one transaction, a moment apart. */
@@ -198,7 +200,14 @@ export function stockAt(rows: any[], facilityId: string, at: number, orderId: st
     const first = own[0];
     const last = own[own.length - 1];
 
-    return { facilityId, before: num(first.lastAvailableToPromise), after: balanceAfter(last).atp, onHand: balanceAfter(last).qoh, exact: true };
+    return {
+      facilityId,
+      before: num(first.lastAvailableToPromise),
+      after: balanceAfter(last).atp,
+      onHand: balanceAfter(last).qoh,
+      change: own.reduce((sum, row) => sum + (num(row.availableToPromiseDiff) ?? 0), 0),
+      exact: true,
+    };
   }
   const prior = sorted.filter((row) => movementAt(row) <= at).pop();
   if(!prior) {return null;}
@@ -270,6 +279,7 @@ function issuanceAt(item: RoutingItem, orderId: string, page: MovementPage | und
         after: balanceAfter(last).atp,
         onHand: summary?.qohAfter ?? null,
         onHandBefore: summary?.qohBefore ?? null,
+        change: rows.reduce((sum, row) => sum + (num(row.availableToPromiseDiff) ?? 0), 0),
         exact: true,
       },
     },
@@ -356,6 +366,20 @@ export function buildRoutingHistory(input: {
 
     return { orderItemSeqId: item.orderItemSeqId, productId: item.productId, facilityId: item.facilityId, events, since };
   });
+}
+
+/**
+ * Why an item's timeline is empty. "preLaunch": it was completed before the store went live on HotWax
+ * inventory, so nothing ever issued for it - launch-day stock already excluded it, and issuing it again
+ * would deduct it twice. "none": nothing has moved its stock yet. Null when the timeline has entries.
+ */
+export function noInventoryImpact(item: RoutingItem, history: ItemRoutingHistory, cutoffAt: number | null): { reason: "preLaunch" | "none"; launchAt?: number } | null {
+  if(history.events.length || history.since?.movements.length) {return null;}
+  if(item.statusId === "ITEM_COMPLETED" && cutoffAt && item.completedAt && item.completedAt < cutoffAt) {
+    return { reason: "preLaunch", launchAt: cutoffAt };
+  }
+
+  return { reason: "none" };
 }
 
 /** An item still waiting to ship from a real location that now has less than nothing to promise. */

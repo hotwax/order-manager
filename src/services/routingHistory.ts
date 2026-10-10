@@ -54,6 +54,28 @@ export async function fetchRoutingChanges(orderId: string): Promise<any[]> {
     .sort((a, b) => (toMillis(a.changeDatetime) ?? 0) - (toMillis(b.changeDatetime) ?? 0));
 }
 
+/**
+ * When the store went live on HotWax inventory: its Shopify shop's newOrderSync.launchDate, the same
+ * cut-over the OMS reads. A line fulfilled before it arrives complete and never issues, because its stock
+ * left while the old system was authoritative. Null when the store maps to no shop or to several (two
+ * shops mean two go-lives, and the OMS resolves none either), or the date is not set.
+ *
+ * The stored value is a wall clock in the server's zone; it is read in the app's zone, which is close
+ * enough to tell an item fulfilled before launch from one fulfilled after.
+ */
+export async function fetchInventoryCutoff(productStoreId: string): Promise<number | null> {
+  const shops = rowsOf(await api({ url: "oms/shopifyShops/shops", method: "GET", params: { productStoreId, pageSize: 2 } }));
+  if(shops.length !== 1) {return null;}
+  const response: any = await api({
+    url: "admin/systemProperties",
+    method: "GET",
+    params: { systemResourceId: shops[0].shopId, systemPropertyId: "newOrderSync.launchDate", pageSize: 1 }
+  });
+  const properties = rowsOf(response).length ? rowsOf(response) : response?.data?.systemPropertyList || [];
+
+  return toMillis(properties[0]?.systemPropertyValue) ?? null;
+}
+
 /** Available to promise and on hand for each product at each facility, summed over its inventory items. */
 export async function fetchLocationStock(pairs: ProductFacilityPair[]): Promise<Record<string, LocationStock>> {
   if(!pairs.length) {return {};}

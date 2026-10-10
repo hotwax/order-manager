@@ -1,6 +1,7 @@
 <template>
   <!-- Stock after a movement, as Order Routing's inventory history shows it: the balance, then the
-       signed change in parentheses, coloured by direction. A missing balance shows the change alone. -->
+       signed change in parentheses, coloured by direction. A missing balance shows the change alone,
+       and a figure with neither is left out. -->
   <div class="header-deltas">
     <span v-for="figure in figures" :key="figure.label" class="delta-pill">
       <small>{{ translate(figure.label) }}</small>
@@ -26,10 +27,11 @@ const props = defineProps<{
   qoh: Figure;
 }>();
 
+// A figure with neither a balance nor a change says nothing, so it is left out rather than shown empty.
 const figures = computed(() => [
   { label: "ATP", ...props.atp },
   { label: "QOH", ...props.qoh },
-]);
+].filter((figure) => figure.balance != null || figure.change != null));
 </script>
 
 <style scoped>

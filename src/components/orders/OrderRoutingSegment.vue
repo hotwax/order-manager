@@ -58,8 +58,8 @@
       </ion-item>
 
       <!-- The timeline opens on demand. Collapsed, the header still answers "can it ship from here?" with the
-           stock now; open, it lists changes oldest first, ten at a time. -->
-      <ion-accordion-group v-if="entry.rows.length || entry.history.since" class="timeline-loaded">
+           stock now; open, it lists changes oldest first, ten at a time, or says why there are none. -->
+      <ion-accordion-group v-if="status === 'loaded'" class="timeline-loaded">
         <ion-accordion :value="entry.item.orderItemSeqId">
           <ion-item slot="header">
             <ion-icon slot="start" :icon="timeOutline" />
@@ -75,6 +75,13 @@
             />
           </ion-item>
           <ion-list slot="content" lines="full">
+            <ion-item v-if="!entry.rows.length" lines="none">
+              <ion-icon slot="start" :icon="removeCircleOutline" color="medium" />
+              <ion-label class="ion-text-wrap">
+                {{ translate('No inventory impact') }}
+                <p>{{ noImpactDetail(entry) }}</p>
+              </ion-label>
+            </ion-item>
             <ion-item v-for="(row, index) in visibleRows(entry)" :key="row.id" :lines="isLastRow(entry, index) ? 'none' : undefined">
               <ion-icon slot="start" :icon="row.icon" :color="row.color" />
               <ion-label>
@@ -111,11 +118,6 @@
         </ion-accordion>
       </ion-accordion-group>
 
-      <ion-item v-else-if="status === 'loaded'" lines="none">
-        <ion-label color="medium">
-          {{ translate('No routing changes recorded for this item.') }}
-        </ion-label>
-      </ion-item>
       <!-- Shaped like the timeline header it becomes, so the card keeps its height when the routing arrives. -->
       <ion-item v-else-if="status !== 'error'">
         <ion-icon slot="start" :icon="timeOutline" color="medium" />
@@ -135,14 +137,14 @@ import { useSeedData } from "@common/db";
 import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonChip, IonIcon, IonItem, IonLabel, IonList, IonSkeletonText, IonThumbnail } from "@ionic/vue";
 import {
   arrowRedoOutline, arrowUndoOutline, banOutline, businessOutline, closeCircleOutline, compassOutline, exitOutline, openOutline,
-  pauseCircleOutline, returnDownBackOutline, swapHorizontalOutline, timeOutline, warningOutline,
+  pauseCircleOutline, removeCircleOutline, returnDownBackOutline, swapHorizontalOutline, timeOutline, warningOutline,
 } from "ionicons/icons";
 import { type ComponentPublicInstance, computed, nextTick, reactive, ref } from "vue";
 import InventoryDeltaPills from "@/components/orders/InventoryDeltaPills.vue";
 import OrderRoutingFlow from "@/components/orders/OrderRoutingFlow.vue";
 import { useProductIdentity } from "@/composables/useProductIdentity";
 import type { EnrichedOrder, EnrichedOrderItem } from "@/types/orderDetail";
-import { formatDateTime, formatNumber } from "@/utils/format";
+import { formatDate, formatDateTime, formatNumber } from "@/utils/format";
 import { classifyMovement } from "@/utils/inventoryMovement";
 import type { RoutingFlow } from "@/utils/routingFlow";
 import { type ItemRoutingHistory, type RoutingEvent, type RoutingEventKind, isStockLocation, ruleName } from "@/utils/routingHistory";
@@ -155,6 +157,8 @@ const props = defineProps<{
   flow?: RoutingFlow;
   /** Available to promise at the item's location, for items whose location is short. */
   shortStock?: Record<string, number>;
+  /** Why an item's timeline is empty, by order item (see noInventoryImpact). */
+  noImpact?: Record<string, { reason: "preLaunch" | "none"; launchAt?: number }>;
 }>();
 
 const emit = defineEmits<{ retry: []; "reject-item": [item: EnrichedOrderItem]; "move-item": [item: EnrichedOrderItem] }>();
@@ -318,7 +322,7 @@ function rowsFor(history: ItemRoutingHistory): Row[] {
     detail: eventDetail(event),
     atp: event.stock ? {
       balance: event.stock.after,
-      change: event.stock.exact && event.stock.before !== null && event.stock.after !== null ? event.stock.after - event.stock.before : null,
+      change: event.stock.exact ? event.stock.change ?? null : null,
     } : undefined,
     qoh: event.stock ? {
       balance: event.stock.onHand,
@@ -344,6 +348,15 @@ function rowsFor(history: ItemRoutingHistory): Row[] {
   });
 
   return [...routing, ...stock].sort((a, b) => a.at - b.at);
+}
+
+/** Why nothing moved this item's stock: completed before the store went live, or not reserved or issued yet. */
+function noImpactDetail(entry: Entry) {
+  const note = props.noImpact?.[entry.item.orderItemSeqId];
+
+  return note?.reason === "preLaunch" && note.launchAt
+    ? translate("Fulfilled before this store went live on HotWax on {date}. Stock that left before go-live is already out of the launch inventory, so it is not deducted again.", { date: formatDate(note.launchAt) })
+    : translate("Nothing has reserved or issued stock for this item.");
 }
 
 /** Oldest first, a page at a time. */
