@@ -55,21 +55,29 @@
             :data-node-id="node.id"
             @click="select('node', node.id)"
           >
-            <span class="routing-flow-node-title">{{ facility(node.facilityId) }}</span>
-            <small class="routing-flow-node-subtitle">
-              {{ translate('Ship group {id}', { id: node.shipGroupSeqId }) }}
-              <ion-badge v-if="nodeBadge(node)" :color="nodeBadge(node)!.color">{{ nodeBadge(node)!.label }}</ion-badge>
-            </small>
-            <span v-for="id in node.orderItemSeqIds" :key="id" class="routing-flow-item">
-              <span class="routing-flow-thumb"><DxpShopifyImg :key="itemImage(id)" :src="itemImage(id)" size="small" /></span>
-              <span class="routing-flow-item-text">
-                <span>{{ itemPrimary(id) }}</span>
-                <small>{{ itemSecondary(id) }}</small>
-              </span>
-              <span v-if="node.isCurrent && shortStock[id] !== undefined" class="routing-flow-short">
+            <ion-item lines="none">
+              <ion-label>
+                <h2>{{ facility(node.facilityId) }}</h2>
+                <ion-note>{{ translate('Ship group {id}', { id: node.shipGroupSeqId }) }}</ion-note>
+              </ion-label>
+              <ion-badge v-if="nodeBadge(node)" slot="end" :color="nodeBadge(node)!.color">
+                {{ nodeBadge(node)!.label }}
+              </ion-badge>
+            </ion-item>
+            <ion-item v-for="id in node.orderItemSeqIds" :key="id" lines="none">
+              <ion-thumbnail slot="start">
+                <DxpShopifyImg :key="itemImage(id)" :src="itemImage(id)" size="small" />
+              </ion-thumbnail>
+              <ion-label>
+                {{ itemPrimary(id) }}
+                <ion-note v-if="itemSecondary(id)">
+                  {{ itemSecondary(id) }}
+                </ion-note>
+              </ion-label>
+              <ion-badge v-if="node.isCurrent && shortStock[id] !== undefined" slot="end" color="warning">
                 {{ translate('({available})', { available: formatNumber(shortStock[id]) }) }}
-              </span>
-            </span>
+              </ion-badge>
+            </ion-item>
           </button>
         </div>
       </Transition>
@@ -80,7 +88,7 @@
 <script setup lang="ts">
 import { DxpShopifyImg, translate } from "@common";
 import { useSeedData } from "@common/db";
-import { IonBadge, IonLabel, IonSpinner } from "@ionic/vue";
+import { IonBadge, IonItem, IonLabel, IonNote, IonSpinner, IonThumbnail } from "@ionic/vue";
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { useProductIdentity } from "@/composables/useProductIdentity";
 import type { EnrichedOrderItem } from "@/types/orderDetail";
@@ -329,7 +337,7 @@ function edgeTitle(edge: FlowEdge) {
 
 .routing-flow-column-label {
   position: absolute;
-  top: 12px;
+  top: var(--spacer-sm);
   display: flex;
   flex-direction: column;
   font-size: 0.8rem;
@@ -401,8 +409,7 @@ function edgeTitle(edge: FlowEdge) {
   position: absolute;
   display: flex;
   flex-direction: column;
-  gap: var(--spacer-2xs);
-  padding: 10px 12px;
+  padding: 0;
   border: 1px solid var(--ion-color-light-shade);
   border-radius: 10px;
   background: var(--ion-background-color, #fff);
@@ -431,61 +438,29 @@ function edgeTitle(edge: FlowEdge) {
   box-shadow: 0 0 0 3px rgba(var(--ion-color-primary-rgb), 0.3);
 }
 
-.routing-flow-node-title {
-  font-weight: 600;
+.routing-flow-node ion-item {
+  --background: transparent;
+  --min-height: 52px;
+  --padding-start: var(--spacer-xs);
+  --inner-padding-end: var(--spacer-xs);
 }
 
-.routing-flow-node-subtitle {
-  display: flex;
-  align-items: center;
-  gap: var(--spacer-2xs);
-  color: var(--ion-color-medium-shade);
+.routing-flow-node ion-item:first-child {
+  --min-height: 58px;
 }
 
-.routing-flow-item {
-  display: flex;
-  align-items: center;
-  gap: var(--spacer-xs);
-  flex: 0 0 auto;
-  height: 48px;
-  box-sizing: border-box;
+.routing-flow-node ion-item + ion-item {
   border-top: 1px solid var(--ion-color-light-shade);
-  padding-top: var(--spacer-2xs);
 }
 
-.routing-flow-thumb {
-  flex: 0 0 36px;
-  width: 36px;
-  height: 36px;
-  overflow: hidden;
-  border-radius: 4px;
+.routing-flow-node ion-thumbnail {
+  --size: 36px;
+  --border-radius: var(--spacer-2xs);
+  margin-inline-end: var(--spacer-xs);
 }
 
-.routing-flow-item-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  font-size: 0.85rem;
-}
-
-.routing-flow-item-text span, .routing-flow-item-text small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.routing-flow-item-text small {
-  color: var(--ion-color-medium-shade);
-}
-
-.routing-flow-short {
-  margin-inline-start: auto;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: var(--ion-color-warning);
-  color: var(--ion-color-warning-contrast);
-  font-size: 0.75rem;
-  font-weight: 600;
+.routing-flow-node ion-note {
+  display: block;
 }
 
 </style>

@@ -29,7 +29,10 @@
         </ion-thumbnail>
         <ion-label>
           {{ primaryIdentifier(entry.item.productId) || entry.item.name }}
-          <p>{{ translate('Item {id}', { id: entry.item.orderItemSeqId }) }} · {{ secondaryIdentifier(entry.item.productId) || entry.item.sku }}</p>
+          <p v-if="secondaryIdentifier(entry.item.productId) || entry.item.sku">
+            {{ secondaryIdentifier(entry.item.productId) || entry.item.sku }}
+          </p>
+          <p>{{ translate('Item {id}', { id: entry.item.orderItemSeqId }) }}</p>
         </ion-label>
         <ion-chip v-if="entry.item.facilityId" slot="end" :outline="!isShort(entry)" :class="{ 'facility-warning': isShort(entry) }">
           <ion-icon :icon="isShort(entry) ? warningOutline : businessOutline" />
