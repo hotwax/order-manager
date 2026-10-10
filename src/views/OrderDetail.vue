@@ -293,8 +293,11 @@ const routingItems = computed<RoutingItem[]>(() => (order.value?.shipGroups || [
   .flatMap((group) => group.items)
   .map((item) => ({ orderItemSeqId: item.orderItemSeqId, productId: item.productId, facilityId: item.facilityId, statusId: item.statusId })));
 
+/** When the order came in: the routing graph's first column, and where items that were never routed are read from. */
+const orderImportedAt = computed(() => toMillis(orderDetailStore.orderById(props.orderId)?.entryDate || orderDetailStore.orderById(props.orderId)?.orderDate) || 0);
+
 function loadRoutingHistory(force = false) {
-  if (routingItems.value.length) routingHistoryStore.loadRoutingHistory(props.orderId, routingItems.value, force);
+  if (routingItems.value.length) routingHistoryStore.loadRoutingHistory(props.orderId, routingItems.value, force, orderImportedAt.value || undefined);
 }
 
 // Current stock at each item's location, so a location that is short shows it on the item and its ship group.
@@ -337,7 +340,7 @@ const routingFlow = computed(() => order.value ? buildRoutingFlow({
   items: (order.value.shipGroups || []).flatMap((group) => group.items.map((item) => ({ orderItemSeqId: item.orderItemSeqId, shipGroupSeqId: group.id }))),
   shipGroups: (order.value.shipGroups || []).map((group) => ({ id: group.id, facilityId: group.facilityId })),
   changes: routingHistoryStore.changesByOrderId[props.orderId] || [],
-  importedAt: toMillis(orderDetailStore.orderById(props.orderId)?.entryDate || orderDetailStore.orderById(props.orderId)?.orderDate) || 0,
+  importedAt: orderImportedAt.value,
 }) : undefined);
 
 /* ── Holds tab ────────────────────────────────────────────────────────── */

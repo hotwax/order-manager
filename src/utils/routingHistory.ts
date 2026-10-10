@@ -1,6 +1,7 @@
 import { useSeedData } from "@common/db";
 import { type LocationStock, type ProductFacilityPair, pairKey } from "@/services/routingHistory";
 import { toMillis } from "@/utils/format";
+import { isIssuanceRow, summariseIssuance } from "@/utils/inventoryIssuance";
 
 /**
  * The routing history of an order's items, with the stock each change saw.
@@ -11,7 +12,8 @@ import { toMillis } from "@/utils/format";
  * item here, and can it ship from here?" without anyone reading logs.
  */
 
-export type RoutingEventKind = "brokered" | "released" | "allocated" | "moved" | "rejected" | "parked" | "requeued" | "unfillable" | "cancelled";
+/** Routing changes, plus "issued": the item's stock leaving the books at its location. */
+export type RoutingEventKind = "brokered" | "released" | "allocated" | "moved" | "rejected" | "parked" | "requeued" | "unfillable" | "cancelled" | "issued";
 
 /** Stock at one location around a routing change. `exact` when the change's own movements were found. */
 export interface StockMoment {
@@ -19,6 +21,8 @@ export interface StockMoment {
   before: number | null;
   after: number | null;
   onHand: number | null;
+  /** On hand before, when the change's rows record it (an issuance does; a routing change reads ATP). */
+  onHandBefore?: number | null;
   exact: boolean;
 }
 
@@ -235,8 +239,48 @@ function eventsForItem(changes: any[], item: RoutingItem): RoutingEvent[] {
   return events;
 }
 
-/** The product and location pairs whose movements the history needs, each from the earliest moment it matters. */
-export function movementRequests(items: RoutingItem[], changes: any[]): Array<ProductFacilityPair & { sinceMillis: number }> {
+/**
+ * The item's issuance at its location, as a timeline event: the same issuance rows, read the same
+ * way, as the ship group view, so the two never disagree. Returns the rows too, since later
+ * changes at the location are measured from the last of them.
+ */
+function issuanceAt(item: RoutingItem, orderId: string, page: MovementPage | undefined): { event: RoutingEvent; rows: any[] } | null {
+  const rows = (page?.rows || []).filter((row) => isIssuanceRow(row, orderId, item.orderItemSeqId)).sort(bySequence);
+  if(!rows.length) {return null;}
+  const first = rows[0];
+  const last = rows[rows.length - 1];
+  const summary = summariseIssuance(rows)[item.orderItemSeqId];
+
+  return {
+    rows,
+    event: {
+      id: `issued-${item.orderItemSeqId}`,
+      at: movementAt(first),
+      attempts: 1,
+      kind: "issued",
+      fromFacilityId: item.facilityId,
+      toFacilityId: item.facilityId,
+      reasonEnumId: "",
+      actor: "",
+      user: "",
+      rule: "",
+      stock: {
+        facilityId: item.facilityId,
+        before: num(first.lastAvailableToPromise),
+        after: balanceAfter(last).atp,
+        onHand: summary?.qohAfter ?? null,
+        onHandBefore: summary?.qohBefore ?? null,
+        exact: true,
+      },
+    },
+  };
+}
+
+/**
+ * The product and location pairs whose movements the history needs, each from the earliest moment it
+ * matters. An item that was never routed (sold at a counter) is read from when the order came in.
+ */
+export function movementRequests(items: RoutingItem[], changes: any[], importedAt?: number): Array<ProductFacilityPair & { sinceMillis: number }> {
   const requests = new Map<string, ProductFacilityPair & { sinceMillis: number }>();
   const want = (productId: string, facilityId: string, at: number) => {
     if(!productId || !isStockLocation(facilityId)) {return;}
@@ -249,7 +293,7 @@ export function movementRequests(items: RoutingItem[], changes: any[]): Array<Pr
     events.forEach((event) => want(item.productId, stockLocationOf(event), event.at));
     if(isStockLocation(item.facilityId)) {
       const arrival = [...events].reverse().find((event) => ARRIVALS.includes(event.kind) && event.toFacilityId === item.facilityId);
-      want(item.productId, item.facilityId, arrival?.at ?? Date.now());
+      want(item.productId, item.facilityId, arrival?.at ?? importedAt ?? Date.now());
     }
   });
 
@@ -277,13 +321,25 @@ export function buildRoutingHistory(input: {
     if(isStockLocation(item.facilityId)) {
       const key = pairKey(item.productId, item.facilityId);
       const page = movements[key];
+      const issuance = issuanceAt(item, orderId, page);
+      if(issuance) {
+        events.push(issuance.event);
+        events.sort((a, b) => a.at - b.at);
+      }
+      // "Since" runs from the item's last own moment here: its arrival, or its issuance when that came
+      // after (a counter sale is issued without ever being routed).
       const arrival = [...events].reverse().find((event) => ARRIVALS.includes(event.kind) && event.toFacilityId === item.facilityId);
+      const anchor = issuance && (!arrival || issuance.event.at >= arrival.at) ? issuance.event : arrival;
+      const anchorRow = issuance && anchor === issuance.event ? issuance.rows[issuance.rows.length - 1] : undefined;
+      // Rows written in the same instant as the issuance are ordered by sequence, not by time.
+      const isAfterAnchor = (row: any) => anchorRow ? bySequence(row, anchorRow) > 0 : movementAt(row) > (anchor?.at ?? 0);
       if(page || stock[key]) {
-        const fromAt = arrival?.at ?? 0;
-        // Without the arrival there is no "since" to measure from, so only the current stock shows.
-        const later = arrival ? (page?.rows || [])
-          .filter((row) => movementAt(row) > fromAt)
-          .filter((row) => !isOwnMovement(row, orderId, item.orderItemSeqId, arrival.at))
+        const fromAt = anchor?.at ?? 0;
+        // Without an anchor there is no "since" to measure from, so only the current stock shows.
+        const later = anchor ? (page?.rows || [])
+          .filter(isAfterAnchor)
+          .filter((row) => !isIssuanceRow(row, orderId, item.orderItemSeqId))
+          .filter((row) => !isOwnMovement(row, orderId, item.orderItemSeqId, anchor.at))
           .sort(bySequence)
           .map((row) => toMovement(row)) : [];
         const lastMovement = later[later.length - 1];
@@ -291,8 +347,8 @@ export function buildRoutingHistory(input: {
           facilityId: item.facilityId,
           fromAt,
           movements: later,
-          availableNow: stock[key]?.atp ?? lastMovement?.atpAfter ?? arrival?.stock?.after ?? null,
-          onHandNow: stock[key]?.qoh ?? lastMovement?.qohAfter ?? arrival?.stock?.onHand ?? null,
+          availableNow: stock[key]?.atp ?? lastMovement?.atpAfter ?? anchor?.stock?.after ?? null,
+          onHandNow: stock[key]?.qoh ?? lastMovement?.qohAfter ?? anchor?.stock?.onHand ?? null,
           truncated: Boolean(page?.truncated),
         };
       }

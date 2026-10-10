@@ -463,6 +463,7 @@
   "Inventory": "Inventario",
   "Inventory details": "Detalles de inventario",
   "Inventory issued": "Inventario emitido",
+  "Inventory issued at {facility}": "Inventario descontado en {facility}",
   "Inventory not issued": "Inventario no emitido",
   "Inventory outcome": "Resultado del inventario",
   "Inventory partly issued": "Inventario emitido parcialmente",

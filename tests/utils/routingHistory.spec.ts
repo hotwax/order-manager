@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 import { describe, expect, it, vi } from "vitest";
+import { summariseIssuance } from "@/utils/inventoryIssuance";
 import {
   buildRoutingHistory, isShortAtLocation, isStockLocation, movementRequests, routingEventKind, ruleLabel, stockAt,
 } from "@/utils/routingHistory";
@@ -133,6 +134,52 @@ describe("routing history", () => {
     });
 
     expect(history.map((unit) => [unit.events[0].stock?.before, unit.events[0].stock?.after])).toEqual([[5, 4], [4, 3], [3, 2]]);
+  });
+
+  it("shows a counter sale's issuance, and the return after it, the way the ship group view reads it", () => {
+    // Shaped on a store order that came in with its return: never routed, issued on import, and the
+    // return received in the same instant. The two rows share a createdStamp; sequence orders them.
+    const STORE = "100010";
+    const sale = { orderItemSeqId: "01", productId: PRODUCT, facilityId: STORE, statusId: "ITEM_COMPLETED" };
+    const issuanceRow = {
+      inventoryItemDetailSeqId: "139820", inventoryItemId: "247224", productId: PRODUCT, facilityId: STORE, createdStamp: t("2026-08-17T08:19:24.276Z"),
+      effectiveDate: t("2026-08-17T08:19:24.596Z"), orderId: ORDER_ID, orderItemSeqId: "01", itemIssuanceId: "100022",
+      lastAvailableToPromise: 0, availableToPromiseDiff: -1, lastQuantityOnHand: 0, quantityOnHandDiff: -1,
+    };
+    const returnRow = {
+      inventoryItemDetailSeqId: "139827", inventoryItemId: "247224", productId: PRODUCT, facilityId: STORE, createdStamp: t("2026-08-17T08:19:24.276Z"),
+      effectiveDate: t("2026-08-17T08:19:24.897Z"), returnId: "100515", reasonEnumId: "RTN_ITM_RCPT",
+      lastAvailableToPromise: -1, availableToPromiseDiff: 1, lastQuantityOnHand: -1, quantityOnHandDiff: 1,
+    };
+    const importedAt = t("2026-08-17T08:19:24.324Z");
+
+    expect(movementRequests([sale], [], importedAt)).toEqual([{ productId: PRODUCT, facilityId: STORE, sinceMillis: importedAt }]);
+
+    const [history] = buildRoutingHistory({
+      orderId: ORDER_ID,
+      items: [sale],
+      changes: [],
+      movements: { [`${PRODUCT}|${STORE}`]: { rows: [returnRow, issuanceRow], truncated: false } },
+      stock: { [`${PRODUCT}|${STORE}`]: { atp: 0, qoh: 0 } },
+    });
+
+    expect(history.events).toHaveLength(1);
+    expect(history.events[0]).toMatchObject({ kind: "issued", toFacilityId: STORE, stock: { before: 0, after: -1, onHand: -1, onHandBefore: 0, exact: true } });
+    // The ship group view's issuance, from the same rows: the same answer.
+    expect(summariseIssuance([issuanceRow, returnRow])["01"]).toEqual({ issued: 1, qohBefore: 0, qohAfter: -1 });
+    expect(history.since?.movements.map((movement) => [movement.raw.reasonEnumId, movement.qohDiff, movement.qohAfter])).toEqual([["RTN_ITM_RCPT", 1, 0]]);
+  });
+
+  it("shows only today's stock for an item with neither a routing arrival nor an issuance", () => {
+    const [history] = buildRoutingHistory({
+      orderId: ORDER_ID,
+      items: [item],
+      changes: [],
+      movements: { [`${PRODUCT}|${WAREHOUSE}`]: { rows, truncated: false } },
+      stock: { [`${PRODUCT}|${WAREHOUSE}`]: { atp: -1, qoh: 1 } },
+    });
+    expect(history.events).toEqual([]);
+    expect(history.since).toMatchObject({ movements: [], availableNow: -1, onHandNow: 1 });
   });
 
   it("reads SQL timestamps the same as epoch millis", () => {

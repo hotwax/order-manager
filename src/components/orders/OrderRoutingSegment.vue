@@ -134,7 +134,7 @@ import { DxpShopifyImg, translate, useFastTravel } from "@common";
 import { useSeedData } from "@common/db";
 import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonChip, IonIcon, IonItem, IonLabel, IonList, IonSkeletonText, IonThumbnail } from "@ionic/vue";
 import {
-  arrowRedoOutline, arrowUndoOutline, banOutline, businessOutline, closeCircleOutline, compassOutline, openOutline,
+  arrowRedoOutline, arrowUndoOutline, banOutline, businessOutline, closeCircleOutline, compassOutline, exitOutline, openOutline,
   pauseCircleOutline, returnDownBackOutline, swapHorizontalOutline, timeOutline, warningOutline,
 } from "ionicons/icons";
 import { type ComponentPublicInstance, computed, nextTick, reactive, ref } from "vue";
@@ -212,6 +212,7 @@ const EVENT_ICONS: Record<RoutingEventKind, string> = {
   rejected: returnDownBackOutline,
   parked: pauseCircleOutline,
   requeued: arrowUndoOutline,
+  issued: exitOutline,
   unfillable: banOutline,
   cancelled: closeCircleOutline,
 };
@@ -286,6 +287,7 @@ function eventTitle(event: RoutingEvent) {
     case "rejected": return translate("Rejected from {facility}", { facility: facility(event.fromFacilityId) });
     case "parked": return translate("Parked in {facility}", { facility: facility(event.toFacilityId) });
     case "requeued": return translate("Back to queue");
+    case "issued": return translate("Inventory issued at {facility}", { facility: facility(event.toFacilityId) });
     case "cancelled": return translate("Cancelled at {facility}", { facility: facility(event.fromFacilityId) });
     default: return event.attempts > 1
       ? translate("No location had stock ({count} attempts)", { count: event.attempts })
@@ -310,7 +312,7 @@ function rowsFor(history: ItemRoutingHistory): Row[] {
     id: `e-${event.id}`,
     at: event.at,
     type: "routing",
-    color: event.kind === "rejected" || event.kind === "unfillable" ? "warning" : "primary",
+    color: event.kind === "rejected" || event.kind === "unfillable" ? "warning" : event.kind === "issued" ? "success" : "primary",
     icon: EVENT_ICONS[event.kind],
     title: eventTitle(event),
     detail: eventDetail(event),
@@ -318,7 +320,10 @@ function rowsFor(history: ItemRoutingHistory): Row[] {
       balance: event.stock.after,
       change: event.stock.exact && event.stock.before !== null && event.stock.after !== null ? event.stock.after - event.stock.before : null,
     } : undefined,
-    qoh: event.stock ? { balance: event.stock.onHand } : undefined,
+    qoh: event.stock ? {
+      balance: event.stock.onHand,
+      change: event.stock.onHandBefore != null && event.stock.onHand !== null ? event.stock.onHand - event.stock.onHandBefore : null,
+    } : undefined,
   }));
   // Stock movements read exactly as in Order Routing's inventory history: type, reference, balance and change.
   const stock: Row[] = (history.since?.movements || []).map((movement) => {

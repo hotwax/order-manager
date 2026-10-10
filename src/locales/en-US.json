@@ -463,6 +463,7 @@
   "Inventory": "Inventory",
   "Inventory details": "Inventory details",
   "Inventory issued": "Inventory issued",
+  "Inventory issued at {facility}": "Inventory issued at {facility}",
   "Inventory not issued": "Inventory not issued",
   "Inventory outcome": "Inventory outcome",
   "Inventory partly issued": "Inventory partly issued",

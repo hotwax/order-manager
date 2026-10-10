@@ -61,12 +61,15 @@ export const useRoutingHistoryStore = defineStore("routingHistory", {
       stale.add(orderId);
     },
 
-    /** Routing changes, the stock movements behind them, and current stock, for the Routing segment. */
-    loadRoutingHistory(orderId: string, items: RoutingItem[], force = false): Promise<void> {
+    /**
+     * Routing changes, the stock movements behind them, and current stock, for the Routing segment.
+     * `importedAt` is when the order came in, where an item that was never routed is read from.
+     */
+    loadRoutingHistory(orderId: string, items: RoutingItem[], force = false, importedAt?: number): Promise<void> {
       if(!force && !stale.has(orderId) && this.statusByOrderId[orderId] === "loaded") {return Promise.resolve();}
       const running = inFlight.get(orderId);
       // A forced load wants changes newer than the running load has read, so it runs again after it.
-      if(running) {return force ? running.then(() => this.loadRoutingHistory(orderId, items, true)) : running;}
+      if(running) {return force ? running.then(() => this.loadRoutingHistory(orderId, items, true, importedAt)) : running;}
 
       // A reload keeps the routing already shown on screen until the new one is in.
       const reloading = this.statusByOrderId[orderId] === "loaded";
@@ -76,7 +79,7 @@ export const useRoutingHistoryStore = defineStore("routingHistory", {
         try {
           const changes = await fetchRoutingChanges(orderId);
           this.changesByOrderId[orderId] = changes;
-          const requests = movementRequests(items, changes);
+          const requests = movementRequests(items, changes, importedAt);
           const pages = await Promise.allSettled(requests.map((request) =>
             fetchStockMovements(request.productId, request.facilityId, request.sinceMillis)));
           pages.forEach((page, index) => {
