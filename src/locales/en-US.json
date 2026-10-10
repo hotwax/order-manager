@@ -588,6 +588,8 @@
   "No email": "No email",
   "No estimated delivery date": "No estimated delivery date",
   "No facilities found": "No facilities found",
+  "No facility has enough stock for all {count} items.": "No facility has enough stock for all {count} items.",
+  "No facility has enough stock for this item.": "No facility has enough stock for this item.",
   "No fraud reviews": "No fraud reviews",
   "No history recorded": "No history recorded",
   "No holds": "No holds",

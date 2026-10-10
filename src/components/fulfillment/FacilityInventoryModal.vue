@@ -38,6 +38,13 @@
   </ion-header>
 
   <ion-content>
+    <!-- Said once at the top, so nobody has to read every row to learn that no row has enough. -->
+    <ion-item v-if="!isLoading && !hasFailed && noStockAnywhere" color="warning" lines="none">
+      <ion-icon slot="start" :icon="warningOutline" />
+      <ion-label class="ion-text-wrap">
+        {{ detailedItemIndex >= 0 ? translate('No facility has enough stock for this item.') : translate('No facility has enough stock for all {count} items.', { count: items.length }) }}
+      </ion-label>
+    </ion-item>
     <template v-if="isLoading">
       <div class="empty-state">
         <ion-item lines="none">
@@ -197,13 +204,13 @@
 
 <script setup lang="ts">
 import { IonAccordion, IonAccordionGroup, IonAvatar, IonButton, IonButtons, IonChip, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonRadio, IonRadioGroup, IonSearchbar, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
+import { closeOutline, saveOutline, warningOutline } from 'ionicons/icons';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api, DxpShopifyImg, logger, translate } from '@common';
 import { useSeedData } from '@common/db';
 import { formatNumber } from '@/utils/format';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
-import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, pinCurrentFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
+import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, noFacilityCovers, pinCurrentFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
 
 const seed = useSeedData();
 
@@ -264,6 +271,9 @@ function toggleDetailedItem(index: number) {
   if (props.items.length === 1) return;
   detailedItemIndex.value = detailedItemIndex.value === index ? -1 : index;
 }
+
+/** No facility the store fulfills from can cover the item being detailed, or all of them together. Judged on every facility, not the current search. */
+const noStockAnywhere = computed(() => noFacilityCovers(allFacilities.value, detailedItemIndex.value));
 
 /** A row as rendered: it carries the item the list is detailing, or null when it summarises several items. */
 function withDetail(facility: FacilityCoverageRow) {

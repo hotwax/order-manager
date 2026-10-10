@@ -588,6 +588,8 @@
   "No email": "Sin correo electrónico",
   "No estimated delivery date": "Sin fecha estimada de entrega",
   "No facilities found": "No se encontraron instalaciones",
+  "No facility has enough stock for all {count} items.": "Ninguna instalación tiene stock suficiente para los {count} artículos.",
+  "No facility has enough stock for this item.": "Ninguna instalación tiene stock suficiente para este artículo.",
   "No fraud reviews": "No hay revisiones de fraude",
   "No history recorded": "No hay historial registrado",
   "No holds": "Sin retenciones",

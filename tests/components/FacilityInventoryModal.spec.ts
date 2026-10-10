@@ -62,4 +62,10 @@ describe('facility inventory modal', () => {
     expect(source).toContain("const selectedFacilityId = ref(props.currentFacilityId || '');");
     expect(source).toContain('selectedFacilityId.value !== props.currentFacilityId');
   });
+
+  it('says once, at the top, when no facility has enough stock', () => {
+    expect(source).toContain('noFacilityCovers(allFacilities.value, detailedItemIndex.value)');
+    expect(source).toContain("translate('No facility has enough stock for this item.')");
+    expect(source).toContain("translate('No facility has enough stock for all {count} items.'");
+  });
 });
