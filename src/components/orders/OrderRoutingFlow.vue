@@ -47,10 +47,10 @@
           <button
             v-for="node in graph.nodes"
             :key="node.id"
+            :ref="observeNode"
             type="button"
             class="routing-flow-node"
             :class="{ virtual: !isStockLocation(node.facilityId), short: isNodeShort(node), selected: isSelected('node', node.id) }"
-            :ref="observeNode"
             :style="nodeStyle(node)"
             :data-node-id="node.id"
             @click="select('node', node.id)"
