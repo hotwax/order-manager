@@ -730,6 +730,7 @@
   "Original total": "Original total",
   "Original unit price": "Original unit price",
   "Overdue (>24h)": "Overdue (>24h)",
+  "Overdue by {count} days": "Overdue by {count} day | Overdue by {count} days",
   "overdue by {value}": "overdue by {value}",
   "Pack": "Pack",
   "Packed": "Packed",

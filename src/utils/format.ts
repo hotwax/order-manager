@@ -88,6 +88,17 @@ export const formatDateTime = (value: any, { year = true } = {}) =>
 export const formatMonthYear = (value: any) => format(value, { month: 'long', year: 'numeric' });
 
 /** "3 days ago", "in 2 hours". */
+/**
+ * Whole calendar days a date is in the past, in the user's time zone: 1 the day after it, 0 on the
+ * day itself or before it, and 0 when there is no date.
+ */
+export function daysPast(value: any, now = Date.now()): number {
+  const millis = toMillis(value);
+  if (millis === undefined) return 0;
+  const days = DateTime.fromMillis(now).startOf('day').diff(DateTime.fromMillis(millis).startOf('day'), 'days').days;
+  return Math.max(Math.round(days), 0);
+}
+
 export function formatRelative(value: any): string {
   const millis = toMillis(value);
   if (millis === undefined) return '';

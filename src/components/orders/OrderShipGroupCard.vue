@@ -103,6 +103,9 @@
           <ion-label>
             <p>{{ translate('Estimated ship date') }}</p>
             {{ formatDateTime(shipGroup.estimatedShipDate) }}
+            <p v-if="shipOverdueDays">
+              <ion-badge color="warning">{{ translate('Overdue by {count} days', { count: shipOverdueDays }) }}</ion-badge>
+            </p>
           </ion-label>
           <ion-label>
             <p>{{ translate('Estimated delivery date') }}</p>
@@ -495,7 +498,7 @@ import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { confirmAction, isKit } from '@/utils';
 import type { ShipGroupMilestones } from '@/utils/orderEvents';
-import { formatDateTime, formatElapsed, formatNumber, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
+import { daysPast, formatDateTime, formatElapsed, formatNumber, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
 import { OrderActionValidator, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import type { EnrichedShipGroup, ItemIssuance, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 
@@ -566,6 +569,9 @@ const COLLAPSED_ITEM_LIMIT = 3;
 const hiddenItemCount = computed(() => Math.max(props.shipGroup.items.length - COLLAPSED_ITEM_LIMIT, 0));
 const shortItems = computed(() => props.shipGroup.items.filter((item) => props.shortStock?.[item.orderItemSeqId] !== undefined));
 const orderIsTerminal = computed(() => OrderActionValidator.isOrderTerminal({ statusId: props.orderStatusId }));
+// Days the estimated ship date has passed while items are still open. A settled group isn't late,
+// and neither is an empty one, which the settled rule doesn't cover.
+const shipOverdueDays = computed(() => (props.shipGroup.isSettled || !props.shipGroup.items?.length ? 0 : daysPast(props.shipGroup.estimatedShipDate)));
 
 /** A stopped group is read-only: its options describe a shipment that will no longer change. */
 const optionsOpen = computed(() => {
