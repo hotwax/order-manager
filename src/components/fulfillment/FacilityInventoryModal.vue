@@ -49,13 +49,19 @@
     <div class="empty-state" v-else-if="hasFailed">
       <p>{{ translate('Failed to fetch facility inventory. Please try again.') }}</p>
     </div>
-    <div class="empty-state" v-else-if="!visibleFacilities.length">
+    <div class="empty-state" v-else-if="!facilitySections.some((section) => section.rows.length)">
       <p>{{ translate('No facilities found') }}</p>
     </div>
     <ion-radio-group v-else-if="isMobileViewport" v-model="selectedFacilityId">
-      <ion-list>
+      <ion-list v-for="section in facilitySections" :key="section.key">
+        <ion-list-header v-if="section.label">
+          <ion-label>{{ section.label }}</ion-label>
+        </ion-list-header>
+        <ion-item v-if="!section.rows.length" lines="none">
+          <ion-label>{{ translate('No facilities found') }}</ion-label>
+        </ion-item>
         <ion-accordion-group>
-          <ion-accordion v-for="facility in visibleFacilities" :key="facility.facilityId" :value="facility.facilityId">
+          <ion-accordion v-for="facility in section.rows" :key="facility.facilityId" :value="facility.facilityId">
             <div slot="header" class="list-item facility-inventory-mobile-row">
               <ion-item lines="none">
                 <ion-radio label-placement="end" justify="start" :value="facility.facilityId" @click.stop>
@@ -119,12 +125,15 @@
       </ion-list>
     </ion-radio-group>
     <ion-radio-group v-else v-model="selectedFacilityId">
-      <ion-list>
+      <ion-list v-for="section in facilitySections" :key="section.key">
         <ion-list-header>
-          <ion-label class="tablet">{{ translate('Select fulfillment facility') }}</ion-label>
+          <ion-label class="tablet">{{ section.label || translate('Select fulfillment facility') }}</ion-label>
         </ion-list-header>
+        <ion-item v-if="!section.rows.length" lines="none">
+          <ion-label>{{ translate('No facilities found') }}</ion-label>
+        </ion-item>
         <div
-          v-for="facility in visibleFacilities"
+          v-for="facility in section.rows"
           :key="facility.facilityId"
           class="list-item"
           :class="facility.detail ? 'facility-inventory-row' : 'facility-coverage-row'"
@@ -179,7 +188,7 @@
     </ion-radio-group>
 
     <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedFacilityId" :aria-label="translate('Save')" @click="save">
+      <ion-fab-button :disabled="!canSave" :aria-label="translate('Save')" @click="save">
         <ion-icon :icon="saveOutline" />
       </ion-fab-button>
     </ion-fab>
@@ -194,7 +203,7 @@ import { api, DxpShopifyImg, logger, translate } from '@common';
 import { useSeedData } from '@common/db';
 import { formatNumber } from '@/utils/format';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
-import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
+import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, pinCurrentFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
 
 const seed = useSeedData();
 
@@ -211,6 +220,12 @@ const props = defineProps<{
   productStoreId?: string;
   title?: string;
   excludedFacilityIds?: string[];
+  /**
+   * The facility every item is at now, when they share one real facility. It is pinned first and
+   * preselected, and saving it would only reject the items and release them back to the same place,
+   * so Save stays off until another facility is picked.
+   */
+  currentFacilityId?: string;
 }>();
 
 const MAX_SHORT_NAMES = 2;
@@ -219,7 +234,7 @@ const isLoading = ref(false);
 const hasFailed = ref(false);
 const allFacilities = ref<FacilityCoverageRow[]>([]);
 const filteredFacilities = ref<FacilityCoverageRow[]>([]);
-const selectedFacilityId = ref('');
+const selectedFacilityId = ref(props.currentFacilityId || '');
 const queryString = ref('');
 const isMobileViewport = ref(false);
 // A single item is always detailed; with more than one the strip decides.
@@ -229,8 +244,10 @@ let mobileMediaQuery: MediaQueryList | null = null;
 
 const productIds = computed(() => Array.from(new Set(props.items.map((item) => item.productId).filter(Boolean))));
 
+const canSave = computed(() => Boolean(selectedFacilityId.value) && selectedFacilityId.value !== props.currentFacilityId);
+
 function save() {
-  if (selectedFacilityId.value) {
+  if (canSave.value) {
     modalController.dismiss(selectedFacilityId.value);
   }
 }
@@ -248,16 +265,24 @@ function toggleDetailedItem(index: number) {
   detailedItemIndex.value = detailedItemIndex.value === index ? -1 : index;
 }
 
+/** A row as rendered: it carries the item the list is detailing, or null when it summarises several items. */
+function withDetail(facility: FacilityCoverageRow) {
+  return { ...facility, detail: (facility.items[detailedItemIndex.value] ?? null) as FacilityItemAvailability | null };
+}
+
 /**
- * The rows as rendered: each carries the item the list is currently detailing, or null when the
- * list is summarising several items.
+ * The rows in the groups the list renders: the current facility on its own, then the rest. Without a
+ * current facility there is one group, and its header keeps the original wording.
  */
-const visibleFacilities = computed(() =>
-  sortFacilityCoverageRows(filteredFacilities.value, detailedItemIndex.value).map((facility) => ({
-    ...facility,
-    detail: (facility.items[detailedItemIndex.value] ?? null) as FacilityItemAvailability | null
-  }))
-);
+const facilitySections = computed(() => {
+  const shown = sortFacilityCoverageRows(filteredFacilities.value, detailedItemIndex.value);
+  const { current, others } = pinCurrentFacility(allFacilities.value, shown, props.currentFacilityId);
+  if (!current) return [{ key: 'all', label: '', rows: others.map(withDetail) }];
+  return [
+    { key: 'current', label: translate('Current facility'), rows: [withDetail(current)] },
+    { key: 'others', label: translate('Select a different facility'), rows: others.map(withDetail) }
+  ];
+});
 
 function chipLabel(item: FacilityInventoryModalItem) {
   const quantity = Number(item.quantity ?? 1);

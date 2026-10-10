@@ -137,9 +137,14 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
    * ship group's selection differ only in how many items are handed over.
    */
   async function openFacilityInventoryModal(items: EnrichedOrderItem[]): Promise<string | null> {
+    // Items that share one real facility have a current facility the picker pins first and won't
+    // save. Items in a queue or parking location have none, so every facility is a choice.
+    const facilityIds = new Set(items.map((item) => item.facilityId));
+    const currentFacilityId = facilityIds.size === 1 && !items.some(isVirtualForItem) ? items[0]?.facilityId : undefined;
     const modal = await modalController.create({
       component: FacilityInventoryModal,
       componentProps: {
+        currentFacilityId,
         items: items.map((item) => ({
           orderItemSeqId: item.orderItemSeqId,
           productId: item.productId || '',

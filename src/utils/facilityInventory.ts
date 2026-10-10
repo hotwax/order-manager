@@ -248,3 +248,14 @@ export function filterFacilityCoverageRows(rows: FacilityCoverageRow[], query: s
   if (!search) return rows;
   return rows.filter((row) => row.searchText.includes(search));
 }
+
+/**
+ * The rows as the picker groups them: the facility the items are at now, pinned on its own like the
+ * browser time zone, then every other facility. The current facility stays pinned while the operator
+ * searches, so the comparison they opened the picker for never scrolls away. Without a current
+ * facility (the items sit in a queue or parking), every row is a choice.
+ */
+export function pinCurrentFacility<T extends { facilityId: string }>(allRows: T[], shownRows: T[], currentFacilityId?: string) {
+  const current = currentFacilityId ? allRows.find((row) => row.facilityId === currentFacilityId) ?? null : null;
+  return { current, others: current ? shownRows.filter((row) => row.facilityId !== current.facilityId) : shownRows };
+}
