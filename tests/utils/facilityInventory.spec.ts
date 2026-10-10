@@ -3,6 +3,7 @@ import {
   buildFacilityCoverageRows,
   filterFacilityCoverageRows,
   isPhysicalFacility,
+  pinCurrentFacility,
   sortFacilityCoverageRows
 } from '@/utils/facilityInventory';
 
@@ -138,5 +139,26 @@ describe('facility coverage rows', () => {
   it('separates physical facilities from virtual ones by parent type', () => {
     expect(isPhysicalFacility({ facilityId: 'STORE_A', parentTypeId: 'PHYSICAL_STORE' })).toBe(true);
     expect(isPhysicalFacility({ facilityId: 'PRE_ORDER_PARKING', parentTypeId: 'VIRTUAL_FACILITY' })).toBe(false);
+  });
+});
+
+describe('pinning the current facility', () => {
+  const rows = [{ facilityId: 'STORE_A' }, { facilityId: 'STORE_B' }, { facilityId: 'WAREHOUSE' }];
+
+  it('takes the current facility out of the choices and pins it on its own', () => {
+    expect(pinCurrentFacility(rows, rows, 'STORE_B')).toEqual({
+      current: { facilityId: 'STORE_B' },
+      others: [{ facilityId: 'STORE_A' }, { facilityId: 'WAREHOUSE' }],
+    });
+  });
+
+  it('keeps the current facility pinned while a search hides it from the list', () => {
+    const searched = [{ facilityId: 'WAREHOUSE' }];
+    expect(pinCurrentFacility(rows, searched, 'STORE_B')).toEqual({ current: { facilityId: 'STORE_B' }, others: searched });
+  });
+
+  it('pins nothing when there is no current facility, or it is not one of the choices', () => {
+    expect(pinCurrentFacility(rows, rows)).toEqual({ current: null, others: rows });
+    expect(pinCurrentFacility(rows, rows, 'PARKING')).toEqual({ current: null, others: rows });
   });
 });
