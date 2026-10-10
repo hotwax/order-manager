@@ -1,10 +1,12 @@
 <template>
   <!-- The graph stays pinned at the top of the segment while the item history below scrolls under it.
-       It scrolls inside its own frame so a long routing history never widens the page. -->
-  <div class="routing-flow">
+       It scrolls inside its own frame so a long routing history never widens the page. Pinned, it
+       compresses as the user scrolls (a CSS scroll-driven animation, see the styles), and opens back up
+       while the user hovers or focuses it. -->
+  <div class="routing-flow" :style="{ '--routing-flow-frame': frameOpen }">
     <!-- The frame is sized before the routing arrives, from the ship groups the order has now, so the
          timeline below does not jump when the graph replaces the placeholder. -->
-    <div ref="scrollEl" class="routing-flow-scroll" :style="{ height: frameHeight }">
+    <div ref="scrollEl" class="routing-flow-scroll">
       <Transition name="routing-flow-fade" mode="out-in">
         <div v-if="!flow" key="loading" class="routing-flow-loading" :style="{ height: `${estimatedHeight}px` }">
           <ion-spinner name="crescent" />
@@ -152,7 +154,9 @@ const estimatedHeight = computed(() => {
 const scrollEl = ref<HTMLElement>();
 const scrollbarHeight = ref(0);
 const FRAME_BORDER = 2;
-const frameHeight = computed(() => `min(${(props.flow ? layout.value.height : estimatedHeight.value) + FRAME_BORDER + scrollbarHeight.value}px, 40vh)`);
+const frameBase = computed(() => (props.flow ? layout.value.height : estimatedHeight.value) + FRAME_BORDER + scrollbarHeight.value);
+/** The frame's open height; the styles derive the compressed height and the matching margin from it. */
+const frameOpen = computed(() => `min(${frameBase.value}px, 40vh)`);
 watch(layout, async () => {
   await nextTick();
   const el = scrollEl.value;
@@ -290,15 +294,64 @@ function edgeTitle(edge: FlowEdge) {
 </script>
 
 <style scoped>
+/*
+ * Compressing while pinned, done by the browser rather than by script. The frame's open height comes in
+ * as --routing-flow-frame. Two registered numbers scale what it gives up when compressed (open minus
+ * 20vh): --routing-flow-compress follows the page's scroll, and --routing-flow-rest is 0 while the user
+ * hovers or focuses the graph. The margin below grows by exactly what the frame loses, so the graph
+ * always takes the same room and the history never moves under the user.
+ */
+@property --routing-flow-frame {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+@property --routing-flow-compress {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 0;
+}
+
+@property --routing-flow-rest {
+  syntax: "<number>";
+  inherits: true;
+  initial-value: 1;
+}
+
 .routing-flow {
+  --routing-flow-give: calc(var(--routing-flow-frame) - min(var(--routing-flow-frame), 20vh));
+  --routing-flow-shrink: calc(var(--routing-flow-give) * var(--routing-flow-compress) * var(--routing-flow-rest));
   position: sticky;
-  top: 0;
+  top: var(--spacer-sm);
   z-index: 2;
+  margin-bottom: var(--routing-flow-shrink);
+  /* Leaving waits a moment before compressing again, so a pointer crossing it mid-scroll does not flicker. */
+  transition: --routing-flow-frame 0.25s ease, --routing-flow-rest 0.25s ease 0.25s;
+}
+
+.routing-flow:hover, .routing-flow:focus-within {
+  --routing-flow-rest: 0;
+  transition: --routing-flow-frame 0.25s ease, --routing-flow-rest 0.25s ease;
+}
+
+/* Pinned at --spacer-sm, the same as the segment's padding, so the graph pins exactly as the segment's top
+   edge crosses the top of the scroll area: exit-crossing 0. It then compresses a pixel per pixel scrolled. */
+@supports (animation-timeline: view()) {
+  .routing-flow {
+    animation: routing-flow-compress linear both;
+    animation-timeline: --routing-tab;
+    animation-range: exit-crossing 0 exit-crossing var(--routing-flow-give);
+  }
+}
+
+@keyframes routing-flow-compress {
+  to { --routing-flow-compress: 1; }
 }
 
 .routing-flow-scroll {
+  height: calc(var(--routing-flow-frame) - var(--routing-flow-shrink));
   overflow: auto;
-  transition: height 0.25s ease;
   border: 1px solid var(--ion-color-light-shade);
   border-radius: 10px;
   /* The same grid the Data Document graph builder draws behind its cards. */
@@ -330,7 +383,7 @@ function edgeTitle(edge: FlowEdge) {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .routing-flow-scroll, .routing-flow-fade-enter-active, .routing-flow-fade-leave-active {
+  .routing-flow, .routing-flow:hover, .routing-flow:focus-within, .routing-flow-fade-enter-active, .routing-flow-fade-leave-active {
     transition: none;
   }
 }

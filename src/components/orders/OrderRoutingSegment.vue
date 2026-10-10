@@ -396,6 +396,8 @@ function showLess(entry: Entry) {
   display: flex;
   flex-direction: column;
   gap: var(--spacer-sm, 12px);
+  /* The scroll timeline the pinned routing graph compresses along (see OrderRoutingFlow). */
+  view-timeline-name: --routing-tab;
   /* At least a screen tall below the toolbar (56px) and segment bar (48px). Switching here from a
      taller tab then never shortens the page under the user, so the browser has no reason to clamp
      the scroll position and jump the page. */
