@@ -1,6 +1,6 @@
 import { DateTime } from "luxon";
 import { describe, expect, it } from "vitest";
-import { buildRoutingFlow, layoutRoutingFlow } from "@/utils/routingFlow";
+import { ROUTING_FLOW_SIZE, buildRoutingFlow, estimateFlowHeight, layoutRoutingFlow } from "@/utils/routingFlow";
 
 const t = (iso: string) => Date.parse(iso);
 const change = (id: string, item: string, shipGroup: string, from: string, to: string, reason: string, iso: string, extra: Record<string, any> = {}) => ({
@@ -143,6 +143,20 @@ describe("routing flow", () => {
 
     expect(flow.nodes.map((node) => node.id)).toEqual(["0-00001", "1-00004", "2-00001"]);
     expect(flow.edges.map((edge) => [edge.kind, edge.attempts])).toEqual([["unfillable", 1], ["requeued", 3]]);
+  });
+
+  it("estimates the graph's height from today's ship groups before the routing loads", () => {
+    // Six items imported together, then split five and one: the estimate is the height the graph takes.
+    const items = ["01", "02", "03", "04", "05", "06"].map((id) => ({ orderItemSeqId: id, shipGroupSeqId: id === "01" ? "00003" : "00002" }));
+    const flow = buildRoutingFlow({
+      items,
+      shipGroups: [{ id: "00001", facilityId: "_NA_" }, { id: "00002", facilityId: "100000" }, { id: "00003", facilityId: "100007" }],
+      changes: items.map((item) => change(`b${item.orderItemSeqId}`, item.orderItemSeqId, item.shipGroupSeqId, "_NA_", item.shipGroupSeqId === "00002" ? "100000" : "100007", "BROKERED", "2026-10-08T17:02:00Z")),
+      importedAt: t("2026-10-08T16:59:45Z"),
+    });
+
+    expect(estimateFlowHeight([5, 1])).toBe(layoutRoutingFlow(flow, ROUTING_FLOW_SIZE).height);
+    expect(estimateFlowHeight([])).toBe(0);
   });
 
   it("shows an order that never moved as its imported ship group", () => {

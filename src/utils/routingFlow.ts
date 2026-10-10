@@ -242,9 +242,25 @@ export interface FlowLayout {
 }
 
 /** Cards sit in columns; each card lines up with the cards its items came from, without overlapping. */
-export function layoutRoutingFlow(flow: RoutingFlow, size: {
-  cardWidth: number; columnGap: number; headerHeight: number; rowHeight: number; cardGap: number; top: number; left: number;
-}): FlowLayout {
+/** The graph's card sizes, shared by the graph and by the placeholder that holds its place while it loads. */
+export const ROUTING_FLOW_SIZE = { cardWidth: 260, columnGap: 210, headerHeight: 58, rowHeight: 52, cardGap: 28, top: 52, left: 16 };
+export type FlowSize = typeof ROUTING_FLOW_SIZE;
+
+/**
+ * The canvas height the graph will most likely need, from the order as it is now: the imported
+ * column shows every item on one card, and the latest column shows today's ship groups stacked.
+ */
+export function estimateFlowHeight(itemsPerShipGroup: number[], size: FlowSize = ROUTING_FLOW_SIZE): number {
+  const groups = itemsPerShipGroup.filter((count) => count > 0);
+  if(!groups.length) {return 0;}
+  const cardHeight = (items: number) => size.headerHeight + items * size.rowHeight;
+  const imported = cardHeight(groups.reduce((sum, count) => sum + count, 0));
+  const current = groups.reduce((sum, count) => sum + cardHeight(count), 0) + (groups.length - 1) * size.cardGap;
+
+  return size.top + Math.max(imported, current) + size.cardGap;
+}
+
+export function layoutRoutingFlow(flow: RoutingFlow, size: FlowSize = ROUTING_FLOW_SIZE): FlowLayout {
   const positions: FlowLayout["positions"] = {};
   const cardHeight = (node: FlowNode) => size.headerHeight + node.orderItemSeqIds.length * size.rowHeight;
   let bottom = 0;

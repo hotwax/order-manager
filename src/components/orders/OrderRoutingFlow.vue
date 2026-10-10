@@ -2,65 +2,75 @@
   <!-- The graph stays pinned at the top of the segment while the item history below scrolls under it.
        It scrolls inside its own frame so a long routing history never widens the page. -->
   <div class="routing-flow">
-    <div class="routing-flow-scroll">
-      <div class="routing-flow-canvas" :style="{ width: `${layout.width}px`, height: `${layout.height}px` }">
-        <div
-          v-for="column in flow.columns"
-          :key="column.index"
-          class="routing-flow-column-label"
-          :style="{ left: `${columnX(column.index)}px`, width: `${SIZE.cardWidth}px` }"
-        >
-          <strong>{{ columnLabel(column) }}</strong>
-          <span>{{ formatDateTime(column.at, { year: false }) }}</span>
+    <!-- The frame is sized before the routing arrives, from the ship groups the order has now, so the
+         timeline below does not jump when the graph replaces the placeholder. -->
+    <div ref="scrollEl" class="routing-flow-scroll" :style="{ height: frameHeight }">
+      <Transition name="routing-flow-fade" mode="out-in">
+        <div v-if="!flow" key="loading" class="routing-flow-loading" :style="{ height: `${estimatedHeight}px` }">
+          <ion-spinner name="crescent" />
+          <ion-label color="medium">
+            {{ translate('Loading routing history...') }}
+          </ion-label>
         </div>
-
-        <svg class="routing-flow-edges" :width="layout.width" :height="layout.height" :viewBox="`0 0 ${layout.width} ${layout.height}`">
-          <g
-            v-for="edge in flow.edges"
-            :key="edge.id"
-            class="routing-flow-edge"
-            :class="[`edge-${edge.kind}`, { selected: isSelected('edge', edge.id) }]"
-            role="button"
-            tabindex="0"
-            :aria-label="edgeTitle(edge)"
-            @click="select('edge', edge.id)"
-            @keydown.enter="select('edge', edge.id)"
+        <div v-else key="graph" class="routing-flow-canvas" :style="{ width: `${layout.width}px`, height: `${layout.height}px` }">
+          <div
+            v-for="column in graph.columns"
+            :key="column.index"
+            class="routing-flow-column-label"
+            :style="{ left: `${columnX(column.index)}px`, width: `${SIZE.cardWidth}px` }"
           >
-            <line class="edge-hit" v-bind="edgeEnds(edge)" />
-            <line class="edge-line" v-bind="edgeEnds(edge)" />
-            <text :x="edgeLabelPoint(edge).x" :y="edgeLabelPoint(edge).y" text-anchor="middle">{{ edgeLabel(edge) }}</text>
-            <text v-if="edgeActor(edge)" class="edge-actor" :x="edgeLabelPoint(edge).x" :y="edgeLabelPoint(edge).y + 20" text-anchor="middle">
-              {{ edgeActor(edge) }}
-            </text>
-          </g>
-        </svg>
+            <strong>{{ columnLabel(column) }}</strong>
+            <span>{{ formatDateTime(column.at, { year: false }) }}</span>
+          </div>
 
-        <button
-          v-for="node in flow.nodes"
-          :key="node.id"
-          type="button"
-          class="routing-flow-node"
-          :class="{ virtual: !isStockLocation(node.facilityId), short: isNodeShort(node), selected: isSelected('node', node.id) }"
-          :style="nodeStyle(node)"
-          @click="select('node', node.id)"
-        >
-          <span class="routing-flow-node-title">{{ facility(node.facilityId) }}</span>
-          <small class="routing-flow-node-subtitle">
-            {{ translate('Ship group {id}', { id: node.shipGroupSeqId }) }}
-            <ion-badge v-if="nodeBadge(node)" :color="nodeBadge(node)!.color">{{ nodeBadge(node)!.label }}</ion-badge>
-          </small>
-          <span v-for="id in node.orderItemSeqIds" :key="id" class="routing-flow-item">
-            <span class="routing-flow-thumb"><DxpShopifyImg :key="itemImage(id)" :src="itemImage(id)" size="small" /></span>
-            <span class="routing-flow-item-text">
-              <span>{{ itemPrimary(id) }}</span>
-              <small>{{ itemSecondary(id) }}</small>
+          <svg class="routing-flow-edges" :width="layout.width" :height="layout.height" :viewBox="`0 0 ${layout.width} ${layout.height}`">
+            <g
+              v-for="edge in graph.edges"
+              :key="edge.id"
+              class="routing-flow-edge"
+              :class="[`edge-${edge.kind}`, { selected: isSelected('edge', edge.id) }]"
+              role="button"
+              tabindex="0"
+              :aria-label="edgeTitle(edge)"
+              @click="select('edge', edge.id)"
+              @keydown.enter="select('edge', edge.id)"
+            >
+              <line class="edge-hit" v-bind="edgeEnds(edge)" />
+              <line class="edge-line" v-bind="edgeEnds(edge)" />
+              <text :x="edgeLabelPoint(edge).x" :y="edgeLabelPoint(edge).y" text-anchor="middle">{{ edgeLabel(edge) }}</text>
+              <text v-if="edgeActor(edge)" class="edge-actor" :x="edgeLabelPoint(edge).x" :y="edgeLabelPoint(edge).y + 20" text-anchor="middle">
+                {{ edgeActor(edge) }}
+              </text>
+            </g>
+          </svg>
+
+          <button
+            v-for="node in graph.nodes"
+            :key="node.id"
+            type="button"
+            class="routing-flow-node"
+            :class="{ virtual: !isStockLocation(node.facilityId), short: isNodeShort(node), selected: isSelected('node', node.id) }"
+            :style="nodeStyle(node)"
+            @click="select('node', node.id)"
+          >
+            <span class="routing-flow-node-title">{{ facility(node.facilityId) }}</span>
+            <small class="routing-flow-node-subtitle">
+              {{ translate('Ship group {id}', { id: node.shipGroupSeqId }) }}
+              <ion-badge v-if="nodeBadge(node)" :color="nodeBadge(node)!.color">{{ nodeBadge(node)!.label }}</ion-badge>
+            </small>
+            <span v-for="id in node.orderItemSeqIds" :key="id" class="routing-flow-item">
+              <span class="routing-flow-thumb"><DxpShopifyImg :key="itemImage(id)" :src="itemImage(id)" size="small" /></span>
+              <span class="routing-flow-item-text">
+                <span>{{ itemPrimary(id) }}</span>
+                <small>{{ itemSecondary(id) }}</small>
+              </span>
+              <span v-if="node.isCurrent && shortStock[id] !== undefined" class="routing-flow-short">
+                {{ translate('({available})', { available: formatNumber(shortStock[id]) }) }}
+              </span>
             </span>
-            <span v-if="node.isCurrent && shortStock[id] !== undefined" class="routing-flow-short">
-              {{ translate('({available})', { available: formatNumber(shortStock[id]) }) }}
-            </span>
-          </span>
-        </button>
-      </div>
+          </button>
+        </div>
+      </Transition>
     </div>
   </div>
 </template>
@@ -68,16 +78,19 @@
 <script setup lang="ts">
 import { DxpShopifyImg, translate } from "@common";
 import { useSeedData } from "@common/db";
-import { IonBadge } from "@ionic/vue";
-import { computed, ref } from "vue";
+import { IonBadge, IonLabel, IonSpinner } from "@ionic/vue";
+import { computed, nextTick, ref, watch } from "vue";
 import { useProductIdentity } from "@/composables/useProductIdentity";
 import type { EnrichedOrderItem } from "@/types/orderDetail";
 import { formatDateTime, formatNumber } from "@/utils/format";
-import { type FlowColumn, type FlowEdge, type FlowNode, type RoutingFlow, layoutRoutingFlow } from "@/utils/routingFlow";
+import {
+  type FlowColumn, type FlowEdge, type FlowNode, ROUTING_FLOW_SIZE, type RoutingFlow, estimateFlowHeight, layoutRoutingFlow,
+} from "@/utils/routingFlow";
 import { isStockLocation, ruleName } from "@/utils/routingHistory";
 
 const props = defineProps<{
-  flow: RoutingFlow;
+  /** Undefined while the routing loads; the frame then holds the graph's likely size. */
+  flow?: RoutingFlow;
   items: EnrichedOrderItem[];
   /** Available to promise at the item's location, for items whose location is short. */
   shortStock: Record<string, number>;
@@ -88,8 +101,30 @@ const emit = defineEmits<{ "select-items": [orderItemSeqIds: string[]] }>();
 const seed = useSeedData();
 const { getProduct, primaryIdentifier, secondaryIdentifier } = useProductIdentity();
 
-const SIZE = { cardWidth: 260, columnGap: 210, headerHeight: 58, rowHeight: 52, cardGap: 28, top: 52, left: 16 };
-const layout = computed(() => layoutRoutingFlow(props.flow, SIZE));
+const SIZE = ROUTING_FLOW_SIZE;
+const EMPTY_FLOW: RoutingFlow = { columns: [], nodes: [], edges: [] };
+const graph = computed(() => props.flow ?? EMPTY_FLOW);
+const layout = computed(() => layoutRoutingFlow(graph.value, SIZE));
+
+/** The graph's likely height before it loads: today's ship groups stacked, or every item on one imported card. */
+const estimatedHeight = computed(() => {
+  const itemsPerGroup = new Map<string, number>();
+  props.items.forEach((item) => itemsPerGroup.set(item.shipGroupSeqId, (itemsPerGroup.get(item.shipGroupSeqId) || 0) + 1));
+
+  return estimateFlowHeight([...itemsPerGroup.values()], SIZE);
+});
+
+// An explicit height (not max-height) is what lets the frame ease between the estimate and the real
+// graph. It includes the frame's border and its horizontal scrollbar, when the graph is wider than the page.
+const scrollEl = ref<HTMLElement>();
+const scrollbarHeight = ref(0);
+const FRAME_BORDER = 2;
+const frameHeight = computed(() => `min(${(props.flow ? layout.value.height : estimatedHeight.value) + FRAME_BORDER + scrollbarHeight.value}px, 40vh)`);
+watch(layout, async () => {
+  await nextTick();
+  const el = scrollEl.value;
+  if(el) {scrollbarHeight.value = Math.max(el.offsetHeight - el.clientHeight - FRAME_BORDER, 0);}
+}, { immediate: true });
 
 const KIND_LABELS: Record<string, string> = {
   imported: "Imported",
@@ -110,8 +145,8 @@ const selected = ref<{ kind: "node" | "edge"; id: string } | null>(null);
 
 function select(kind: "node" | "edge", id: string) {
   selected.value = isSelected(kind, id) ? null : { kind, id };
-  const edge = selected.value?.kind === "edge" ? props.flow.edges.find((entry) => entry.id === id) : undefined;
-  const node = selected.value?.kind === "node" ? props.flow.nodes.find((entry) => entry.id === id) : undefined;
+  const edge = selected.value?.kind === "edge" ? graph.value.edges.find((entry) => entry.id === id) : undefined;
+  const node = selected.value?.kind === "node" ? graph.value.nodes.find((entry) => entry.id === id) : undefined;
   emit("select-items", edge?.orderItemSeqIds || node?.orderItemSeqIds || []);
 }
 
@@ -174,7 +209,7 @@ function columnLabel(column: FlowColumn) {
 /** A line leaves its card at a point spread along the card's height, so several lines from one card stay apart. */
 function anchor(nodeId: string, edge: FlowEdge, side: "out" | "in") {
   const position = layout.value.positions[nodeId];
-  const siblings = props.flow.edges.filter((other) => (side === "out" ? other.from : other.to) === nodeId);
+  const siblings = graph.value.edges.filter((other) => (side === "out" ? other.from : other.to) === nodeId);
   const index = siblings.findIndex((other) => other.id === edge.id);
 
   return {
@@ -229,8 +264,8 @@ function edgeTitle(edge: FlowEdge) {
 }
 
 .routing-flow-scroll {
-  max-height: 40vh;
   overflow: auto;
+  transition: height 0.25s ease;
   border: 1px solid var(--ion-color-light-shade);
   border-radius: 10px;
   /* The same grid the Data Document graph builder draws behind its cards. */
@@ -244,6 +279,27 @@ function edgeTitle(edge: FlowEdge) {
 .routing-flow-canvas {
   position: relative;
   min-width: 100%;
+}
+
+.routing-flow-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacer-xs, 8px);
+}
+
+.routing-flow-fade-enter-active, .routing-flow-fade-leave-active {
+  transition: opacity 0.15s ease;
+}
+
+.routing-flow-fade-enter-from, .routing-flow-fade-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .routing-flow-scroll, .routing-flow-fade-enter-active, .routing-flow-fade-leave-active {
+    transition: none;
+  }
 }
 
 .routing-flow-column-label {
@@ -320,7 +376,7 @@ function edgeTitle(edge: FlowEdge) {
   position: absolute;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--spacer-2xs);
   padding: 10px 12px;
   border: 1px solid var(--ion-color-light-shade);
   border-radius: 10px;
@@ -357,19 +413,19 @@ function edgeTitle(edge: FlowEdge) {
 .routing-flow-node-subtitle {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--spacer-2xs);
   color: var(--ion-color-medium-shade);
 }
 
 .routing-flow-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--spacer-xs);
   flex: 0 0 auto;
   height: 48px;
   box-sizing: border-box;
   border-top: 1px solid var(--ion-color-light-shade);
-  padding-top: 4px;
+  padding-top: var(--spacer-2xs);
 }
 
 .routing-flow-thumb {

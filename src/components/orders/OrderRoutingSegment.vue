@@ -9,8 +9,8 @@
     </ion-item>
 
     <OrderRoutingFlow
-      v-if="flow && status === 'loaded'"
-      :flow="flow"
+      v-if="status !== 'error' && entries.length"
+      :flow="status === 'loaded' ? flow : undefined"
       :items="entries.map((entry) => entry.item)"
       :short-stock="shortStock || {}"
       @select-items="focusItems"
@@ -59,7 +59,7 @@
 
       <!-- The timeline opens on demand. Collapsed, the header still answers "can it ship from here?" with the
            stock now; open, it lists changes oldest first, ten at a time. -->
-      <ion-accordion-group v-if="entry.rows.length || entry.history.since">
+      <ion-accordion-group v-if="entry.rows.length || entry.history.since" class="timeline-loaded">
         <ion-accordion :value="entry.item.orderItemSeqId">
           <ion-item slot="header">
             <ion-icon slot="start" :icon="timeOutline" />
@@ -116,10 +116,14 @@
           {{ translate('No routing changes recorded for this item.') }}
         </ion-label>
       </ion-item>
-      <ion-item v-else-if="status === 'loading'" lines="none">
-        <ion-label color="medium">
-          {{ translate('Loading routing history...') }}
+      <!-- Shaped like the timeline header it becomes, so the card keeps its height when the routing arrives. -->
+      <ion-item v-else-if="status !== 'error'">
+        <ion-icon slot="start" :icon="timeOutline" color="medium" />
+        <ion-label>
+          {{ translate('Inventory timeline') }}
+          <p><ion-skeleton-text animated class="placeholder-count" /></p>
         </ion-label>
+        <ion-skeleton-text slot="end" animated class="placeholder-pills" />
       </ion-item>
     </ion-card>
   </div>
@@ -128,7 +132,7 @@
 <script setup lang="ts">
 import { DxpShopifyImg, translate, useFastTravel } from "@common";
 import { useSeedData } from "@common/db";
-import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonChip, IonIcon, IonItem, IonLabel, IonList, IonThumbnail } from "@ionic/vue";
+import { IonAccordion, IonAccordionGroup, IonButton, IonCard, IonChip, IonIcon, IonItem, IonLabel, IonList, IonSkeletonText, IonThumbnail } from "@ionic/vue";
 import {
   arrowRedoOutline, arrowUndoOutline, banOutline, businessOutline, closeCircleOutline, compassOutline, openOutline,
   pauseCircleOutline, returnDownBackOutline, swapHorizontalOutline, timeOutline, warningOutline,
@@ -371,6 +375,11 @@ function showLess(entry: Entry) {
   display: flex;
   flex-direction: column;
   gap: var(--spacer-sm, 12px);
+  /* At least a screen tall below the toolbar (56px) and segment bar (48px). Switching here from a
+     taller tab then never shortens the page under the user, so the browser has no reason to clamp
+     the scroll position and jump the page. */
+  box-sizing: border-box;
+  min-height: calc(100vh - 104px);
 }
 
 .routing-item {
@@ -379,6 +388,30 @@ function showLess(entry: Entry) {
 
 .routing-item.highlighted {
   outline: 2px solid var(--ion-color-primary);
+}
+
+.placeholder-count {
+  width: 72px;
+}
+
+.placeholder-pills {
+  width: 96px;
+  height: 28px;
+}
+
+/* The timeline fades in over its placeholder rather than popping in. */
+.timeline-loaded {
+  animation: timeline-fade-in 0.2s ease;
+}
+
+@keyframes timeline-fade-in {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .timeline-loaded {
+    animation: none;
+  }
 }
 
 .facility-warning {
