@@ -35,6 +35,9 @@
         <ion-segment-button value="ship-groups">
           <ion-label>{{ translate('Ship groups') }}</ion-label>
         </ion-segment-button>
+        <ion-segment-button value="routing">
+          <ion-label>{{ translate('Routing') }}</ion-label>
+        </ion-segment-button>
         <ion-segment-button value="holds">
           <ion-label>{{ translate('Holds') }}</ion-label>
         </ion-segment-button>
@@ -49,6 +52,7 @@
         :order="order"
         :item-actions="itemActions"
         :payment-return-ids="paymentReturnIds"
+        :short-stock="shortStock"
         @reject-and-release="rejectAndReleaseItem"
         @open-item-attributes="openItemAttributesModal"
         @open-item-transfers="openItemTransfersModal"
@@ -72,9 +76,11 @@
             :has-transferable-items="inventoryTransferItemsForShipGroup(shipGroup).length > 0"
             :editor="shipGroupEditor(shipGroup)"
             :saving="savingShipGroupId === shipGroup.id"
+            :short-stock="shortStock"
             @update:expanded="$event ? expandedShipGroupIds.add(shipGroup.id) : expandedShipGroupIds.delete(shipGroup.id)"
             @update:selected-item-ids="selectedShipGroupItems[shipGroup.id] = $event"
             @show-holds="selectedSegment = 'holds'"
+            @show-routing="selectedSegment = 'routing'"
             @broker="brokerShipGroup(shipGroup)"
             @release="releaseSelectedItems(shipGroup)"
             @park="parkSelectedItems(shipGroup)"
@@ -92,6 +98,19 @@
         <EmptyState v-else :title="translate('No ship groups')"
           :message="translate('There are no ship groups defined for this order.')" />
       </div>
+
+      <OrderRoutingSegment
+        v-if="selectedSegment === 'routing'"
+        :order="order"
+        :history="routingHistory"
+        :flow="routingFlow"
+        :short-stock="shortStock"
+        :no-impact="routingNoImpact"
+        :status="routingHistoryStore.statusFor(orderId)"
+        @retry="loadRoutingHistory(true)"
+        @reject-item="rejectItemFromRouting"
+        @move-item="rejectAndReleaseItem"
+      />
 
       <OrderHoldsSegment
         v-if="selectedSegment === 'holds'"
@@ -166,19 +185,25 @@ import ErrorState from '@/components/common/ErrorState.vue';
 import OrderCommsSegment from '@/components/orders/OrderCommsSegment.vue';
 import OrderHoldsSegment from '@/components/orders/OrderHoldsSegment.vue';
 import OrderItemsSegment from '@/components/orders/OrderItemsSegment.vue';
+import OrderRoutingSegment from '@/components/orders/OrderRoutingSegment.vue';
 import OrderShipGroupCard from '@/components/orders/OrderShipGroupCard.vue';
 import OrderSummaryHeader from '@/components/orders/OrderSummaryHeader.vue';
 import { useOrderActions } from '@/composables/useOrderActions';
 import { useOrderDistances } from '@/composables/useOrderDistances';
 import { useProductMaster } from '@/composables/useProductMaster';
+import { pairKey } from '@/services/routingHistory';
 import { useCustomerStore } from '@/store/customer';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderTaskStore } from '@/store/orderTask';
+import { useRoutingHistoryStore } from '@/store/routingHistory';
 import { useUserStore } from '@/store/user';
 import type { ShipGroupActionId } from '@/utils/OrderActionValidator';
+import { toMillis } from '@/utils/format';
 import { countShipGroupHoldTasks } from '@/utils/orderHoldTasks';
+import { buildRoutingFlow } from '@/utils/routingFlow';
+import { type RoutingItem, isShortAtLocation, noInventoryImpact } from '@/utils/routingHistory';
 import { shopifyAdminOrderUrl, singleShopIdForProductStore } from '@/utils/shopifyAdmin';
-import type { EnrichedPayment } from '@/types/orderDetail';
+import type { EnrichedOrderItem, EnrichedPayment } from '@/types/orderDetail';
 import type { OrderEventLink } from '@/utils/orderEvents';
 
 const props = defineProps<{
@@ -188,6 +213,7 @@ const props = defineProps<{
 const orderDetailStore = useOrderDetailStore();
 const seed = useSeedData();
 const orderTaskStore = useOrderTaskStore();
+const routingHistoryStore = useRoutingHistoryStore();
 const customerStore = useCustomerStore();
 const userStore = useUserStore();
 const canViewReturns = computed(() => userStore.hasPermission(Actions.APP_ORDER_RETURN_VIEW));
@@ -224,6 +250,7 @@ watch(selectedSegment, (segment) => {
     orderDetailStore.fetchRiskAssessments(props.orderId);
   }
   if (segment === 'comms') orderDetailStore.fetchCommEvents(props.orderId);
+  if (segment === 'routing') loadRoutingHistory();
 });
 
 const {
@@ -260,6 +287,94 @@ const availableCarriers = computed(() =>
     return nameA.localeCompare(nameB);
   })
 );
+
+/* ── Routing tab and short-stock warnings ─────────────────────────────── */
+
+/** When each item was completed, from the order's status history: an item completed before go-live never moved stock. */
+const itemCompletedAt = computed(() => {
+  const completed: Record<string, number> = {};
+  (orderDetailStore.orderById(props.orderId)?.statuses || []).forEach((row: any) => {
+    const at = row.statusId === 'ITEM_COMPLETED' && row.orderItemSeqId ? toMillis(row.statusDatetime) : undefined;
+    if (at && at > (completed[row.orderItemSeqId] || 0)) completed[row.orderItemSeqId] = at;
+  });
+  return completed;
+});
+
+const routingItems = computed<RoutingItem[]>(() => (order.value?.shipGroups || [])
+  .flatMap((group) => group.items)
+  .map((item) => ({
+    orderItemSeqId: item.orderItemSeqId,
+    productId: item.productId,
+    facilityId: item.facilityId,
+    statusId: item.statusId,
+    completedAt: itemCompletedAt.value[item.orderItemSeqId],
+  })));
+
+/** When the order came in: the routing graph's first column, and where items that were never routed are read from. */
+const orderImportedAt = computed(() => toMillis(orderDetailStore.orderById(props.orderId)?.entryDate || orderDetailStore.orderById(props.orderId)?.orderDate) || 0);
+
+function loadRoutingHistory(force = false) {
+  if (!routingItems.value.length) return;
+  routingHistoryStore.loadRoutingHistory(props.orderId, routingItems.value, {
+    force,
+    importedAt: orderImportedAt.value || undefined,
+    productStoreId: orderDetailStore.orderById(props.orderId)?.productStoreId,
+  });
+}
+
+// Current stock at each item's location, so a location that is short shows it on the item and its ship group.
+// When items move (an action on this page, or routing on the server), the routing read before is out of date.
+watch(() => routingItems.value.map((item) => `${item.orderItemSeqId}:${pairKey(item.productId, item.facilityId)}:${item.statusId}`).join(','),
+  (_items, previousItems) => {
+    routingHistoryStore.fetchItemLocationStock(routingItems.value);
+    const moved = previousItems !== undefined;
+    if (selectedSegment.value === 'routing') loadRoutingHistory(moved);
+    else if (moved) routingHistoryStore.markStale(props.orderId);
+  }, { immediate: true });
+
+/** Available to promise at the item's location, only for items whose location is short. */
+const shortStock = computed(() => Object.fromEntries(routingItems.value
+  .filter((item) => isShortAtLocation(item, routingHistoryStore.stockByPair))
+  .map((item) => [item.orderItemSeqId, routingHistoryStore.stockByPair[pairKey(item.productId, item.facilityId)].atp])));
+
+const routingHistory = computed(() => routingHistoryStore.historyFor(props.orderId, routingItems.value));
+
+/** Why an item's inventory timeline is empty: completed before the store went live, or nothing moved yet. */
+const routingNoImpact = computed(() => {
+  const cutoff = routingHistoryStore.cutoffFor(orderDetailStore.orderById(props.orderId)?.productStoreId);
+  const byItem = new Map(routingHistory.value.map((history) => [history.orderItemSeqId, history]));
+  return Object.fromEntries(routingItems.value.flatMap((item) => {
+    const history = byItem.get(item.orderItemSeqId);
+    const note = history && noInventoryImpact(item, history, cutoff);
+    return note ? [[item.orderItemSeqId, note]] : [];
+  }));
+});
+
+// Reject and Move (rejectAndReleaseItem, bound as is) reload the order when they go through; the items watcher above then refreshes the routing.
+
+/** Reject one item from its ship group with a reason, the same dialog as Pull back. */
+async function rejectItemFromRouting(item: EnrichedOrderItem) {
+  const shipGroup = order.value?.shipGroups.find((group) => group.id === item.shipGroupSeqId);
+  if (!shipGroup) return;
+  // Pull back acts on the ship group's checked items, so check only this one, then give back what was checked.
+  const checked = selectedShipGroupItems.value[shipGroup.id] || [];
+  selectedShipGroupItems.value[shipGroup.id] = [item.orderItemSeqId];
+  try {
+    await rejectSelectedItems(shipGroup);
+  } finally {
+    // A rejected item has left the ship group by now (the order reloads first); a cancelled one has not.
+    const stillHere = new Set(order.value?.shipGroups.find((group) => group.id === shipGroup.id)?.items.map((groupItem) => groupItem.orderItemSeqId));
+    selectedShipGroupItems.value[shipGroup.id] = checked.filter((id) => stillHere.has(id));
+  }
+}
+
+
+const routingFlow = computed(() => order.value ? buildRoutingFlow({
+  items: (order.value.shipGroups || []).flatMap((group) => group.items.map((item) => ({ orderItemSeqId: item.orderItemSeqId, shipGroupSeqId: group.id }))),
+  shipGroups: (order.value.shipGroups || []).map((group) => ({ id: group.id, facilityId: group.facilityId })),
+  changes: routingHistoryStore.changesByOrderId[props.orderId] || [],
+  importedAt: orderImportedAt.value,
+}) : undefined);
 
 /* ── Holds tab ────────────────────────────────────────────────────────── */
 
