@@ -113,7 +113,8 @@ export function routingEventKind(row: any): RoutingEventKind {
   switch (row.changeReasonEnumId) {
     case "BROKERED": return "brokered";
     case "RELEASED": return "released";
-    case "ALLOCATED": return "allocated";
+    // A Shopify sync records its moves as allocations, even when it puts the item in a parking lot.
+    case "ALLOCATED": return isStockLocation(row.facilityId) ? "allocated" : "parked";
     case "PARKED": return "parked";
     case "UNFILLABLE": return "unfillable";
     case "SHOPIFY_CANCELLATION": return "cancelled";

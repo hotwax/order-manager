@@ -1,7 +1,7 @@
 import { DateTime } from "luxon";
 import { describe, expect, it, vi } from "vitest";
 import {
-  buildRoutingHistory, isShortAtLocation, isStockLocation, movementRequests, ruleLabel, stockAt,
+  buildRoutingHistory, isShortAtLocation, isStockLocation, movementRequests, routingEventKind, ruleLabel, stockAt,
 } from "@/utils/routingHistory";
 
 // One seeded facility: a parking lot whose id does not follow the *_PARKING convention.
@@ -106,6 +106,13 @@ describe("routing history", () => {
     expect(isStockLocation("PARKING")).toBe(false);
     expect(isStockLocation("REJECTED_ITM_PARKING")).toBe(false);
     expect(isStockLocation(WAREHOUSE)).toBe(true);
+  });
+
+  it("calls a Shopify sync's move into a parking lot parked, not allocated", () => {
+    const shopifySync = { changeReasonEnumId: "ALLOCATED", fromFacilityId: "UNFILLABLE_PARKING", comments: "Shopify sync: could not reopen in-progress fulfillment order" };
+    expect(routingEventKind({ ...shopifySync, facilityId: "REJECTED_ITM_PARKING" })).toBe("parked");
+    expect(routingEventKind({ ...shopifySync, facilityId: "PARKING" })).toBe("parked");
+    expect(routingEventKind({ ...shopifySync, facilityId: WAREHOUSE })).toBe("allocated");
   });
 
   it("reads SQL timestamps the same as epoch millis", () => {
