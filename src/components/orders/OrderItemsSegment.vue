@@ -28,6 +28,7 @@
               :quantity="group.totalQty"
               :quantity-label="translate('qty')"
               :facility-label="group.locationLabel"
+              :facility-warning="group.items.some((item) => shortStock?.[item.orderItemSeqId] !== undefined)"
               :facility-disabled="true"
               :statuses="group.statuses"
               :amount="money(group.totalPrice)"
@@ -133,7 +134,7 @@ import OrderItemListRow from '@/components/orders/OrderItemListRow.vue';
 import OrderItemTransferChip from '@/components/orders/OrderItemTransferChip.vue';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { isKit } from '@/utils';
-import { formatDateTime, formatMoney } from '@/utils/format';
+import { formatDateTime, formatMoney, formatNumber } from '@/utils/format';
 import { OrderActionValidator } from '@/utils/OrderActionValidator';
 import type { EnrichedItemGroup, EnrichedOrder, EnrichedOrderItem } from '@/types/orderDetail';
 
@@ -144,6 +145,8 @@ const props = defineProps<{
   itemActions: Record<string, { facilityDisabled: boolean }>;
   /** Returns carried over onto exchange credit/payment preferences, keyed by payment id. */
   paymentReturnIds: Record<string, string[]>;
+  /** Available to promise at the item's location, for items whose location is short. Keyed by order item. */
+  shortStock?: Record<string, number>;
 }>();
 
 const emit = defineEmits<{
@@ -193,6 +196,12 @@ function itemIdentity(item: EnrichedOrderItem) {
   };
 }
 
+/** The location's name, followed by its available count when it is short, e.g. "2301 E. 51st St. (-1)". */
+function facilityLabel(item: EnrichedOrderItem) {
+  const available = props.shortStock?.[item.orderItemSeqId];
+  return available === undefined ? item.facilityName : translate('{facility} ({available})', { facility: item.facilityName, available: formatNumber(available) });
+}
+
 /** Everything one order item's row shows and reports, under the given identity. Its buttons stay in the slot. */
 function itemRow(item: EnrichedOrderItem, identity: ReturnType<typeof productRowProps> | ReturnType<typeof itemIdentity>) {
   const attributeCount = Number(item.attributeCount) || 0;
@@ -202,7 +211,8 @@ function itemRow(item: EnrichedOrderItem, identity: ReturnType<typeof productRow
     selected: isSelected(item),
     quantity: item.quantity,
     quantityLabel: translate('qty'),
-    facilityLabel: item.facilityName,
+    facilityLabel: facilityLabel(item),
+    facilityWarning: props.shortStock?.[item.orderItemSeqId] !== undefined,
     facilityDisabled: props.itemActions[item.orderItemSeqId]?.facilityDisabled,
     attributesLabel: translate('{count} attributes', { count: attributeCount }),
     statuses: item.statuses,
