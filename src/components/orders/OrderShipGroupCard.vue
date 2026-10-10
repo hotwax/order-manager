@@ -495,6 +495,7 @@ import {
 import { DxpShopifyImg, translate } from '@common';
 import { useSeedData } from '@common/db';
 import { useProductIdentity } from '@/composables/useProductIdentity';
+import { useToday } from '@/composables/useToday';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { confirmAction, isKit } from '@/utils';
 import type { ShipGroupMilestones } from '@/utils/orderEvents';
@@ -570,8 +571,10 @@ const hiddenItemCount = computed(() => Math.max(props.shipGroup.items.length - C
 const shortItems = computed(() => props.shipGroup.items.filter((item) => props.shortStock?.[item.orderItemSeqId] !== undefined));
 const orderIsTerminal = computed(() => OrderActionValidator.isOrderTerminal({ statusId: props.orderStatusId }));
 // Days the estimated ship date has passed while items are still open. A settled group isn't late,
-// and neither is an empty one, which the settled rule doesn't cover.
-const shipOverdueDays = computed(() => (props.shipGroup.isSettled || !props.shipGroup.items?.length ? 0 : daysPast(props.shipGroup.estimatedShipDate)));
+// and neither is an empty one, which the settled rule doesn't cover. Counted against a clock that
+// turns at local midnight, so a page left open overnight shows the new day's count.
+const today = useToday();
+const shipOverdueDays = computed(() => (props.shipGroup.isSettled || !props.shipGroup.items?.length ? 0 : daysPast(props.shipGroup.estimatedShipDate, today.value)));
 
 /** A stopped group is read-only: its options describe a shipment that will no longer change. */
 const optionsOpen = computed(() => {
