@@ -15,7 +15,7 @@
     </template>
     <ion-item v-else lines="none">
       <ion-label class="ion-text-center">
-        {{ translate('No items found') }}
+        {{ translate('No open tasks') }}
       </ion-label>
     </ion-item>
   </ion-list>
