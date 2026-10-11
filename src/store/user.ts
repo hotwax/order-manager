@@ -68,7 +68,6 @@ export const useUserStore = defineStore("user", {
       } catch (error: any) {
         await showToast(translate("Failed to fetch user profile information. Please try again."));
         logger.error("Failed to fetch user profile information", error);
-        useAuth().clearAuth();
         this.fetchStatus.profile = "error";
         return Promise.reject(error);
       }
