@@ -1,16 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="closeModal()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ translate('Park order') }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
-
-  <ion-content>
+  <DxpModal :state="facilityModal" :title="translate('Park order')">
     <ion-searchbar
       @ionFocus="selectSearchBarText($event)"
       :placeholder="translate('Search facilities')"
@@ -41,20 +30,13 @@
         </div>
       </ion-list>
     </ion-radio-group>
-
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedFacilityId" :aria-label="translate('Save')" @click="save">
-        <ion-icon :icon="saveOutline" />
-      </ion-fab-button>
-    </ion-fab>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSearchbar, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
+import { IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSearchbar, IonSpinner } from '@ionic/vue';
 import { onMounted, ref } from 'vue';
-import { api, logger, translate } from '@common';
+import { api, DxpModal, logger, translate, useDxpModal } from '@common';
 
 type Facility = {
   facilityId: string;
@@ -68,15 +50,11 @@ const isLoading = ref(false);
 const selectedFacilityId = ref('');
 const queryString = ref('');
 
-function closeModal(facilityId?: string) {
-  modalController.dismiss(facilityId);
-}
-
-function save() {
-  if (selectedFacilityId.value) {
-    closeModal(selectedFacilityId.value);
-  }
-}
+// Save hands back the chosen facility; the screen that opened the picker parks the order.
+const facilityModal = useDxpModal({
+  canConfirm: () => !!selectedFacilityId.value,
+  confirm: () => selectedFacilityId.value,
+});
 
 function findFacility() {
   const search = queryString.value.trim().toLowerCase();

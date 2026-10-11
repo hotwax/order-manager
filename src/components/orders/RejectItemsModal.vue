@@ -1,16 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="dismiss()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ translate('Reject items') }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
-
-  <ion-content>
+  <DxpModal :state="rejectModal" :title="translate('Reject items')">
     <div v-if="!rejectionReasons.length" class="empty-state">
       <p>{{ translate('No rejection reasons found') }}</p>
     </div>
@@ -24,20 +13,13 @@
         </ion-item>
       </ion-list>
     </ion-radio-group>
-
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedReasonId" @click="confirm()" :aria-label="translate('Save')">
-        <ion-icon :icon="saveOutline" />
-      </ion-fab-button>
-    </ion-fab>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
+import { IonItem, IonLabel, IonList, IonRadio, IonRadioGroup } from '@ionic/vue';
 import { computed, ref } from 'vue';
-import { translate } from '@common';
+import { DxpModal, translate, useDxpModal } from '@common';
 import { useSeedData } from '@common/db';
 
 const seed = useSeedData();
@@ -45,14 +27,11 @@ const seed = useSeedData();
 
 const selectedReasonId = ref('');
 
-function dismiss() {
-  modalController.dismiss(null, 'cancel');
-}
-
-function confirm() {
-  if (!selectedReasonId.value) return;
-  modalController.dismiss({ rejectionReasonId: selectedReasonId.value }, 'confirm');
-}
+// Save hands back the chosen reason; the screen that opened the modal rejects the items.
+const rejectModal = useDxpModal({
+  canConfirm: () => !!selectedReasonId.value,
+  confirm: () => ({ rejectionReasonId: selectedReasonId.value }),
+});
 
 const rejectionReasons = computed(() => {
   const seen = new Set<string>();

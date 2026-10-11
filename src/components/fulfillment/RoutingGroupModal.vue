@@ -1,16 +1,5 @@
 <template>
-  <ion-header>
-    <ion-toolbar>
-      <ion-buttons slot="start">
-        <ion-button @click="closeModal()" :aria-label="translate('Close')" :title="translate('Close')">
-          <ion-icon slot="icon-only" :icon="closeOutline" />
-        </ion-button>
-      </ion-buttons>
-      <ion-title>{{ translate('Select routing group') }}</ion-title>
-    </ion-toolbar>
-  </ion-header>
-
-  <ion-content>
+  <DxpModal :state="routingGroupModal" :title="translate('Select routing group')">
     <ion-radio-group v-model="selectedRoutingGroupId">
       <ion-list>
         <div class="empty-state" v-if="isLoading">
@@ -34,20 +23,13 @@
         </div>
       </ion-list>
     </ion-radio-group>
-
-    <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-      <ion-fab-button :disabled="!selectedRoutingGroupId" :aria-label="translate('Save')" @click="save">
-        <ion-icon :icon="saveOutline" />
-      </ion-fab-button>
-    </ion-fab>
-  </ion-content>
+  </DxpModal>
 </template>
 
 <script setup lang="ts">
-import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
-import { closeOutline, saveOutline } from 'ionicons/icons';
+import { IonItem, IonLabel, IonList, IonRadio, IonRadioGroup, IonSpinner } from '@ionic/vue';
 import { onMounted, ref } from 'vue';
-import { api, logger, translate } from '@common';
+import { api, DxpModal, logger, translate, useDxpModal } from '@common';
 
 const props = defineProps<{
   productStoreId: string;
@@ -62,15 +44,11 @@ const routingGroups = ref<RoutingGroup[]>([]);
 const isLoading = ref(false);
 const selectedRoutingGroupId = ref('');
 
-function closeModal(routingGroupId?: string) {
-  modalController.dismiss(routingGroupId);
-}
-
-function save() {
-  if (selectedRoutingGroupId.value) {
-    closeModal(selectedRoutingGroupId.value);
-  }
-}
+// Save hands back the chosen routing group; the screen that opened the picker brokers with it.
+const routingGroupModal = useDxpModal({
+  canConfirm: () => !!selectedRoutingGroupId.value,
+  confirm: () => selectedRoutingGroupId.value,
+});
 
 async function fetchRoutingGroups() {
   isLoading.value = true;
