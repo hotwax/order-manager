@@ -348,7 +348,8 @@
                 </ion-list>
                 <ion-fab vertical="bottom" horizontal="end" slot="fixed">
                   <ion-fab-button :disabled="saving" @click="saveShippingAddress" :aria-label="translate('Save')">
-                    <ion-icon :icon="saveOutline" />
+                    <ion-spinner v-if="saving" name="crescent" />
+                    <ion-icon v-else :icon="saveOutline" />
                   </ion-fab-button>
                 </ion-fab>
               </ion-content>
@@ -395,7 +396,8 @@
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
           <ion-fab-button :disabled="saving" @click="saveGiftMessage" :aria-label="translate('Save')">
-            <ion-icon :icon="saveOutline" />
+            <ion-spinner v-if="saving" name="crescent" />
+            <ion-icon v-else :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
       </ion-content>
@@ -421,7 +423,8 @@
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
           <ion-fab-button :disabled="saving" @click="saveShippingDates" :aria-label="translate('Save')">
-            <ion-icon :icon="saveOutline" />
+            <ion-spinner v-if="saving" name="crescent" />
+            <ion-icon v-else :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
       </ion-content>
@@ -447,7 +450,8 @@
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
           <ion-fab-button :disabled="saving" @click="saveDeliveryDates" :aria-label="translate('Save')">
-            <ion-icon :icon="saveOutline" />
+            <ion-spinner v-if="saving" name="crescent" />
+            <ion-icon v-else :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
       </ion-content>
@@ -469,7 +473,8 @@
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
           <ion-fab-button :disabled="saving" @click="saveInstruction" :aria-label="translate('Save')">
-            <ion-icon :icon="saveOutline" />
+            <ion-spinner v-if="saving" name="crescent" />
+            <ion-icon v-else :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
       </ion-content>
@@ -482,7 +487,7 @@ import { computed, ref, watch, type Directive } from 'vue';
 import {
   IonBadge, IonButton, IonButtons, IonCard, IonCardHeader, IonCardSubtitle, IonCardTitle, IonCheckbox, IonChip, IonContent,
   IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonModal, IonNote, IonPopover,
-  IonProgressBar, IonSelect, IonSelectOption, IonTextarea, IonThumbnail, IonTitle, IonToolbar,
+  IonProgressBar, IonSelect, IonSelectOption, IonSpinner, IonTextarea, IonThumbnail, IonTitle, IonToolbar,
 } from '@ionic/vue';
 import {
   calendarOutline, chevronDownOutline, chevronUpOutline, closeOutline, compassOutline, createOutline, cubeOutline,
