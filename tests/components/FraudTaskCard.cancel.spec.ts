@@ -45,8 +45,8 @@ vi.mock('@/store/orderTask', () => ({
   }),
 }));
 
-vi.mock('@/store/seed', () => ({
-  useSeedStore: () => ({
+vi.mock('@common/db', () => ({
+  useSeedData: () => ({
     enumDescription: (value: string) => value,
     paymentMethodDescription: (value: string) => value,
     statusDescription: (value: string) => value,

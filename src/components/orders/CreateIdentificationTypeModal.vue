@@ -33,10 +33,8 @@
 import { IonInput, IonItem, IonList } from '@ionic/vue';
 import { ref } from 'vue';
 import { commonUtil, DxpModal, translate, useDxpModal } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { createOrderIdentificationType } from '@/services/orderIdentification';
 import { showToast, requiredLabel } from '@/utils';
-
-const seedStore = useSeedStore();
 const formData = ref({ enumId: '', enumName: '', description: '' });
 
 function setEnumId(enumName: string) {
@@ -66,7 +64,7 @@ const typeModal = useDxpModal({
     if (formData.value.enumId.length > 20) throw new Error(translate('ID cannot be more than 20 characters.'));
 
     try {
-      await seedStore.createOrderIdentificationType({
+      await createOrderIdentificationType({
         enumId: formData.value.enumId,
         description: formData.value.description.trim() || formData.value.enumName.trim()
       });

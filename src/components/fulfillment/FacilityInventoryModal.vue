@@ -30,6 +30,13 @@
       </ion-toolbar>
     </template>
 
+    <!-- Said once at the top, so nobody has to read every row to learn that no row has enough. -->
+    <ion-item v-if="!isLoading && !hasFailed && noStockAnywhere" color="warning" lines="none">
+      <ion-icon slot="start" :icon="warningOutline" />
+      <ion-label class="ion-text-wrap">
+        {{ detailedItemIndex >= 0 ? translate('No facility has enough stock for this item.') : translate('No facility has enough stock for all {count} items.', { count: items.length }) }}
+      </ion-label>
+    </ion-item>
     <template v-if="isLoading">
       <div class="empty-state">
         <ion-item lines="none">
@@ -41,13 +48,19 @@
     <div class="empty-state" v-else-if="hasFailed">
       <p>{{ translate('Failed to fetch facility inventory. Please try again.') }}</p>
     </div>
-    <div class="empty-state" v-else-if="!visibleFacilities.length">
+    <div class="empty-state" v-else-if="!facilitySections.some((section) => section.rows.length)">
       <p>{{ translate('No facilities found') }}</p>
     </div>
     <ion-radio-group v-else-if="isMobileViewport" v-model="selectedFacilityId">
-      <ion-list>
+      <ion-list v-for="section in facilitySections" :key="section.key">
+        <ion-list-header v-if="section.label">
+          <ion-label>{{ section.label }}</ion-label>
+        </ion-list-header>
+        <ion-item v-if="!section.rows.length" lines="none">
+          <ion-label>{{ translate('No facilities found') }}</ion-label>
+        </ion-item>
         <ion-accordion-group>
-          <ion-accordion v-for="facility in visibleFacilities" :key="facility.facilityId" :value="facility.facilityId">
+          <ion-accordion v-for="facility in section.rows" :key="facility.facilityId" :value="facility.facilityId">
             <div slot="header" class="list-item facility-inventory-mobile-row">
               <ion-item lines="none">
                 <ion-radio label-placement="end" justify="start" :value="facility.facilityId" @click.stop>
@@ -111,12 +124,15 @@
       </ion-list>
     </ion-radio-group>
     <ion-radio-group v-else v-model="selectedFacilityId">
-      <ion-list>
+      <ion-list v-for="section in facilitySections" :key="section.key">
         <ion-list-header>
-          <ion-label class="tablet">{{ translate('Select fulfillment facility') }}</ion-label>
+          <ion-label class="tablet">{{ section.label || translate('Select fulfillment facility') }}</ion-label>
         </ion-list-header>
+        <ion-item v-if="!section.rows.length" lines="none">
+          <ion-label>{{ translate('No facilities found') }}</ion-label>
+        </ion-item>
         <div
-          v-for="facility in visibleFacilities"
+          v-for="facility in section.rows"
           :key="facility.facilityId"
           class="list-item"
           :class="facility.detail ? 'facility-inventory-row' : 'facility-coverage-row'"
@@ -173,13 +189,16 @@
 </template>
 
 <script setup lang="ts">
-import { IonAccordion, IonAccordionGroup, IonAvatar, IonChip, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonRadio, IonRadioGroup, IonSearchbar, IonSpinner, IonToolbar } from '@ionic/vue';
+import { IonAccordion, IonAccordionGroup, IonAvatar, IonChip, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonRadio, IonRadioGroup, IonSearchbar, IonSpinner, IonToolbar } from '@ionic/vue';
+import { warningOutline } from 'ionicons/icons';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { api, DxpModal, DxpShopifyImg, logger, translate, useDxpModal } from '@common';
+import { useSeedData } from '@common/db';
 import { formatNumber } from '@/utils/format';
-import { useSeedStore } from '@/store/seed';
 import type { FacilityCoverageRow, FacilityItemAvailability } from '@/utils/facilityInventory';
-import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
+import { buildFacilityCoverageRows, filterFacilityCoverageRows, isPhysicalFacility, noFacilityCovers, pinCurrentFacility, sortFacilityCoverageRows } from '@/utils/facilityInventory';
+
+const seed = useSeedData();
 
 export type FacilityInventoryModalItem = {
   orderItemSeqId: string;
@@ -194,16 +213,21 @@ const props = defineProps<{
   productStoreId?: string;
   title?: string;
   excludedFacilityIds?: string[];
+  /**
+   * The facility every item is at now, when they share one real facility. It is pinned first and
+   * preselected, and saving it would only reject the items and release them back to the same place,
+   * so Save stays off until another facility is picked.
+   */
+  currentFacilityId?: string;
 }>();
 
 const MAX_SHORT_NAMES = 2;
 
-const seedStore = useSeedStore();
 const isLoading = ref(false);
 const hasFailed = ref(false);
 const allFacilities = ref<FacilityCoverageRow[]>([]);
 const filteredFacilities = ref<FacilityCoverageRow[]>([]);
-const selectedFacilityId = ref('');
+const selectedFacilityId = ref(props.currentFacilityId || '');
 const queryString = ref('');
 const isMobileViewport = ref(false);
 // A single item is always detailed; with more than one the strip decides.
@@ -215,7 +239,7 @@ const productIds = computed(() => Array.from(new Set(props.items.map((item) => i
 
 // Save hands back the chosen facility; the screen that opened the modal releases the items to it.
 const facilityModal = useDxpModal({
-  canConfirm: () => !!selectedFacilityId.value,
+  canConfirm: () => Boolean(selectedFacilityId.value) && selectedFacilityId.value !== props.currentFacilityId,
   confirm: () => selectedFacilityId.value,
 });
 
@@ -232,16 +256,27 @@ function toggleDetailedItem(index: number) {
   detailedItemIndex.value = detailedItemIndex.value === index ? -1 : index;
 }
 
+/** No facility the store fulfills from can cover the item being detailed, or all of them together. Judged on every facility, not the current search. */
+const noStockAnywhere = computed(() => noFacilityCovers(allFacilities.value, detailedItemIndex.value));
+
+/** A row as rendered: it carries the item the list is detailing, or null when it summarises several items. */
+function withDetail(facility: FacilityCoverageRow) {
+  return { ...facility, detail: (facility.items[detailedItemIndex.value] ?? null) as FacilityItemAvailability | null };
+}
+
 /**
- * The rows as rendered: each carries the item the list is currently detailing, or null when the
- * list is summarising several items.
+ * The rows in the groups the list renders: the current facility on its own, then the rest. Without a
+ * current facility there is one group, and its header keeps the original wording.
  */
-const visibleFacilities = computed(() =>
-  sortFacilityCoverageRows(filteredFacilities.value, detailedItemIndex.value).map((facility) => ({
-    ...facility,
-    detail: (facility.items[detailedItemIndex.value] ?? null) as FacilityItemAvailability | null
-  }))
-);
+const facilitySections = computed(() => {
+  const shown = sortFacilityCoverageRows(filteredFacilities.value, detailedItemIndex.value);
+  const { current, others } = pinCurrentFacility(allFacilities.value, shown, props.currentFacilityId);
+  if (!current) return [{ key: 'all', label: '', rows: others.map(withDetail) }];
+  return [
+    { key: 'current', label: translate('Current facility'), rows: [withDetail(current)] },
+    { key: 'others', label: translate('Select a different facility'), rows: others.map(withDetail) }
+  ];
+});
 
 function chipLabel(item: FacilityInventoryModalItem) {
   const quantity = Number(item.quantity ?? 1);
@@ -293,10 +328,6 @@ function todayIsoDate() {
   const now = new Date();
   const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
   return localDate.toISOString().slice(0, 10);
-}
-
-function seedDatasetRecords(dataset: any) {
-  return dataset?.ids?.map((id: string) => dataset.byId[id]) ?? [];
 }
 
 function syncMobileViewport() {
@@ -355,15 +386,18 @@ async function fetchFacilityInventory() {
   isLoading.value = true;
   hasFailed.value = false;
   try {
-    await Promise.all([
-      seedStore.loadFacilities(),
-      props.productStoreId ? seedStore.loadProductStoreSeedData(props.productStoreId) : Promise.resolve()
+    // facilityIds drive the inventory request below, so read the rows rather than waiting
+    // on a reactive subscription to emit.
+    const [facilityRows, storeFacilityRows] = await Promise.all([
+      seed.getFacilities(),
+      props.productStoreId ? seed.getProductStoreFacilities(props.productStoreId) : Promise.resolve([]),
     ]);
 
     const excludedFacilityIds = new Set(props.excludedFacilityIds || []);
-    const facilities = seedDatasetRecords(seedStore.facilities)
+    const facilities = facilityRows
       .filter(isPhysicalFacility)
       .filter((facility: any) => !excludedFacilityIds.has(facility.facilityId));
+    const facilityNameById = new Map(facilityRows.map((row: any) => [row.facilityId, row.facilityName]));
     const facilityIds = facilities.map((facility: any) => facility.facilityId);
     const joinedProductIds = productIds.value.join(',');
 
@@ -399,9 +433,9 @@ async function fetchFacilityInventory() {
       inventoryItems: inventoryResp,
       facilityOrderCounts: orderCountResp,
       productStoreFacilities: props.productStoreId
-        ? seedDatasetRecords(seedStore.productStoreFacilitiesByStoreId[props.productStoreId])
+        ? storeFacilityRows
         : [],
-      facilityName: (facilityId) => seedStore.facilityName(facilityId)
+      facilityName: (facilityId) => facilityNameById.get(facilityId) ?? facilityId
     }));
     filterFacilities();
   } catch (error) {

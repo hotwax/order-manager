@@ -44,8 +44,10 @@ import { computed, onMounted } from 'vue';
 import { DxpModal, translate } from '@common';
 import { DateTime } from 'luxon';
 import { useCustomerStore } from '@/store/customer';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { formatDate } from '@/utils/format';
+
+const seed = useSeedData();
 
 const props = defineProps<{
   currentPartyId: string;
@@ -54,7 +56,6 @@ const props = defineProps<{
 }>();
 
 const store = useCustomerStore() as any;
-const seed = useSeedStore();
 
 onMounted(() => {
   store.loadCustomerRelationships(props.currentPartyId, true);
@@ -83,7 +84,7 @@ const timeline = computed(() => {
 
   const personalEntries = personal.map((rel: any) => ({
     key: rel.key,
-    typeLabel: (seed as any).describe(rel.partyRelationshipTypeId) as string,
+    typeLabel: seed.partyRelationshipDescription(rel.partyRelationshipTypeId),
     partyName: rel.relatedPartyName,
     partyId: rel.relatedPartyId,
     fromDate: rel.fromDate,
@@ -93,7 +94,7 @@ const timeline = computed(() => {
 
   const duplicateEntries = duplicates.map((rel: any) => ({
     key: rel.key,
-    typeLabel: (seed as any).describe('DUPLICATE') as string,
+    typeLabel: seed.partyRelationshipDescription('DUPLICATE'),
     partyName: rel.isCanonical ? rel.duplicatePartyName : rel.canonicalPartyName,
     partyId: rel.isCanonical ? rel.duplicatePartyId : rel.canonicalPartyId,
     fromDate: rel.fromDate,

@@ -248,3 +248,25 @@ export function filterFacilityCoverageRows(rows: FacilityCoverageRow[], query: s
   if (!search) return rows;
   return rows.filter((row) => row.searchText.includes(search));
 }
+
+/**
+ * Whether no facility the store can fulfill from has enough stock: for the item the picker is
+ * detailing, or, while it summarises several, for all of them at once. Facilities outside the
+ * product store don't count, since the store can't fulfill from them.
+ */
+export function noFacilityCovers(rows: FacilityCoverageRow[], detailedItemIndex = -1) {
+  const candidates = rows.filter((row) => row.inStore);
+  if (!candidates.length) return false;
+  return !candidates.some((row) => (detailedItemIndex >= 0 ? Boolean(row.items[detailedItemIndex]?.covered) : row.coveredCount === row.totalCount));
+}
+
+/**
+ * The rows as the picker groups them: the facility the items are at now, pinned on its own like the
+ * browser time zone, then every other facility. The current facility stays pinned while the operator
+ * searches, so the comparison they opened the picker for never scrolls away. Without a current
+ * facility (the items sit in a queue or parking), every row is a choice.
+ */
+export function pinCurrentFacility<T extends { facilityId: string }>(allRows: T[], shownRows: T[], currentFacilityId?: string) {
+  const current = currentFacilityId ? allRows.find((row) => row.facilityId === currentFacilityId) ?? null : null;
+  return { current, others: current ? shownRows.filter((row) => row.facilityId !== current.facilityId) : shownRows };
+}

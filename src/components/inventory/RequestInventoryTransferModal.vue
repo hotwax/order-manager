@@ -169,9 +169,9 @@ import {
   fetchFacilitySalesVelocity, fetchFacilityStock, requestInventoryTransfers
 } from "@/services/inventoryTransfers";
 import { useOrderDetailStore } from "@/store/orderDetail";
-import { useSeedStore } from "@/store/seed";
 import { showToast } from "@/utils";
 import { formatNumber } from "@/utils/format";
+import { useSeedData } from "@common/db";
 
 const props = defineProps<{
   orderId: string;
@@ -191,7 +191,7 @@ const FACILITY_GROUPS = [
 const groupOf = (facility: any) => FACILITY_GROUPS.find((group) => group.includes(facility));
 
 const orderDetailStore = useOrderDetailStore();
-const seedStore = useSeedStore();
+const seed = useSeedData();
 const { getProduct, primaryIdentifier, secondaryIdentifier, featureLabel } = useProductIdentity();
 
 const item = computed(() => orderDetailStore.enrichedOrderByOrderId(props.orderId)?.shipGroups
@@ -247,7 +247,7 @@ const isOutOfStock = (row: FacilityRow) => row.atp !== undefined && row.atp <= 0
 const facilityGroups = computed(() => {
   const rows = facilities.value.map((facility): FacilityRow & { group: unknown } => ({
     facilityId: facility.facilityId,
-    facilityName: seedStore.facilityName(facility.facilityId),
+    facilityName: facility.facilityName || facility.facilityId,
     atp: stock.value?.[facility.facilityId]?.atp,
     qoh: stock.value?.[facility.facilityId]?.qoh,
     // A facility Solr has no sales for sold none.
@@ -267,13 +267,12 @@ const shown = (value?: number, options?: Intl.NumberFormatOptions) => value === 
 async function load() {
   loading.value = true;
   try {
-    await seedStore.loadFacilities();
+    const rows = await seed.getFacilities();
+    facilities.value = rows
+      .filter((facility) => facility && facility.facilityId !== props.destinationFacilityId && groupOf(facility));
   } catch (error) {
     logger.error("Failed to load facilities", error);
   }
-  const dataset = seedStore.facilities;
-  facilities.value = dataset.ids.map((id) => dataset.byId[id])
-    .filter((facility) => facility && facility.facilityId !== props.destinationFacilityId && groupOf(facility));
 
   const productId = item.value?.productId;
   if(productId) {
@@ -297,7 +296,7 @@ onMounted(load);
 // Out of the source, into the destination: each side's stock now, and once the transfer completes.
 const sides = computed(() => source.value ? [
   { title: translate("Transfer from"), facilityId: source.value.facilityId, facilityName: source.value.facilityName, change: -quantity.value },
-  { title: translate("Transfer to"), facilityId: props.destinationFacilityId, facilityName: seedStore.facilityName(props.destinationFacilityId), change: quantity.value },
+  { title: translate("Transfer to"), facilityId: props.destinationFacilityId, facilityName: seed.facilityName(props.destinationFacilityId), change: quantity.value },
 ] : []);
 
 

@@ -600,13 +600,15 @@ import { translate, StatCard, Sparkline, commonUtil, DxpModal, useDxpModal } fro
 import { UNFILLABLE_FACILITY_ID, useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { useUserStore } from '@/store/user';
 import { useElapsedHoursSinceDayStart } from '@/utils/funnelClock';
 import { createLatestRequestScope } from '@/utils/latestRequestScope';
 import { nativeRouteHref, navigateNativeRoute } from '@/utils/nativeRouterLink';
 import { reconcileSelectedFacilityId } from '@/utils/funnelFacilitySelection';
 import { DIMENSION_LABELS, facilityProgressAccessibleName } from '@/utils/funnelProgress';
+
+const seed = useSeedData();
 import { useRouter, type RouteLocationRaw } from 'vue-router';
 import HoldTaskCountList from '@/components/tasks/HoldTaskCountList.vue';
 import { fetchWorkflowOrderTotals, type WorkflowOrderTotals } from '@/services/order';
@@ -614,9 +616,9 @@ import { DateTime } from 'luxon';
 import { formatDate, formatNumber, formatRelative } from '@/utils/format';
 
 const store = useCustomerServiceStore();
+
 const orderStore = useOrderStore();
 const productStore = useProductStore() as any;
-const seedStore = useSeedStore();
 const userStore = useUserStore();
 const router = useRouter();
 const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -744,7 +746,6 @@ const queueSegments = computed(() => {
   const topSortField = sortRules[0]?.id || 'deliveryDays';
   let segments: any[] = [];
 
-  const seedStore = useSeedStore() as any;
 
   if (topSortField === 'deliveryDays' || topSortField === 'shipmentMethodTypeId') {
     // Dynamic combinations grouping
@@ -769,8 +770,8 @@ const queueSegments = computed(() => {
 
     let runningMinutes = 0;
     segments = sortedCombinations.map((item, index) => {
-      const shipmentMethod = seedStore.shipmentMethodTypes?.byId?.[item.shipmentMethodTypeId];
-      const label = translate("{count}d - {method}", { count: item.deliveryDays, method: shipmentMethod?.description || item.shipmentMethodTypeId || translate("None") });
+      const methodLabel = item.shipmentMethodTypeId ? seed.shipmentMethodDescription(String(item.shipmentMethodTypeId).trim()) : '';
+      const label = translate("{count}d - {method}", { count: item.deliveryDays, method: methodLabel || item.shipmentMethodTypeId || translate("None") });
       const segmentMinutes = Math.ceil(item.count / batchSize) * cronIntervalMinutes;
       runningMinutes += segmentMinutes;
       return {
@@ -1106,13 +1107,13 @@ function retrySyncData() {
   if (selectedFacilityId.value) store.fetchFulfillmentSyncData(selectedFacilityId.value);
 }
 
-function getFacilityName(facilityId: string) {
-  return seedStore.facilityName(facilityId);
+function facilityLabelFor(facilityId: string) {
+  return seed.facilityName(facilityId) || facilityId;
 }
 
 const selectedFacilityName = computed(() => {
   const selected = filteredFacilities.value.find(item => item.facilityId === selectedFacilityId.value);
-  return selected ? selected.name : getFacilityName(selectedFacilityId.value);
+  return selected ? selected.name : facilityLabelFor(selectedFacilityId.value);
 });
 
 const filteredFacilities = computed(() => {
@@ -1120,14 +1121,14 @@ const filteredFacilities = computed(() => {
   if (selectedDimension.value === 'volume') {
     list = facilityOrderVolume.value.map(item => ({
       facilityId: item.facilityId,
-      name: item.facilityName || getFacilityName(item.facilityId),
+      name: item.facilityName || facilityLabelFor(item.facilityId),
       value: item.lastOrderCount,
       label: ordersLabel(item.lastOrderCount || 0)
     }));
   } else if (selectedDimension.value === 'velocity') {
     list = facilityFulfillmentVelocity.value.map(item => ({
       facilityId: item.facilityId,
-      name: item.facilityName || getFacilityName(item.facilityId),
+      name: item.facilityName || facilityLabelFor(item.facilityId),
       value: item.activeFacilityFallback ? item.lastOrderCount : (item.fulfillmentVelocity || 0),
       activeFacilityFallback: item.activeFacilityFallback,
       label: item.activeFacilityFallback
@@ -1137,7 +1138,7 @@ const filteredFacilities = computed(() => {
   } else if (selectedDimension.value === 'rejections') {
     list = facilityRejections.value.map(item => ({
       facilityId: item.facilityId,
-      name: item.facilityName || getFacilityName(item.facilityId),
+      name: item.facilityName || facilityLabelFor(item.facilityId),
       value: item.lastOrderCount || 0,
       label: item.rejectedShipGroupCount
         ? `${translate("{count} active orders", { count: item.lastOrderCount || 0 })}, ${translate("{count} rejected orders", { count: item.rejectedShipGroupCount })}`
@@ -1224,11 +1225,11 @@ const handleReorder = (event: any) => {
 };
 
 
+
 const availableSortOptions = computed(() => {
-  const seedStore = useSeedStore() as any;
-  const allParams = seedStore.getEnumsByType('PP_SORT_PARAM_TYPE') || [];
   const currentIds = sortRules.value.map(r => r.id);
-  return allParams.filter((e: any) => !currentIds.includes(e.enumCode));
+
+  return seed.enumsByType('PP_SORT_PARAM_TYPE').filter((e: any) => !currentIds.includes(e.enumCode));
 });
 
 function addSortRule(enumCode: string) {
