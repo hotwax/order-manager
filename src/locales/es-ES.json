@@ -733,6 +733,7 @@
   "Original total": "Total original",
   "Original unit price": "Precio unitario original",
   "Overdue (>24h)": "Atrasados (>24 h)",
+  "Overdue by {count} days": "Retrasado {count} día | Retrasado {count} días",
   "overdue by {value}": "con retraso de {value}",
   "Pack": "Empacar",
   "Packed": "Empacados",
