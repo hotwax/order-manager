@@ -1,16 +1,18 @@
+import { api } from "@common";
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 
 const calls = vi.hoisted(() => [] as string[]);
+const clearAuth = vi.hoisted(() => vi.fn());
 
 vi.mock('@common', () => ({
   api: vi.fn(),
-  commonUtil: { hasError: () => false, showToast: vi.fn() },
+  commonUtil: { hasError: () => false, showToast: vi.fn(), getMaargURL: () => "https://maarg.test/rest/s1/" },
   cookieHelper: () => ({ get: () => '' }),
   logger: { error: vi.fn(), warn: vi.fn(), info: vi.fn() },
   translate: (message: string) => message,
 }));
-vi.mock('@common/composables/useAuth', () => ({ useAuth: () => ({}) }));
+vi.mock("@common/composables/useAuth", () => ({ useAuth: () => ({ clearAuth, updateUserId: vi.fn() }) }));
 vi.mock('@/utils', () => ({ showToast: vi.fn() }));
 vi.mock('@/store/orderDetail', () => ({ useOrderDetailStore: () => ({ reset: vi.fn() }) }));
 vi.mock('@/store/productCache', () => ({ useProductCacheStore: () => ({ reset: vi.fn() }) }));
@@ -35,7 +37,16 @@ import { useUserStore } from '@/store/user';
 describe('postLogin', () => {
   beforeEach(() => {
     calls.length = 0;
+    clearAuth.mockClear();
     setActivePinia(createPinia());
+  });
+
+  it.each([new Error("Network Error"), { response: { status: 500 } }])("rejects a profile failure without clearing shared auth", async error => {
+    vi.mocked(api).mockRejectedValueOnce(error);
+    const store = useUserStore();
+    await expect(store.fetchUserProfile()).rejects.toBe(error);
+    expect(store.fetchStatus.profile).toBe("error");
+    expect(clearAuth).not.toHaveBeenCalled();
   });
 
   it('wipes the local database before anything reads it, then starts the sync', async () => {
