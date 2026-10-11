@@ -1,5 +1,6 @@
 import { api, commonUtil, useSolrSearch } from '@common';
-import { omDb } from '@/db/orderManagerDb';
+import { getActivePinia } from 'pinia';
+import { useSeedStore } from '@/store/seed';
 import type { Order } from '@/types/order';
 import type {
   AllocationItemDocument,
@@ -271,9 +272,7 @@ export async function searchOrders(params: OrderSearchParams = {}): Promise<Orde
 
   if (commonUtil.hasError(response)) return Promise.reject(response.data);
 
-  // facilityParentTypeId is stamped onto the normalized rows, so it cannot self-correct.
-  const facilityTypeRows = await readFacilityTypes();
-  const result = normalizeOrderSolrResponse(response.data, params.allocationSummary, facilityTypeRows);
+  const result = normalizeOrderSolrResponse(response.data, params.allocationSummary);
   if (params.allocationSummary?.mode !== 'queue-first' || !result.orders.length) return result;
 
   const enrichment = await fetchOrderRowEnrichment(result.orders.map((order) => order.id));
@@ -333,7 +332,7 @@ export async function fetchOrderRowEnrichment(orderIds: readonly string[]): Prom
   if (!uniqueOrderIds.length) return {};
   const response = await useSolrSearch().runSolrQuery(buildOrderRowEnrichmentPayload(uniqueOrderIds));
   if (commonUtil.hasError(response)) return Promise.reject(response.data);
-  return normalizeOrderRowEnrichment(response.data, await readFacilityTypes());
+  return normalizeOrderRowEnrichment(response.data);
 }
 
 export function buildActivePhysicalFacilityOrderVolumePayload(params: { productStoreId?: string } = {}) {
@@ -697,13 +696,13 @@ function normalizeVirtualLocationCountResponse(data: any): VirtualLocationOrderC
     .filter((row: VirtualLocationOrderCount) => row.facilityId);
 }
 
-function normalizeOrderSolrResponse(data: any, allocationSummary: AllocationSummaryOptions | undefined, facilityTypeRows: any[]): OrderSearchResult {
+function normalizeOrderSolrResponse(data: any, allocationSummary?: AllocationSummaryOptions): OrderSearchResult {
   const groupedOrders = data?.grouped?.orderId;
 
   if (groupedOrders) {
     return {
       orders: (groupedOrders.groups || [])
-        .map((group: any) => normalizeGroupedOrder(group, allocationSummary, facilityTypeRows))
+        .map((group: any) => normalizeGroupedOrder(group, allocationSummary))
         .filter(Boolean),
       total: Number(groupedOrders.ngroups ?? groupedOrders.matches ?? (groupedOrders.groups?.length || 0))
     };
@@ -712,26 +711,26 @@ function normalizeOrderSolrResponse(data: any, allocationSummary: AllocationSumm
   const docs = allDocs(data);
   return {
     orders: docs
-      .map((doc: any) => normalizeOrderWithParkingUnits([doc], allocationSummary, facilityTypeRows))
+      .map((doc: any) => normalizeOrderWithParkingUnits([doc], allocationSummary))
       .filter(Boolean) as Order[],
     total: Number(data?.response?.numFound ?? docs.length)
   };
 }
 
-function normalizeGroupedOrder(group: any, allocationSummary: AllocationSummaryOptions | undefined, facilityTypeRows: any[]) {
+function normalizeGroupedOrder(group: any, allocationSummary?: AllocationSummaryOptions) {
   const docs = allDocs(group?.doclist);
-  return normalizeOrderWithParkingUnits(docs, allocationSummary, facilityTypeRows);
+  return normalizeOrderWithParkingUnits(docs, allocationSummary);
 }
 
-function normalizeOrderWithParkingUnits(docs: any[], allocationSummary: AllocationSummaryOptions | undefined, facilityTypeRows: any[]) {
+function normalizeOrderWithParkingUnits(docs: any[], allocationSummary?: AllocationSummaryOptions) {
   const primaryDoc = docs[0];
   if (!primaryDoc) return undefined;
 
-  const itemDocuments = allocationDocuments(docs, facilityTypeRows);
+  const itemDocuments = allocationDocuments(docs);
   return {
     ...normalizeOrderDoc(primaryDoc),
     parkingUnitCount: sumParkingUnits(docs),
-    ...summarizeBrokeredFacilities(docs, facilityTypeRows),
+    ...summarizeBrokeredFacilities(docs),
     allocationSummary: summarizeOrderAllocation(itemDocuments, allocationSummary || { mode: 'physical-first' })
   };
 }
@@ -768,11 +767,11 @@ function normalizeActivePhysicalFacilityOrderVolume(data: any): ActiveFacilityOr
 // the brokered numerator/chip. When none are brokered, virtual/parking facilities
 // provide the fallback location chip without contributing to the numerator.
 // Exported so OrderDetail can summarize a grouped item's locations the same way.
-export function summarizeBrokeredFacilities(docs: any[], facilityTypeRows: any[] = []) {
-  const itemDocuments = allocationDocuments(docs, facilityTypeRows);
+export function summarizeBrokeredFacilities(docs: any[]) {
+  const itemDocuments = allocationDocuments(docs);
   const summary = summarizeOrderAllocation(itemDocuments, { mode: 'physical-first' });
   const selectedDocument = itemDocuments.find((document) => document.facilityId === summary?.facilityId);
-  const selectedIsVirtual = selectedDocument ? isVirtualFacilityDoc(selectedDocument, facilityTypeRows) : false;
+  const selectedIsVirtual = selectedDocument ? isVirtualFacilityDoc(selectedDocument) : false;
 
   return {
     brokeredFacilityName: !selectedIsVirtual ? summary?.facilityName ?? '' : '',
@@ -784,34 +783,19 @@ export function summarizeBrokeredFacilities(docs: any[], facilityTypeRows: any[]
   };
 }
 
-/** Facility type rows, read straight from IndexedDB; unavailable means no parent types. */
-async function readFacilityTypes(): Promise<any[]> {
-  try {
-    return await omDb().all('facilityTypes');
-  } catch {
-    return [];
-  }
-}
-
-/** Parent type of a facility TYPE, from rows the caller already read. */
-function parentTypeOf(facilityTypeRows: any[], facilityTypeId: string): string {
-  return facilityTypeRows.find((row: any) => row.facilityTypeId === facilityTypeId)?.parentTypeId ?? '';
-}
-
-function isVirtualFacilityDoc(doc: any, facilityTypeRows: any[]) {
+function isVirtualFacilityDoc(doc: any) {
   const facilityTypeId = toStringValue(doc.facilityTypeId);
   if (facilityTypeId === 'VIRTUAL_FACILITY') return true;
 
-  if (!facilityTypeId) return false;
-
-  return parentTypeOf(facilityTypeRows, facilityTypeId) === 'VIRTUAL_FACILITY';
+  // The parent-type check needs the seed store; guard it so this service stays callable
+  // outside an active Pinia (e.g. unit tests), falling back to the direct type check.
+  if (!facilityTypeId || !getActivePinia()) return false;
+  const parentTypeId = useSeedStore().facilityType(facilityTypeId)?.parentTypeId;
+  return parentTypeId === 'VIRTUAL_FACILITY';
 }
 
-/**
- * Stamps facilityParentTypeId onto each document, so the caller must already hold the
- * facilityTypes rows — the async entry points read them from IndexedDB and thread them down.
- */
-function allocationDocuments(docs: readonly any[], facilityTypeRows: any[]): AllocationItemDocument[] {
+function allocationDocuments(docs: readonly any[]): AllocationItemDocument[] {
+  const seedStore = getActivePinia() ? useSeedStore() : undefined;
   return docs.map((doc) => {
     const facilityTypeId = toStringValue(doc.facilityTypeId);
     return {
@@ -820,12 +804,12 @@ function allocationDocuments(docs: readonly any[], facilityTypeRows: any[]): All
       facilityId: toStringValue(doc.facilityId),
       facilityName: toStringValue(doc.facilityName),
       facilityTypeId,
-      facilityParentTypeId: parentTypeOf(facilityTypeRows, facilityTypeId)
+      facilityParentTypeId: seedStore?.facilityType(facilityTypeId)?.parentTypeId
     };
   });
 }
 
-function normalizeOrderRowEnrichment(data: any, facilityTypeRows: any[]): Record<string, OrderRowEnrichment> {
+function normalizeOrderRowEnrichment(data: any): Record<string, OrderRowEnrichment> {
   const groups = data?.grouped?.orderId?.groups || [];
   return groups.reduce((byOrderId: Record<string, OrderRowEnrichment>, group: any) => {
     const docs = allDocs(group?.doclist);
@@ -848,7 +832,7 @@ function normalizeOrderRowEnrichment(data: any, facilityTypeRows: any[]): Record
       promisedDatetime: toStringValue(primary.promisedDatetime),
       shipBeforeDate: toStringValue(primary.shipBeforeDate),
       shipByDate: toStringValue(primary.shipByDate),
-      itemDocuments: allocationDocuments(docs, facilityTypeRows)
+      itemDocuments: allocationDocuments(docs)
     };
     return byOrderId;
   }, {});

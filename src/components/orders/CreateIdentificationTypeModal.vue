@@ -52,9 +52,10 @@ import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, Ion
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { ref } from 'vue';
 import { commonUtil, translate } from '@common';
-import { createOrderIdentificationType } from '@/services/orderIdentification';
+import { useSeedStore } from '@/store/seed';
 import { showToast, requiredLabel } from '@/utils';
 
+const seedStore = useSeedStore();
 const saving = ref(false);
 
 const formData = ref({ enumId: '', enumName: '', description: '' });
@@ -90,7 +91,7 @@ async function createType() {
 
   saving.value = true;
   try {
-    await createOrderIdentificationType({
+    await seedStore.createOrderIdentificationType({
       enumId: formData.value.enumId,
       description: formData.value.description.trim() || formData.value.enumName.trim()
     });

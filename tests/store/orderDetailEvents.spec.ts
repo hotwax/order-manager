@@ -19,9 +19,8 @@ vi.mock('@/composables/useOrderDetail', async (importOriginal) => {
   return { ...actual, useOrderDetail: vi.fn() };
 });
 
-vi.mock('@/db/orderManagerDb', async (importOriginal) => ({
-  ...(await importOriginal<any>()),
-  omDb: () => ({ all: async () => [], get: async () => undefined }),
+vi.mock('@/store/seed', () => ({
+  useSeedStore: vi.fn(() => ({ orderAdjustmentTypeDescription: (id: string) => id })),
 }));
 
 const ORDER_ID = 'M102510';

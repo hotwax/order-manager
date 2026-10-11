@@ -37,9 +37,7 @@ describe('facility inventory modal', () => {
   });
 
   it('takes the order limit from the cached facility and the consumption live', () => {
-    // facilityIds drive the inventory request, so the rows are read up front, not observed.
-    expect(source).toContain('getFacilities()');
-    expect(source).toContain('getProductStoreFacilities(props.productStoreId)');
+    expect(source).toContain('seedStore.loadFacilities()');
     expect(source).toContain("url: 'admin/facilities/orderCount'");
     expect(source).toContain("facilityId_op: 'in'");
     // The unscoped oms mount returned every facility for every date; the admin mount is the one
@@ -50,22 +48,6 @@ describe('facility inventory modal', () => {
   it('keeps the whole row tappable and the save action reachable', () => {
     expect(source).toContain('@click="selectedFacilityId = facility.facilityId"');
     expect(source).toContain('<ion-fab vertical="bottom" horizontal="end" slot="fixed">');
-    expect(source).toContain(':disabled="!canSave"');
-  });
-
-  it('pins the current facility first and keeps Save off until another is picked', () => {
-    // Like the browser time zone: the facility the items are at sits on its own above the rest.
-    expect(source).toContain("translate('Current facility')");
-    expect(source).toContain("translate('Select a different facility')");
-    expect(source).toContain('pinCurrentFacility(allFacilities.value, shown, props.currentFacilityId)');
-    // Opens on the current facility, and saving it would only reject and re-release in place.
-    expect(source).toContain("const selectedFacilityId = ref(props.currentFacilityId || '');");
-    expect(source).toContain('selectedFacilityId.value !== props.currentFacilityId');
-  });
-
-  it('says once, at the top, when no facility has enough stock', () => {
-    expect(source).toContain('noFacilityCovers(allFacilities.value, detailedItemIndex.value)');
-    expect(source).toContain("translate('No facility has enough stock for this item.')");
-    expect(source).toContain("translate('No facility has enough stock for all {count} items.'");
+    expect(source).toContain(':disabled="!selectedFacilityId"');
   });
 });

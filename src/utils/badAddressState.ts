@@ -1,3 +1,4 @@
+import { useSeedStore } from '@/store/seed';
 import type { AddressForm, AddressState } from '@/types/order';
 
 // Builds the editable address-form state a BadAddressTaskCard renders from.
@@ -19,14 +20,8 @@ function buildAddressForm(src: any, task: any): AddressForm {
   };
 }
 
-/** Resolve a geo code against rows the caller already read. */
-function geoIdByCode(geos: Array<Record<string, any>>, code: string): string {
-  if (!code) return '';
-
-  return geos.find((geo) => geo.geoCodeAlpha2 === code || geo.geoCode === code)?.geoId ?? '';
-}
-
-function buildSuggestedForm(geos: Array<Record<string, any>>, task: any): AddressForm {
+function buildSuggestedForm(task: any): AddressForm {
+  const seedStore = useSeedStore();
   let parsed: any = {};
   try { parsed = task.locationDesc ? JSON.parse(task.locationDesc) : {}; } catch { parsed = {}; }
   return {
@@ -34,8 +29,8 @@ function buildSuggestedForm(geos: Array<Record<string, any>>, task: any): Addres
     address2: parsed.address2 ?? '',
     city: parsed.city ?? '',
     postalCode: parsed.postalCode ?? '',
-    stateProvinceGeoId: geoIdByCode(geos, parsed.stateOrProvinceCode ?? ''),
-    countryGeoId: geoIdByCode(geos, parsed.countryCode ?? ''),
+    stateProvinceGeoId: seedStore.getGeoIdByCode(parsed.stateOrProvinceCode ?? ''),
+    countryGeoId: seedStore.getGeoIdByCode(parsed.countryCode ?? ''),
     contactMechId: task?.shippingAddress?.contactMechId ?? '',
     contactMechPurposeTypeId: task?.shippingAddress?.contactMechPurposeTypeId || 'SHIPPING_LOCATION',
     partyId: task?.customer?.partyId ?? '',
@@ -43,8 +38,8 @@ function buildSuggestedForm(geos: Array<Record<string, any>>, task: any): Addres
   };
 }
 
-export function buildAddressState(geos: Array<Record<string, any>>, task: any): AddressState {
-  const suggested = buildSuggestedForm(geos, task);
+export function buildAddressState(task: any): AddressState {
+  const suggested = buildSuggestedForm(task);
   const original = buildAddressForm(task.shippingAddress, task);
   return {
     selectedAddressType: 'suggested',

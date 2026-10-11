@@ -1,8 +1,8 @@
 import { defineStore } from "pinia";
 import { api, commonUtil, logger, translate, useSolrSearch } from "@common";
-import { seedData } from "@common/db";
 import { FACILITY_CHANGE_PAGE_SIZE, UNFILLABLE_SAMPLE_SIZE, useOrderDetail, type IssuanceLine } from "@/composables/useOrderDetail";
 import { useProductCacheStore } from "./productCache";
+import { useSeedStore } from "./seed";
 import { useCustomerStore } from "./customer";
 import { useUserStore } from "./user";
 import Actions from "@/authorization/actions";
@@ -11,7 +11,6 @@ import { getReturn } from "@/services/returns";
 import { fetchOrderInventoryTransfers } from "@/services/inventoryTransfers";
 import { enrichOrder, isPosCompletedShipGroup } from "@/utils/orderDetailEnrichment";
 import { toMillis } from "@/utils/format";
-import { type ItemIssuanceSummary, summariseIssuance } from "@/utils/inventoryIssuance";
 import { OrderActionValidator } from "@/utils/OrderActionValidator";
 import { buildOrderEvents, clusterEvents, type ExchangeChild, type OrderEvent, type UnfillableSummary } from "@/utils/orderEvents";
 import { adjustmentAmount, adjustmentKey, adjustmentLabel } from "@/utils/orderAdjustments";
@@ -59,18 +58,19 @@ const QUEUE_FACILITY_ID = "_NA_";
 /** Parking and queue facilities, where an item waits rather than being fulfilled. */
 export function isVirtualFacilityId(facilityId: string): boolean {
   if (!facilityId || facilityId === QUEUE_FACILITY_ID) return true;
-  const facilityTypeId = seedData.facility(facilityId)?.facilityTypeId;
+  const seed = useSeedStore();
+  const facilityTypeId = seed.facility(facilityId)?.facilityTypeId;
   return OrderActionValidator.isVirtualFacility({
     facilityId,
     facilityTypeId,
-    facilityParentTypeId: seedData.facilityType(facilityTypeId)?.parentTypeId,
+    facilityParentTypeId: seed.facilityType(facilityTypeId)?.parentTypeId,
   });
 }
 
 const newEntry = (): OrderEntry => ({ payload: null, status: "idle", loadedAt: "", error: "" });
 
 const adjustmentDisplayLabel = (adj: any) =>
-  adjustmentLabel(adj, seedData.orderAdjustmentTypeDescription, "OTHER_ADJUSTMENT");
+  adjustmentLabel(adj, useSeedStore().orderAdjustmentTypeDescription, "OTHER_ADJUSTMENT");
 
 const adjustmentUniqueKey = (adj: any, fallbackSeqId = "") =>
   adjustmentKey(adj, adjustmentDisplayLabel(adj), fallbackSeqId);
@@ -142,6 +142,57 @@ function responseList(data: any): any[] {
 
 function eventMillis(value: any): number {
   return commonUtil.parseDateTimeValue(value)?.toMillis() ?? 0;
+}
+
+export interface ItemIssuanceSummary {
+  /** Units taken off the books for this order item. */
+  issued: number;
+  /** Quantity on hand across the inventory items involved, before and after the issuance. */
+  qohBefore: number;
+  qohAfter: number;
+}
+
+/**
+ * Fold an order's issuance rows into a per-order-item summary.
+ *
+ * `lastQuantityOnHand` is written by the PopulateInventoryItemDetailLastTotals EECA
+ * *before* the row is stored, so it is the balance the issuance started from and
+ * `last + quantityOnHandDiff` is where it ended. Rows are grouped by inventory item and
+ * read in effective order, because two issuances against the same inventory item chain
+ * — the second one's "before" is the first one's "after", and summing both would count
+ * the opening balance twice.
+ */
+function summariseIssuance(rows: any[]): Record<string, ItemIssuanceSummary> {
+  const byItemAndInventory: Record<string, Record<string, any[]>> = {};
+
+  rows.forEach((row: any) => {
+    if (!row.orderItemSeqId || !row.itemIssuanceId) return;
+    const perItem = byItemAndInventory[row.orderItemSeqId] ||= {};
+    (perItem[row.inventoryItemId || ""] ||= []).push(row);
+  });
+
+  const summary: Record<string, ItemIssuanceSummary> = {};
+  Object.entries(byItemAndInventory).forEach(([orderItemSeqId, byInventoryItem]) => {
+    const totals: ItemIssuanceSummary = { issued: 0, qohBefore: 0, qohAfter: 0 };
+
+    Object.values(byInventoryItem).forEach((inventoryRows) => {
+      const ordered = inventoryRows
+        .slice()
+        .sort((left, right) =>
+          eventMillis(left.effectiveDate) - eventMillis(right.effectiveDate)
+          || String(left.inventoryItemDetailSeqId).localeCompare(String(right.inventoryItemDetailSeqId)));
+      const first = ordered[0];
+      const last = ordered[ordered.length - 1];
+
+      totals.issued += ordered.reduce((sum, row) => sum + Math.abs(Number(row.quantityOnHandDiff) || 0), 0);
+      totals.qohBefore += Number(first.lastQuantityOnHand) || 0;
+      totals.qohAfter += (Number(last.lastQuantityOnHand) || 0) + (Number(last.quantityOnHandDiff) || 0);
+    });
+
+    summary[orderItemSeqId] = totals;
+  });
+
+  return summary;
 }
 
 /**
@@ -230,7 +281,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
           riskAssessments: this.riskAssessmentsForOrder(orderId),
           returnedQtyBySeqId: this.returnedQtyByItemSeqIdByOrderId(orderId),
           inventoryTransfers: this.inventoryTransfersByOrderId[orderId] || [],
-        }, { seed: seedData, productCache: useProductCacheStore() });
+        }, { seed: useSeedStore(), productCache: useProductCacheStore() });
       };
     },
 
@@ -284,19 +335,17 @@ export const useOrderDetailStore = defineStore("orderDetail", {
      * document plus the facility changes, unfillable attempts, fulfillment dates, returns and
      * exchanges loaded beside it. See utils/orderEvents.
      */
-    orderEventsByOrderId(): (orderId: string) => OrderEvent[] {
-      return (orderId: string): OrderEvent[] => buildOrderEvents({
-        order: this.byOrderId[orderId]?.payload || null,
-        facilityChanges: this.facilityChangesByOrderId[orderId] || [],
-        facilityChangesLoaded: Array.isArray(this.facilityChangesByOrderId[orderId]),
-        facilityChangesTruncated: !!this.facilityChangesTruncatedByOrderId[orderId],
-        unfillable: this.unfillableByOrderId[orderId] || null,
-        fulfillment: this.fulfillmentTimelineByOrderId[orderId] || [],
-        returnHeadersById: this.returnHeadersById,
-        exchangeChildren: this.exchangeChildrenByOrderId[orderId] || [],
-        isVirtualFacility: (facilityId: string) => isVirtualFacilityId(facilityId),
-      });
-    },
+    orderEventsByOrderId: (state) => (orderId: string): OrderEvent[] => buildOrderEvents({
+      order: state.byOrderId[orderId]?.payload || null,
+      facilityChanges: state.facilityChangesByOrderId[orderId] || [],
+      facilityChangesLoaded: Array.isArray(state.facilityChangesByOrderId[orderId]),
+      facilityChangesTruncated: !!state.facilityChangesTruncatedByOrderId[orderId],
+      unfillable: state.unfillableByOrderId[orderId] || null,
+      fulfillment: state.fulfillmentTimelineByOrderId[orderId] || [],
+      returnHeadersById: state.returnHeadersById,
+      exchangeChildren: state.exchangeChildrenByOrderId[orderId] || [],
+      isVirtualFacility: isVirtualFacilityId,
+    }),
 
     orderHistoryStatus: (state) => (orderId: string): OrderHistoryStatus => ({
       loading: (state.historyStatusByOrderId[orderId]?.loading || 0) > 0,
@@ -326,9 +375,7 @@ export const useOrderDetailStore = defineStore("orderDetail", {
       return totals;
     },
 
-    orderTotalsByOrderId(): (orderId: string) => ReturnType<typeof orderTotals> {
-      return (orderId: string) => orderTotals(this.byOrderId[orderId]?.payload);
-    },
+    orderTotalsByOrderId: (state) => (orderId: string) => orderTotals(state.byOrderId[orderId]?.payload),
 
     allItemsByOrderId: (state) => (orderId: string) => {
       const current = state.byOrderId[orderId]?.payload;
@@ -406,11 +453,15 @@ export const useOrderDetailStore = defineStore("orderDetail", {
     },
 
     /** Shipping methods for a given carrier partyId, derived from the fetched carrierShipmentMethods list or the local database. */
-    shippingMethodsByCarrier(): (carrierPartyId: string) => any[] {
-      return (carrierPartyId: string) => {
-        const fromDetail = this.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId);
-        return fromDetail.length ? fromDetail : seedData.shipmentMethodsByCarrier(carrierPartyId);
-      };
+    shippingMethodsByCarrier: (state) => (carrierPartyId: string) => {
+      const fromDetail = state.shippingMethods.filter((m: any) => m.partyId === carrierPartyId || m.carrierPartyId === carrierPartyId);
+      if (fromDetail.length) return fromDetail;
+      try {
+        const seedStore = useSeedStore();
+        return seedStore.shippingMethodsByCarrier(carrierPartyId);
+      } catch {
+        return [];
+      }
     },
   },
   actions: {

@@ -64,17 +64,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import {
   IonAccordion, IonAccordionGroup, IonButton, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonNote, IonSkeletonText,
 } from '@ionic/vue';
 import { timeOutline, warningOutline } from 'ionicons/icons';
 import { translate } from '@common';
-import { serviceState, useSeedData } from '@common/db';
 import OrderTimelineEntry from '@/components/orders/OrderTimelineEntry.vue';
 import { FACILITY_CHANGE_PAGE_SIZE } from '@/composables/useOrderDetail';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { isVirtualFacilityId, useOrderDetailStore, type OrderHistoryStatus } from '@/store/orderDetail';
+import { useSeedStore } from '@/store/seed';
 import type { EnrichedOrder } from '@/types/orderDetail';
 import { formatTime } from '@/utils/format';
 import type { OrderEvent, OrderEventLink } from '@/utils/orderEvents';
@@ -90,8 +90,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{ retry: [] }>();
 
+const seed = useSeedStore();
 const orderDetailStore = useOrderDetailStore();
-const seed = useSeedData();
 const { primaryIdentifier } = useProductIdentity();
 
 const context = computed<TimelineContext>(() => {
@@ -105,9 +105,9 @@ const context = computed<TimelineContext>(() => {
     translate,
     facilityName: (facilityId: string) => seed.facilityName(facilityId),
     statusDescription: (statusId: string) => seed.statusDescription(statusId),
-    describe: (value: string) => seed.enumDescription(value),
+    describe: (value: string) => seed.describe(value),
     enumDescription: (enumId: string) => seed.enumDescription(enumId),
-    isVirtualFacility: (facilityId: string) => isVirtualFacilityId(facilityId),
+    isVirtualFacility: isVirtualFacilityId,
     itemTotal: Object.keys(shipGroupOfItem).length,
     shipGroupOfItem,
     posShipGroupIds: new Set(props.order.shipGroups.filter((shipGroup) => shipGroup.isPosCompleted).map((shipGroup) => shipGroup.id)),
@@ -122,14 +122,8 @@ const context = computed<TimelineContext>(() => {
 });
 
 // Whether a facility is parking decides how a move reads — the move a cancellation makes into
-// Rejected Item Parking, or a rejection — so the rows wait for the facility tables on a cold load:
-// until they hold this login's sync, or their first read has landed and sync has stopped, so a
-// failed sync still shows the history rather than loading forever.
-const facilitiesRead = ref(false);
-Promise.all([seed.getFacilities(), seed.getFacilityTypes()]).finally(() => { facilitiesRead.value = true; });
-const facilitiesReady = computed(() =>
-  (seed.facilities.withSync().synced && seed.facilityTypes.withSync().synced)
-  || (facilitiesRead.value && !serviceState.running));
+// Rejected Item Parking, or a rejection — so the rows wait for the facility list on a cold load.
+const facilitiesReady = computed(() => seed.facilities.ids.length > 0 || ['loaded', 'error'].includes(seed.facilities.status));
 const loading = computed(() => props.status.loading || !facilitiesReady.value);
 
 const days = computed(() => (facilitiesReady.value ? timelineDays(groupTransactions(props.events, context.value), context.value) : []));

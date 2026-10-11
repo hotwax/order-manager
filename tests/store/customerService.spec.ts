@@ -48,8 +48,12 @@ vi.mock('@/store/order', () => ({
   })),
 }));
 
-vi.mock('@/db/orderManagerDb', () => ({
-  omDb: () => ({ all: async () => [], get: async () => undefined }),
+vi.mock('@/store/seed', () => ({
+  useSeedStore: vi.fn(() => ({
+    productStores: { byId: {} },
+    shipmentMethodTypes: { byId: {} },
+    getEnumsByType: vi.fn(() => []),
+  })),
 }));
 
 vi.mock('@/store/orderDetail', () => ({

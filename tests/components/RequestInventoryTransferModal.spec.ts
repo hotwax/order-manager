@@ -53,9 +53,10 @@ vi.mock('@/store/orderDetail', () => ({
     fetchInventoryTransfers: mocks.fetchInventoryTransfers,
   }),
 }));
-vi.mock('@common/db', () => ({
-  useSeedData: () => ({
-    getFacilities: async () => Object.values(facilities),
+vi.mock('@/store/seed', () => ({
+  useSeedStore: () => ({
+    loadFacilities: vi.fn(),
+    facilities: { ids: Object.keys(facilities), byId: facilities },
     facilityName: (facilityId: string) => facilities[facilityId]?.facilityName || facilityId,
   }),
 }));

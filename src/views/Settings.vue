@@ -208,9 +208,8 @@
           </ion-radio-group>
 
           <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-            <ion-fab-button :disabled="!timeZoneId || isSavingTimeZone" @click="saveUserTimeZone" :aria-label="translate('Save')">
-              <ion-spinner v-if="isSavingTimeZone" name="crescent" />
-              <ion-icon v-else :icon="saveOutline" />
+            <ion-fab-button :disabled="!timeZoneId" @click="saveUserTimeZone" :aria-label="translate('Save')">
+              <ion-icon :icon="saveOutline" />
             </ion-fab-button>
           </ion-fab>
         </ion-content>
@@ -228,8 +227,8 @@ import { useDbStatus } from '@common/db';
 import { useAuth } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
-import { getOrderManagerDb, orderManagerDb } from '@/db/orderManagerDb';
-import { resyncDomain, resyncReferenceData, syncService } from '@/services/appDbSync';
+import { getOrderManagerDb } from '@/db/orderManagerDb';
+import { ORDER_MANAGER_SYNC_CATALOG } from '@/config/appSyncConfig';
 import DxpProductIdentifier from "@/components/settings/DxpProductIdentifier.vue";
 import DxpAppVersionInfo from "@/components/settings/DxpAppVersionInfo.vue";
 import Actions from "@/authorization/actions";
@@ -266,7 +265,6 @@ const props = defineProps({
 });
 
 const isLoading = ref(true);
-const isSavingTimeZone = ref(false);
 const isOmsOffline = ref(false);
 const timeZoneModal = ref();
 const queryString = ref('');
@@ -319,13 +317,8 @@ function setCurrentProductStore(event: CustomEvent) {
 }
 
 async function saveUserTimeZone() {
-  isSavingTimeZone.value = true;
-  try {
-    await userStore.setUserTimeZone(timeZoneId.value);
-    closeModal();
-  } finally {
-    isSavingTimeZone.value = false;
-  }
+  await userStore.setUserTimeZone(timeZoneId.value);
+  closeModal();
 }
 
 function logout() {
@@ -370,14 +363,7 @@ function clearSearch() {
 // Live IndexedDB status
 const {
   domains, refreshing, totalRows, oldestSyncedAt, lastSyncedAt, refreshDomain, refreshAll,
-} = useDbStatus(
-  orderManagerDb.raw(),
-  orderManagerDb.statusCatalog,
-  {
-    resyncDomain,
-    resyncAll: resyncReferenceData,
-  },
-);
+} = useDbStatus(getOrderManagerDb(commonUtil.getOMSInstanceName()), ORDER_MANAGER_SYNC_CATALOG);
 
 const formatSyncTime = (millis: number) => formatDateTime(millis);
 

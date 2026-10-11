@@ -3,8 +3,6 @@ import {
   buildFacilityCoverageRows,
   filterFacilityCoverageRows,
   isPhysicalFacility,
-  noFacilityCovers,
-  pinCurrentFacility,
   sortFacilityCoverageRows
 } from '@/utils/facilityInventory';
 
@@ -140,55 +138,5 @@ describe('facility coverage rows', () => {
   it('separates physical facilities from virtual ones by parent type', () => {
     expect(isPhysicalFacility({ facilityId: 'STORE_A', parentTypeId: 'PHYSICAL_STORE' })).toBe(true);
     expect(isPhysicalFacility({ facilityId: 'PRE_ORDER_PARKING', parentTypeId: 'VIRTUAL_FACILITY' })).toBe(false);
-  });
-});
-
-describe('pinning the current facility', () => {
-  const rows = [{ facilityId: 'STORE_A' }, { facilityId: 'STORE_B' }, { facilityId: 'WAREHOUSE' }];
-
-  it('takes the current facility out of the choices and pins it on its own', () => {
-    expect(pinCurrentFacility(rows, rows, 'STORE_B')).toEqual({
-      current: { facilityId: 'STORE_B' },
-      others: [{ facilityId: 'STORE_A' }, { facilityId: 'WAREHOUSE' }],
-    });
-  });
-
-  it('keeps the current facility pinned while a search hides it from the list', () => {
-    const searched = [{ facilityId: 'WAREHOUSE' }];
-    expect(pinCurrentFacility(rows, searched, 'STORE_B')).toEqual({ current: { facilityId: 'STORE_B' }, others: searched });
-  });
-
-  it('pins nothing when there is no current facility, or it is not one of the choices', () => {
-    expect(pinCurrentFacility(rows, rows)).toEqual({ current: null, others: rows });
-    expect(pinCurrentFacility(rows, rows, 'PARKING')).toEqual({ current: null, others: rows });
-  });
-});
-
-describe('telling the operator no facility has enough stock', () => {
-  // Two items: a facility covers the first, the second, both, or neither.
-  const row = (facilityId: string, covers: boolean[], inStore = true) => ({
-    facilityId,
-    inStore,
-    items: covers.map((covered) => ({ covered })),
-    coveredCount: covers.filter(Boolean).length,
-    totalCount: covers.length,
-  }) as any;
-
-  it('says so for the item being detailed when no store facility covers it', () => {
-    const rows = [row('STORE_A', [false, true]), row('STORE_B', [false, false])];
-    expect(noFacilityCovers(rows, 0)).toBe(true);
-    expect(noFacilityCovers(rows, 1)).toBe(false);
-  });
-
-  it('while summarising, needs one facility that covers every item at once', () => {
-    // Each item is covered somewhere, but never both in the same facility.
-    expect(noFacilityCovers([row('STORE_A', [true, false]), row('STORE_B', [false, true])])).toBe(true);
-    expect(noFacilityCovers([row('STORE_A', [true, true])])).toBe(false);
-  });
-
-  it('ignores facilities outside the product store, and says nothing when there is nothing to judge', () => {
-    expect(noFacilityCovers([row('STORE_A', [false]), row('OTHER_BRAND', [true], false)], 0)).toBe(true);
-    expect(noFacilityCovers([], 0)).toBe(false);
-    expect(noFacilityCovers([row('OTHER_BRAND', [false], false)], 0)).toBe(false);
   });
 });

@@ -29,18 +29,6 @@
       </ion-button>
     </ion-item>
 
-    <!-- The group's location has promised more of these items' products than it has, so they
-         will not ship from here unless stock arrives or someone re-routes them. -->
-    <ion-item v-if="shortItems.length" color="warning" lines="none">
-      <ion-icon slot="start" :icon="warningOutline" />
-      <ion-label class="ion-text-wrap">
-        {{ translate('{count} items short at {facility}', { count: shortItems.length, facility: shipGroup.facilityName }) }}
-      </ion-label>
-      <ion-button slot="end" fill="solid" color="dark" size="small" @click="emit('show-routing')">
-        {{ translate('View routing') }}
-      </ion-button>
-    </ion-item>
-
     <!-- Gift, shipping date, delivery date and instruction options all describe a
          shipment that will happen; a counter sale has already happened. -->
     <div v-if="!shipGroup.isPosCompleted" class="ship-group-options-wrapper">
@@ -214,9 +202,6 @@
               <!-- Inventory lookup answers "can we still fulfil this?"; the goods have
                    already left the store. What matters instead is whether the stock
                    they left with came off the books. -->
-              <ion-badge v-if="shortStock?.[item.orderItemSeqId] !== undefined" slot="end" color="warning">
-                {{ translate('Available here: {available}', { available: formatNumber(shortStock?.[item.orderItemSeqId]) }) }}
-              </ion-badge>
               <ion-button v-if="!shipGroup.isPosCompleted" slot="end" fill="clear" color="medium" @click.stop="emit('view-inventory', item.productId)" :aria-label="translate('View inventory')" :title="translate('View inventory')">
                 <ion-icon slot="icon-only" :icon="cubeOutline" />
               </ion-button>
@@ -330,7 +315,7 @@
                     <ion-select :label="translate('Country')" label-placement="stacked" interface="popover"
                       :placeholder="translate('Select country')" v-model="shippingAddressForm.countryGeoId"
                       @ionChange="shippingAddressForm.stateProvinceGeoId = ''">
-                      <ion-select-option v-for="country in seed.countries()" :key="country.geoId" :value="country.geoId">
+                      <ion-select-option v-for="country in seed.getCountries" :key="country.geoId" :value="country.geoId">
                         {{ country.geoName }}
                       </ion-select-option>
                     </ion-select>
@@ -340,7 +325,7 @@
                       interface="popover" :placeholder="translate('Select State / Province')"
                       :disabled="!shippingAddressForm.countryGeoId"
                       v-model="shippingAddressForm.stateProvinceGeoId">
-                      <ion-select-option v-for="state in seed.states()" :key="state.geoId" :value="state.geoId">
+                      <ion-select-option v-for="state in seed.getStates" :key="state.geoId" :value="state.geoId">
                         {{ state.geoName }}
                       </ion-select-option>
                     </ion-select>
@@ -495,9 +480,9 @@ import {
   warningOutline,
 } from 'ionicons/icons';
 import { DxpShopifyImg, translate } from '@common';
-import { useSeedData } from '@common/db';
 import { useProductIdentity } from '@/composables/useProductIdentity';
 import { useOrderDetailStore } from '@/store/orderDetail';
+import { useSeedStore } from '@/store/seed';
 import { confirmAction, isKit } from '@/utils';
 import type { ShipGroupMilestones } from '@/utils/orderEvents';
 import { formatDateTime, formatElapsed, formatNumber, formatRelative, formatTime, toDateInputValue } from '@/utils/format';
@@ -522,15 +507,12 @@ const props = defineProps<{
   editor: ShipGroupEditor | null;
   /** A save from this card is in flight. */
   saving: boolean;
-  /** Available to promise at this group's location, for items whose location is short. Keyed by order item. */
-  shortStock?: Record<string, number>;
 }>();
 
 const emit = defineEmits<{
   'update:expanded': [expanded: boolean];
   'update:selectedItemIds': [ids: string[]];
   'show-holds': [];
-  'show-routing': [];
   broker: [];
   release: [];
   park: [];
@@ -545,8 +527,8 @@ const emit = defineEmits<{
   'save-address': [address: ShipGroupAddressEdit];
 }>();
 
+const seed = useSeedStore();
 const orderDetailStore = useOrderDetailStore();
-const seed = useSeedData();
 const { getProduct, imagePreview, primaryIdentifier, secondaryIdentifier, featureLabel } = useProductIdentity();
 
 const ISSUANCE_LABELS: Record<ItemIssuance['kind'], string> = {
@@ -569,7 +551,6 @@ const detailsOpen = computed(() => props.shipGroup.isPosCompleted || props.expan
 // (#516); the rest are one tap away, and the "+N more" row says how many.
 const COLLAPSED_ITEM_LIMIT = 3;
 const hiddenItemCount = computed(() => Math.max(props.shipGroup.items.length - COLLAPSED_ITEM_LIMIT, 0));
-const shortItems = computed(() => props.shipGroup.items.filter((item) => props.shortStock?.[item.orderItemSeqId] !== undefined));
 const orderIsTerminal = computed(() => OrderActionValidator.isOrderTerminal({ statusId: props.orderStatusId }));
 
 /** A stopped group is read-only: its options describe a shipment that will no longer change. */

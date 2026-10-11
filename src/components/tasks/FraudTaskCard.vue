@@ -95,7 +95,7 @@ import { commonUtil, DxpShopifyImg, translate } from '@common';
 import { showToast, sentimentCounts } from '@/utils';
 import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedData } from '@common/db';
+import { useSeedStore } from '@/store/seed';
 import { useProductCacheStore } from '@/store/productCache';
 import { useProductStore } from '@/store/productStore';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
@@ -103,8 +103,6 @@ import TaskCardShell from '@/components/tasks/TaskCardShell.vue';
 import { formatMoney } from '@/utils/format';
 import { formatTaskAmount, taskOrderSubtitle, taskOrderTitle } from '@/utils/taskCardDisplay';
 import type { TaskCardAction } from '@/types/taskCard';
-
-const seed = useSeedData();
 
 const props = withDefaults(defineProps<{ task: any; selectable?: boolean; selected?: boolean; showViewOrderAction?: boolean }>(), {
   selectable: false,
@@ -118,6 +116,7 @@ const emit = defineEmits<{
 }>();
 
 const orderTaskStore = useOrderTaskStore();
+const seedStore = useSeedStore();
 const productIdentificationPref = computed(() => useProductStore().getProductIdentificationPref);
 
 const cardActions = computed<TaskCardAction[]>(() => ([
@@ -160,12 +159,14 @@ function orderedItemSecondary(item: any): string {
 
 function paymentMethodLabel(payment: any): string {
   return payment.paymentMethodDescription
-    || seed.paymentMethodDescription(payment.paymentMethodTypeId);
+    || seedStore.paymentMethodDescription(payment.paymentMethodTypeId)
+    || payment.paymentMethodTypeId;
 }
 
 function paymentStatusLabel(payment: any): string {
   return payment.statusDescription
-    || seed.statusDescription(payment.statusId);
+    || seedStore.statusDescription(payment.statusId)
+    || payment.statusId;
 }
 
 function paymentStatusColor(payment: any): string | undefined {
@@ -179,8 +180,8 @@ function paymentStatusColor(payment: any): string | undefined {
 
 function suggestedActionLabel(task: any): string {
   return task.suggestedAction
-    || seed.enumDescription(task.riskRecommendationEnumId ?? '')
-    || seed.enumDescription(task.recommendationEnumId ?? '')
+    || seedStore.enumDescription(task.riskRecommendationEnumId)
+    || seedStore.enumDescription(task.recommendationEnumId)
     || translate('Review');
 }
 

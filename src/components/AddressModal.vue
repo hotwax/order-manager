@@ -64,9 +64,7 @@ import {
 import { computed, onMounted, ref } from 'vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { translate } from "@common";
-import { useSeedData } from '@common/db';
-
-const seed = useSeedData();
+import { useSeedStore } from '@/store/seed';
 
 const address = ref({
   address1: "",
@@ -79,8 +77,8 @@ const address = ref({
 })
 
 const props = defineProps(["customerAddress"])
-const countries = computed(() => seed.countries())
-const states = computed(() => seed.statesForCountry(address.value.country))
+const countries = computed(() => useSeedStore().getCountries)
+const states = computed(() => useSeedStore().getStatesForCountry(address.value.country))
 
 onMounted(() => {
   prepareAddress();
@@ -88,6 +86,9 @@ onMounted(() => {
 
 function onCountryChange() {
   address.value.province = "";
+  if(address.value.country) {
+    useSeedStore().loadGeoAssocs(address.value.country);
+  }
 }
 
 function prepareAddress() {

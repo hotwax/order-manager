@@ -1,12 +1,15 @@
 import { DateTime, Settings } from "luxon";
 import { defineStore } from "pinia";
 import { api, commonUtil, cookieHelper, logger, translate } from "@common";
+import { clearLocalDb } from "@common/db";
 import { useAuth } from "@common/composables/useAuth";
 import { showToast } from "@/utils";
+import { getOrderManagerDb } from "@/db/orderManagerDb";
+import { useSeedStore } from "./seed";
 import { useOrderDetailStore } from "./orderDetail";
 import { useProductCacheStore } from "./productCache";
 import { useProductStore } from "@/store/productStore";
-import { startAppDbSync, stopAppDbSync } from "@/services/appDbSync";
+import { getSyncToken, startAppDbSync } from "@/services/appDbSync";
 
 export const useUserStore = defineStore("user", {
   state: () => ({
@@ -161,15 +164,6 @@ export const useUserStore = defineStore("user", {
       this.pwaState.updateExists = payload.updateExists;
     },
     async postLogin() {
-      // Start every login from an empty local database. The logout wipe does not always run: a
-      // session that expires while nothing is requesting (a closed tab, a sleeping laptop) lands on
-      // /login without a 401 and so without `postLogout`, leaving the previous session's rows and its
-      // once-per-login sync markers behind. The next login — the same user or another one — would
-      // then skip the seed and read them. This hook runs once per real login (never on a reload),
-      // before anything below reads the database, and stops a sync the `isAuthenticated` watcher in
-      // App.vue may already have started against the old rows.
-      await stopAppDbSync().catch((error) => logger.error("Failed to clear the local database on login", error));
-
       try {
         await this.fetchUserProfile();
         this.oms = cookieHelper().get("oms") || "";
@@ -178,13 +172,27 @@ export const useUserStore = defineStore("user", {
         await useProductStore().fetchProductStorePreference();
 
         // Start non-blocking Web Worker sync to hydrate and update the local IndexedDB
-        void startAppDbSync();
+        startAppDbSync(getSyncToken(), () => useSeedStore().populateFromDb())
+          .catch((err) => {
+            logger.warn("Database background sync notice:", err);
+          });
+
+        // Initialize in-memory seed store from the local database/API
+        await useSeedStore().initSeedDb();
+
+        // On a fresh login the database is still filling in the worker, so load whatever the seed
+        // store does not have yet directly from the API rather than waiting on the bootstrap.
+        const productStoreIds = (useProductStore().productStores || [])
+          .map((store: any) => store.productStoreId)
+          .filter(Boolean);
+        useSeedStore().loadInitialSeedData(productStoreIds).catch(() => undefined);
       } catch (error: any) {
         return Promise.reject(error);
       }
     },
     async postLogout() {
-      await stopAppDbSync();
+      await clearLocalDb(getOrderManagerDb(commonUtil.getOMSInstanceName()));
+      useSeedStore().resetSeedData();
       useOrderDetailStore().reset();
       useProductCacheStore().reset();
       this.$reset();
