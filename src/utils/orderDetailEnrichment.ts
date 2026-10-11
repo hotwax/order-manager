@@ -9,7 +9,7 @@ import { shipGroupMilestones, type OrderEvent } from './orderEvents';
 import { adjustmentAmount, adjustmentKey, adjustmentLabel } from './orderAdjustments';
 import type { SeedData } from '@common/db';
 import type { useProductCacheStore } from '@/store/productCache';
-import type { ItemIssuanceSummary } from '@/store/orderDetail';
+import type { ItemIssuanceSummary } from './inventoryIssuance';
 import type {
   EnrichedItemGroup,
   EnrichedOrder,

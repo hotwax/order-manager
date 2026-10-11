@@ -39,6 +39,11 @@
 ## 2026-09-23 - Ionic ion-button vs raw a tags
 **Learning:** The application uses raw a tags in some places with openOutline icons. This breaks visual consistency and can cause focus state and accessibility issues. Ionic's ion-button natively supports href, target, and rel attributes and renders a compliant anchor tag internally.
 **Action:** When adding external links or reviewing them, upgrade a tags to ion-button fill='clear' to maintain keyboard accessibility, correct focus styling, and general UI cohesion within the app.
+## 2024-05-18 - Visual Loading Feedback for ion-fab-button
+**Learning:** `ion-fab-button` elements performing asynchronous actions often lack a visual loading indicator (e.g. `ion-spinner`), only relying on a `disabled` state which can feel unresponsive. Unlike `ion-button`, `ion-fab-button` uses the Shadow DOM and only has a default slot. Therefore, inner elements like `ion-spinner` should NOT use `slot="icon-only"`, as this will hide them.
+**Action:** When auditing `ion-fab-button` components, check if their action is asynchronous (e.g. form submission or API save). If so, introduce an `isSubmitting` / `isSaving` ref, disable the button when true, and conditionally render an `ion-spinner` (without `slot="icon-only"`) in place of the default `ion-icon`.
+
 ## 2025-10-08 - Added IonSpinner to async <ion-fab-button>
 **Learning:** Found that <ion-fab-button> instances used for saving forms within modals were relying solely on the `:disabled="saving"` attribute. While they were not double-submitting, they lacked explicit visual loading feedback (like an <ion-spinner>) which is a better UX pattern for async actions. Additionally, verified that we shouldn't use `slot="icon-only"` inside `<ion-fab-button>` because it uses the Shadow DOM and only has a default unnamed slot, otherwise the element is hidden.
 **Action:** Replaced static save icons with conditional `<ion-spinner>` indicators within the `<ion-fab-button>` for modal submit actions, and ensured `IonSpinner` was imported in the script setup.
+

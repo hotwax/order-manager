@@ -25,7 +25,7 @@
             <ion-item>
               <ion-icon :icon="businessOutline" slot="start" />
               <ion-select v-model="orderForm.facilityId" :label="translate('Facility')" :placeholder="translate('Select')" interface="popover">
-                <ion-select-option v-for="facility in facilities" :value="facility.facilityId" :key="facility.facilityId">{{ facility.faciityName ? facility.faciityName : facility.facilityId }}</ion-select-option>
+                <ion-select-option v-for="facility in facilities" :value="facility.facilityId" :key="facility.facilityId">{{ facility.facilityName ? facility.facilityName : facility.facilityId }}</ion-select-option>
               </ion-select>
             </ion-item>
             <ion-item>
