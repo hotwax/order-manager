@@ -1,6 +1,7 @@
 import { computed, ref, type Ref } from 'vue';
 import { alertController, modalController } from '@ionic/vue';
 import { api, translate } from '@common';
+import { useSeedData } from '@common/db';
 import { showToast } from '@/utils';
 import { OrderActionValidator, type FooterActionView, type ShipGroupActionId } from '@/utils/OrderActionValidator';
 import { isInventoryTransferEligibleItem } from '@/services/inventoryTransfers';
@@ -9,7 +10,6 @@ import { useCustomerStore } from '@/store/customer';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useProductStore } from '@/store/productStore';
-import { useSeedStore } from '@/store/seed';
 import type { EnrichedOrder, EnrichedOrderItem, EnrichedShipGroup, ShipGroupAddressEdit, ShipGroupEditor, ShipGroupFieldsEdit } from '@/types/orderDetail';
 
 import AddContactModal from '@/components/AddContactModal.vue';
@@ -62,9 +62,10 @@ interface SelectionAction<Input> {
  */
 export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShipGroupItems, selectedSegment, canRequestInventoryTransfer }: UseOrderActionsOptions) {
   const orderDetailStore = useOrderDetailStore();
+  const seed = useSeedData();
   const orderTaskStore = useOrderTaskStore();
   const customerStore = useCustomerStore();
-  const seed = useSeedStore();
+  const productStore = useProductStore();
   const { getProduct, primaryIdentifier } = useProductIdentity();
 
   const allItems = computed(() => (order.value?.groupedItems || []).flatMap((group) => group.items));
@@ -136,9 +137,14 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
    * ship group's selection differ only in how many items are handed over.
    */
   async function openFacilityInventoryModal(items: EnrichedOrderItem[]): Promise<string | null> {
+    // Items that share one real facility have a current facility the picker pins first and won't
+    // save. Items in a queue or parking location have none, so every facility is a choice.
+    const facilityIds = new Set(items.map((item) => item.facilityId));
+    const currentFacilityId = facilityIds.size === 1 && !items.some(isVirtualForItem) ? items[0]?.facilityId : undefined;
     const modal = await modalController.create({
       component: FacilityInventoryModal,
       componentProps: {
+        currentFacilityId,
         items: items.map((item) => ({
           orderItemSeqId: item.orderItemSeqId,
           productId: item.productId || '',
@@ -262,7 +268,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     apply: (orderId, items, { rejectionReasonId }) => api({
       url: `oms/orders/${orderId}/reject`,
       method: 'POST',
-      data: { orderId, items: items.map(({ orderItemSeqId }) => ({ orderItemSeqId, quantity: '1', rejectionReasonId, maySplit: 'Y' })) },
+      data: { orderId, items: items.map(({ orderItemSeqId }) => ({ orderItemSeqId, quantity: '1', rejectionReasonId, maySplit: 'Y', updateQOH: productStore.getAffectQOHOnRej === "Y" })) },
     }),
     success: 'Items rejected successfully.',
     failure: 'Failed to reject items. Please try again.',
@@ -397,7 +403,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
 
     if (!isVirtualForItem(item)) {
       try {
-        await api({ url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/reject`, method: 'POST', data: { rejectionReasonId: 'NO_VARIANCE_LOG' } });
+        await api({ url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/reject`, method: 'POST', data: { rejectionReasonId: 'NO_VARIANCE_LOG', updateQOH: productStore.getAffectQOHOnRej === "Y" } });
       } catch {
         await showToast(translate('Failed to reject the item. Please try again.'));
         return;

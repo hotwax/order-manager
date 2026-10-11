@@ -43,13 +43,15 @@
     </div>
 
     <div class="tablet order-item-details">
+      <!-- A warning chip names a location that has promised more of this product than it has. -->
       <ion-chip
         v-if="facilityLabel"
-        outline
+        :outline="!facilityWarning"
+        :class="{ 'facility-warning': facilityWarning }"
         :disabled="facilityDisabled"
         @click.stop="emit('facility-click')"
       >
-        <ion-icon :icon="businessOutline" />
+        <ion-icon :icon="facilityWarning ? warningOutline : businessOutline" />
         <ion-label>{{ facilityLabel }}</ion-label>
       </ion-chip>
       <!-- Chips about where the item's stock comes from, such as its inventory transfers, sit under the facility. -->
@@ -91,7 +93,7 @@
 
 <script setup lang="ts">
 import { IonBadge, IonCheckbox, IonChip, IonIcon, IonItem, IonLabel, IonNote, IonThumbnail } from '@ionic/vue';
-import { businessOutline, listOutline } from 'ionicons/icons';
+import { businessOutline, listOutline, warningOutline } from 'ionicons/icons';
 import { DxpShopifyImg, translate } from '@common';
 import type { ItemStatusBadge } from '@/utils/itemStatusBadges';
 
@@ -111,6 +113,8 @@ withDefaults(defineProps<{
   showQuantity?: boolean;
   facilityLabel?: string;
   facilityDisabled?: boolean;
+  /** The location is short of stock for this item; the label carries the available count. */
+  facilityWarning?: boolean;
   attributesLabel?: string;
   attributesDisabled?: boolean;
   statuses?: ItemStatusBadge[];
@@ -128,6 +132,7 @@ withDefaults(defineProps<{
   showQuantity: true,
   facilityLabel: '',
   facilityDisabled: false,
+  facilityWarning: false,
   attributesLabel: '',
   attributesDisabled: false,
   statuses: () => [],
@@ -147,6 +152,12 @@ const emit = defineEmits<{
 </script>
 
 <style scoped>
+/* Filled like the warning banners elsewhere on the order page; yellow text on white is hard to read. */
+.facility-warning {
+  --background: var(--ion-color-warning);
+  --color: var(--ion-color-warning-contrast);
+}
+
 /* Every row has the same four columns: product (with the quantity in its end slot), details,
    status and amount. Item actions live in the page footer and act on the selected rows.
    The shared list-item grid sizes its last column to fit a row's call to action; these rows end

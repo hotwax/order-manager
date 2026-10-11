@@ -17,12 +17,13 @@ vi.mock('@common', async (importOriginal) => {
   };
 });
 
-vi.mock('@/store/seed', () => ({
-  useSeedStore: vi.fn(() => ({
-    productStores: { byId: {} },
-    shipmentMethodTypes: { byId: {} },
-  })),
-}));
+vi.mock('@/db/orderManagerDb', async (importOriginal) => {
+  const actual = await importOriginal<any>();
+  return {
+    ...actual,
+    omDb: () => ({ all: async () => [], get: async () => undefined }),
+  };
+});
 
 vi.mock('@/services/order', () => ({
   searchOrders: vi.fn(),

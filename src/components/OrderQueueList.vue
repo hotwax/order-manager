@@ -156,13 +156,15 @@ import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderStore } from '@/store/order';
 import { useOrderTaskStore } from '@/store/orderTask';
 import { useProductStore } from '@/store/productStore';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import type { Order } from '@/types/order';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
 import RoutingGroupModal from '@/components/fulfillment/RoutingGroupModal.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
+
+const seed = useSeedData();
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import UniformFilterLayout from '@/components/common/UniformFilterLayout.vue';
@@ -209,7 +211,6 @@ const orderDetailStore = useOrderDetailStore();
 const orderStore = useOrderStore();
 const orderTaskStore = useOrderTaskStore();
 const productStore = useProductStore();
-const seedStore = useSeedStore();
 const userStore = useUserStore();
 // The same permissions Find orders checks for each bulk action.
 const canCancelOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_CANCEL));
@@ -237,8 +238,8 @@ const debounceTimer = ref<ReturnType<typeof setTimeout>>();
 const selectMode = ref(false);
 const selectedOrderIds = ref<string[]>([]);
 
-const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
-const shipmentMethodOptions = computed(() => seedStore.getShipmentMethodOptions);
+const salesChannels = computed(() => seed.enumsByType('ORDER_SALES_CHANNEL'));
+const shipmentMethodOptions = computed(() => seed.shipmentMethodOptions());
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const hasMore = computed(() => searchResults.value.length < searchTotal.value);
 
@@ -254,7 +255,9 @@ function hasGlobalAction(action: QueueGlobalAction): boolean {
   return props.globalActions?.includes(action) ?? false;
 }
 
-onMounted(runSearch);
+onMounted(() => {
+  runSearch();
+});
 
 watch(searchQuery, scheduleSearch);
 watch(() => props.facilityIds, () => runSearch(), { deep: true });
@@ -451,6 +454,13 @@ async function brokerSelectedOrderShipGroups(orderIds: string[], routingGroupId:
 }
 
 async function brokerableShipGroupsForOrders(orderIds: string[]) {
+  // Read the facility rows once for the whole sweep rather than per ship group.
+  const facilityRows = await seed.getFacilities();
+  const facilityById = new Map(facilityRows.map((row: any) => [row.facilityId, row]));
+  const parentTypeByFacilityType = await seed.getFacilityParentTypeIds(
+    facilityRows.map((row: any) => row.facilityTypeId),
+  );
+
   const shipGroupsByOrder = await Promise.all(
     orderIds.map(async (orderId) => ({
       orderId,
@@ -460,7 +470,7 @@ async function brokerableShipGroupsForOrders(orderIds: string[]) {
 
   return shipGroupsByOrder.flatMap(({ orderId, shipGroups }) =>
     shipGroups
-      .filter(isVirtualShipGroup)
+      .filter((shipGroup: any) => isVirtualShipGroup(shipGroup, facilityById, parentTypeByFacilityType))
       .map((shipGroup) => ({ orderId, shipGroupSeqId: shipGroupSeqId(shipGroup) }))
       .filter((shipGroup) => shipGroup.shipGroupSeqId)
   );
@@ -475,13 +485,20 @@ function shipGroupSeqId(shipGroup: any) {
   return shipGroup.shipGroupSeqId || shipGroup.id || '';
 }
 
-function isVirtualShipGroup(shipGroup: any) {
+function isVirtualShipGroup(
+  shipGroup: any,
+  facilityById: Map<string, any>,
+  parentTypeByFacilityType: Record<string, string>,
+) {
   const facilityId = shipGroup.facilityId || shipGroup.facility?.facilityId || '';
   if (!facilityId) return true;
 
-  const facility = seedStore.facility(facilityId);
-  const facilityTypeId = shipGroup.facilityTypeId || shipGroup.facility?.facilityTypeId || facility?.facilityTypeId;
-  const parentTypeId = shipGroup.facilityParentTypeId || shipGroup.parentFacilityTypeId || seedStore.facilityType(facilityTypeId)?.parentTypeId;
+  const facilityRow = facilityById.get(facilityId);
+  const facilityTypeId = shipGroup.facilityTypeId || shipGroup.facility?.facilityTypeId || facilityRow?.facilityTypeId;
+  // The parent type of the facility TYPE, not of the facility — the two are different fields.
+  const parentTypeId = shipGroup.facilityParentTypeId
+    || shipGroup.parentFacilityTypeId
+    || parentTypeByFacilityType[facilityTypeId];
 
   return facilityTypeId === 'VIRTUAL_FACILITY' || parentTypeId === 'VIRTUAL_FACILITY';
 }

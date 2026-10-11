@@ -208,7 +208,7 @@ import { useOrderStore, DEFAULT_ORDER_SEARCH_SORT } from '@/store/order';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import router from '@/router';
 import AddOrderTaskModal from '@/components/tasks/AddOrderTaskModal.vue';
 import EditShippingMethodModal from '@/components/fulfillment/EditShippingMethodModal.vue';
@@ -216,6 +216,8 @@ import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
+
+const seed = useSeedData();
 import UniformFilterLayout from '@/components/common/UniformFilterLayout.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
@@ -228,7 +230,6 @@ const orderStore = useOrderStore();
 const orderDetailStore = useOrderDetailStore();
 const userStore = useUserStore();
 const productStore = useProductStore();
-const seedStore = useSeedStore();
 const { searchQuery, searchFilters, searchSort, searchResults, searchTotal, loading, error, hasMore } = storeToRefs(orderStore);
 
 function handleOrderRowClick(order: any) {
@@ -242,9 +243,10 @@ const debounceTimer = ref<ReturnType<typeof setTimeout>>();
 const selectMode = ref(false);
 const selectedOrderIds = ref<string[]>([]);
 
-const orderStatuses = computed(() => seedStore.getStatusItemsByType('ORDER_STATUS'));
-const salesChannels = computed(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL'));
-const shipmentMethodOptions = computed(() => seedStore.getShipmentMethodOptions);
+const orderStatuses = computed(() => seed.statusItemsByType('ORDER_STATUS'));
+const salesChannels = computed(() => seed.enumsByType('ORDER_SALES_CHANNEL'));
+const shipmentMethodOptions = computed(() => seed.shipmentMethodOptions());
+
 const selectedProductStoreId = computed(() => productStore.getCurrentProductStore?.productStoreId || 'All');
 const selectedStatusIds = computed(() => {
   const status = searchFilters.value.status as string[] | string;
@@ -434,7 +436,7 @@ function setStatusFilter(statusId: string, checked: boolean) {
 }
 
 function statusDescription(statusId: string) {
-  return seedStore.statusDescription(statusId);
+  return seed.statusDescription(statusId);
 }
 
 </script>

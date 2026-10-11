@@ -108,25 +108,27 @@ import TaskQueueEmptyState from '@/components/tasks/TaskQueueEmptyState.vue';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import BadAddressTaskCard from '@/components/tasks/BadAddressTaskCard.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { useOrderTaskRouteState } from '@/composables/useOrderTaskRouteState';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import { buildTaskQueueRequest, hasTaskFilters } from '@/utils/orderTaskFilters';
 import { countTaskTargets, groupTaskCardsByTarget, runGroupedTaskMutation, shipGroupTaskTarget } from '@/utils/orderTaskBulk';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
-import { defaultOrderTaskFilters, taskSortOptions, type TaskFilterOption } from '@/types/orderTaskFilters';
+
+const seed = useSeedData();
+import { defaultOrderTaskFilters, taskSortOptions } from '@/types/orderTaskFilters';
 
 const orderTaskStore = useOrderTaskStore();
-const seedStore = useSeedStore();
 
 const filters = ref(defaultOrderTaskFilters());
 useOrderTaskRouteState(filters, 'badAddress');
 const { facilityOptions, loadPhysicalFacilities } = usePhysicalFacilityOptions();
-const channelOptions = computed<TaskFilterOption[]>(() => seedStore.getEnumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
-const shipmentMethodOptions = computed<TaskFilterOption[]>(() => seedStore.getShipmentMethodOptions);
+const channelOptions = computed(() => seed.enumsByType('ORDER_SALES_CHANNEL').map((channel: any) => ({ id: channel.enumId, label: channel.description || channel.enumId })));
+const shipmentMethodOptions = computed(() => seed.shipmentMethodOptions());
+const countries = computed(() => seed.countries());
+
 const sortOptions = taskSortOptions('badAddress');
 // Computed once here and passed as a prop — avoids N per-card reactive subscriptions.
-const countries = computed(() => seedStore.getCountries);
 const companyCarrierUrl = buildAppUrl('company', '/carriers');
 const selectMode = ref(false);
 const selectedOrders = ref<Record<string, boolean>>({});
@@ -338,21 +340,6 @@ async function loadMoreAddressValidationTasks(event: any) {
 
 onIonViewWillEnter(async () => {
   loadPhysicalFacilities();
-
-  // The cards name a country from the geo dataset, so the queue waits for it. The page's own
-  // loading state has to be raised for that wait too: with nothing in the store yet, the
-  // template would otherwise render the "no addresses to review" empty state for the whole of
-  // the geo request, and a request that never settles would leave that false answer on screen.
-  // Only when there is nothing to show — a revisit keeps its hydrated cards, as the task fetch
-  // itself does. The fetch raises the flag again in the same tick, so there is no flicker.
-  const showFullLoading = !addressValidationTasks.value.length;
-  if (showFullLoading) loading.value = true;
-  try {
-    await seedStore.loadGeos();
-  } finally {
-    if (showFullLoading) loading.value = false;
-  }
-
   await replaceAddressValidationTasks();
 });
 </script>
