@@ -194,16 +194,17 @@ import SearchFilterCard from "@/components/common/SearchFilterCard.vue";
 import UniformFilterLayout from "@/components/common/UniformFilterLayout.vue";
 import router from "@/router";
 import { useReturnsStore } from "@/store/returns";
-import { useSeedStore } from "@/store/seed";
+import { useSeedData } from '@common/db';
 import { formatDate } from "@/utils/format";
 import { returnStatusColor } from "@/utils/statusColors";
 
+const seed = useSeedData();
+
 const returnsStore = useReturnsStore();
-const seed = useSeedStore();
 const { returns, total, query, loading, error, hasMore } = storeToRefs(returnsStore);
 
-const returnStatuses = computed(() => seed.getStatusItemsByType("ORDER_RETURN_STTS"));
-const returnChannels = computed(() => seed.getEnumsByType("RETURN_CHANNEL"));
+const returnStatuses = computed(() => seed.statusItemsByType("ORDER_RETURN_STTS"));
+const returnChannels = computed(() => seed.enumsByType("RETURN_CHANNEL"));
 const searchPlaceholder = computed(() => ({
   RETURN_ID: translate("Exact return ID"),
   ORDER_ID: translate("Exact internal order ID"),
@@ -246,7 +247,7 @@ function openReturn(returnId: string) {
 }
 
 function statusLabel(statusId: string) {
-  return seed.statusDescription(statusId) || statusId || translate("Not specified");
+  return seed.statusDescription(statusId) || translate("Not specified");
 }
 
 function returnCustomerLabel(returnRecord: any) {
@@ -260,15 +261,16 @@ function returnTypeLabel(returnHeaderTypeId?: string) {
   if(returnHeaderTypeId === "CUSTOMER_RETURN") {return translate("Customer return");}
   if(returnHeaderTypeId === "APPEASEMENT") {return translate("Appeasement");}
 
-  return returnHeaderTypeId ? seed.describe(returnHeaderTypeId) || returnHeaderTypeId : translate("Return");
+  // returnHeaderTypeId has no seed table, so the old describe() call always returned the id.
+  return returnHeaderTypeId || translate("Return");
 }
 
 function channelLabel(returnChannelEnumId?: string) {
-  return returnChannelEnumId ? seed.enumDescription(returnChannelEnumId) || returnChannelEnumId : translate("No channel");
+  return returnChannelEnumId ? seed.enumDescription(returnChannelEnumId) : translate("No channel");
 }
 
 function facilityLabel(destinationFacilityId?: string) {
-  return destinationFacilityId ? seed.facilityName(destinationFacilityId) || destinationFacilityId : translate("No destination facility");
+  return destinationFacilityId ? seed.facilityName(destinationFacilityId) : translate("No destination facility");
 }
 
 </script>

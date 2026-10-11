@@ -1,6 +1,6 @@
 {
   "name": "order-manager",
-  "version": "1.2.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Order Manager App",
   "type": "module",
@@ -37,10 +37,10 @@
   },
   "devDependencies": {
     "@capacitor/cli": "catalog:",
-    "@vitejs/plugin-legacy": "catalog:",
     "@types/file-saver": "catalog:",
     "@types/luxon": "catalog:",
     "@types/papaparse": "catalog:",
+    "@vitejs/plugin-legacy": "catalog:",
     "@vitejs/plugin-vue": "catalog:",
     "eslint": "catalog:",
     "typescript": "catalog:",

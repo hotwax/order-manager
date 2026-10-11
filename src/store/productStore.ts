@@ -1,7 +1,6 @@
 import { defineStore } from 'pinia'
 import { api, commonUtil, logger, translate, useSolrSearch } from '@common'
 import { useUserStore } from '@/store/user'
-import { useSeedStore } from "@/store/seed";
 const defaultProductStoreSettings = JSON.parse(import.meta.env.VITE_DEFAULT_PRODUCT_STORE_SETTINGS as string || '{"PRDT_IDEN_PREF":{"stateKey":"productIdentifier.productIdentificationPref","value":{"primaryId":"SKU","secondaryId":"productId"}}}')
 const productStoreInitialization = new WeakMap<object, Promise<void>>()
 
@@ -22,6 +21,7 @@ export const useProductStore = defineStore('productStore', {
         barcodeIdentifierPref: "",
         barcodeIdentifierOptions: [] as any[],
       },
+      affectQOHOnRej: 'N'
     } as any,
     productStores: [] as any[],
     isProductStoreInitialized: false,
@@ -36,6 +36,7 @@ export const useProductStore = defineStore('productStore', {
     getProductIdentificationOptions: (state) => state.settings.productIdentifier.productIdentificationOptions,
     getBarcodeIdentifierOptions: (state) => state.settings.barcodeIdentifier.barcodeIdentifierOptions,
     getCurrentSampleProduct: (state) => state.settings.productIdentifier.currentSampleProduct,
+    getAffectQOHOnRej: (state) => state.settings.affectQOHOnRej,
   },
 
   actions: {
@@ -60,6 +61,7 @@ export const useProductStore = defineStore('productStore', {
     },
     async setCurrentProductStore(store: any) {
       this.currentProductStore = store
+      this.fetchProductStoreSettings(store.productStoreId);
     },
 
     async fetchProductStores() {
@@ -137,8 +139,8 @@ export const useProductStore = defineStore('productStore', {
       } catch (error) {
         console.error('error', error)
       }
+      this.fetchProductStoreSettings(payload.productStoreId);
       this.currentProductStore = payload;
-      await useSeedStore().loadProductStoreSeedData(payload.productStoreId);
     },
     async fetchProductStoreSettings(productStoreId: string) {
       const productStoreSettings = {} as any
