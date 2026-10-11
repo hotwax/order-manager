@@ -348,7 +348,7 @@
                 </ion-list>
                 <ion-fab vertical="bottom" horizontal="end" slot="fixed">
                   <ion-fab-button :disabled="saving" @click="saveShippingAddress" :aria-label="translate('Save')">
-                    <ion-spinner v-if="saving" name="crescent" slot="icon-only" />
+                    <ion-spinner v-if="saving" name="crescent" />
                     <ion-icon v-else :icon="saveOutline" />
                   </ion-fab-button>
                 </ion-fab>
@@ -396,7 +396,7 @@
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
           <ion-fab-button :disabled="saving" @click="saveGiftMessage" :aria-label="translate('Save')">
-            <ion-spinner v-if="saving" name="crescent" slot="icon-only" />
+            <ion-spinner v-if="saving" name="crescent" />
             <ion-icon v-else :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
@@ -423,7 +423,7 @@
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
           <ion-fab-button :disabled="saving" @click="saveShippingDates" :aria-label="translate('Save')">
-            <ion-spinner v-if="saving" name="crescent" slot="icon-only" />
+            <ion-spinner v-if="saving" name="crescent" />
             <ion-icon v-else :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
@@ -450,7 +450,7 @@
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
           <ion-fab-button :disabled="saving" @click="saveDeliveryDates" :aria-label="translate('Save')">
-            <ion-spinner v-if="saving" name="crescent" slot="icon-only" />
+            <ion-spinner v-if="saving" name="crescent" />
             <ion-icon v-else :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
@@ -473,7 +473,7 @@
         </ion-item>
         <ion-fab vertical="bottom" horizontal="end" slot="fixed">
           <ion-fab-button :disabled="saving" @click="saveInstruction" :aria-label="translate('Save')">
-            <ion-spinner v-if="saving" name="crescent" slot="icon-only" />
+            <ion-spinner v-if="saving" name="crescent" />
             <ion-icon v-else :icon="saveOutline" />
           </ion-fab-button>
         </ion-fab>
