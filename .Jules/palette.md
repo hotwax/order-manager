@@ -46,9 +46,8 @@
 ## 2024-09-28 - Missing empty states for data lists
 **Learning:** When displaying dynamic data lists (e.g. `<ion-list>` rendered conditionally via `v-for`), if the dataset is empty, the UI can feel broken or collapsed. Adding a fallback empty state using an `<ion-item v-else lines="none">` with a `translate()` wrapped `ion-label` makes the UI much more communicative and polished.
 **Action:** Before rendering lists, always verify if there is a possibility that the underlying data might be empty. If so, apply an empty state layout, such as a fallback item explaining "No items found".
-
 ## 2025-10-08 - Added IonSpinner to async <ion-fab-button>
-**Learning:** Found that `<ion-fab-button>` instances used for saving forms within modals were relying solely on the `:disabled="saving"` attribute. While they were not double-submitting, they lacked explicit visual loading feedback (like an `<ion-spinner>`) which is a better UX pattern for async actions. Additionally, verified that we shouldn't use `slot="icon-only"` inside `<ion-fab-button>` because it uses the Shadow DOM and only has a default unnamed slot, otherwise the element is hidden.
+**Learning:** Found that <ion-fab-button> instances used for saving forms within modals were relying solely on the `:disabled="saving"` attribute. While they were not double-submitting, they lacked explicit visual loading feedback (like an <ion-spinner>) which is a better UX pattern for async actions. Additionally, verified that we shouldn't use `slot="icon-only"` inside `<ion-fab-button>` because it uses the Shadow DOM and only has a default unnamed slot, otherwise the element is hidden.
 **Action:** Replaced static save icons with conditional `<ion-spinner>` indicators within the `<ion-fab-button>` for modal submit actions, and ensured `IonSpinner` was imported in the script setup.
 
 ## 2026-09-27 - Async Feedback on Icon-only Action Buttons

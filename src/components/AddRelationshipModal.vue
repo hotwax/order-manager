@@ -160,8 +160,10 @@ import {
 import { arrowBackOutline, arrowForwardOutline, closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, ref } from 'vue';
 import { translate } from '@common';
-import { useSeedStore } from '@/store/seed';
+import { useSeedData } from '@common/db';
 import { searchCustomers } from '@/services/customer';
+
+const seed = useSeedData();
 
 interface RelatableParty {
   partyId: string;
@@ -173,7 +175,6 @@ const props = defineProps<{
   currentPartyId: string;
 }>();
 
-const seed = useSeedStore();
 
 const step = ref<'party' | 'relationship'>('party');
 const queryString = ref('');
@@ -188,17 +189,9 @@ const comments = ref('');
 // Guards against an earlier search resolving after a later one and overwriting it.
 let latestSearchId = 0;
 
-const relationshipTypes = computed(() =>
-  (seed as any).partyRelationshipTypes.ids
-    .map((id: string) => (seed as any).partyRelationshipTypes.byId[id])
-    .filter(Boolean)
-);
-
-const availableRoleTypes = computed(() =>
-  ((seed as any).roleTypes.ids as string[])
-    .map((id: string) => (seed as any).roleTypes.byId[id])
-    .filter(Boolean)
-);
+// Reactive reads from the local database; both fill in once their tables land.
+const relationshipTypes = computed(() => seed.partyRelationshipTypes().filter(Boolean));
+const availableRoleTypes = computed(() => seed.roleTypes().filter(Boolean));
 
 const hasSearchTerm = computed(() => queryString.value.trim().length > 0);
 
