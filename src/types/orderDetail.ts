@@ -33,6 +33,7 @@ export interface EnrichedOrderItem {
   issuance?: ItemIssuance;
   /** Inventory transfers requested for this item, newest first. */
   transfers: EnrichedTransfer[];
+  promisedDatetime: string;
 }
 
 /** One InventoryTransfer row for an order item, with its names and labels resolved. */
