@@ -39,7 +39,18 @@
 ## 2026-09-23 - Ionic ion-button vs raw a tags
 **Learning:** The application uses raw a tags in some places with openOutline icons. This breaks visual consistency and can cause focus state and accessibility issues. Ionic's ion-button natively supports href, target, and rel attributes and renders a compliant anchor tag internally.
 **Action:** When adding external links or reviewing them, upgrade a tags to ion-button fill='clear' to maintain keyboard accessibility, correct focus styling, and general UI cohesion within the app.
+## 2024-05-18 - Visual Loading Feedback for ion-fab-button
+**Learning:** `ion-fab-button` elements performing asynchronous actions often lack a visual loading indicator (e.g. `ion-spinner`), only relying on a `disabled` state which can feel unresponsive. Unlike `ion-button`, `ion-fab-button` uses the Shadow DOM and only has a default slot. Therefore, inner elements like `ion-spinner` should NOT use `slot="icon-only"`, as this will hide them.
+**Action:** When auditing `ion-fab-button` components, check if their action is asynchronous (e.g. form submission or API save). If so, introduce an `isSubmitting` / `isSaving` ref, disable the button when true, and conditionally render an `ion-spinner` (without `slot="icon-only"`) in place of the default `ion-icon`.
+
+## 2024-09-28 - Missing empty states for data lists
+**Learning:** When displaying dynamic data lists (e.g. `<ion-list>` rendered conditionally via `v-for`), if the dataset is empty, the UI can feel broken or collapsed. Adding a fallback empty state using an `<ion-item v-else lines="none">` with a `translate()` wrapped `ion-label` makes the UI much more communicative and polished.
+**Action:** Before rendering lists, always verify if there is a possibility that the underlying data might be empty. If so, apply an empty state layout, such as a fallback item explaining "No items found".
+
+## 2025-10-08 - Added IonSpinner to async <ion-fab-button>
+**Learning:** Found that `<ion-fab-button>` instances used for saving forms within modals were relying solely on the `:disabled="saving"` attribute. While they were not double-submitting, they lacked explicit visual loading feedback (like an `<ion-spinner>`) which is a better UX pattern for async actions. Additionally, verified that we shouldn't use `slot="icon-only"` inside `<ion-fab-button>` because it uses the Shadow DOM and only has a default unnamed slot, otherwise the element is hidden.
+**Action:** Replaced static save icons with conditional `<ion-spinner>` indicators within the `<ion-fab-button>` for modal submit actions, and ensured `IonSpinner` was imported in the script setup.
 
 ## 2026-09-27 - Async Feedback on Icon-only Action Buttons
 **Learning:** Icon-only action buttons (like `<ion-fab-button>`) that execute asynchronous actions (like saving or submitting forms) often rely solely on the `disabled` state for feedback. This lack of visual change during the action degrades UX and accessibility, especially when the async action takes longer to resolve.
-**Action:** When working with async action buttons, specifically `<ion-fab-button>` in Ionic, always incorporate an inline loading spinner (e.g. `<ion-spinner v-if="submitting" name="crescent" slot="icon-only" />`) conditionally replacing the default icon to provide immediate, clear system status feedback.
+**Action:** When working with async action buttons, specifically `<ion-fab-button>` in Ionic, always incorporate an inline loading spinner (e.g. `<ion-spinner v-if="submitting" name="crescent" />`) conditionally replacing the default icon to provide immediate, clear system status feedback.
