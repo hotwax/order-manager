@@ -53,3 +53,7 @@
 ## 2026-09-27 - Async Feedback on Icon-only Action Buttons
 **Learning:** Icon-only action buttons (like `<ion-fab-button>`) that execute asynchronous actions (like saving or submitting forms) often rely solely on the `disabled` state for feedback. This lack of visual change during the action degrades UX and accessibility, especially when the async action takes longer to resolve.
 **Action:** When working with async action buttons, specifically `<ion-fab-button>` in Ionic, always incorporate an inline loading spinner (e.g. `<ion-spinner v-if="submitting" name="crescent" />`) conditionally replacing the default icon to provide immediate, clear system status feedback.
+
+## 2023-10-15 - Async Operations in Modals require inline loading states
+**Learning:** When performing async API calls inside a modal that remains open during the operation, it is a critical UX improvement to add inline loading feedback (e.g., a spinner on the action button) instead of relying solely on a global page loader, as it gives better immediate contextual feedback to the user on the specific action they took.
+**Action:** When creating or modifying asynchronous action buttons inside modals, explicitly track the loading state (e.g. `isSaving`) and render a local `<ion-spinner>` and `disabled` state on the button instead of omitting feedback.
