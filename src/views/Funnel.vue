@@ -479,8 +479,9 @@
 
               <!-- Floating Save Button -->
               <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button :aria-label="translate('Save schedule')" @click="saveSchedule">
-                  <ion-icon :icon="saveOutline" />
+                <ion-fab-button :aria-label="translate('Save schedule')" @click="saveSchedule" :disabled="isSavingSchedule">
+                  <ion-spinner v-if="isSavingSchedule" name="crescent" />
+                  <ion-icon v-else :icon="saveOutline" />
                 </ion-fab-button>
               </ion-fab>
             </ion-content>
@@ -1261,6 +1262,7 @@ const isScheduleModalOpen = ref(false);
 const cronExpressionInput = ref('');
 const selectedScheduleOption = ref('');
 const isJobActive = ref(true);
+const isSavingSchedule = ref(false);
 
 const scheduleOptions = computed(() => [
   { label: translate('Every 5 minutes'), value: '0 */5 * ? * *' },
@@ -1320,14 +1322,18 @@ async function saveSchedule() {
     return;
   }
   
-  await store.updateServiceJob(
-    settings.jobName,
-    cronExpressionInput.value,
-    isJobActive.value ? 'N' : 'Y',
-    selectedFacilityId.value
-  );
-  
-  closeScheduleModal();
+  isSavingSchedule.value = true;
+  try {
+    await store.updateServiceJob(
+      settings.jobName,
+      cronExpressionInput.value,
+      isJobActive.value ? 'N' : 'Y',
+      selectedFacilityId.value
+    );
+    closeScheduleModal();
+  } finally {
+    isSavingSchedule.value = false;
+  }
 }
 
 function handleBatchSizeChange(event: any) {
