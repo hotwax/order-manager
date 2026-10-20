@@ -53,3 +53,6 @@
 ## 2026-09-27 - Async Feedback on Icon-only Action Buttons
 **Learning:** Icon-only action buttons (like `<ion-fab-button>`) that execute asynchronous actions (like saving or submitting forms) often rely solely on the `disabled` state for feedback. This lack of visual change during the action degrades UX and accessibility, especially when the async action takes longer to resolve.
 **Action:** When working with async action buttons, specifically `<ion-fab-button>` in Ionic, always incorporate an inline loading spinner (e.g. `<ion-spinner v-if="submitting" name="crescent" />`) conditionally replacing the default icon to provide immediate, clear system status feedback.
+## 2026-10-20 - Adding Loading Feedback to Async Action Modal Buttons
+**Learning:** Found an `<ion-fab-button>` in a modal (`Funnel.vue`) responsible for saving a schedule asynchronously without any visual feedback or disabling logic during the API call. This can lead to multiple submissions or user confusion as the UI appears unresponsive during network latency.
+**Action:** When finding an action button invoking an asynchronous method, ensure it has a reactive flag (e.g., `isSavingSchedule`) that is set to `true` on submission and `false` in a `finally` block, bind it to `:disabled`, and conditionally display an `<ion-spinner>` instead of the default icon.
