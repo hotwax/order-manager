@@ -42,7 +42,7 @@
           <ion-card-content>
             {{ translate("This is the name of the OMS you are connected to right now. Make sure that you are connected to the right instance before proceeding.") }}
           </ion-card-content>
-          <ion-button v-if="!commonUtil.isMoqui()" fill="clear" :disabled="!userStore.hasPermission(Actions.APP_COMMERCE_VIEW)" @click="commonUtil.goToOms()">
+          <ion-button v-if="!isMoquiOmsRef" fill="clear" :disabled="!userStore.hasPermission(Actions.APP_COMMERCE_VIEW)" @click="commonUtil.goToOms()">
             {{ translate("Go to OMS") }}
             <ion-icon slot="end" :icon="openOutline" />
           </ion-button>
@@ -225,7 +225,7 @@ import { checkmarkCircle, closeCircle, closeOutline, openOutline, saveOutline, s
 import { computed, onBeforeMount, ref } from 'vue';
 import { commonUtil, cookieHelper, i18n, translate } from '@common';
 import { useDbStatus } from '@common/db';
-import { useAuth } from '@common/composables/useAuth';
+import { useAuth, isMoquiOmsRef } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';
 import { useProductStore } from '@/store/productStore';
 import { orderManagerDb } from '@/db/orderManagerDb';
