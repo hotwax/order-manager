@@ -340,7 +340,7 @@
                       interface="popover" :placeholder="translate('Select State / Province')"
                       :disabled="!shippingAddressForm.countryGeoId"
                       v-model="shippingAddressForm.stateProvinceGeoId">
-                      <ion-select-option v-for="state in seed.states()" :key="state.geoId" :value="state.geoId">
+                      <ion-select-option v-for="state in seed.statesForCountry(shippingAddressForm.countryGeoId)" :key="state.geoId" :value="state.geoId">
                         {{ state.geoName }}
                       </ion-select-option>
                     </ion-select>
