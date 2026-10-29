@@ -188,10 +188,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     return requested;
   }
 
-  const allocateItem = (orderId: string, orderItemSeqId: string, facilityId: string) => api({
-    url: `oms/orders/${orderId}/items/${orderItemSeqId}/allocation`,
+  const allocateItem = (orderId: string, orderItemSeqIds: string[], facilityId: string) => api({
+    url: `oms/orders/${orderId}/release/${facilityId}`,
     method: 'POST',
-    data: { facilityId, orderFacilityChange: { changeReasonEnumId: 'RELEASED' } },
+    data: { orderItemSeqIds, orderFacilityChange: { changeReasonEnumId: 'RELEASED' } },
   });
 
   /* ── Ship group actions ───────────────────────────────────────────────── */
@@ -279,7 +279,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     eligible: (item) => OrderActionValidator.isItemPreFulfill(item),
     prompt: openFacilityInventoryModal,
     apply: async (orderId, items, facilityId) => {
-      for (const { orderItemSeqId } of items) await allocateItem(orderId, orderItemSeqId, facilityId);
+      await allocateItem(orderId, items.map((item) => item.orderItemSeqId), facilityId);
     },
     success: 'Items released to facility.',
     failure: 'Failed to release items. Please try again.',
@@ -411,7 +411,7 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     }
 
     try {
-      await allocateItem(orderId, item.orderItemSeqId, facilityId);
+      await allocateItem(orderId, [item.orderItemSeqId], facilityId);
       await showToast(translate('Item released to facility.'));
     } catch {
       await showToast(translate('Failed to release the item. Please try again.'));

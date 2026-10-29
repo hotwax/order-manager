@@ -103,10 +103,14 @@ describe('ship group selection actions', () => {
 
     await actions.releaseSelectedItems(shipGroup);
 
-    const release = { facilityId: 'BROADWAY', orderFacilityChange: { changeReasonEnumId: 'RELEASED' } };
     expect(calls()).toEqual([
-      { url: 'oms/orders/O1/items/01/allocation', data: release },
-      { url: 'oms/orders/O1/items/03/allocation', data: release },
+      {
+        url: 'oms/orders/O1/release/BROADWAY',
+        data: {
+          orderItemSeqIds: ['01', '03'],
+          orderFacilityChange: { changeReasonEnumId: 'RELEASED' },
+        },
+      },
     ]);
     expect(showToast).toHaveBeenCalledWith('Items released to facility.');
   });
