@@ -56,3 +56,6 @@
 ## 2023-10-23 - Async Action Buttons
 **Learning:** When clicking an async action button (e.g. `saveSchedule` inside `<ion-modal>`), users need immediate visual feedback while the API call is in flight. Without it, they may click multiple times or assume the app is unresponsive.
 **Action:** Conditionally disable `ion-fab-button` elements during async operations and swap the inner `ion-icon` for an `ion-spinner` using an `isSaving` / `isSubmitting` ref.
+## 2024-11-20 - Add empty state to lists
+**Learning:** When rendering lists of data (like order identifications or attributes), a missing empty state can leave users wondering if data is missing or just loading.
+**Action:** Add a fallback `<ion-item>` with a localized label indicating that there are no items to show when the array length is falsy.

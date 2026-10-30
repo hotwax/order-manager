@@ -158,6 +158,9 @@
               <ion-icon slot="icon-only" :icon="openOutline" />
             </ion-button>
           </ion-item>
+          <ion-item v-if="!order?.identifications?.length">
+            <ion-label>{{ translate('No order identifications') }}</ion-label>
+          </ion-item>
         </ion-list>
       </ion-card>
 
