@@ -314,7 +314,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         this.holdTotal = total;
         if (isFirstPage) this.holdStatus = 'success';
       } catch (err: any) {
-        console.error('Failed to fetch the hold tasks', err);
+        logger.error('Failed to fetch the hold tasks', err);
         if (isFirstPage) {
           this.holdStatus = 'error';
           this.holdError = 'Failed to load hold tasks. Please try again.';
@@ -344,7 +344,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         this.addressValidationTotal = total;
         return true;
       } catch (err) {
-        console.error('Failed to fetch the address validation tasks', err);
+        logger.error('Failed to fetch the address validation tasks', err);
         return false;
       }
     },
@@ -382,7 +382,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         await prefetchSwapTaskAssets(detailedTasks);
         if (isFirstPage) this.swapStatus = 'success';
       } catch (err) {
-        console.error('Failed to fetch the swap tasks', err);
+        logger.error('Failed to fetch the swap tasks', err);
         if (isFirstPage) {
           this.swapStatus = 'error';
           this.swapError = 'Failed to load swap tasks. Please try again.';
@@ -420,7 +420,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
         // Success only after both the list and the per-task enrichment have settled.
         if (isFirstPage) this.fraudStatus = 'success';
       } catch (err) {
-        console.error('Failed to fetch the fraud tasks', err);
+        logger.error('Failed to fetch the fraud tasks', err);
         if (isFirstPage) {
           this.fraudStatus = 'error';
           this.fraudError = 'Failed to load fraud tasks. Please try again.';
@@ -456,7 +456,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
           this.orderHoldTasksByOrderId[orderId] = await Promise.all(tasks.map(enrichHoldTask));
         } catch (err) {
-          console.error('Failed to fetch the order hold tasks', err);
+          logger.error('Failed to fetch the order hold tasks', err);
         }
       };
 
@@ -477,7 +477,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           const tasks = (listResponse.data ?? []).filter((task: any) => task.orderId === orderId);
           this.orderAddressValidationTasksByOrderId[orderId] = await Promise.all(tasks.map(enrichShipGroupTask));
         } catch (err) {
-          console.error('Failed to fetch the order address validation tasks', err);
+          logger.error('Failed to fetch the order address validation tasks', err);
         }
       };
 
@@ -500,7 +500,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           this.orderSwapTasksByOrderId[orderId] = detailedTasks;
           await prefetchSwapTaskAssets(detailedTasks);
         } catch (err) {
-          console.error('Failed to fetch the order swap tasks', err);
+          logger.error('Failed to fetch the order swap tasks', err);
         }
       };
 
@@ -523,7 +523,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           this.orderFraudTasksByOrderId[orderId] = detailedTasks;
           await prefetchFraudTaskAssets(detailedTasks);
         } catch (err) {
-          console.error('Failed to fetch the order fraud tasks', err);
+          logger.error('Failed to fetch the order fraud tasks', err);
         }
       };
 
@@ -541,7 +541,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           data: address,
         });
       } catch (err) {
-        console.error('Failed to update shipping information', err);
+        logger.error('Failed to update shipping information', err);
         throw err;
       }
     },
@@ -560,7 +560,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           },
         });
       } catch (err) {
-        console.error('Failed to cancel the order', err);
+        logger.error('Failed to cancel the order', err);
         throw err;
       }
     },
@@ -580,7 +580,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           },
         });
       } catch (err) {
-        console.error('Failed to change the task status', err);
+        logger.error('Failed to change the task status', err);
         throw err;
       }
     },
@@ -592,7 +592,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           data: { facilityId, changeReasonEnumId: 'NO_VARIANCE_LOG', ...(workEffortId && { workEffortId }) },
         });
       } catch (err) {
-        console.error('Failed to park the order', err);
+        logger.error('Failed to park the order', err);
         throw err;
       }
     },
@@ -604,7 +604,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           data: { facilityId, changeReasonEnumId: 'NO_VARIANCE_LOG' },
         });
       } catch (err) {
-        console.error('Failed to park the order', err);
+        logger.error('Failed to park the order', err);
         throw err;
       }
     },
@@ -621,7 +621,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           },
         });
       } catch (err) {
-        console.error('Failed to broker the ship group', err);
+        logger.error('Failed to broker the ship group', err);
         throw err;
       }
     },
@@ -638,7 +638,7 @@ export const useOrderTaskStore = defineStore('orderTask', {
           },
         });
       } catch (err) {
-        console.error('Failed to swap the order', err);
+        logger.error('Failed to swap the order', err);
         throw err;
       }
     },

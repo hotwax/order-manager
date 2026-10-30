@@ -829,7 +829,7 @@ export const useCustomerServiceStore = defineStore('customerService', {
         const list = response.data;
         return Array.isArray(list) ? list : list?.entityValueList || [];
       } catch (error) {
-        console.error('Failed to get pick profile groups from server', error);
+        logger.error('Failed to get pick profile groups from server', error);
         return [];
       }
     },
@@ -862,8 +862,9 @@ export const useCustomerServiceStore = defineStore('customerService', {
         await this.savePickProfile(activeProfile);
         await this.fetchFulfillmentSyncData(facilityId);
       } catch (error) {
+        const serverError = commonUtil.getErrorMessage(error);
         logger.error('Failed to update sort rules order', error);
-        commonUtil.showToast(translate('Failed to reorder sort rules.'));
+        commonUtil.showToast(`${translate("Failed to reorder sort rules.")} ${serverError}`);
       }
     },
     async addSortRule(facilityId: string, fieldName: string) {
@@ -896,8 +897,9 @@ export const useCustomerServiceStore = defineStore('customerService', {
         await this.savePickProfile(activeProfile);
         await this.fetchFulfillmentSyncData(facilityId);
       } catch (error) {
+        const serverError = commonUtil.getErrorMessage(error);
         logger.error('Failed to add sort rule', error);
-        commonUtil.showToast(translate('Failed to add sort rule.'));
+        commonUtil.showToast(`${translate("Failed to add sort rule.")} ${serverError}`);
       }
     },
     async removeSortRule(facilityId: string, fieldName: string) {
@@ -921,8 +923,9 @@ export const useCustomerServiceStore = defineStore('customerService', {
         }
         await this.fetchFulfillmentSyncData(facilityId);
       } catch (error) {
+        const serverError = commonUtil.getErrorMessage(error);
         logger.error('Failed to remove sort rule', error);
-        commonUtil.showToast(translate('Failed to remove sort rule.'));
+        commonUtil.showToast(`${translate("Failed to remove sort rule.")} ${serverError}`);
       }
     },
     async updateBatchSize(facilityId: string, batchSize: number) {
@@ -981,8 +984,9 @@ export const useCustomerServiceStore = defineStore('customerService', {
         await this.savePickProfile(activeProfile);
         await this.fetchFulfillmentSyncData(facilityId);
       } catch (error) {
+        const serverError = commonUtil.getErrorMessage(error);
         logger.error('Failed to update batch size', error);
-        commonUtil.showToast(translate('Failed to update batch size.'));
+        commonUtil.showToast(`${translate("Failed to update batch size.")} ${serverError}`);
       }
     },
     async fetchFulfillmentSyncData(facilityId: string) {
@@ -1132,8 +1136,9 @@ export const useCustomerServiceStore = defineStore('customerService', {
         await this.fetchFulfillmentSyncData(facilityId);
         commonUtil.showToast(translate('Fulfillment sync schedule updated successfully.'));
       } catch (error) {
+        const serverError = commonUtil.getErrorMessage(error);
         logger.error('Failed to update service job', error);
-        commonUtil.showToast(translate('Failed to update fulfillment sync schedule.'));
+        commonUtil.showToast(`${translate("Failed to update fulfillment sync schedule.")} ${serverError}`);
       }
     },
     async savePickProfile(profile: any) {

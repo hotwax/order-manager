@@ -134,7 +134,7 @@
 import { computed } from 'vue';
 import { IonBadge, IonButton, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController, popoverController, modalController } from '@ionic/vue';
 import { arrowUndoOutline, chevronForwardOutline, closeCircleOutline, ellipsisVerticalOutline, gitBranchOutline } from 'ionicons/icons';
-import { commonUtil, DxpShopifyImg, translate } from '@common';
+import { commonUtil, DxpShopifyImg, logger, translate } from '@common';
 import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
 import ReleaseSwapOrderModal from '@/components/swaps/ReleaseSwapOrderModal.vue';
@@ -448,8 +448,10 @@ async function releaseUpdatedOrder(task: any) {
     await orderTaskStore.changeTaskStatus(task.workEffortId, 'TASK_COMPLETED');
     await showToast(translate('Order successfully updated and released.'));
     emit('completed');
-  } catch {
-    await showToast(translate('Failed to release the updated order. Please try again.'));
+  } catch (err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to release the updated order. Please try again.')} ${serverError}`);
   }
 }
 
@@ -466,8 +468,10 @@ async function cancelOrder() {
           try {
             await submitCancel();
             emit('completed');
-          } catch {
-            await showToast(translate('Failed to cancel the order. Please try again.'));
+          } catch (err) {
+            const serverError = commonUtil.getErrorMessage(err);
+            logger.error(err);
+            await showToast(`${translate('Failed to cancel the order. Please try again.')} ${serverError}`);
           }
         }
       }
@@ -489,8 +493,10 @@ async function parkOrder() {
     await submitPark(facilityId);
     await showToast(translate('Order successfully moved to parking.'));
     emit('completed');
-  } catch {
-    await showToast(translate('Failed to park the order. Please try again.'));
+  } catch (err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to park the order. Please try again.')} ${serverError}`);
   }
 }
 

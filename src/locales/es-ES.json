@@ -352,6 +352,7 @@
   "Failed to load swap tasks. Please try again.": "No se pudieron cargar las tareas de intercambio. Inténtalo de nuevo.",
   "Failed to load tasks": "No se pudieron cargar las tareas",
   "Failed to load unfillable products. Please try again.": "No se pudieron cargar los productos no asignables. Inténtalo de nuevo.",
+  "Failed to login.": "Error al iniciar sesión.",
   "Failed to merge contact. Please try again.": "No se pudo combinar el contacto. Inténtalo de nuevo.",
   "Failed to park items. Please try again.": "No se pudieron mover los artículos a estacionamiento. Inténtalo de nuevo.",
   "Failed to park the order. Please try again.": "No se pudo mover el pedido a estacionamiento. Inténtalo de nuevo.",

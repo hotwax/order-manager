@@ -112,7 +112,7 @@ import {
 } from '@ionic/vue';
 import { closeOutline } from 'ionicons/icons';
 import { computed, ref, watch } from 'vue';
-import { DxpShopifyImg, logger, translate } from '@common';
+import { commonUtil, DxpShopifyImg, logger, translate } from '@common';
 import Actions from '@/authorization/actions';
 import { useOrder } from '@/composables/useOrder';
 import { useProductIdentity } from '@/composables/useProductIdentity';
@@ -200,7 +200,8 @@ async function runAction(action: () => Promise<unknown>, success: string, failur
     await loadStock();
   } catch (error) {
     logger.error(failure, error);
-    await showToast(failure);
+    const serverError = commonUtil.getErrorMessage(error);
+    await showToast(`${failure}. ${serverError}`);
   } finally {
     working.value = false;
   }

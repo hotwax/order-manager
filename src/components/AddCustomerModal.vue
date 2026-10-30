@@ -97,7 +97,7 @@
 
 <script setup lang="ts">
 import { showToast } from '@/utils';
-import { emitter, translate } from '@common';
+import { commonUtil, emitter, logger, translate } from '@common';
 import { IonInput, IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonSegment, IonSegmentButton, IonSegmentView, IonSegmentContent, IonSpinner, IonItem, IonLabel, IonSearchbar, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { closeOutline, saveOutline } from "ionicons/icons";
 import { ref } from 'vue';
@@ -153,7 +153,9 @@ async function searchCustomers() {
   try {
     customers.value = await customerStore.searchShopifyCustomers(props.shopId, query);
   } catch (err: any) {
-    showToast(translate("Failed to search customers: {message}", { message: String(err.message || err) }, { escapeParameter: true }));
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error("Failed to search customers", err);
+    showToast(translate("Failed to search customers: {message}", { message: serverError }, { escapeParameter: true }));
   } finally {
     isLoading.value = false;
   }
@@ -200,8 +202,10 @@ async function handleCreateCustomer() {
     selectCustomer(newCust)
     showToast(translate("Customer created and selected successfully!"));
   } catch (err: any) {
+    const serverError = commonUtil.getErrorMessage(err);
     emitter.emit('dismissLoader');
-    showToast(translate("Failed to create customer: {message}", { message: String(err.message || err) }, { escapeParameter: true }));
+    logger.error("Failed to create customer", err);
+    showToast(translate("Failed to create customer: {message}", { message: serverError }, { escapeParameter: true }));
   }
 }
 

@@ -112,7 +112,7 @@ import {
 } from '@ionic/vue';
 import { checkmarkDoneOutline, closeOutline, createOutline, saveOutline, trashOutline } from 'ionicons/icons';
 import { computed, onMounted, reactive, ref } from 'vue';
-import { commonUtil, translate } from '@common';
+import { commonUtil, logger, translate } from '@common';
 import EmptyState from '@/components/common/EmptyState.vue';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -243,9 +243,11 @@ async function save() {
     saving.value = false;
     await showToast(translate('Attributes saved.'));
     await modalController.dismiss(undefined, 'confirm');
-  } catch {
+  } catch(err) {
     // What went through is now the saved state, so another Save sends only what is left.
-    await showToast(translate('Failed to save attributes. Please try again.'));
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to save attributes. Please try again.')} ${serverError}`);
   } finally {
     saving.value = false;
   }

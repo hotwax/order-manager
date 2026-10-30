@@ -616,7 +616,7 @@ import {
   powerOutline,
   alertCircleOutline
 } from 'ionicons/icons';
-import { translate, StatCard, Sparkline, commonUtil } from '@common';
+import { translate, logger, StatCard, Sparkline, commonUtil } from '@common';
 import { UNFILLABLE_FACILITY_ID, useCustomerServiceStore, type DashboardStatusKey } from '@/store/customerService';
 import { useOrderStore } from '@/store/order';
 import { useProductStore } from '@/store/productStore';
@@ -753,7 +753,7 @@ const queueSegments = computed(() => {
     const next2 = parsedCron.next().getTime();
     cronIntervalMinutes = Math.max(1, Math.round((next2 - next1) / (60 * 1000)));
   } catch (error) {
-    console.error('Failed to parse cron expression for interval', error);
+    logger.error('Failed to parse cron expression for interval', error);
   }
 
   const formatEstimatedTime = (mins: number) => {
@@ -966,7 +966,7 @@ async function fetchBrokeredWorkload(productStoreId: string) {
         orderStore.setNavCount('packed', brokeredWorkload.value.packed);
       },
       onError: (error) => {
-        console.error('Failed to fetch brokered workload totals', error);
+        logger.error('Failed to fetch brokered workload totals', error);
         brokeredWorkloadError.value = true;
       },
       onSettled: () => {

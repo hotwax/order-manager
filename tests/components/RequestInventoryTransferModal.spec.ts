@@ -14,6 +14,9 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@common', () => ({
+  commonUtil: {
+    getErrorMessage: (err: any) => err?.message || '',
+  },
   DxpShopifyImg: { template: '<img />' },
   logger: { error: vi.fn() },
   translate: (key: string, params?: Record<string, unknown>) => key.replace(/\{(\w+)\}/g, (_, name) => String(params?.[name] ?? '')),
@@ -217,7 +220,7 @@ describe('request inventory transfer modal', () => {
     await wrapper.find('.fab').trigger('click');
     await flushPromises();
 
-    expect(mocks.showToast).toHaveBeenCalledWith('Failed to request inventory transfer. Please try again.');
+    expect(mocks.showToast).toHaveBeenCalledWith('Failed to request inventory transfer. Please try again. down');
     expect(mocks.dismiss).not.toHaveBeenCalled();
     expect(mocks.fetchInventoryTransfers).not.toHaveBeenCalled();
     expect(wrapper.find('.fab').attributes('disabled')).toBeUndefined();

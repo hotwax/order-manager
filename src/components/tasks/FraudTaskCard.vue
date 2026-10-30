@@ -91,7 +91,7 @@
 import { computed } from 'vue';
 import { IonButton, IonChip, IonIcon, IonItem, IonLabel, IonList, IonListHeader, IonNote, IonText, IonThumbnail, alertController, modalController } from '@ionic/vue';
 import { alertCircleOutline, checkmarkCircleOutline, hardwareChipOutline } from 'ionicons/icons';
-import { commonUtil, DxpShopifyImg, translate } from '@common';
+import { commonUtil, DxpShopifyImg, logger, translate } from '@common';
 import { showToast, sentimentCounts } from '@/utils';
 import RiskAssessmentModal from '@/components/orders/RiskAssessmentModal.vue';
 import { useOrderTaskStore } from '@/store/orderTask';
@@ -223,8 +223,10 @@ async function resolveTask() {
     await submitTaskStatus('TASK_COMPLETED');
     await showToast(translate('Task resolved successfully.'));
     emit('completed');
-  } catch {
-    await showToast(translate('Failed to resolve task. Please try again.'));
+  } catch (err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to resolve task. Please try again.')} ${serverError}`);
   }
 }
 
@@ -246,8 +248,10 @@ async function cancelOrder() {
             await orderTaskStore.cancelOrder(props.task.orderId, items);
             await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_CANCELLED');
             emit('completed');
-          } catch {
-            await showToast(translate('Failed to cancel the order. Please try again.'));
+          } catch (err) {
+            const serverError = commonUtil.getErrorMessage(err);
+            logger.error(err);
+            await showToast(`${translate('Failed to cancel the order. Please try again.')} ${serverError}`);
           }
         }
       }

@@ -1,6 +1,6 @@
 import { computed, ref, type Ref } from 'vue';
 import { alertController, modalController } from '@ionic/vue';
-import { api, translate } from '@common';
+import { api, commonUtil, logger, translate } from '@common';
 import { useSeedData } from '@common/db';
 import { showToast } from '@/utils';
 import { OrderActionValidator, type FooterActionView, type ShipGroupActionId } from '@/utils/OrderActionValidator';
@@ -209,8 +209,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       await orderTaskStore.brokerShipGroup({ routingGroupId, orderId: order.value!.id, shipGroupSeqId: shipGroup.id, productStoreId });
       await showToast(translate('Ship group brokered successfully.'));
       await loadOrder(order.value!.id, true);
-    } catch {
-      await showToast(translate('Failed to broker the ship group. Please try again.'));
+    } catch (err) {
+      const serverError = commonUtil.getErrorMessage(err);
+      logger.error(err);
+      await showToast(`${translate('Failed to broker the ship group. Please try again.')} ${serverError}`);
     }
   }
 
@@ -228,8 +230,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       selectedShipGroupItems.value[shipGroup.id] = [];
       await showToast(translate(action.success));
       await loadOrder(orderId, true);
-    } catch {
-      await showToast(translate(action.failure));
+    } catch (err) {
+      const serverError = commonUtil.getErrorMessage(err);
+      logger.error(err);
+      await showToast(`${translate(action.failure)} ${serverError}`);
     }
   }
 
@@ -312,8 +316,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     try {
       await createTasks(order.value!.id, [shipGroup.id], data);
       await showToast(translate('Tasks created successfully.'));
-    } catch {
-      await showToast(translate('Failed to create tasks. Please try again.'));
+    } catch (err) {
+      const serverError = commonUtil.getErrorMessage(err);
+      logger.error(err);
+      await showToast(`${translate('Failed to create tasks. Please try again.')} ${serverError}`);
     }
   }
 
@@ -338,8 +344,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       await orderDetailStore.updateShipmentCarrierAndMethod(order.value!.id, shipGroup.id, shipmentMethodTypeId, carrierPartyId);
       await showToast(translate('Carrier and shipping method updated successfully.'));
       await loadOrder(order.value!.id, true);
-    } catch {
-      await showToast(translate('Failed to update carrier and shipping method. Please try again.'));
+    } catch (err) {
+      const serverError = commonUtil.getErrorMessage(err);
+      logger.error(err);
+      await showToast(`${translate('Failed to update carrier and shipping method. Please try again.')} ${serverError}`);
     }
   }
 
@@ -365,8 +373,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       if (openShipGroupEditor.value?.shipGroupId === shipGroup.id) openShipGroupEditor.value = null;
       await showToast(translate(success));
       await loadOrder(orderId, true);
-    } catch {
-      await showToast(translate(failure));
+    } catch (err) {
+      const serverError = commonUtil.getErrorMessage(err);
+      logger.error(err);
+      await showToast(`${translate(failure)} ${serverError}`);
     } finally {
       savingShipGroupId.value = '';
     }
@@ -404,8 +414,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     if (!isVirtualForItem(item)) {
       try {
         await api({ url: `oms/orders/${orderId}/items/${item.orderItemSeqId}/reject`, method: 'POST', data: { rejectionReasonId: 'NO_VARIANCE_LOG', updateQOH: productStore.getAffectQOHOnRej === "Y" } });
-      } catch {
-        await showToast(translate('Failed to reject the item. Please try again.'));
+      } catch (err) {
+        const serverError = commonUtil.getErrorMessage(err);
+        logger.error(err);
+        await showToast(`${translate('Failed to reject the item. Please try again.')} ${serverError}`);
         return;
       }
     }
@@ -413,8 +425,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
     try {
       await allocateItem(orderId, item.orderItemSeqId, facilityId);
       await showToast(translate('Item released to facility.'));
-    } catch {
-      await showToast(translate('Failed to release the item. Please try again.'));
+    } catch (err) {
+      const serverError = commonUtil.getErrorMessage(err);
+      logger.error(err);
+      await showToast(`${translate('Failed to release the item. Please try again.')} ${serverError}`);
     } finally {
       await loadOrder(orderId, true);
     }
@@ -502,8 +516,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
         selectedItemIds.value.clear();
         await showToast(translate('Selected items cancelled successfully.'));
         await loadOrder(orderId, true);
-      } catch {
-        await showToast(translate('Failed to cancel the selected items. Please try again.'));
+      } catch (err) {
+        const serverError = commonUtil.getErrorMessage(err);
+        logger.error(err);
+        await showToast(`${translate('Failed to cancel the selected items. Please try again.')} ${serverError}`);
       }
     });
   }
@@ -516,8 +532,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
         await cancelItems(orderId, items);
         await showToast(translate('Order cancelled successfully.'));
         await loadOrder(orderId, true);
-      } catch {
-        await showToast(translate('Failed to cancel the order. Please try again.'));
+      } catch (err) {
+        const serverError = commonUtil.getErrorMessage(err);
+        logger.error(err);
+        await showToast(`${translate('Failed to cancel the order. Please try again.')} ${serverError}`);
       }
     });
   }
@@ -527,8 +545,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       await api({ url: `oms/orders/${orderId}/status`, method: 'POST', data: { orderId, statusId, setItemStatus: true } });
       await showToast(translate('Order status updated successfully.'));
       await loadOrder(orderId, true);
-    } catch {
-      await showToast(translate('Failed to update the order status. Please try again.'));
+    } catch (err) {
+      const serverError = commonUtil.getErrorMessage(err);
+      logger.error(err);
+      await showToast(`${translate('Failed to update the order status. Please try again.')} ${serverError}`);
     }
   }
 
@@ -616,8 +636,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       await (customerStore as any).addContact(partyId, contactMechTypeId, data);
       if (order.value?.id) await loadOrder(order.value.id, true);
       await showToast(translate('Customer contact updated successfully.'));
-    } catch {
-      await showToast(translate('Failed to update customer contact. Please try again.'));
+    } catch (err) {
+      const serverError = commonUtil.getErrorMessage(err);
+      logger.error(err);
+      await showToast(`${translate('Failed to update customer contact. Please try again.')} ${serverError}`);
     }
   }
 
@@ -627,8 +649,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       await api({ url: `oms/orders/${order.value.id}`, method: 'PUT', data: { orderId: order.value.id, localeString } });
       await loadOrder(order.value.id, true);
       await showToast(translate('Order locale updated successfully.'));
-    } catch {
-      await showToast(translate('Failed to update order locale. Please try again.'));
+    } catch (err) {
+      const serverError = commonUtil.getErrorMessage(err);
+      logger.error(err);
+      await showToast(`${translate('Failed to update order locale. Please try again.')} ${serverError}`);
     }
   }
 
@@ -724,8 +748,10 @@ export function useOrderActions({ order, loadOrder, selectedItemIds, selectedShi
       await showToast(translate('Tasks created successfully.'));
       selectedSegment.value = 'holds';
       await reloadHoldTasks();
-    } catch {
-      await showToast(translate('Failed to create tasks. Please try again.'));
+    } catch (err) {
+      const serverError = commonUtil.getErrorMessage(err);
+      logger.error(err);
+      await showToast(`${translate('Failed to create tasks. Please try again.')} ${serverError}`);
     }
   }
 

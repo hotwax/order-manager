@@ -441,7 +441,7 @@
 </template>
 
 <script setup lang="ts">
-import { commonUtil, translate } from '@common';
+import { commonUtil, logger, translate } from '@common';
 import {
   IonBackButton,
   IonBadge,
@@ -677,8 +677,10 @@ async function onDeleteCustomer() {
               await customerStore.indexCustomer(props.customerId);
               await commonUtil.showToast(translate('Customer data has been anonymized.'));
               router.replace('/customers');
-            } catch {
-              await commonUtil.showToast(translate('Failed to anonymize customer data. Please try again.'));
+            } catch (err){
+              const serverError = commonUtil.getErrorMessage(err);
+              logger.error(err);
+              await commonUtil.showToast(`${translate("Failed to anonymize customer data. Please try again.")} ${serverError}`);
             } finally {
               deleting.value = false;
             }
@@ -715,8 +717,10 @@ async function onMergeCandidate(candidatePartyId: string) {
   try {
     await mergeContact(candidatePartyId);
     await commonUtil.showToast(translate('Contact merged successfully.'));
-  } catch {
-    await commonUtil.showToast(translate('Failed to merge contact. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await commonUtil.showToast(`${translate('Failed to merge contact. Please try again.')} ${serverError}`);
   } finally {
     mergingIds.value = mergingIds.value.filter((id) => id !== candidatePartyId);
   }

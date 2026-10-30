@@ -157,7 +157,7 @@
 </template>
 
 <script setup lang="ts">
-import { DxpShopifyImg, logger, translate } from "@common";
+import { DxpShopifyImg, logger, translate, commonUtil } from "@common";
 import {
   IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel,
   IonList, IonSelect, IonSelectOption, IonSpinner, IonTextarea, IonThumbnail, IonTitle, IonToggle, IonToolbar, modalController
@@ -338,8 +338,9 @@ async function submit() {
     submitting.value = false;
     await modalController.dismiss({ inventoryTransferIds }, "confirm");
   } catch (error) {
+    const serverError = commonUtil.getErrorMessage(error);
     logger.error("Failed to request the inventory transfer", error);
-    await showToast(translate("Failed to request inventory transfer. Please try again."));
+    await showToast(`${translate("Failed to request inventory transfer. Please try again.")} ${serverError}`);
   } finally {
     submitting.value = false;
   }
