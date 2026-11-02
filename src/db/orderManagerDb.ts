@@ -18,14 +18,14 @@
  * Deep imports, not the `@common/db` barrel, for the same reason.
  */
 
-import { defineAppDb } from "@common/db/schema/defineAppDb";
-import { commonSchema } from "@common/db/seed/seedSchema";
+import { defineAppDb } from "@common/db/model/defineAppDb";
+import { commonSchema } from "@common/db/schema/commonSchema";
 import type { BaseDB } from "@common/db/storage/baseDb";
 
 /**
- * Order Manager takes the whole common schema (seed reference data and the `products` master) and
- * declares no tables of its own. Deep imports, not the `@common/db` barrel: the barrel re-exports
- * modules that import `vue`, and the sync worker imports this file.
+ * Order Manager takes the framework's whole common module (seed reference data and the
+ * `products` master) and declares no tables of its own. Deep imports, not the `@common/db` barrel:
+ * the barrel re-exports modules that import `vue`, and the sync worker imports this file.
  */
 export const orderManagerDb = defineAppDb({
   suffix: "OrderManagerDB",

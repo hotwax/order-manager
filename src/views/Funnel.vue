@@ -479,8 +479,9 @@
 
               <!-- Floating Save Button -->
               <ion-fab vertical="bottom" horizontal="end" slot="fixed">
-                <ion-fab-button :aria-label="translate('Save schedule')" @click="saveSchedule">
-                  <ion-icon :icon="saveOutline" />
+                <ion-fab-button :disabled="isSavingSchedule" :aria-label="translate('Save schedule')" @click="saveSchedule">
+                  <ion-spinner v-if="isSavingSchedule" name="crescent" />
+                  <ion-icon v-else :icon="saveOutline" />
                 </ion-fab-button>
               </ion-fab>
             </ion-content>
@@ -1258,6 +1259,7 @@ function removeSortRule(enumCode: string) {
 }
 
 const isScheduleModalOpen = ref(false);
+const isSavingSchedule = ref(false);
 const cronExpressionInput = ref('');
 const selectedScheduleOption = ref('');
 const isJobActive = ref(true);
@@ -1314,6 +1316,8 @@ function handleScheduleOptionChange(event: any) {
 }
 
 async function saveSchedule() {
+  isSavingSchedule.value = true;
+  try {
   const settings = fulfillmentSyncData.value?.settings;
   if (!settings || !settings.jobName) {
     commonUtil.showToast(translate('Job name not found. Cannot save.'));
@@ -1328,6 +1332,9 @@ async function saveSchedule() {
   );
   
   closeScheduleModal();
+  } finally {
+    isSavingSchedule.value = false;
+  }
 }
 
 function handleBatchSizeChange(event: any) {

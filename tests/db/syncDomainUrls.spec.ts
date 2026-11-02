@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { clearSyncRegistry, commonDomains, getAllSyncDomains, registerDomains } from '@common/db';
+import { clearSyncRegistry, getAllSyncDomains, registerDomains, commonDomains } from '@common/db';
 import { orderManagerDb } from '@/db/orderManagerDb';
 
 vi.mock('@common', () => ({

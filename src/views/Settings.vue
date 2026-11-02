@@ -6,6 +6,12 @@
           <ion-menu-button />
         </ion-buttons>
         <ion-title>{{ translate("Settings") }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button fill="clear" @click="openLogs()">
+            <ion-icon slot="start" :icon="documentTextOutline" />
+            {{ translate("View logs") }}
+          </ion-button>
+        </ion-buttons>
       </ion-toolbar>
     </ion-header>
 
@@ -220,10 +226,10 @@
 </template>
 
 <script setup lang="ts">
-import { IonAvatar, IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonPage, IonRadio, IonRadioGroup, IonSearchbar, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToolbar } from '@ionic/vue';
-import { checkmarkCircle, closeCircle, closeOutline, openOutline, saveOutline, syncOutline } from 'ionicons/icons';
+import { IonAvatar, IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonPage, IonRadio, IonRadioGroup, IonSearchbar, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
+import { checkmarkCircle, closeCircle, closeOutline, openOutline, saveOutline, syncOutline, documentTextOutline } from 'ionicons/icons';
 import { computed, onBeforeMount, ref } from 'vue';
-import { commonUtil, cookieHelper, i18n, translate } from '@common';
+import { commonUtil, cookieHelper, i18n, translate, DxpLogsModal } from '@common';
 import { useDbStatus } from '@common/db';
 import { useAuth } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';
@@ -430,6 +436,13 @@ const getStatusLabel = (status: string) => {
     default: return 'Not fetched';
   }
 };
+
+async function openLogs() {
+  const logsModal = await modalController.create({
+    component: DxpLogsModal
+  });
+  return logsModal.present();
+}
 </script>
 
 <style scoped>
