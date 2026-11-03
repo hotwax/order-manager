@@ -117,7 +117,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue';
 import { IonButton, IonButtons, IonContent, IonFooter, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonMenuButton, IonPage, IonProgressBar, IonSpinner, IonTitle, IonToolbar, alertController, modalController, onIonViewWillEnter } from '@ionic/vue';
-import { translate } from '@common';
+import { commonUtil, logger, translate } from '@common';
 import ErrorState from '@/components/common/ErrorState.vue';
 import SwapTaskCard from '@/components/tasks/SwapTaskCard.vue';
 import OrderTaskFilterCard from '@/components/tasks/OrderTaskFilterCard.vue';
@@ -381,8 +381,10 @@ async function rebrokerProductOrders(candidate: SwapSetupCandidate) {
     if (successes) await showToast(translate('{count} ship groups submitted for rebrokering.', { count: successes }));
     if (failures) await showToast(translate('{count} ship groups could not be rebrokered.', { count: failures }));
     await fetchSwapTasks();
-  } catch {
-    setupError.value = translate('Failed to rebroker orders for this product. Please try again.');
+  } catch (err: any) {
+    logger.error('Failed to rebroker orders for this product', err);
+    const serverError = commonUtil.getErrorMessage(err);
+    setupError.value = `${translate('Failed to rebroker orders for this product. Please try again.')} ${serverError}`;
   } finally {
     setupLoading.value = false;
   }

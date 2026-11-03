@@ -90,7 +90,7 @@
 import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonLabel, IonList, IonListHeader, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { addOutline, closeOutline, trashOutline } from 'ionicons/icons';
 import { reactive, ref } from 'vue';
-import { translate } from '@common';
+import { commonUtil, logger, translate } from '@common';
 import EmptyState from '@/components/common/EmptyState.vue';
 import AttributeListItem from '@/components/orders/AttributeListItem.vue';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -129,8 +129,10 @@ async function addAttribute() {
     form.attrValue = '';
     form.attrDescription = '';
     await showToast(translate('Attribute added successfully.'));
-  } catch {
-    await showToast(translate('Failed to add attribute. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to add attribute. Please try again.')} ${serverError}`);
   } finally {
     saving.value = false;
   }
@@ -143,8 +145,10 @@ async function deleteAttribute(attr: Attribute) {
     await orderDetailStore.deleteOrderItemAttribute(props.orderId, props.orderItemSeqId, attr.attrName);
     localAttributes.value = localAttributes.value.filter(a => a.attrName !== attr.attrName);
     await showToast(translate('Attribute deleted.'));
-  } catch {
-    await showToast(translate('Failed to delete attribute. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to delete attribute. Please try again.')} ${serverError}`);
   } finally {
     deletingAttr.value = '';
   }

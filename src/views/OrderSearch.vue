@@ -200,7 +200,7 @@ import {
   alertController,
   modalController,
 } from '@ionic/vue';
-import { translate } from '@common';
+import { commonUtil, logger, translate } from '@common';
 import { chevronDownOutline } from 'ionicons/icons';
 import { computed, onMounted, ref, watch } from 'vue';
 import { storeToRefs } from 'pinia';
@@ -324,8 +324,10 @@ async function confirmCancelOrders() {
             await showToast(translate('Orders cancelled successfully.'));
             exitSelectMode();
             await runSearch();
-          } catch {
-            await showToast(translate('Failed to cancel orders. Please try again.'));
+          } catch (err) {
+            const serverError = commonUtil.getErrorMessage(err);
+            logger.error(err);
+            await showToast(`${translate('Failed to cancel orders. Please try again.')} ${serverError}`);
           }
         },
       },
@@ -344,8 +346,10 @@ async function openAddTaskModal() {
     await orderDetailStore.bulkCreateOrderTasks(orderIds, data);
     await showToast(translate('Tasks created successfully.'));
     exitSelectMode();
-  } catch {
-    await showToast(translate('Failed to create tasks. Please try again.'));
+  } catch (err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to create tasks. Please try again.')} ${serverError}`);
   }
 }
 
@@ -360,8 +364,10 @@ async function openEditShippingMethodModal() {
     await showToast(translate('Shipping method updated successfully.'));
     exitSelectMode();
     await runSearch();
-  } catch {
-    await showToast(translate('Failed to update shipping method. Please try again.'));
+  } catch (err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to update shipping method. Please try again.')} ${serverError}`);
   }
 }
 

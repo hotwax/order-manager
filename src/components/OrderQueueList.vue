@@ -149,7 +149,7 @@ import {
   modalController,
   useIonRouter,
 } from '@ionic/vue';
-import { translate } from '@common';
+import { commonUtil, logger, translate } from '@common';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useOrderStore } from '@/store/order';
@@ -362,8 +362,10 @@ async function confirmCancelOrders() {
             await showToast(translate('Orders cancelled successfully.'));
             exitSelectMode();
             await runSearch();
-          } catch {
-            await showToast(translate('Failed to cancel orders. Please try again.'));
+          } catch(err) {
+            const serverError = commonUtil.getErrorMessage(err);
+            logger.error(err);
+            await showToast(`${translate('Failed to cancel orders. Please try again.')} ${serverError}`);
           }
         },
       },
@@ -382,8 +384,10 @@ async function openAddTaskModal() {
     await orderDetailStore.bulkCreateOrderTasks(orderIds, data);
     await showToast(translate('Tasks created successfully.'));
     exitSelectMode();
-  } catch {
-    await showToast(translate('Failed to create tasks. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to create tasks. Please try again.')} ${serverError}`);
   }
 }
 
@@ -398,8 +402,10 @@ async function openEditShippingMethodModal() {
     await showToast(translate('Shipping method updated successfully.'));
     exitSelectMode();
     await runSearch();
-  } catch {
-    await showToast(translate('Failed to update shipping method. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to update shipping method. Please try again.')} ${serverError}`);
   }
 }
 
@@ -450,8 +456,10 @@ async function brokerSelectedOrderShipGroups(orderIds: string[], routingGroupId:
     if (failureCount) {
       await showToast(translate('{count} ship groups could not be brokered. Please try again.', { count: failureCount }));
     }
-  } catch {
-    await showToast(translate('Failed to broker selected orders. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to broker selected orders. Please try again.')} ${serverError}`);
   } finally {
     loading.value = false;
   }

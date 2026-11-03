@@ -1,6 +1,6 @@
 import { DateTime } from 'luxon';
 import { defineStore } from 'pinia';
-import { api, useSolrSearch } from '@common';
+import { api, useSolrSearch, logger, translate } from '@common';
 import {
   asList,
   buildCustomerOrdersPayload,
@@ -21,7 +21,6 @@ import {
 import { toStringValue } from '@/utils/orderDocs';
 import { useReturnsStore } from '@/store/returns';
 import { refreshAfterMutation } from '@/db/appDbSync';
-import { translate } from '@common';
 import type {
   ContactSection,
   CustomerCommunicationSummary,
@@ -126,7 +125,7 @@ function allRelationships(profile: CustomerProfile | null, loadedRelationships: 
 }
 
 function triggerCustomerIndex(partyId: string): void {
-  useCustomerStore().indexCustomer(partyId).catch((e) => console.error(`[customer index] failed for ${partyId}:`, e));
+  useCustomerStore().indexCustomer(partyId).catch((e) => logger.error(`[customer index] failed for ${partyId}:`, e));
 }
 
 export const useCustomerStore = defineStore('customerDetail', {

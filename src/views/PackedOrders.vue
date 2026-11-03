@@ -137,7 +137,7 @@ function facilityTypeRows() {
   return seed.getFacilityTypes().catch(() => []);
 }
 import { useOrder } from '@/composables/useOrder';
-import { translate } from '@common';
+import { commonUtil, logger, translate } from '@common';
 import { usePhysicalFacilityOptions } from '@/composables/usePhysicalFacilityOptions';
 import router from '@/router';
 import { showToast } from '@/utils';
@@ -351,8 +351,10 @@ async function runAction(action: BulkActionDefinition) {
     await store.runBulkAction(bucket, action.id, await facilityTypeRows());
     await loadWorkflowOrders();
     await showToast(translate('{action}: {count} orders', { action: translate(action.label), count }));
-  } catch {
-    await showToast(translate('Failed to complete bulk action. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to complete bulk action. Please try again.')} ${serverError}`);
   }
 }
 

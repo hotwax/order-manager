@@ -124,7 +124,7 @@ import {
   modalController,
 } from '@ionic/vue';
 import { chevronDownOutline } from 'ionicons/icons';
-import { commonUtil, translate } from '@common';
+import { commonUtil, logger, translate } from '@common';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import { confirmParkOrder, showToast } from '@/utils';
 import FacilityModal from '@/components/fulfillment/FacilityModal.vue';
@@ -324,8 +324,10 @@ async function saveAndReleaseHold() {
   try {
     await submitSaveAndRelease();
     emit('completed');
-  } catch {
-    await showToast(translate('Failed to update shipping information. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to update shipping information. Please try again.')} ${serverError}`);
   }
 }
 
@@ -342,8 +344,10 @@ async function cancelOrder() {
           try {
             await submitCancel();
             emit('completed');
-          } catch {
-            await showToast(translate('Failed to cancel the order. Please try again.'));
+          } catch (err) {
+            const serverError = commonUtil.getErrorMessage(err);
+            logger.error(err);
+            await showToast(`${translate('Failed to cancel the order. Please try again.')} ${serverError}`);
           }
         }
       }
@@ -365,8 +369,10 @@ async function parkOrder() {
     await submitPark(facilityId);
     await showToast(translate('Order successfully moved to parking.'));
     emit('completed');
-  } catch {
-    await showToast(translate('Failed to park the order. Please try again.'));
+  } catch (err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to park the order. Please try again.')} ${serverError}`);
   }
 }
 

@@ -162,8 +162,9 @@ export const useStockStore = defineStore("stock", {
           throw resp.data
         }
       } catch (err) {
+        const serverError = commonUtil.getErrorMessage(err);
         logger.error(err)
-        commonUtil.showToast(translate("No data available."))
+        commonUtil.showToast(`${translate("No data available.")} ${serverError}`);
       }
     }
   },

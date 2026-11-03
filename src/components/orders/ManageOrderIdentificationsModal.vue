@@ -112,7 +112,7 @@ import {
 import { addOutline, checkmarkDoneOutline, closeOutline, createOutline, trashOutline } from 'ionicons/icons';
 import { computed, reactive, ref } from 'vue';
 import { DateTime } from 'luxon';
-import { commonUtil, translate } from '@common';
+import { commonUtil, logger, translate } from '@common';
 import { useSeedData } from '@common/db';
 import { useOrderDetailStore } from '@/store/orderDetail';
 import { useUserStore } from '@/store/user';
@@ -218,8 +218,10 @@ async function addIdentification() {
     addForm.idValue = '';
     dirty.value = true;
     await showToast(translate('Identification added successfully.'));
-  } catch {
-    await showToast(translate('Failed to add identification. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to add identification. Please try again.')} ${serverError}`);
   } finally {
     adding.value = false;
   }
@@ -257,8 +259,10 @@ async function saveEdit(identification: Identification) {
     editValue.value = '';
     dirty.value = true;
     await showToast(translate('Identification updated successfully.'));
-  } catch {
-    await showToast(translate('Failed to update identification. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to update identification. Please try again.')} ${serverError}`);
   } finally {
     savingKey.value = '';
   }
@@ -276,8 +280,10 @@ async function removeIdentification(identification: Identification) {
     localIdentifications.value = localIdentifications.value.filter((entry) => rowKey(entry) !== key);
     dirty.value = true;
     await showToast(translate('Identification removed.'));
-  } catch {
-    await showToast(translate('Failed to remove identification. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to remove identification. Please try again.')} ${serverError}`);
   } finally {
     removingKey.value = '';
   }

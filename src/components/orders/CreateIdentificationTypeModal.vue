@@ -51,7 +51,7 @@
 import { IonButton, IonButtons, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonInput, IonItem, IonList, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { closeOutline, saveOutline } from 'ionicons/icons';
 import { ref } from 'vue';
-import { commonUtil, translate } from '@common';
+import { commonUtil, logger, translate } from '@common';
 import { useOrderIdentificationTypes } from '@/composables/useOrderIdentificationTypes';
 import { showToast, requiredLabel } from '@/utils';
 
@@ -97,8 +97,10 @@ async function createType() {
     });
     await showToast(translate('Identification type created successfully.'));
     modalController.dismiss({ enumId: formData.value.enumId }, 'confirm');
-  } catch {
-    await showToast(translate('Failed to create identification type. Please try again.'));
+  } catch(err) {
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to create identification type. Please try again.')} ${serverError}`);
   } finally {
     saving.value = false;
   }

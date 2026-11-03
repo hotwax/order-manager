@@ -137,7 +137,7 @@ export const useProductStore = defineStore('productStore', {
           }
         });
       } catch (error) {
-        console.error('error', error)
+        logger.error('error', error)
       }
       this.fetchProductStoreSettings(payload.productStoreId);
       this.currentProductStore = payload;
@@ -235,7 +235,8 @@ export const useProductStore = defineStore('productStore', {
           throw resp
         }
       } catch (err) {
-        commonUtil.showToast(translate('Failed to update Product Store setting.'))
+        const serverError = commonUtil.getErrorMessage(err);
+        commonUtil.showToast(`${translate("Failed to update Product Store setting.")} ${serverError}`);
         logger.error(err)
       }
     },
@@ -265,7 +266,7 @@ export const useProductStore = defineStore('productStore', {
 
         fetchedGoodIdentificationOptions = resp.data
       } catch (error) {
-        console.error('Failed to fetch good identification types', error)
+        logger.error('Failed to fetch good identification types', error)
       }
 
       // Merge the arrays and remove duplicates
@@ -285,7 +286,7 @@ export const useProductStore = defineStore('productStore', {
         this.settings.productIdentifier.sampleProducts = Array.isArray(resp.products) ? resp.products : []
         this.shuffleProduct()
       } catch (error: any) {
-        console.error("Failed to fetch sample products", error)
+        logger.error("Failed to fetch sample products", error)
       }
     },
     shuffleProduct() {

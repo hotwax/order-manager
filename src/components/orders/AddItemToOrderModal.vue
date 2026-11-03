@@ -62,7 +62,7 @@
 import { IonButton, IonButtons, IonContent, IonHeader, IonIcon, IonItem, IonLabel, IonList, IonSearchbar, IonSpinner, IonThumbnail, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { checkmarkCircle, closeOutline } from 'ionicons/icons';
 import { ref, computed } from 'vue';
-import { commonUtil, DxpShopifyImg, translate } from '@common';
+import { commonUtil, DxpShopifyImg, logger, translate } from '@common';
 import { useSolrSearch } from '@common/composables/useSolrSearch';
 import { showToast } from '@/utils';
 import { useOrderDetailStore } from '@/store/orderDetail';
@@ -116,7 +116,9 @@ async function addToOrder(product: any) {
     await showToast(translate('Item added to order successfully.'));
     props.onItemAdded?.();
   } catch (err: any) {
-    await showToast(err?.response?.data?.errorMessage || translate('Failed to add item. Insufficient inventory or invalid product.'));
+    const serverError = commonUtil.getErrorMessage(err);
+    logger.error(err);
+    await showToast(`${translate('Failed to add item. Insufficient inventory or invalid product.')} ${serverError}`);
   } finally {
     addingProductId.value = null;
   }

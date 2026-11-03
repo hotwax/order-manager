@@ -100,7 +100,7 @@ import {
 } from '@ionic/vue';
 import { closeCircleOutline, closeOutline, saveOutline } from 'ionicons/icons';
 import { computed, onMounted, ref } from 'vue';
-import { DxpShopifyImg, translate } from '@common';
+import { commonUtil, DxpShopifyImg, logger, translate } from '@common';
 import { useSolrSearch } from '@common/composables/useSolrSearch';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
@@ -245,8 +245,10 @@ async function save() {
       ...removals.map((productId) => expireSubstituteAssociation(props.productId, existingById.value[productId])),
     ]);
     modalController.dismiss({ hasSubstitutes: currentIds.size > 0, selectedProductIds: [...currentIds] }, 'confirm');
-  } catch {
-    error.value = translate('Failed to save substitute relationships. Please try again.');
+  } catch (err: any) {
+    logger.error('Failed to save substitute relationships', err);
+    const serverError = commonUtil.getErrorMessage(err);
+    error.value = `${translate('Failed to save substitute relationships. Please try again.')} ${serverError}`;
   } finally {
     saving.value = false;
   }
