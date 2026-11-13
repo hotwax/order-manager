@@ -7,7 +7,7 @@
         </ion-buttons>
         <ion-title>{{ translate("Settings") }}</ion-title>
         <ion-buttons slot="end">
-          <ion-button fill="clear" @click="openLogs()">
+          <ion-button fill="clear" v-if="DxpLogsModal" @click="openLogs()">
             <ion-icon slot="start" :icon="documentTextOutline" />
             {{ translate("View logs") }}
           </ion-button>
@@ -226,10 +226,12 @@
 </template>
 
 <script setup lang="ts">
+import * as sharedComponents from "@common";
+const DxpLogsModal = (sharedComponents as any).DxpLogsModal;
 import { IonAvatar, IonBadge, IonButton, IonButtons, IonCard, IonCardContent, IonCardHeader, IonCardSubtitle, IonCardTitle, IonContent, IonFab, IonFabButton, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonListHeader, IonMenuButton, IonModal, IonPage, IonRadio, IonRadioGroup, IonSearchbar, IonSelect, IonSelectOption, IonSpinner, IonTitle, IonToolbar, modalController } from '@ionic/vue';
 import { checkmarkCircle, closeCircle, closeOutline, openOutline, saveOutline, syncOutline, documentTextOutline } from 'ionicons/icons';
 import { computed, onBeforeMount, ref } from 'vue';
-import { commonUtil, cookieHelper, i18n, translate, DxpLogsModal } from '@common';
+import { commonUtil, cookieHelper, i18n, translate } from '@common';
 import { useDbStatus } from '@common/db';
 import { useAuth, isMoquiOmsRef } from '@common/composables/useAuth';
 import { useUserStore } from '@/store/user';

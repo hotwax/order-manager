@@ -121,6 +121,7 @@
 </template>
 
 <script setup lang="ts">
+const localUiFixtures = import.meta.env.DEV && import.meta.env.MODE === "mock";
 import { IonBadge, IonContent, IonHeader, IonIcon, IonItem, IonItemDivider, IonLabel, IonList, IonMenu, IonMenuToggle, IonTitle, IonToolbar } from '@ionic/vue';
 import {
   airplaneOutline,

@@ -32,7 +32,7 @@ const authGuard = async () => {
 const routes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/funnel'
+    redirect: import.meta.env.DEV && import.meta.env.MODE === 'mock' ? '/hold' : '/funnel'
   },
   {
     path: '/login',

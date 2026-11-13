@@ -1270,5 +1270,13 @@
   "{shown}/{count} items brokered": "{shown}/{count} item brokered | {shown}/{count} items brokered",
   "{start} to {end}": "{start} to {end}",
   "{status}: {items}": "{status}: {items}",
-  "{total} orders": "{total} order | {total} orders"
+  "{total} orders": "{total} order | {total} orders",
+  "Follow up by": "Follow up by",
+  "Hold scope": "Hold scope",
+  "Assigned to": "Assigned to",
+  "Activity": "Activity",
+  "Edit hold": "Edit hold",
+  "Internal notes": "Internal notes",
+  "Save hold details": "Save hold details",
+  "Describe why this hold is needed.": "Describe why this hold is needed."
 }

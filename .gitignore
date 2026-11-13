@@ -45,3 +45,6 @@ npm-debug.log*
 /.claude
 /.gstack
 .claude/launch.json
+
+# Public development fixtures only; contains no credentials.
+!.env.mock

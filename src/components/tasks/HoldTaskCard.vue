@@ -1,5 +1,5 @@
 <template>
-  <TaskCardShell
+  <TaskCardShell class="rich-hold-card"
     :title="taskOrderTitle(task)"
     :subtitle="taskOrderSubtitle(task.orderDate, translate('Ordered'))"
     :amount="formatTaskAmount(task.grandTotal, task.currencyUom)"
@@ -13,18 +13,22 @@
     :selectable="selectable"
     :selected="selected"
     :actions="cardActions"
-    :view-order-link="showViewOrderAction && task.orderId ? `/orders/${task.orderId}` : ''"
+    :view-order-link="showViewOrderAction && !localUiMock && task.orderId ? `/orders/${task.orderId}` : ''"
     @update:selected="emit('update:selected', $event)"
     @action="handleAction"
   >
     <ion-list lines="full">
       <ion-item>
-        <ion-label>
+        <ion-label class="ion-text-wrap">
           {{ task.workEffortName }}
           <p>{{ task.purposeDescription }}</p>
+          <p class="ion-text-wrap" v-if="task.description">{{ task.description }}</p>
+          <ion-chip v-if="task.priority" :color="task.priority === 'Urgent' ? 'danger' : task.priority === 'High' ? 'warning' : 'medium'">{{ translate(task.priority) }}</ion-chip>
         </ion-label>
-        <ion-note slot="end" v-if="task.estimatedCompletionDate">{{ task.estimatedCompletionDate }}</ion-note>
+
       </ion-item>
+      <ion-item v-if="task.estimatedCompletionDate"><ion-label><p class="overline">{{ translate('Follow up by') }}</p>{{ formatDateTime(task.estimatedCompletionDate) }}</ion-label></ion-item>
+      <ion-item v-if="task.scopeLabel || task.blockingEffect"><ion-label class="ion-text-wrap"><p class="overline">{{ translate('Hold scope') }}</p>{{ task.scopeLabel }}<p>{{ task.blockingEffect }}</p></ion-label></ion-item>
       <ion-item v-if="task.notes">
         <ion-label>
           <p class="overline">{{ translate('Notes') }}</p>
@@ -36,6 +40,7 @@
     <ion-list lines="full">
       <ion-item>
         <ion-label>
+          <p class="overline">{{ translate('Assigned to') }}</p>
           {{ assignedPartyName(task, 'TASK_ASSIGNEE') }}
           <p v-if="assignedPartyDate(task, 'TASK_ASSIGNEE')">{{ assignedPartyDate(task, 'TASK_ASSIGNEE') }}</p>
         </ion-label>
@@ -59,6 +64,10 @@
       </ion-item>
     </ion-list>
 
+    <ion-list class="hold-activity" v-if="task.history?.length" lines="none" data-testid="hold-history">
+     <ion-item><ion-label><h3>{{ translate('Activity') }}</h3></ion-label></ion-item>
+     <ion-item v-for="event in task.history" :key="event.id"><ion-label class="ion-text-wrap">{{ event.message }}<p>{{ event.actor }} · {{ formatDateTime(event.at) }}</p></ion-label></ion-item>
+    </ion-list>
   </TaskCardShell>
 </template>
 
@@ -66,6 +75,8 @@
 import { computed, ref, watch } from 'vue';
 import { formatDateTime } from '@/utils/format';
 import {
+  IonChip,
+  modalController,
   IonItem,
   IonLabel,
   IonList,
@@ -90,9 +101,15 @@ const emit = defineEmits<{
   (e: 'completed'): void;
 }>();
 
+import EditHoldDetailsModal from './EditHoldDetailsModal.vue';
+import { useHoldDetailsStore } from '@/store/holdDetails';
+const localUiMock = import.meta.env.DEV && import.meta.env.MODE === 'mock';
+const details = localUiMock ? useHoldDetailsStore() : { byId: {} as Record<string,any>, people: [] as {id:string;name:string}[] };
+const task = computed(() => ({ ...props.task, ...(localUiMock ? details.byId[props.task.workEffortId] : {}) }));
 const orderTaskStore = useOrderTaskStore();
 
 const cardActions = computed<TaskCardAction[]>(() => [
+  ...(localUiMock ? [{id:'edit',label:translate('Edit hold'),kind:'neutral' as const}] : []),
   { id: 'resolve', label: translate('Resolve task'), kind: 'primary' },
 ]);
 
@@ -125,7 +142,8 @@ async function submitResolve() {
   await orderTaskStore.changeTaskStatus(props.task.workEffortId, 'TASK_COMPLETED', resolutionCommunication());
 }
 
-function handleAction(actionId: string) {
+async function handleAction(actionId: string) {
+  if (actionId === 'edit') { const modal = await modalController.create({ component: EditHoldDetailsModal, componentProps: { task: task.value, people: details.people } }); await modal.present(); return; }
   if (actionId === 'resolve') return resolveTask();
 }
 
@@ -178,3 +196,11 @@ defineExpose({
   submitResolve,
 });
 </script>
+
+<style scoped>
+.rich-hold-card { container-type: inline-size; }
+.rich-hold-card :deep(.ship-group-detail-columns) { display:grid;grid-template-columns:2fr 1fr 1.2fr; }
+.rich-hold-card :deep(.ship-group-detail-columns > ion-list) { min-width:0; }
+.hold-activity { grid-column:1/-1;border-top:1px solid var(--ion-color-light-shade);border-inline-end:0 !important; }
+@container (max-width:700px) { .rich-hold-card :deep(.ship-group-detail-columns) {grid-template-columns:1fr;} .rich-hold-card :deep(.ship-group-detail-columns > ion-list) {border-inline-end:0;} }
+</style>

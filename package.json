@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "test:unit": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "dev:mock": "vite --mode mock --host 127.0.0.1"
   },
   "dependencies": {
     "@capacitor/android": "catalog:",
