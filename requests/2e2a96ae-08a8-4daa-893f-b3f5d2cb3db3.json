@@ -6,8 +6,26 @@
   "action": "",
   "version": null,
   "actor": "ravilodhi",
-  "status": "running",
+  "status": "completed",
   "createdAt": "2026-11-16T11:13:53.042Z",
   "steps": [],
-  "runUrl": "https://github.com/hotwax/order-manager/actions/runs/43855848092"
+  "runUrl": "https://github.com/hotwax/order-manager/actions/runs/43855848092",
+  "hosting": {
+    "available": true,
+    "target": {
+      "project": "digital-commerce-71eb8",
+      "site": "hotwax-order-manager",
+      "environment": "prod",
+      "origin": "https://hotwax-order-manager.web.app"
+    },
+    "versions": [],
+    "defaultVersion": "v1.4.0",
+    "configuredEnvironment": "AppEnvDev",
+    "defaultSource": "Compiled build metadata",
+    "checkedAt": "2026-11-16T11:13:57.084Z",
+    "deployedAt": "2026-10-09T13:05:41.945Z",
+    "release": "sites/hotwax-order-manager/channels/live/releases/1791551141945000",
+    "fileCount": 28
+  },
+  "finishedAt": "2026-11-16T11:13:59.028Z"
 }
