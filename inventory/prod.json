@@ -1,0 +1,17 @@
+{
+  "available": true,
+  "target": {
+    "project": "digital-commerce-71eb8",
+    "site": "hotwax-order-manager",
+    "environment": "prod",
+    "origin": "https://hotwax-order-manager.web.app"
+  },
+  "versions": [],
+  "defaultVersion": "v1.4.0",
+  "configuredEnvironment": "AppEnvDev",
+  "defaultSource": "Compiled build metadata",
+  "checkedAt": "2026-11-16T11:13:57.084Z",
+  "deployedAt": "2026-10-09T13:05:41.945Z",
+  "release": "sites/hotwax-order-manager/channels/live/releases/1791551141945000",
+  "fileCount": 28
+}
