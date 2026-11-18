@@ -16,6 +16,7 @@ import { Settings } from 'luxon';
 import { emitter, FastTravel, translate } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 import { startAppDbSync } from '@/db/appDbSync';
+import { useOmsInstanceChangeAlert } from '@/composables/useOmsInstanceChangeAlert';
 import Menu from '@/components/layout/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';
@@ -23,6 +24,9 @@ import { useUserStore } from '@/store/user';
 const loader = ref<HTMLIonLoadingElement | null>(null);
 const { isAuthenticated } = useAuth();
 const userStore = useUserStore();
+
+// A login in another tab or app switched the shared session to another instance and stopped the sync.
+useOmsInstanceChangeAlert();
 const userProfile = computed(() => userStore.getUserProfile);
 
 async function presentLoader(options = { message: '', backdropDismiss: true }) {
