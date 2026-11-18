@@ -13,10 +13,9 @@
 import { IonApp, IonRouterOutlet, IonSplitPane, loadingController } from '@ionic/vue';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { Settings } from 'luxon';
-import { emitter, FastTravel, translate } from '@common';
+import { emitter, FastTravel, translate, useSessionChangeAlert } from '@common';
 import { useAuth } from '@common/composables/useAuth';
 import { startAppDbSync } from '@/db/appDbSync';
-import { useOmsInstanceChangeAlert } from '@/composables/useOmsInstanceChangeAlert';
 import Menu from '@/components/layout/Menu.vue';
 import router from './router';
 import { useUserStore } from '@/store/user';
@@ -25,8 +24,9 @@ const loader = ref<HTMLIonLoadingElement | null>(null);
 const { isAuthenticated } = useAuth();
 const userStore = useUserStore();
 
-// A login in another tab or app switched the shared session to another instance and stopped the sync.
-useOmsInstanceChangeAlert();
+// A login elsewhere (another instance, Maarg or user) replaced the shared session cookies: the
+// framework stops the sync and asks the user to reload.
+useSessionChangeAlert();
 const userProfile = computed(() => userStore.getUserProfile);
 
 async function presentLoader(options = { message: '', backdropDismiss: true }) {
