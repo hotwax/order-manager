@@ -134,7 +134,7 @@
           </span>
           <ion-label>{{ translate("{shown} of {count} matching orders", { shown: searchResults.length, count: searchTotal }) }}</ion-label>
           <OrderSortPopover v-model="searchSort" trigger-id="find-order-sort-trigger" />
-          <ion-button v-if="canUseBulkActions" fill="clear" size="small" @click="toggleSelectMode">
+          <ion-button fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
@@ -160,14 +160,18 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <ion-footer v-if="selectMode">
+    <ion-footer v-if="selectMode" class="bulk-actions-footer">
       <ion-toolbar>
-        <ion-title size="small">{{ translate('{count} selected', { count: selectedOrderIds.length }) }}</ion-title>
-        <ion-buttons slot="end" class="bulk-action-buttons">
-          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" fill="outline" color="danger" :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
-          <ion-button fill="outline" :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
-          <ion-button fill="outline" :disabled="!selectedOrderIds.length || !canCreateOrderTasks" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
-        </ion-buttons>
+        <div class="bulk-actions">
+          <span class="bulk-selection-count" aria-live="polite">{{ translate('{count} selected', { count: selectedOrderIds.length }) }}</span>
+          <ion-button class="bulk-action-more" fill="outline" aria-haspopup="dialog" :disabled="!selectedOrderIds.length" @click="openBulkActions">{{ translate('More actions') }}</ion-button>
+          <ion-buttons class="bulk-action-buttons">
+            <ion-button fill="outline" :disabled="!selectedOrderIds.length" @click="exportSelectedOrders">{{ translate('Export selected CSV') }}</ion-button>
+            <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS && canCancelOrders" fill="outline" color="danger" :disabled="!selectedOrderIds.length" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
+            <ion-button v-if="canUpdateOrders" fill="outline" :disabled="!selectedOrderIds.length" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
+            <ion-button v-if="canCreateOrderTasks" fill="outline" :disabled="!selectedOrderIds.length" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
+          </ion-buttons>
+        </div>
       </ion-toolbar>
     </ion-footer>
   </ion-page>
@@ -197,6 +201,7 @@ import {
   IonSelectOption,
   IonTitle,
   IonToolbar,
+  actionSheetController,
   alertController,
   modalController,
 } from '@ionic/vue';
@@ -227,6 +232,7 @@ import UniformFilterLayout from '@/components/common/UniformFilterLayout.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import { toSearchOrderRowViewModel } from '@/utils/orderRows';
+import { buildSelectedOrdersCsv } from '@/utils/orderExport';
 import { showToast } from '@/utils';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import Actions from "@/authorization/actions";
@@ -275,7 +281,6 @@ const someCurrentPageSelected = computed(() => {
 const canCancelOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_CANCEL));
 const canUpdateOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_UPDATE));
 const canCreateOrderTasks = computed(() => userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE));
-const canUseBulkActions = computed(() => (!HIDE_SHOPIFY_UNSYNCED_ACTIONS && canCancelOrders.value) || canUpdateOrders.value || canCreateOrderTasks.value);
 
 onMounted(async () => {
   orderStore.searchFilters.productStoreId = selectedProductStoreId.value;
@@ -306,6 +311,36 @@ watch(searchResults, () => {
 function scheduleSearch() {
   if (debounceTimer.value) clearTimeout(debounceTimer.value);
   debounceTimer.value = setTimeout(() => runSearch(), 300);
+}
+
+async function openBulkActions() {
+  const buttons = [
+    // Start the download inside the tap handler so mobile browsers retain the user gesture.
+    { text: translate('Export selected CSV'), handler: () => { void exportSelectedOrders(); } },
+    ...(canUpdateOrders.value ? [{ text: translate('Edit shipping method'), data: { action: 'shipping' } }] : []),
+    ...(canCreateOrderTasks.value ? [{ text: translate('Add task'), data: { action: 'task' } }] : []),
+    ...(!HIDE_SHOPIFY_UNSYNCED_ACTIONS && canCancelOrders.value
+      ? [{ text: translate('Cancel open items'), role: 'destructive', data: { action: 'cancelOrders' } }]
+      : []),
+    { text: translate('Close'), role: 'cancel' }
+  ];
+  const sheet = await actionSheetController.create({ header: translate('Bulk actions'), buttons });
+  await sheet.present();
+  const { data } = await sheet.onDidDismiss();
+  if (data?.action === 'shipping') await openEditShippingMethodModal();
+  else if (data?.action === 'task') await openAddTaskModal();
+  else if (data?.action === 'cancelOrders') await confirmCancelOrders();
+}
+
+async function exportSelectedOrders() {
+  try {
+    const csv = buildSelectedOrdersCsv(searchResults.value, selectedOrderIds.value);
+    commonUtil.downloadCsv(`\uFEFF${csv}`, 'selected-orders.csv');
+    await showToast(translate('Export started for {count} selected orders.', { count: selectedOrderIds.value.length }));
+  } catch (err) {
+    logger.error(err);
+    await showToast(translate('Could not export selected orders. Please try again.'));
+  }
 }
 
 async function confirmCancelOrders() {
@@ -468,7 +503,33 @@ function statusDescription(statusId: string) {
   min-width: 24px;
 }
 
-.bulk-action-buttons {
-  overflow-x: auto;
+.bulk-actions-footer {
+  container-type: inline-size;
+}
+
+.bulk-actions {
+  align-items: center;
+  display: flex;
+  gap: var(--spacer-xs);
+  padding: var(--spacer-xs) var(--spacer-sm);
+}
+
+.bulk-selection-count {
+  font-weight: 500;
+  margin-inline-end: auto;
+}
+
+.bulk-action-more {
+  display: none;
+}
+
+@container (max-width: 900px) {
+  .bulk-action-buttons {
+    display: none;
+  }
+
+  .bulk-action-more {
+    display: inline-flex;
+  }
 }
 </style>
