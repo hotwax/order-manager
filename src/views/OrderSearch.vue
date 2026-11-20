@@ -164,7 +164,7 @@
       <ion-toolbar>
         <div class="bulk-actions">
           <span class="bulk-selection-count" aria-live="polite">{{ translate('{count} selected', { count: selectedOrderIds.length }) }}</span>
-          <ion-button class="bulk-action-more" fill="outline" aria-haspopup="dialog" :disabled="!selectedOrderIds.length" @click="openBulkActions">{{ translate('More actions') }}</ion-button>
+          <ion-button class="bulk-action-more" fill="outline" aria-haspopup="dialog" :disabled="!selectedOrderIds.length || bulkActionsOpen" @click="openBulkActions">{{ translate('More actions') }}</ion-button>
           <ion-buttons class="bulk-action-buttons">
             <ion-button fill="outline" :disabled="!selectedOrderIds.length" @click="exportSelectedOrders">{{ translate('Export selected CSV') }}</ion-button>
             <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS && canCancelOrders" fill="outline" color="danger" :disabled="!selectedOrderIds.length" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
@@ -252,6 +252,7 @@ function handleOrderRowClick(order: any) {
 }
 const debounceTimer = ref<ReturnType<typeof setTimeout>>();
 const selectMode = ref(false);
+const bulkActionsOpen = ref(false);
 const selectedOrderIds = ref<string[]>([]);
 
 const orderStatuses = computed(() => seed.statusItemsByType('ORDER_STATUS'));
@@ -314,22 +315,28 @@ function scheduleSearch() {
 }
 
 async function openBulkActions() {
-  const buttons = [
-    // Start the download inside the tap handler so mobile browsers retain the user gesture.
-    { text: translate('Export selected CSV'), handler: () => { void exportSelectedOrders(); } },
-    ...(canUpdateOrders.value ? [{ text: translate('Edit shipping method'), data: { action: 'shipping' } }] : []),
-    ...(canCreateOrderTasks.value ? [{ text: translate('Add task'), data: { action: 'task' } }] : []),
-    ...(!HIDE_SHOPIFY_UNSYNCED_ACTIONS && canCancelOrders.value
-      ? [{ text: translate('Cancel open items'), role: 'destructive', data: { action: 'cancelOrders' } }]
-      : []),
-    { text: translate('Close'), role: 'cancel' }
-  ];
-  const sheet = await actionSheetController.create({ header: translate('Bulk actions'), buttons });
-  await sheet.present();
-  const { data } = await sheet.onDidDismiss();
-  if (data?.action === 'shipping') await openEditShippingMethodModal();
-  else if (data?.action === 'task') await openAddTaskModal();
-  else if (data?.action === 'cancelOrders') await confirmCancelOrders();
+  if (bulkActionsOpen.value) return;
+  bulkActionsOpen.value = true;
+  try {
+    const buttons = [
+      // Start the download inside the tap handler so mobile browsers retain the user gesture.
+      { text: translate('Export selected CSV'), handler: () => { void exportSelectedOrders(); } },
+      ...(canUpdateOrders.value ? [{ text: translate('Edit shipping method'), data: { action: 'shipping' } }] : []),
+      ...(canCreateOrderTasks.value ? [{ text: translate('Add task'), data: { action: 'task' } }] : []),
+      ...(!HIDE_SHOPIFY_UNSYNCED_ACTIONS && canCancelOrders.value
+        ? [{ text: translate('Cancel open items'), role: 'destructive', data: { action: 'cancelOrders' } }]
+        : []),
+      { text: translate('Close'), role: 'cancel' }
+    ];
+    const sheet = await actionSheetController.create({ header: translate('Bulk actions'), buttons });
+    await sheet.present();
+    const { data } = await sheet.onDidDismiss();
+    if (data?.action === 'shipping') await openEditShippingMethodModal();
+    else if (data?.action === 'task') await openAddTaskModal();
+    else if (data?.action === 'cancelOrders') await confirmCancelOrders();
+  } finally {
+    bulkActionsOpen.value = false;
+  }
 }
 
 async function exportSelectedOrders() {
