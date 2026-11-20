@@ -1,5 +1,4 @@
 import { toStringValue } from '@/utils/orderDocs';
-import type { Customer } from '@/types/order';
 import type {
   CustomerCommunicationSummary,
   CustomerContactMech,
@@ -19,8 +18,15 @@ export interface CustomerSearchParams {
   sort?: string;
 }
 
+export interface CustomerSearchRow {
+  partyId: string;
+  fullName?: string;
+  emailAddress?: string;
+  phoneNumber?: string;
+}
+
 export interface CustomerSearchResult {
-  customers: Customer[];
+  customers: CustomerSearchRow[];
   total: number;
 }
 

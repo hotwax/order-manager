@@ -109,19 +109,14 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <ion-footer v-if="selectMode">
-      <ion-toolbar>
-        <ion-title size="small">{{ translate('{count} selected', { count: selectedOrderIds.length }) }}</ion-title>
-        <ion-buttons slot="end" class="bulk-action-buttons">
-          <ion-button v-if="hasGlobalAction('brokerSelected')" fill="solid" :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openBrokerSelectedModal">
-            {{ translate('Broker selected') }}
-          </ion-button>
-          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" fill="outline" color="danger" :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
-          <ion-button fill="outline" :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
-          <ion-button fill="outline" :disabled="!selectedOrderIds.length || !canCreateOrderTasks" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-footer>
+    <BulkSelectionFooter
+      v-if="selectMode"
+      :count="selectedOrderIds.length"
+      :disabled="loading || Boolean(error)"
+      :build-csv="buildOrdersCsv"
+      :filename="countKey ? `selected-${countKey}-orders.csv` : 'selected-orders.csv'"
+      :actions="bulkActions"
+    />
   </ion-page>
 </template>
 
@@ -131,7 +126,6 @@ import {
   IonButtons,
   IonCheckbox,
   IonContent,
-  IonFooter,
   IonHeader,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
@@ -167,6 +161,8 @@ const seed = useSeedData();
 import DateFilterSelect from '@/components/common/DateFilterSelect.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 import UniformFilterLayout from '@/components/common/UniformFilterLayout.vue';
+import BulkSelectionFooter from '@/components/common/BulkSelectionFooter.vue';
+import { buildSelectedOrdersCsv } from '@/utils/findExport';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import { toSearchOrderRowViewModel } from '@/utils/orderRows';
@@ -259,6 +255,33 @@ function hasGlobalAction(action: QueueGlobalAction): boolean {
   return props.globalActions?.includes(action) ?? false;
 }
 
+const bulkActions = computed(() => [
+  ...(hasGlobalAction('brokerSelected')
+    ? [{
+        id: 'broker',
+        label: translate('Broker selected'),
+        fill: 'solid' as const,
+        disabled: !canUpdateOrders.value,
+        run: openBrokerSelectedModal
+      }]
+    : []),
+  ...(!HIDE_SHOPIFY_UNSYNCED_ACTIONS
+    ? [{
+        id: 'cancelOrders',
+        label: translate('Cancel open items'),
+        destructive: true,
+        disabled: !canCancelOrders.value,
+        run: confirmCancelOrders
+      }]
+    : []),
+  { id: 'shipping', label: translate('Edit shipping method'), disabled: !canUpdateOrders.value, run: openEditShippingMethodModal },
+  { id: 'task', label: translate('Add task'), disabled: !canCreateOrderTasks.value, run: openAddTaskModal }
+]);
+
+function buildOrdersCsv() {
+  return buildSelectedOrdersCsv(searchResults.value, selectedOrderIds.value);
+}
+
 onMounted(() => {
   runSearch();
 });
@@ -274,10 +297,10 @@ watch(
     searchFilters.value.dateThru = newDateThru ? String(newDateThru) : '';
   }
 );
-watch(searchResults, () => {
-  const currentOrderIds = new Set(currentPageOrderIds.value);
+watch(searchResults, (results) => {
+  const currentOrderIds = new Set(results.map((order) => order.id));
   selectedOrderIds.value = selectedOrderIds.value.filter((orderId) => currentOrderIds.has(orderId));
-});
+}, { flush: 'sync' });
 
 // The nav badge is a rollup of the whole queue, so only an unnarrowed search
 // may publish it. Deep links from the funnel land here pre-filtered, and a
@@ -579,10 +602,6 @@ function orderDetailLink(order: Order) {
 .order-results-header-start {
   display: flex;
   min-width: 24px;
-}
-
-.bulk-action-buttons {
-  overflow-x: auto;
 }
 
 </style>

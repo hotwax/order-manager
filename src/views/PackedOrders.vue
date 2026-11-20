@@ -35,7 +35,7 @@
             :options="sortOptions"
             trigger-id="packed-order-sort-trigger"
           />
-          <ion-button v-if="actions.length" fill="clear" size="small" @click="toggleSelectMode">
+          <ion-button fill="clear" size="small" @click="toggleSelectMode">
             {{ selectMode ? translate('Done') : translate('Select') }}
           </ion-button>
         </ion-list-header>
@@ -76,23 +76,14 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <ion-footer v-if="selectMode && actions.length">
-      <ion-toolbar>
-        <ion-title size="small">{{ translate('{count} selected', { count: selectedIds.size }) }}</ion-title>
-        <ion-buttons slot="end">
-          <ion-button
-            v-for="action in actions"
-            :key="action.id"
-            :fill="action.destructive ? 'outline' : 'solid'"
-            :color="action.destructive ? 'danger' : 'primary'"
-            :disabled="!selectedIds.size"
-            @click="runAction(action)"
-          >
-            {{ translate(action.label) }}
-          </ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-footer>
+    <BulkSelectionFooter
+      v-if="selectMode"
+      :count="selectedIds.size"
+      :disabled="isLoading || Boolean(loadError)"
+      :build-csv="buildOrdersCsv"
+      filename="selected-packed-orders.csv"
+      :actions="actions"
+    />
   </ion-page>
 </template>
 
@@ -102,7 +93,6 @@ import {
   IonButtons,
   IonCheckbox,
   IonContent,
-  IonFooter,
   IonHeader,
   IonInfiniteScroll,
   IonInfiniteScrollContent,
@@ -127,6 +117,8 @@ import { WORKFLOW_ORDER_SORT_OPTIONS } from '@/types/customerService';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import WorkflowOrderFilterCard from '@/components/orders/WorkflowOrderFilterCard.vue';
+import BulkSelectionFooter from '@/components/common/BulkSelectionFooter.vue';
+import { buildSelectedWorkflowOrdersCsv } from '@/utils/findExport';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 
@@ -166,7 +158,13 @@ const facilityFilterOptions = computed(() => facilityOptions.value.map((facility
 
 const orders = computed(() => store.filteredOrders(bucket));
 const selectedIds = computed(() => new Set(store.selection[bucket]));
-const actions = computed<BulkActionDefinition[]>(() => BULK_ACTIONS[bucket]);
+const actions = computed(() => BULK_ACTIONS[bucket].map((action) => ({
+  id: action.id,
+  label: translate(action.label),
+  destructive: action.destructive,
+  fill: action.destructive ? undefined : 'solid' as const,
+  run: () => runAction(action)
+})));
 const selectMode = ref(false);
 const currentPageOrderIds = computed(() => orders.value.map((order) => order.orderId));
 const allCurrentPageSelected = computed(() => {
@@ -263,13 +261,13 @@ watch(
   loadWorkflowOrders
 );
 
-watch(orders, () => {
-  const currentOrderIds = new Set(currentPageOrderIds.value);
+watch(orders, (results) => {
+  const currentOrderIds = new Set(results.map((order) => order.orderId));
   store.setSelection(
     bucket,
     store.selection[bucket].filter((orderId) => currentOrderIds.has(orderId))
   );
-});
+}, { flush: 'sync' });
 
 function clearFilters() {
   store.clearFilters(bucket);
@@ -326,6 +324,10 @@ function setOrderSelection(orderId: string, checked: boolean) {
 
 function orderDetailLink(order: WorkflowOrder) {
   return `/packed/${order.orderId}`;
+}
+
+function buildOrdersCsv() {
+  return buildSelectedWorkflowOrdersCsv(orders.value, store.selection[bucket], (id) => orderStore.workflowEnrichment(bucket, id));
 }
 
 async function runAction(action: BulkActionDefinition) {

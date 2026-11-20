@@ -122,30 +122,26 @@
 
       <ion-list v-else>
         <!-- Hidden at zero, where the empty state says it better than "0 of 0". -->
-        <ion-list-header v-if="searchResults.length" class="order-results-header">
-          <span class="order-results-header-start">
-            <ion-checkbox
-              v-if="selectMode"
-              :checked="allCurrentPageSelected"
-              :indeterminate="someCurrentPageSelected && !allCurrentPageSelected"
-              :aria-label="translate('Select all loaded orders')"
-              @ionChange="toggleCurrentPageSelection($event.detail.checked)"
-            />
-          </span>
-          <ion-label>{{ translate("{shown} of {count} matching orders", { shown: searchResults.length, count: searchTotal }) }}</ion-label>
+        <FindResultsHeader
+          v-if="searchResults.length"
+          :count-label="translate('{shown} of {count} matching orders', { shown: searchResults.length, count: searchTotal })"
+          :select-all-label="translate('Select all loaded orders')"
+          :select-mode="selectMode"
+          :all-selected="allSelected"
+          :some-selected="someSelected"
+          @select-all="selectAll"
+          @toggle-select-mode="toggleSelectMode"
+        >
           <OrderSortPopover v-model="searchSort" trigger-id="find-order-sort-trigger" />
-          <ion-button v-if="canUseBulkActions" fill="clear" size="small" @click="toggleSelectMode">
-            {{ selectMode ? translate('Done') : translate('Select') }}
-          </ion-button>
-        </ion-list-header>
+        </FindResultsHeader>
         <OrderRow
           v-for="order in searchResults"
           :key="order.id"
           :model="toSearchOrderRowViewModel(order)"
           :select-mode="selectMode"
-          :selected="selectedOrderIds.includes(order.id)"
+          :selected="selected.has(order.id)"
           @activate="handleOrderRowClick(order)"
-          @selection-change="setOrderSelection(order.id, $event)"
+          @selection-change="setSelected(order.id, $event)"
         />
       </ion-list>
 
@@ -160,26 +156,22 @@
       </ion-infinite-scroll>
     </ion-content>
 
-    <ion-footer v-if="selectMode">
-      <ion-toolbar>
-        <ion-title size="small">{{ translate('{count} selected', { count: selectedOrderIds.length }) }}</ion-title>
-        <ion-buttons slot="end" class="bulk-action-buttons">
-          <ion-button v-if="!HIDE_SHOPIFY_UNSYNCED_ACTIONS" fill="outline" color="danger" :disabled="!selectedOrderIds.length || !canCancelOrders" @click="confirmCancelOrders">{{ translate('Cancel open items') }}</ion-button>
-          <ion-button fill="outline" :disabled="!selectedOrderIds.length || !canUpdateOrders" @click="openEditShippingMethodModal">{{ translate('Edit shipping method') }}</ion-button>
-          <ion-button fill="outline" :disabled="!selectedOrderIds.length || !canCreateOrderTasks" @click="openAddTaskModal">{{ translate('Add task') }}</ion-button>
-        </ion-buttons>
-      </ion-toolbar>
-    </ion-footer>
+    <BulkSelectionFooter
+      v-if="selectMode"
+      :count="selectedOrderIds.length"
+      :disabled="loading || Boolean(error)"
+      :build-csv="buildOrdersCsv"
+      filename="selected-orders.csv"
+      :actions="bulkActions"
+    />
   </ion-page>
 </template>
 
 <script setup lang="ts">
 import {
-  IonButton,
   IonButtons,
   IonCheckbox,
   IonContent,
-  IonFooter,
   IonHeader,
   IonIcon,
   IonInfiniteScroll,
@@ -188,7 +180,6 @@ import {
   IonItem,
   IonLabel,
   IonList,
-  IonListHeader,
   IonMenuButton,
   IonPage,
   IonPopover,
@@ -217,36 +208,38 @@ import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import SearchFilterCard from '@/components/common/SearchFilterCard.vue';
 
-const seed = useSeedData();
-
-/** The order search with the facility type rows its rows' virtual-location checks need. */
-async function runSearch() {
-  return orderStore.runSearch(await seed.getFacilityTypes().catch(() => []));
-}
 import UniformFilterLayout from '@/components/common/UniformFilterLayout.vue';
 import OrderSortPopover from '@/components/orders/OrderSortPopover.vue';
 import OrderRow from '@/components/orders/OrderRow.vue';
 import { toSearchOrderRowViewModel } from '@/utils/orderRows';
+import { buildSelectedOrdersCsv } from '@/utils/findExport';
+import { useFindSelection } from '@/composables/useFindSelection';
+import BulkSelectionFooter from '@/components/common/BulkSelectionFooter.vue';
+import FindResultsHeader from '@/components/common/FindResultsHeader.vue';
 import { showToast } from '@/utils';
 import { HIDE_SHOPIFY_UNSYNCED_ACTIONS } from '@/config/featureFlags';
 import Actions from "@/authorization/actions";
 
+const seed = useSeedData();
 const orderStore = useOrderStore();
 const orderDetailStore = useOrderDetailStore();
 const userStore = useUserStore();
 const productStore = useProductStore();
 const { searchQuery, searchFilters, searchSort, searchResults, searchTotal, loading, error, hasMore } = storeToRefs(orderStore);
 
+const {
+  selectMode, selectedIds: selectedOrderIds, selected, allSelected, someSelected,
+  setSelected, toggleSelected, selectAll, clearSelection, exitSelectMode, toggleSelectMode
+} = useFindSelection(computed(() => searchResults.value.map((order) => order.id)));
+
 function handleOrderRowClick(order: any) {
   if (selectMode.value) {
-    toggleOrderSelection(order.id);
+    toggleSelected(order.id);
   } else {
     router.push(`/orders/${order.id}`);
   }
 }
 const debounceTimer = ref<ReturnType<typeof setTimeout>>();
-const selectMode = ref(false);
-const selectedOrderIds = ref<string[]>([]);
 
 const orderStatuses = computed(() => seed.statusItemsByType('ORDER_STATUS'));
 const salesChannels = computed(() => seed.enumsByType('ORDER_SALES_CHANNEL'));
@@ -265,17 +258,22 @@ const statusFilterLabel = computed(() => {
 
   return translate('{count} statuses', { count: selectedStatusIds.value.length });
 });
-const currentPageOrderIds = computed(() => searchResults.value.map((order) => order.id));
-const allCurrentPageSelected = computed(() => {
-  return currentPageOrderIds.value.length > 0 && currentPageOrderIds.value.every((orderId) => selectedOrderIds.value.includes(orderId));
-});
-const someCurrentPageSelected = computed(() => {
-  return currentPageOrderIds.value.some((orderId) => selectedOrderIds.value.includes(orderId));
-});
 const canCancelOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_CANCEL));
 const canUpdateOrders = computed(() => userStore.hasPermission(Actions.APP_ORDER_UPDATE));
 const canCreateOrderTasks = computed(() => userStore.hasPermission(Actions.APP_ORDER_TASK_CREATE));
-const canUseBulkActions = computed(() => (!HIDE_SHOPIFY_UNSYNCED_ACTIONS && canCancelOrders.value) || canUpdateOrders.value || canCreateOrderTasks.value);
+
+const bulkActions = computed(() => [
+  ...(!HIDE_SHOPIFY_UNSYNCED_ACTIONS && canCancelOrders.value
+    ? [{ id: 'cancelOrders', label: translate('Cancel open items'), destructive: true, run: confirmCancelOrders }]
+    : []),
+  ...(canUpdateOrders.value
+    ? [{ id: 'shipping', label: translate('Edit shipping method'), run: openEditShippingMethodModal }]
+    : []),
+  ...(canCreateOrderTasks.value
+    ? [{ id: 'task', label: translate('Add task'), run: openAddTaskModal }]
+    : [])
+]);
+
 
 onMounted(async () => {
   orderStore.searchFilters.productStoreId = selectedProductStoreId.value;
@@ -298,14 +296,17 @@ watch(searchSort, () => {
   runSearch();
 });
 
-watch(searchResults, () => {
-  const currentOrderIds = new Set(currentPageOrderIds.value);
-  selectedOrderIds.value = selectedOrderIds.value.filter((orderId) => currentOrderIds.has(orderId));
-});
-
+/** The order search with the facility type rows its rows' virtual-location checks need. */
+async function runSearch() {
+  return orderStore.runSearch(await seed.getFacilityTypes().catch(() => []));
+}
 function scheduleSearch() {
   if (debounceTimer.value) clearTimeout(debounceTimer.value);
   debounceTimer.value = setTimeout(() => runSearch(), 300);
+}
+
+function buildOrdersCsv() {
+  return buildSelectedOrdersCsv(searchResults.value, selectedOrderIds.value);
 }
 
 async function confirmCancelOrders() {
@@ -374,7 +375,7 @@ async function openEditShippingMethodModal() {
 function clearFilters() {
   orderStore.searchQuery = '';
   orderStore.searchSort = DEFAULT_ORDER_SEARCH_SORT;
-  selectedOrderIds.value = [];
+  clearSelection();
   orderStore.searchFilters = {
     status: [],
     channel: 'All',
@@ -391,42 +392,6 @@ function clearFilters() {
 async function loadMore(event: CustomEvent) {
   await orderStore.appendNextPage(await seed.getFacilityTypes().catch(() => []));
   (event.target as HTMLIonInfiniteScrollElement).complete();
-}
-
-function enterSelectMode() {
-  selectMode.value = true;
-}
-
-function exitSelectMode() {
-  selectMode.value = false;
-  selectedOrderIds.value = [];
-}
-
-function toggleSelectMode() {
-  if (selectMode.value) {
-    exitSelectMode();
-    return;
-  }
-
-  enterSelectMode();
-}
-
-function toggleCurrentPageSelection(checked: boolean) {
-  selectedOrderIds.value = checked ? [...currentPageOrderIds.value] : [];
-}
-
-function toggleOrderSelection(orderId: string) {
-  if (!selectMode.value) return;
-  setOrderSelection(orderId, !selectedOrderIds.value.includes(orderId));
-}
-
-function setOrderSelection(orderId: string, checked: boolean) {
-  if (checked) {
-    if (!selectedOrderIds.value.includes(orderId)) selectedOrderIds.value = [...selectedOrderIds.value, orderId];
-    return;
-  }
-
-  selectedOrderIds.value = selectedOrderIds.value.filter((selectedOrderId) => selectedOrderId !== orderId);
 }
 
 function clearStatusFilter() {
@@ -457,18 +422,4 @@ function statusDescription(statusId: string) {
   cursor: pointer;
 }
 
-.order-results-header {
-  align-items: center;
-  display: flex;
-  gap: var(--spacer-xs);
-}
-
-.order-results-header-start {
-  display: flex;
-  min-width: 24px;
-}
-
-.bulk-action-buttons {
-  overflow-x: auto;
-}
 </style>

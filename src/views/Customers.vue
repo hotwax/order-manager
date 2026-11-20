@@ -30,25 +30,41 @@
 
       <ion-list v-else>
         <!-- Hidden at zero, where the empty state says it better than "0 of 0". -->
-        <ion-list-header v-if="customers.length">
-          <ion-label>{{ translate("{shown} of {count} customers", { shown: customers.length, count: total }) }}</ion-label>
+        <FindResultsHeader
+          v-if="customers.length"
+          :count-label="translate('{shown} of {count} customers', { shown: customers.length, count: total })"
+          :select-all-label="translate('Select all loaded customers')"
+          :select-mode="selectMode"
+          :all-selected="allSelected"
+          :some-selected="someSelected"
+          @select-all="selectAll"
+          @toggle-select-mode="toggleSelectMode"
+        >
           <OrderSortPopover
             v-model="searchSort"
             :options="sortOptions"
             trigger-id="find-customer-sort-trigger"
           />
-        </ion-list-header>
+        </FindResultsHeader>
         <div
           v-for="customer in customers"
           :key="customer.partyId"
           class="list-item customer-result-row"
-          role="link"
-          tabindex="0"
-          @click="goToCustomer(customer)"
-          @keydown.enter.prevent="goToCustomer(customer)"
-          @keydown.space.prevent="goToCustomer(customer)"
+          :role="selectMode ? undefined : 'link'"
+          :tabindex="selectMode ? undefined : 0"
+          @click="activateResult(customer)"
+          @keydown.enter.self.prevent="activateResult(customer)"
+          @keydown.space.self.prevent="activateResult(customer)"
         >
           <ion-item lines="none">
+            <ion-checkbox
+              v-if="selectMode"
+              slot="start"
+              :checked="selected.has(customer.partyId)"
+              :aria-label="translate('Select customer {id}', { id: customer.partyId })"
+              @click.stop
+              @ionChange="setSelected(customer.partyId, $event.detail.checked)"
+            />
             <ion-label>
               <p class="overline">{{ customer.partyId }}</p>
               {{ customer.fullName || customer.partyId }}
@@ -75,20 +91,33 @@
         :message="translate('Adjust the search text or filters to broaden the customer list.')"
       />
     </ion-content>
+
+    <BulkSelectionFooter
+      v-if="selectMode"
+      :count="selectedIds.length"
+      :disabled="loading || Boolean(error)"
+      :build-csv="buildCsv"
+      filename="selected-customers.csv"
+    />
   </ion-page>
 </template>
 
 <script setup lang="ts">
-import { IonButtons, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonList, IonListHeader, IonMenuButton, IonPage, IonProgressBar, IonSearchbar, IonTitle, IonToolbar, useIonRouter } from '@ionic/vue';
+import { translate } from '@common';
+import { IonButtons, IonCheckbox, IonContent, IonHeader, IonInfiniteScroll, IonInfiniteScrollContent, IonItem, IonLabel, IonList, IonMenuButton, IonPage, IonProgressBar, IonSearchbar, IonTitle, IonToolbar, useIonRouter } from '@ionic/vue';
 import { computed, onMounted, ref, watch } from 'vue';
 import { useCustomerStore } from '@/store/customer';
-import type { Customer } from '@/types/order';
+import type { CustomerSearchRow } from '@/utils/customer';
 import EmptyState from '@/components/common/EmptyState.vue';
 import ErrorState from '@/components/common/ErrorState.vue';
 import OrderSortPopover, { type OrderSortOption } from '@/components/orders/OrderSortPopover.vue';
 
+import BulkSelectionFooter from '@/components/common/BulkSelectionFooter.vue';
+import FindResultsHeader from '@/components/common/FindResultsHeader.vue';
+import { useFindSelection } from '@/composables/useFindSelection';
+import { buildSelectedCustomersCsv } from '@/utils/findExport';
+
 const customerStore = useCustomerStore();
-import { translate } from '@common'
 
 const ionRouter = useIonRouter();
 
@@ -104,12 +133,21 @@ const sortOptions: OrderSortOption[] = [
 
 const searchQuery = ref('');
 const searchSort = ref('');
-const customers = ref<Customer[]>([]);
+const customers = ref<CustomerSearchRow[]>([]);
 const total = ref(0);
 const pageIndex = ref(0);
 const loading = ref(false);
 const error = ref('');
 const debounceTimer = ref<ReturnType<typeof setTimeout>>();
+
+const {
+  selectMode, selectedIds, selected, allSelected, someSelected, setSelected,
+  toggleSelected, selectAll, toggleSelectMode
+} = useFindSelection(computed(() => customers.value.map((customer) => customer.partyId)));
+
+function buildCsv() {
+  return buildSelectedCustomersCsv(customers.value, selectedIds.value);
+}
 
 const hasMore = computed(() => customers.value.length < total.value);
 
@@ -165,7 +203,12 @@ async function loadMore(event: CustomEvent) {
   }
 }
 
-function goToCustomer(customer: Customer) {
+function activateResult(customer: CustomerSearchRow) {
+  if (selectMode.value) {
+    toggleSelected(customer.partyId);
+    return;
+  }
+
   ionRouter.push(`/customers/${customer.partyId}`);
 }
 </script>

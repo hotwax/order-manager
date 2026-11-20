@@ -33,7 +33,7 @@ describe('OrderQueueList', () => {
 
     expect(unfillableSource).toContain(':global-actions="[\'brokerSelected\']"');
     expect(source).toContain("hasGlobalAction('brokerSelected')");
-    expect(source).toContain("{{ translate('Broker selected') }}");
+    expect(source).toContain("label: translate('Broker selected')");
     expect(source).toContain('component: RoutingGroupModal');
     expect(source).toContain('brokerableShipGroupsForOrders(orderIds)');
     expect(source).toContain('orderDetailStore.fetchOrderShipGroups(orderId)');
