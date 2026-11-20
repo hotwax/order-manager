@@ -105,21 +105,35 @@
       />
 
       <ion-list v-else-if="returns.length">
-        <ion-list-header>
-          <ion-label>{{ resultCountLabel }}</ion-label>
-        </ion-list-header>
+        <FindResultsHeader
+          :count-label="resultCountLabel"
+          :select-all-label="translate('Select all loaded returns')"
+          :select-mode="selectMode"
+          :all-selected="allSelected"
+          :some-selected="someSelected"
+          @select-all="selectAll"
+          @toggle-select-mode="toggleSelectMode"
+        />
         <div
           v-for="returnRecord in returns"
           :key="returnRecord.returnId"
           :data-testid="`return-row-${returnRecord.returnId}`"
           class="list-item return-result-row"
-          role="link"
-          tabindex="0"
-          @click="openReturn(returnRecord.returnId)"
-          @keydown.enter.prevent="openReturn(returnRecord.returnId)"
-          @keydown.space.prevent="openReturn(returnRecord.returnId)"
+          :role="selectMode ? undefined : 'link'"
+          :tabindex="selectMode ? undefined : 0"
+          @click="activateResult(returnRecord)"
+          @keydown.enter.self.prevent="activateResult(returnRecord)"
+          @keydown.space.self.prevent="activateResult(returnRecord)"
         >
           <ion-item lines="none">
+            <ion-checkbox
+              v-if="selectMode"
+              slot="start"
+              :checked="selected.has(returnRecord.returnId)"
+              :aria-label="translate('Select return {id}', { id: returnRecord.returnId })"
+              @click.stop
+              @ionChange="setSelected(returnRecord.returnId, $event.detail.checked)"
+            />
             <ion-label class="ion-text-wrap">
               <h2>{{ returnRecord.returnId }}</h2>
               <p>{{ formatDate(returnRecord.entryDate) || translate("Date not available") }}</p>
@@ -160,6 +174,14 @@
         <ion-infinite-scroll-content loading-spinner="crescent" :loading-text="translate('Loading more returns')" />
       </ion-infinite-scroll>
     </ion-content>
+
+    <BulkSelectionFooter
+      v-if="selectMode"
+      :count="selectedIds.length"
+      :disabled="loading || Boolean(error)"
+      :build-csv="buildCsv"
+      filename="selected-returns.csv"
+    />
   </ion-page>
 </template>
 
@@ -168,6 +190,7 @@ import { translate } from "@common";
 import {
   IonButtons,
   IonBadge,
+  IonCheckbox,
   IonContent,
   IonHeader,
   IonInfiniteScroll,
@@ -175,7 +198,6 @@ import {
   IonItem,
   IonLabel,
   IonList,
-  IonListHeader,
   IonMenuButton,
   IonNote,
   IonPage,
@@ -198,10 +220,25 @@ import { useSeedData } from '@common/db';
 import { formatDate } from "@/utils/format";
 import { returnStatusColor } from "@/utils/statusColors";
 
+import BulkSelectionFooter from '@/components/common/BulkSelectionFooter.vue';
+import FindResultsHeader from '@/components/common/FindResultsHeader.vue';
+import { useFindSelection } from '@/composables/useFindSelection';
+import { buildSelectedReturnsCsv } from '@/utils/findExport';
+import type { ReturnSummary } from '@/types/returns';
+
 const seed = useSeedData();
 
 const returnsStore = useReturnsStore();
 const { returns, total, query, loading, error, hasMore } = storeToRefs(returnsStore);
+
+const {
+  selectMode, selectedIds, selected, allSelected, someSelected, setSelected,
+  toggleSelected, selectAll, toggleSelectMode
+} = useFindSelection(computed(() => returns.value.map((returnRecord) => returnRecord.returnId)));
+
+function buildCsv() {
+  return buildSelectedReturnsCsv(returns.value, selectedIds.value);
+}
 
 const returnStatuses = computed(() => seed.statusItemsByType("ORDER_RETURN_STTS"));
 const returnChannels = computed(() => seed.enumsByType("RETURN_CHANNEL"));
@@ -242,15 +279,20 @@ async function loadMore(event: CustomEvent) {
   await (event.target as { complete: () => Promise<void> }).complete();
 }
 
-function openReturn(returnId: string) {
-  router.push(`/returns/${encodeURIComponent(returnId)}`);
+function activateResult(returnRecord: ReturnSummary) {
+  if (selectMode.value) {
+    toggleSelected(returnRecord.returnId);
+    return;
+  }
+
+  router.push(`/returns/${encodeURIComponent(returnRecord.returnId)}`);
 }
 
 function statusLabel(statusId: string) {
   return seed.statusDescription(statusId) || translate("Not specified");
 }
 
-function returnCustomerLabel(returnRecord: any) {
+function returnCustomerLabel(returnRecord: ReturnSummary) {
   if(returnRecord.customerName) {return returnRecord.customerName;}
   if(returnRecord.fromPartyId) {return translate("Customer {id}", { id: returnRecord.fromPartyId });}
 
