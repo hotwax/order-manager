@@ -32,20 +32,29 @@ describe('selected order CSV', () => {
     expect(() => buildSelectedOrdersCsv([order('1')], ['1', 'missing'])).toThrow();
   });
 
-  it('keeps selected orders without item data when another selected order has matching SKUs', () => {
-    const csv = buildSelectedOrdersCsv([order('1'), order('2', { matchingSkus: ['SKU-A', 'SKU-B'] })], ['1', '2']);
+  it('keeps a summary row for an order without items when another order has item lines', () => {
+    const multiItemOrder = order('2', { matchingItems: [
+      { orderItemSeqId: '00001', sku: 'SKU-A', quantity: '2' },
+      { orderItemSeqId: '00002', sku: 'SKU-B', quantity: '1' }
+    ] });
+    const csv = buildSelectedOrdersCsv([order('1'), multiItemOrder, multiItemOrder], ['1', '2']);
 
     expect(records(csv)).toEqual([
-      expect.objectContaining({ 'Order ID': '1', SKUs: '' }),
-      expect.objectContaining({ 'Order ID': '2', SKUs: 'SKU-A, SKU-B' })
+      expect.objectContaining({ 'Order ID': '1', 'Order item sequence ID': '', SKU: '', Quantity: '' }),
+      expect.objectContaining({ 'Order ID': '2', 'Order item sequence ID': '00001', SKU: 'SKU-A', Quantity: '2' }),
+      expect.objectContaining({ 'Order ID': '2', 'Order item sequence ID': '00002', SKU: 'SKU-B', Quantity: '1' })
     ]);
   });
 
-  it('omits the SKU column when no selected order has matching SKUs', () => {
-    const csv = buildSelectedOrdersCsv([order('1'), order('2', { matchingSkus: ['SKU-A'] })], ['1']);
+  it('omits item columns when no selected order has item details', () => {
+    const csv = buildSelectedOrdersCsv([order('1'), order('2', { matchingItems: [
+      { orderItemSeqId: '00001', sku: 'SKU-A', quantity: '1' }
+    ] })], ['1']);
 
     expect(records(csv)[0]['Order ID']).toBe('1');
-    expect(Papa.parse(csv, { header: true }).meta.fields).not.toContain('SKUs');
+    expect(Papa.parse(csv, { header: true }).meta.fields).not.toContain('Order item sequence ID');
+    expect(Papa.parse(csv, { header: true }).meta.fields).not.toContain('SKU');
+    expect(Papa.parse(csv, { header: true }).meta.fields).not.toContain('Quantity');
   });
 });
 
@@ -75,6 +84,6 @@ describe('other selected result exports', () => {
     ], ['O1'], () => undefined);
 
     expect(records(csv)).toEqual([expect.objectContaining({ 'Order ID': 'O1', Customer: 'C1' })]);
-    expect(Papa.parse(csv, { header: true }).meta.fields).not.toContain('SKUs');
+    expect(Papa.parse(csv, { header: true }).meta.fields).not.toContain('SKU');
   });
 });

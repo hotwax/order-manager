@@ -1,4 +1,4 @@
-import type { Order } from '@/types/order';
+import type { MatchingOrderItem, Order } from '@/types/order';
 import type {
   AllocationItemDocument,
   AllocationSummaryOptions,
@@ -662,7 +662,7 @@ function normalizeOrderWithParkingUnits(docs: any[], allocationSummary: Allocati
   const itemDocuments = allocationDocuments(docs, facilityTypeRows);
   return {
     ...normalizeOrderDoc(primaryDoc),
-    matchingSkus: matchingOrderSkus(docs),
+    matchingItems: matchingOrderItems(docs),
     parkingUnitCount: sumParkingUnits(docs),
     ...summarizeBrokeredFacilities(docs, facilityTypeRows),
     allocationSummary: summarizeOrderAllocation(itemDocuments, allocationSummary || { mode: 'physical-first' })
@@ -670,13 +670,14 @@ function normalizeOrderWithParkingUnits(docs: any[], allocationSummary: Allocati
 }
 
 /** The grouped search only returns item documents that match its search and filters. */
-function matchingOrderSkus(docs: readonly any[]): string[] {
-  const skus = new Set<string>();
-  for (const doc of docs) {
+function matchingOrderItems(docs: readonly any[]): MatchingOrderItem[] {
+  return docs.flatMap((doc) => {
+    const orderItemSeqId = toStringValue(doc.orderItemSeqId);
     const sku = parseGoodIdentifications(doc.goodIdentifications).find(({ type, value }) => type === 'SKU' && value)?.value;
-    if (sku) skus.add(sku);
-  }
-  return [...skus].sort();
+    if (!orderItemSeqId && !sku) return [];
+
+    return [{ orderItemSeqId, sku, quantity: toStringValue(doc.quantity) }];
+  });
 }
 
 function sumParkingUnits(docs: any[]) {

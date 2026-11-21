@@ -5,20 +5,32 @@ import type { Order } from '@/types/order';
 import type { ReturnSummary } from '@/types/returns';
 import type { CustomerSearchRow } from '@/utils/customer';
 
-/** Build one row per selected order from the loaded search results. */
+type CsvRow = Record<string, string | undefined>;
+const orderItemColumns = ['Order item sequence ID', 'SKU', 'Quantity'];
+
+/** Repeat order details for each item returned in the search, or export the order summary alone. */
 export function buildSelectedOrdersCsv(orders: readonly Order[], selectedIds: readonly string[]): string {
-  return buildSelectedRowsCsv(orders, selectedIds, (order) => order.id, (order) => ({
-    'Order ID': order.id,
-    'Order name': order.orderName || order.id,
-    'Customer': order.customerName || order.customerId,
-    'Status': order.status,
-    'Sales channel': order.channel,
-    'Order date': order.orderDate,
-    'Carrier': order.carrierPartyId || '',
-    'Shipping method': order.deliveryMethod,
-    'Estimated delivery': order.estimatedDeliveryDate || order.promisedDatetime || order.shipBeforeDate || order.shipByDate || '',
-    'SKUs': order.matchingSkus?.join(', ')
-  }), 'SKUs');
+  return buildSelectedRowsCsv(orders, selectedIds, (order) => order.id, (order) => {
+    const summary = {
+      'Order ID': order.id,
+      'Order name': order.orderName || order.id,
+      'Customer': order.customerName || order.customerId,
+      'Status': order.status,
+      'Sales channel': order.channel,
+      'Order date': order.orderDate,
+      'Carrier': order.carrierPartyId || '',
+      'Shipping method': order.deliveryMethod,
+      'Estimated delivery': order.estimatedDeliveryDate || order.promisedDatetime || order.shipBeforeDate || order.shipByDate || ''
+    };
+    const items = order.matchingItems?.length ? order.matchingItems : [undefined];
+
+    return items.map((item) => ({
+      ...summary,
+      'Order item sequence ID': item?.orderItemSeqId,
+      'SKU': item?.sku,
+      'Quantity': item?.quantity
+    }));
+  }, orderItemColumns);
 }
 
 export function buildSelectedWorkflowOrdersCsv(
@@ -66,19 +78,20 @@ export function buildSelectedCustomersCsv(customers: readonly CustomerSearchRow[
   }));
 }
 
-/** Keep list order and export each selected ID once, even if a paged result overlaps. */
+/** Process each selected result once in list order, even if a paged result overlaps. */
 function buildSelectedRowsCsv<T>(
   results: readonly T[],
   selectedIds: readonly string[],
   idOf: (result: T) => string,
-  toRow: (result: T) => Record<string, string | undefined>,
-  omitEmptyColumn?: string
+  toRows: (result: T) => CsvRow | CsvRow[],
+  optionalColumns: readonly string[] = []
 ): string {
   const remaining = new Set(selectedIds);
-  const rows = results.filter((result) => remaining.delete(idOf(result))).map(toRow);
+  const rows = results.filter((result) => remaining.delete(idOf(result))).flatMap(toRows);
 
   if (!rows.length || remaining.size) throw new Error('Selected results are no longer available');
 
-  const columns = Object.keys(rows[0]).filter((column) => column !== omitEmptyColumn || rows.some((row) => row[column]));
+  const hasOptionalData = rows.some((row) => optionalColumns.some((column) => row[column]));
+  const columns = Object.keys(rows[0]).filter((column) => hasOptionalData || !optionalColumns.includes(column));
   return Papa.unparse(rows, { columns, escapeFormulae: /^[\s]*[=+\-@\t\r]/ });
 }

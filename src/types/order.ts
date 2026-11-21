@@ -293,6 +293,12 @@ export interface OrderIdentification {
   lastUpdatedStamp?: string;
 }
 
+export interface MatchingOrderItem {
+  orderItemSeqId: string;
+  sku?: string;
+  quantity: string;
+}
+
 export interface Order {
   id: string;
   externalId: string;
@@ -314,7 +320,7 @@ export interface Order {
   carrierPartyId?: string;
   priority: string;
   parkingUnitCount?: number;
-  matchingSkus?: string[];
+  matchingItems?: MatchingOrderItem[];
   brokeredFacilityName?: string;
   brokeredFacilitySplitCount?: number;
   dominantVirtualFacilityName?: string;
