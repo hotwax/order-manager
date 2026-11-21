@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { api, commonUtil, useSolrSearch } from '@common';
 import { useOrderStore } from '@/store/order';
+import { buildSelectedOrdersCsv } from '@/utils/findExport';
+import Papa from 'papaparse';
 import {
   buildActivePhysicalFacilityOrderVolumePayload,
   buildOrderLookupPayload,
@@ -398,6 +400,56 @@ describe('order-row enrichment payload', () => {
       'shipBeforeDate',
       'shipByDate'
     ]));
+  });
+});
+
+describe('order search item export', () => {
+  it('exports only item lines from the filtered Solr search even when a queue loads full-order enrichment', async () => {
+    const item = (orderItemSeqId: string, sku: string, facilityId = 'UNFILLABLE_PARKING') =>
+      ({ orderId: 'M1', orderItemSeqId, quantity: 2, facilityId, goodIdentifications: ['UPC/123', `SKU/${sku}`] });
+    const grouped = (docs: any[]) => ({
+      grouped: { orderId: { ngroups: 1, groups: [{ groupValue: 'M1', doclist: { docs } }] } }
+    });
+    vi.mocked(commonUtil.hasError).mockReturnValue(false);
+    const runSolrQuery = vi.fn()
+      .mockResolvedValueOnce({ data: grouped([item('00001', 'STYLE-A'), item('00002', 'STYLE-A')]) })
+      .mockResolvedValueOnce({ data: grouped([
+        item('00001', 'STYLE-A'), item('00002', 'STYLE-A'), item('00003', 'STYLE-B'), item('00004', 'ALLOCATED', 'WAREHOUSE')
+      ]) });
+    vi.mocked(useSolrSearch).mockReturnValue({ runSolrQuery } as ReturnType<typeof useSolrSearch>);
+
+    const { orders } = await searchOrders({
+      queryString: 'STYLE-A',
+      facilityIds: ['UNFILLABLE_PARKING'],
+      allocationSummary: { mode: 'queue-first', queueFacilityIds: ['UNFILLABLE_PARKING'] }
+    });
+
+    const exported = Papa.parse<Record<string, string>>(buildSelectedOrdersCsv(orders, ['M1']), { header: true }).data;
+    expect(exported).toEqual([
+      expect.objectContaining({ 'Order ID': 'M1', 'Order item sequence ID': '00001', SKU: 'STYLE-A', Quantity: '2' }),
+      expect.objectContaining({ 'Order ID': 'M1', 'Order item sequence ID': '00002', SKU: 'STYLE-A', Quantity: '2' })
+    ]);
+    expect(runSolrQuery).toHaveBeenCalledTimes(2);
+    expect(runSolrQuery.mock.calls[0][0].json.params.fl.split(' ')).toContain('goodIdentifications');
+    expect(runSolrQuery.mock.calls[1][0].json.params.fl.split(' ')).not.toContain('goodIdentifications');
+  });
+
+  it('keeps matching item lines with partial item details', async () => {
+    mockSolrResponse({
+      grouped: { orderId: { groups: [{ doclist: { docs: [
+        { orderId: 'M1', orderItemSeqId: '00001', goodIdentifications: ['SKU/STYLE/B'], quantity: 1.5 },
+        { orderId: 'M1', orderItemSeqId: '00002', goodIdentifications: ['UPC/002'], productId: 'UNIDENTIFIED' },
+        { orderId: 'M1', quantity: 3 }
+      ] } }] } }
+    });
+
+    const { orders } = await searchOrders({ queryString: 'M1' });
+    const exported = Papa.parse<Record<string, string>>(buildSelectedOrdersCsv(orders, ['M1']), { header: true }).data;
+    expect(exported).toEqual([
+      expect.objectContaining({ 'Order item sequence ID': '00001', SKU: 'STYLE/B', Quantity: '1.5' }),
+      expect.objectContaining({ 'Order item sequence ID': '00002', SKU: '', Quantity: '' }),
+      expect.objectContaining({ 'Order item sequence ID': '', SKU: '', Quantity: '3' })
+    ]);
   });
 });
 

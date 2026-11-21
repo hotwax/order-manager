@@ -1,4 +1,4 @@
-import type { Order } from '@/types/order';
+import type { MatchingOrderItem, Order } from '@/types/order';
 import type {
   AllocationItemDocument,
   AllocationSummaryOptions,
@@ -13,6 +13,7 @@ import {
   type OrderSearchResult
 } from '@/utils/orderDocs';
 import { DateTime } from 'luxon';
+import { parseGoodIdentifications } from '@common/db/domain/productDomain';
 
 // Facility id used by OMS to hold archived order items (General Operations Parking).
 // Confirmed present in ORDER docs via the indexed `facilityId` field (see PR #309 field dump).
@@ -98,6 +99,7 @@ const orderSolrFields = [
   'orderItemSeqId',
   'shipGroupSeqId',
   'orderItemShipGroupIdentifier',
+  'goodIdentifications',
   'quantity',
   'orderDate',
   'orderStatusId',
@@ -660,10 +662,23 @@ function normalizeOrderWithParkingUnits(docs: any[], allocationSummary: Allocati
   const itemDocuments = allocationDocuments(docs, facilityTypeRows);
   return {
     ...normalizeOrderDoc(primaryDoc),
+    matchingItems: matchingOrderItems(docs),
     parkingUnitCount: sumParkingUnits(docs),
     ...summarizeBrokeredFacilities(docs, facilityTypeRows),
     allocationSummary: summarizeOrderAllocation(itemDocuments, allocationSummary || { mode: 'physical-first' })
   };
+}
+
+/** The grouped search only returns item documents that match its search and filters. */
+function matchingOrderItems(docs: readonly any[]): MatchingOrderItem[] {
+  return docs.flatMap((doc) => {
+    const orderItemSeqId = toStringValue(doc.orderItemSeqId);
+    const sku = parseGoodIdentifications(doc.goodIdentifications).find(({ type, value }) => type === 'SKU' && value)?.value;
+    const quantity = toStringValue(doc.quantity);
+    if (!orderItemSeqId && !sku && !quantity) return [];
+
+    return [{ orderItemSeqId, sku, quantity }];
+  });
 }
 
 function sumParkingUnits(docs: any[]) {
