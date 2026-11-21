@@ -297,19 +297,19 @@ export const useOrderStore = defineStore('orders', {
       const result = normalizeOrderSolrResponse(response.data, params.allocationSummary, facilityTypes);
       if (params.allocationSummary?.mode !== 'queue-first' || !result.orders.length) return result;
 
-      const enrichment = await this.fetchOrderRowEnrichment(result.orders.map((order) => order.id), facilityTypes);
+      const enrichment = await this.fetchOrderRowEnrichment(result.orders.map((order) => order.id), facilityTypes, params.includeUnfillableSkus);
       return {
         ...result,
         orders: result.orders.map((order) => mergeSearchOrderEnrichment(order, enrichment[order.id], params.allocationSummary!))
       };
     },
     /** `facilityTypes` are the caller's facility type rows, as for queryOrders. */
-    async fetchOrderRowEnrichment(orderIds: readonly string[], facilityTypes: any[]): Promise<Record<string, OrderRowEnrichment>> {
+    async fetchOrderRowEnrichment(orderIds: readonly string[], facilityTypes: any[], includeUnfillableSkus = false): Promise<Record<string, OrderRowEnrichment>> {
       const uniqueOrderIds = [...new Set(orderIds.filter(Boolean))];
       if (!uniqueOrderIds.length) return {};
-      const response = await useSolrSearch().runSolrQuery(buildOrderRowEnrichmentPayload(uniqueOrderIds));
+      const response = await useSolrSearch().runSolrQuery(buildOrderRowEnrichmentPayload(uniqueOrderIds, includeUnfillableSkus));
       if (commonUtil.hasError(response)) return Promise.reject(response.data);
-      return normalizeOrderRowEnrichment(response.data, facilityTypes);
+      return normalizeOrderRowEnrichment(response.data, facilityTypes, includeUnfillableSkus);
     },
     async fetchWorkflowOrderTotals(productStoreId?: string): Promise<WorkflowOrderTotals> {
       const buckets: WorkflowOrderBucket[] = ['open', 'inflight', 'packed'];

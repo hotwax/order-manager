@@ -37,6 +37,7 @@ export interface OrderRowEnrichment {
   shipBeforeDate?: string;
   shipByDate?: string;
   itemDocuments: AllocationItemDocument[];
+  unfillableSkus?: string[];
 }
 
 export interface OrderRowViewModel {

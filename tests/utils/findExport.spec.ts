@@ -31,6 +31,13 @@ describe('selected order CSV', () => {
   it('refuses to silently export a partial selection', () => {
     expect(() => buildSelectedOrdersCsv([order('1')], ['1', 'missing'])).toThrow();
   });
+
+  it('leaves the SKU cell blank only when the selected order details were loaded and had no eligible SKU', () => {
+    const csv = buildSelectedOrdersCsv([order('1', { unfillableSkus: [] })], ['1'], true);
+
+    expect(records(csv)[0]['Unfillable SKUs']).toBe('');
+    expect(() => buildSelectedOrdersCsv([order('1')], ['1'], true)).toThrow('Unfillable item details are no longer available');
+  });
 });
 
 describe('other selected result exports', () => {

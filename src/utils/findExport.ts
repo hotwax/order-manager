@@ -6,18 +6,25 @@ import type { ReturnSummary } from '@/types/returns';
 import type { CustomerSearchRow } from '@/utils/customer';
 
 /** Build one row per selected order from the same loaded summaries shown in Find orders. */
-export function buildSelectedOrdersCsv(orders: readonly Order[], selectedIds: readonly string[]): string {
-  return buildSelectedRowsCsv(orders, selectedIds, (order) => order.id, (order) => ({
-    'Order ID': order.id,
-    'Order name': order.orderName || order.id,
-    'Customer': order.customerName || order.customerId,
-    'Status': order.status,
-    'Sales channel': order.channel,
-    'Order date': order.orderDate,
-    'Carrier': order.carrierPartyId || '',
-    'Shipping method': order.deliveryMethod,
-    'Estimated delivery': order.estimatedDeliveryDate || order.promisedDatetime || order.shipBeforeDate || order.shipByDate || ''
-  }));
+export function buildSelectedOrdersCsv(orders: readonly Order[], selectedIds: readonly string[], includeUnfillableSkus = false): string {
+  return buildSelectedRowsCsv(orders, selectedIds, (order) => order.id, (order) => {
+    if (includeUnfillableSkus && order.unfillableSkus === undefined) {
+      throw new Error('Unfillable item details are no longer available');
+    }
+
+    return {
+      'Order ID': order.id,
+      'Order name': order.orderName || order.id,
+      'Customer': order.customerName || order.customerId,
+      'Status': order.status,
+      'Sales channel': order.channel,
+      'Order date': order.orderDate,
+      'Carrier': order.carrierPartyId || '',
+      'Shipping method': order.deliveryMethod,
+      'Estimated delivery': order.estimatedDeliveryDate || order.promisedDatetime || order.shipBeforeDate || order.shipByDate || '',
+      ...(includeUnfillableSkus ? { 'Unfillable SKUs': order.unfillableSkus?.join(', ') || '' } : {})
+    };
+  });
 }
 
 export function buildSelectedWorkflowOrdersCsv(

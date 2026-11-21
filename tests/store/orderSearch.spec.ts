@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { api, commonUtil, useSolrSearch } from '@common';
 import { useOrderStore } from '@/store/order';
+import { buildSelectedOrdersCsv } from '@/utils/findExport';
+import Papa from 'papaparse';
 import {
   buildActivePhysicalFacilityOrderVolumePayload,
   buildOrderLookupPayload,
@@ -398,6 +400,40 @@ describe('order-row enrichment payload', () => {
       'shipBeforeDate',
       'shipByDate'
     ]));
+  });
+});
+
+describe('Unfillable SKU export', () => {
+  it('includes all open parked SKUs on selected orders, even when search only matched one SKU', async () => {
+    const item = (sku: string, facilityId = 'UNFILLABLE_PARKING', orderItemStatusId = 'ITEM_APPROVED') =>
+      ({ orderId: 'M1', facilityId, orderItemStatusId, goodIdentifications: ['UPC/123', `SKU/${sku}`] });
+    const grouped = (docs: any[]) => ({
+      grouped: { orderId: { ngroups: 1, groups: [{ groupValue: 'M1', doclist: { docs } }] } }
+    });
+    vi.mocked(commonUtil.hasError).mockReturnValue(false);
+    const runSolrQuery = vi.fn()
+      .mockResolvedValueOnce({ data: grouped([item('STYLE-A')]) })
+      .mockResolvedValueOnce({ data: grouped([
+        item('STYLE/A'), item('STYLE-A'), item('STYLE-A'),
+        item('ALLOCATED', 'WAREHOUSE'), item('CANCELLED', 'UNFILLABLE_PARKING', 'ITEM_CANCELLED'),
+        item('COMPLETED', 'UNFILLABLE_PARKING', 'ITEM_COMPLETED'),
+        { orderId: 'M1', facilityId: 'UNFILLABLE_PARKING', orderItemStatusId: 'ITEM_CREATED', productId: 'UNIDENTIFIED' }
+      ]) });
+    vi.mocked(useSolrSearch).mockReturnValue({ runSolrQuery } as ReturnType<typeof useSolrSearch>);
+
+    const { orders } = await searchOrders({
+      queryString: 'STYLE-A',
+      facilityIds: ['UNFILLABLE_PARKING'],
+      includeUnfillableSkus: true,
+      allocationSummary: { mode: 'queue-first', queueFacilityIds: ['UNFILLABLE_PARKING'] }
+    });
+
+    const [exported] = Papa.parse<Record<string, string>>(buildSelectedOrdersCsv(orders, ['M1'], true), { header: true }).data;
+    expect(exported).toMatchObject({ 'Order ID': 'M1', 'Unfillable SKUs': 'STYLE-A, STYLE/A' });
+    expect(runSolrQuery.mock.calls[1][0].json.params.fl.split(' ')).toEqual(
+      expect.arrayContaining(['goodIdentifications', 'orderItemStatusId'])
+    );
+    expect(Papa.parse(buildSelectedOrdersCsv(orders, ['M1']), { header: true }).meta.fields).not.toContain('Unfillable SKUs');
   });
 });
 
