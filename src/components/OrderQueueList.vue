@@ -198,7 +198,6 @@ const props = defineProps<{
   // When set, this queue's total is published to the shared nav-count map so the
   // side menu can show it as a rollup badge (updated as a byproduct of searching).
   countKey?: string;
-  includeUnfillableSkus?: boolean;
 }>();
 const emit = defineEmits<{
   (e: 'clearFilters'): void;
@@ -280,7 +279,7 @@ const bulkActions = computed(() => [
 ]);
 
 function buildOrdersCsv() {
-  return buildSelectedOrdersCsv(searchResults.value, selectedOrderIds.value, props.includeUnfillableSkus);
+  return buildSelectedOrdersCsv(searchResults.value, selectedOrderIds.value);
 }
 
 onMounted(() => {
@@ -327,7 +326,6 @@ function toSearchParams(page: number) {
     pageSize: PAGE_SIZE,
     pageIndex: page,
     status: props.status,
-    includeUnfillableSkus: props.includeUnfillableSkus,
     allocationSummary: {
       mode: 'queue-first' as const,
       queueFacilityIds: props.facilityIds

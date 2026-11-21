@@ -10,7 +10,6 @@
     :date-from="dateFrom"
     :date-thru="dateThru"
     count-key="unfillable"
-    include-unfillable-skus
   />
 </template>
 

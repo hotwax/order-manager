@@ -32,11 +32,20 @@ describe('selected order CSV', () => {
     expect(() => buildSelectedOrdersCsv([order('1')], ['1', 'missing'])).toThrow();
   });
 
-  it('leaves the SKU cell blank only when the selected order details were loaded and had no eligible SKU', () => {
-    const csv = buildSelectedOrdersCsv([order('1', { unfillableSkus: [] })], ['1'], true);
+  it('keeps selected orders without item data when another selected order has matching SKUs', () => {
+    const csv = buildSelectedOrdersCsv([order('1'), order('2', { matchingSkus: ['SKU-A', 'SKU-B'] })], ['1', '2']);
 
-    expect(records(csv)[0]['Unfillable SKUs']).toBe('');
-    expect(() => buildSelectedOrdersCsv([order('1')], ['1'], true)).toThrow('Unfillable item details are no longer available');
+    expect(records(csv)).toEqual([
+      expect.objectContaining({ 'Order ID': '1', SKUs: '' }),
+      expect.objectContaining({ 'Order ID': '2', SKUs: 'SKU-A, SKU-B' })
+    ]);
+  });
+
+  it('omits the SKU column when no selected order has matching SKUs', () => {
+    const csv = buildSelectedOrdersCsv([order('1'), order('2', { matchingSkus: ['SKU-A'] })], ['1']);
+
+    expect(records(csv)[0]['Order ID']).toBe('1');
+    expect(Papa.parse(csv, { header: true }).meta.fields).not.toContain('SKUs');
   });
 });
 
@@ -66,5 +75,6 @@ describe('other selected result exports', () => {
     ], ['O1'], () => undefined);
 
     expect(records(csv)).toEqual([expect.objectContaining({ 'Order ID': 'O1', Customer: 'C1' })]);
+    expect(Papa.parse(csv, { header: true }).meta.fields).not.toContain('SKUs');
   });
 });

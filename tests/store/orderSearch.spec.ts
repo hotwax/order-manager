@@ -403,10 +403,10 @@ describe('order-row enrichment payload', () => {
   });
 });
 
-describe('Unfillable SKU export', () => {
-  it('includes all open parked SKUs on selected orders, even when search only matched one SKU', async () => {
-    const item = (sku: string, facilityId = 'UNFILLABLE_PARKING', orderItemStatusId = 'ITEM_APPROVED') =>
-      ({ orderId: 'M1', facilityId, orderItemStatusId, goodIdentifications: ['UPC/123', `SKU/${sku}`] });
+describe('order search SKU export', () => {
+  it('exports only SKUs from the filtered Solr search even when a queue loads full-order enrichment', async () => {
+    const item = (sku: string, facilityId = 'UNFILLABLE_PARKING') =>
+      ({ orderId: 'M1', facilityId, goodIdentifications: ['UPC/123', `SKU/${sku}`] });
     const grouped = (docs: any[]) => ({
       grouped: { orderId: { ngroups: 1, groups: [{ groupValue: 'M1', doclist: { docs } }] } }
     });
@@ -414,26 +414,35 @@ describe('Unfillable SKU export', () => {
     const runSolrQuery = vi.fn()
       .mockResolvedValueOnce({ data: grouped([item('STYLE-A')]) })
       .mockResolvedValueOnce({ data: grouped([
-        item('STYLE/A'), item('STYLE-A'), item('STYLE-A'),
-        item('ALLOCATED', 'WAREHOUSE'), item('CANCELLED', 'UNFILLABLE_PARKING', 'ITEM_CANCELLED'),
-        item('COMPLETED', 'UNFILLABLE_PARKING', 'ITEM_COMPLETED'),
-        { orderId: 'M1', facilityId: 'UNFILLABLE_PARKING', orderItemStatusId: 'ITEM_CREATED', productId: 'UNIDENTIFIED' }
+        item('STYLE-A'), item('STYLE-B'), item('ALLOCATED', 'WAREHOUSE')
       ]) });
     vi.mocked(useSolrSearch).mockReturnValue({ runSolrQuery } as ReturnType<typeof useSolrSearch>);
 
     const { orders } = await searchOrders({
       queryString: 'STYLE-A',
       facilityIds: ['UNFILLABLE_PARKING'],
-      includeUnfillableSkus: true,
       allocationSummary: { mode: 'queue-first', queueFacilityIds: ['UNFILLABLE_PARKING'] }
     });
 
-    const [exported] = Papa.parse<Record<string, string>>(buildSelectedOrdersCsv(orders, ['M1'], true), { header: true }).data;
-    expect(exported).toMatchObject({ 'Order ID': 'M1', 'Unfillable SKUs': 'STYLE-A, STYLE/A' });
-    expect(runSolrQuery.mock.calls[1][0].json.params.fl.split(' ')).toEqual(
-      expect.arrayContaining(['goodIdentifications', 'orderItemStatusId'])
-    );
-    expect(Papa.parse(buildSelectedOrdersCsv(orders, ['M1']), { header: true }).meta.fields).not.toContain('Unfillable SKUs');
+    const [exported] = Papa.parse<Record<string, string>>(buildSelectedOrdersCsv(orders, ['M1']), { header: true }).data;
+    expect(exported).toMatchObject({ 'Order ID': 'M1', SKUs: 'STYLE-A' });
+    expect(runSolrQuery).toHaveBeenCalledTimes(2);
+    expect(runSolrQuery.mock.calls[0][0].json.params.fl.split(' ')).toContain('goodIdentifications');
+    expect(runSolrQuery.mock.calls[1][0].json.params.fl.split(' ')).not.toContain('goodIdentifications');
+  });
+
+  it('lists distinct recorded SKUs from Find orders and skips items without a SKU', async () => {
+    mockSolrResponse({
+      grouped: { orderId: { groups: [{ doclist: { docs: [
+        { orderId: 'M1', goodIdentifications: ['SKU/STYLE/B'] },
+        { orderId: 'M1', goodIdentifications: ['UPC/001', 'SKU/STYLE-A'] },
+        { orderId: 'M1', goodIdentifications: ['SKU/STYLE-A'] },
+        { orderId: 'M1', goodIdentifications: ['UPC/002'], productId: 'UNIDENTIFIED' }
+      ] } }] } }
+    });
+
+    const { orders } = await searchOrders({ queryString: 'M1' });
+    expect(orders[0].matchingSkus).toEqual(['STYLE-A', 'STYLE/B']);
   });
 });
 

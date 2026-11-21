@@ -50,7 +50,6 @@ export interface OrderSearchParams {
   pageSize?: number;
   pageIndex?: number;
   allocationSummary?: AllocationSummaryOptions;
-  includeUnfillableSkus?: boolean;
 }
 
 export interface ActiveFacilityOrderVolume {
@@ -100,6 +99,7 @@ const orderSolrFields = [
   'orderItemSeqId',
   'shipGroupSeqId',
   'orderItemShipGroupIdentifier',
+  'goodIdentifications',
   'quantity',
   'orderDate',
   'orderStatusId',
@@ -269,7 +269,7 @@ const orderRowEnrichmentFields = [
   'shipByDate'
 ];
 
-export function buildOrderRowEnrichmentPayload(orderIds: readonly string[], includeUnfillableSkus = false) {
+export function buildOrderRowEnrichmentPayload(orderIds: readonly string[]) {
   const uniqueOrderIds = [...new Set(orderIds.filter(Boolean))];
   return {
     json: {
@@ -281,7 +281,7 @@ export function buildOrderRowEnrichmentPayload(orderIds: readonly string[], incl
         'group.limit': 10000,
         'group.ngroups': true,
         'q.op': 'AND',
-        fl: [...orderRowEnrichmentFields, ...(includeUnfillableSkus ? ['goodIdentifications', 'orderItemStatusId'] : [])].join(' ')
+        fl: orderRowEnrichmentFields.join(' ')
       },
       query: '*:*',
       filter: [
@@ -380,14 +380,12 @@ export function buildVirtualLocationCountsPayload(params: VirtualLocationCountPa
   };
 }
 
-const OPEN_UNFILLABLE_ITEM_STATUSES = ['ITEM_CREATED', 'ITEM_APPROVED'];
-
 function unfillableItemFilters(productStoreId?: string, productId?: string) {
   const filters = [
     'docType:ORDER',
     'orderTypeId:SALES_ORDER',
     'orderStatusId:ORDER_APPROVED',
-    `orderItemStatusId:(${OPEN_UNFILLABLE_ITEM_STATUSES.join(' OR ')})`,
+    'orderItemStatusId:(ITEM_CREATED OR ITEM_APPROVED)',
     'facilityId:UNFILLABLE_PARKING'
   ];
   if (productStoreId && productStoreId !== 'All') filters.push(`productStoreId:${escapeSolrValue(productStoreId)}`);
@@ -664,10 +662,21 @@ function normalizeOrderWithParkingUnits(docs: any[], allocationSummary: Allocati
   const itemDocuments = allocationDocuments(docs, facilityTypeRows);
   return {
     ...normalizeOrderDoc(primaryDoc),
+    matchingSkus: matchingOrderSkus(docs),
     parkingUnitCount: sumParkingUnits(docs),
     ...summarizeBrokeredFacilities(docs, facilityTypeRows),
     allocationSummary: summarizeOrderAllocation(itemDocuments, allocationSummary || { mode: 'physical-first' })
   };
+}
+
+/** The grouped search only returns item documents that match its search and filters. */
+function matchingOrderSkus(docs: readonly any[]): string[] {
+  const skus = new Set<string>();
+  for (const doc of docs) {
+    const sku = parseGoodIdentifications(doc.goodIdentifications).find(({ type, value }) => type === 'SKU' && value)?.value;
+    if (sku) skus.add(sku);
+  }
+  return [...skus].sort();
 }
 
 function sumParkingUnits(docs: any[]) {
@@ -750,11 +759,7 @@ function allocationDocuments(docs: readonly any[], facilityTypeRows: any[]): All
   });
 }
 
-export function normalizeOrderRowEnrichment(
-  data: any,
-  facilityTypeRows: any[],
-  includeUnfillableSkus = false
-): Record<string, OrderRowEnrichment> {
+export function normalizeOrderRowEnrichment(data: any, facilityTypeRows: any[]): Record<string, OrderRowEnrichment> {
   const groups = data?.grouped?.orderId?.groups || [];
   return groups.reduce((byOrderId: Record<string, OrderRowEnrichment>, group: any) => {
     const docs = allDocs(group?.doclist);
@@ -777,23 +782,10 @@ export function normalizeOrderRowEnrichment(
       promisedDatetime: toStringValue(primary.promisedDatetime),
       shipBeforeDate: toStringValue(primary.shipBeforeDate),
       shipByDate: toStringValue(primary.shipByDate),
-      itemDocuments: allocationDocuments(docs, facilityTypeRows),
-      ...(includeUnfillableSkus ? { unfillableSkus: unfillableSkus(docs) } : {})
+      itemDocuments: allocationDocuments(docs, facilityTypeRows)
     };
     return byOrderId;
   }, {});
-}
-
-/** Use the complete order group so search filters cannot hide other parked items on the same order. */
-function unfillableSkus(docs: readonly any[]): string[] {
-  const skus = new Set<string>();
-  for (const doc of docs) {
-    if (toStringValue(doc.facilityId) !== 'UNFILLABLE_PARKING'
-      || !OPEN_UNFILLABLE_ITEM_STATUSES.includes(toStringValue(doc.orderItemStatusId))) continue;
-    const sku = parseGoodIdentifications(doc.goodIdentifications).find(({ type, value }) => type === 'SKU' && value)?.value;
-    if (sku) skus.add(sku);
-  }
-  return [...skus].sort();
 }
 
 export function mergeSearchOrderEnrichment(
@@ -814,8 +806,7 @@ export function mergeSearchOrderEnrichment(
     promisedDatetime: enrichment.promisedDatetime || order.promisedDatetime,
     shipBeforeDate: enrichment.shipBeforeDate || order.shipBeforeDate,
     shipByDate: enrichment.shipByDate || order.shipByDate,
-    allocationSummary: summarizeOrderAllocation(enrichment.itemDocuments, allocationSummary),
-    ...(enrichment.unfillableSkus ? { unfillableSkus: enrichment.unfillableSkus } : {})
+    allocationSummary: summarizeOrderAllocation(enrichment.itemDocuments, allocationSummary)
   };
 }
 

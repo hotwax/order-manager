@@ -5,26 +5,20 @@ import type { Order } from '@/types/order';
 import type { ReturnSummary } from '@/types/returns';
 import type { CustomerSearchRow } from '@/utils/customer';
 
-/** Build one row per selected order from the same loaded summaries shown in Find orders. */
-export function buildSelectedOrdersCsv(orders: readonly Order[], selectedIds: readonly string[], includeUnfillableSkus = false): string {
-  return buildSelectedRowsCsv(orders, selectedIds, (order) => order.id, (order) => {
-    if (includeUnfillableSkus && order.unfillableSkus === undefined) {
-      throw new Error('Unfillable item details are no longer available');
-    }
-
-    return {
-      'Order ID': order.id,
-      'Order name': order.orderName || order.id,
-      'Customer': order.customerName || order.customerId,
-      'Status': order.status,
-      'Sales channel': order.channel,
-      'Order date': order.orderDate,
-      'Carrier': order.carrierPartyId || '',
-      'Shipping method': order.deliveryMethod,
-      'Estimated delivery': order.estimatedDeliveryDate || order.promisedDatetime || order.shipBeforeDate || order.shipByDate || '',
-      ...(includeUnfillableSkus ? { 'Unfillable SKUs': order.unfillableSkus?.join(', ') || '' } : {})
-    };
-  });
+/** Build one row per selected order from the loaded search results. */
+export function buildSelectedOrdersCsv(orders: readonly Order[], selectedIds: readonly string[]): string {
+  return buildSelectedRowsCsv(orders, selectedIds, (order) => order.id, (order) => ({
+    'Order ID': order.id,
+    'Order name': order.orderName || order.id,
+    'Customer': order.customerName || order.customerId,
+    'Status': order.status,
+    'Sales channel': order.channel,
+    'Order date': order.orderDate,
+    'Carrier': order.carrierPartyId || '',
+    'Shipping method': order.deliveryMethod,
+    'Estimated delivery': order.estimatedDeliveryDate || order.promisedDatetime || order.shipBeforeDate || order.shipByDate || '',
+    'SKUs': order.matchingSkus?.join(', ')
+  }), 'SKUs');
 }
 
 export function buildSelectedWorkflowOrdersCsv(
@@ -77,12 +71,14 @@ function buildSelectedRowsCsv<T>(
   results: readonly T[],
   selectedIds: readonly string[],
   idOf: (result: T) => string,
-  toRow: (result: T) => Record<string, string | undefined>
+  toRow: (result: T) => Record<string, string | undefined>,
+  omitEmptyColumn?: string
 ): string {
   const remaining = new Set(selectedIds);
   const rows = results.filter((result) => remaining.delete(idOf(result))).map(toRow);
 
   if (!rows.length || remaining.size) throw new Error('Selected results are no longer available');
 
-  return Papa.unparse(rows, { escapeFormulae: /^[\s]*[=+\-@\t\r]/ });
+  const columns = Object.keys(rows[0]).filter((column) => column !== omitEmptyColumn || rows.some((row) => row[column]));
+  return Papa.unparse(rows, { columns, escapeFormulae: /^[\s]*[=+\-@\t\r]/ });
 }

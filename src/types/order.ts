@@ -314,7 +314,7 @@ export interface Order {
   carrierPartyId?: string;
   priority: string;
   parkingUnitCount?: number;
-  unfillableSkus?: string[];
+  matchingSkus?: string[];
   brokeredFacilityName?: string;
   brokeredFacilitySplitCount?: number;
   dominantVirtualFacilityName?: string;
