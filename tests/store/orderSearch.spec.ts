@@ -434,11 +434,12 @@ describe('order search item export', () => {
     expect(runSolrQuery.mock.calls[1][0].json.params.fl.split(' ')).not.toContain('goodIdentifications');
   });
 
-  it('keeps matching item lines that have no SKU or quantity', async () => {
+  it('keeps matching item lines with partial item details', async () => {
     mockSolrResponse({
       grouped: { orderId: { groups: [{ doclist: { docs: [
         { orderId: 'M1', orderItemSeqId: '00001', goodIdentifications: ['SKU/STYLE/B'], quantity: 1.5 },
-        { orderId: 'M1', orderItemSeqId: '00002', goodIdentifications: ['UPC/002'], productId: 'UNIDENTIFIED' }
+        { orderId: 'M1', orderItemSeqId: '00002', goodIdentifications: ['UPC/002'], productId: 'UNIDENTIFIED' },
+        { orderId: 'M1', quantity: 3 }
       ] } }] } }
     });
 
@@ -446,7 +447,8 @@ describe('order search item export', () => {
     const exported = Papa.parse<Record<string, string>>(buildSelectedOrdersCsv(orders, ['M1']), { header: true }).data;
     expect(exported).toEqual([
       expect.objectContaining({ 'Order item sequence ID': '00001', SKU: 'STYLE/B', Quantity: '1.5' }),
-      expect.objectContaining({ 'Order item sequence ID': '00002', SKU: '', Quantity: '' })
+      expect.objectContaining({ 'Order item sequence ID': '00002', SKU: '', Quantity: '' }),
+      expect.objectContaining({ 'Order item sequence ID': '', SKU: '', Quantity: '3' })
     ]);
   });
 });

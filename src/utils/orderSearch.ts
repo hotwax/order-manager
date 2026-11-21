@@ -674,9 +674,10 @@ function matchingOrderItems(docs: readonly any[]): MatchingOrderItem[] {
   return docs.flatMap((doc) => {
     const orderItemSeqId = toStringValue(doc.orderItemSeqId);
     const sku = parseGoodIdentifications(doc.goodIdentifications).find(({ type, value }) => type === 'SKU' && value)?.value;
-    if (!orderItemSeqId && !sku) return [];
+    const quantity = toStringValue(doc.quantity);
+    if (!orderItemSeqId && !sku && !quantity) return [];
 
-    return [{ orderItemSeqId, sku, quantity: toStringValue(doc.quantity) }];
+    return [{ orderItemSeqId, sku, quantity }];
   });
 }
 
