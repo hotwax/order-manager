@@ -71,9 +71,11 @@ export function fetchFacilityOrigin(facilityId: string): Promise<FacilityOrigin>
   if (!facilityOriginRequests.has(facilityId)) {
     facilityOriginRequests.set(facilityId, api({ url: 'oms/facilityContactMechs', method: 'GET', params: { facilityId } })
       .then((resp: any) => {
-        const mechs: any[] = resp?.data?.facilityContactMechs ?? [];
-        const postal = mechs.find((m) => m.contactMechTypeId === 'POSTAL_ADDRESS' && m.contactMechPurposeTypeId === 'SHIP_ORIG_LOCATION')
-          || mechs.find((m) => m.contactMechTypeId === 'POSTAL_ADDRESS');
+        const postals = (resp?.data?.facilityContactMechs ?? []).filter((m: any) => m.contactMechTypeId === 'POSTAL_ADDRESS');
+        // A facility's address is stored under PRIMARY_LOCATION; older facilities may only have SHIP_ORIG_LOCATION.
+        const postal = postals.find((m: any) => m.contactMechPurposeTypeId === 'PRIMARY_LOCATION')
+          || postals.find((m: any) => m.contactMechPurposeTypeId === 'SHIP_ORIG_LOCATION')
+          || postals[0];
         return postal ? { lat: num(postal.latitude), lon: num(postal.longitude), zip: postal.postalCode?.trim() } : null;
       })
       .catch((error: any) => {

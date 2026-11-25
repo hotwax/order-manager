@@ -69,6 +69,23 @@ describe('fetchDistancesFromFacility', () => {
     expect(api).toHaveBeenCalledWith(expect.objectContaining({ url: 'api/stores', data: expect.objectContaining({ point: '40.75,-73.99' }) }));
   });
 
+  it('places the facility by its PRIMARY_LOCATION address first, then SHIP_ORIG_LOCATION', async () => {
+    const postal = (purpose: string, lat: string) => ({ contactMechTypeId: 'POSTAL_ADDRESS', contactMechPurposeTypeId: purpose, latitude: lat, longitude: '-70' });
+    respond({
+      'oms/facilityContactMechs': { facilityContactMechs: [postal('GENERAL_LOCATION', '1'), postal('SHIP_ORIG_LOCATION', '2'), postal('PRIMARY_LOCATION', '3')] },
+      'api/stores': { docs: [] },
+    });
+    await fetchDistancesFromFacility('PRIMARY_FIRST');
+    expect(api).toHaveBeenCalledWith(expect.objectContaining({ url: 'api/stores', data: expect.objectContaining({ point: '3,-70' }) }));
+
+    respond({
+      'oms/facilityContactMechs': { facilityContactMechs: [postal('GENERAL_LOCATION', '1'), postal('SHIP_ORIG_LOCATION', '2')] },
+      'api/stores': { docs: [] },
+    });
+    await fetchDistancesFromFacility('SHIP_ORIG_ONLY');
+    expect(api).toHaveBeenCalledWith(expect.objectContaining({ url: 'api/stores', data: expect.objectContaining({ point: '2,-70' }) }));
+  });
+
   it('has no distances, and asks for none, for a facility without an address', async () => {
     respond({ 'oms/facilityContactMechs': { facilityContactMechs: [] } });
 
